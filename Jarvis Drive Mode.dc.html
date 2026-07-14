@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    body { margin:0; background:#05070a; }
+    @keyframes dpulse { 0%,100%{transform:scale(1);} 50%{transform:scale(1.12);} }
+    input[type=range] { accent-color: #5ad1ff; }
+  </style>
+</helmet>
+
+<div style="min-height:100vh; background:radial-gradient(circle at 50% 100%, rgba(80,140,255,0.08), transparent 55%), #04060a; font-family:'Inter',sans-serif; color:#dce8f0; display:flex; justify-content:center; box-sizing:border-box; padding:20px 16px 50px;">
+<div style="width:100%; max-width:560px;">
+
+  <div style="background:#1a1200; border:1px solid rgba(255,184,77,0.3); border-radius:10px; padding:7px 14px; text-align:center; font-family:'IBM Plex Mono',monospace; font-size:9.5px; color:#ffb84d; margin-bottom:16px;">
+    DRIVE MODE PROTOTYPE — navigation, Waze coordination and vehicle awareness are SIMULATED. Not for use while driving.
+  </div>
+
+  <!-- Drive HUD -->
+  <div style="background:rgba(255,255,255,0.025); border:1px solid {{ hudBorder }}; border-radius:20px; padding:20px; margin-bottom:14px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+      <div>
+        <div style="font-family:'Space Grotesk',sans-serif; font-size:18px; font-weight:700; color:#f2f8ff;">Drive Mode</div>
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; color:{{ stateColor }};">{{ stateLabel }}</div>
+      </div>
+      <div style="position:relative; width:44px; height:44px;">
+        <div style="position:absolute; inset:0; border-radius:50%; border:2px solid {{ stateColor }}; opacity:0.55;"></div>
+        <div style="position:absolute; inset:13px; border-radius:50%; background:{{ stateColor }}; box-shadow:0 0 16px {{ stateColor }}; animation:{{ coreAnim }};"></div>
+      </div>
+    </div>
+
+    <!-- Navigation card -->
+    <div style="background:rgba(90,209,255,0.06); border:1px solid rgba(90,209,255,0.25); border-radius:14px; padding:14px; margin-bottom:12px;">
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:9.5px; color:#5ad1ff; margin-bottom:5px;">NAVIGATION (SIMULATED · COORDINATED WITH WAZE)</div>
+      <div style="font-family:'Space Grotesk',sans-serif; font-size:20px; font-weight:600; color:#f2f8ff;">{{ navInstruction }}</div>
+      <div style="font-size:12px; color:#8fa2b3; margin-top:4px;">{{ navDetail }}</div>
+    </div>
+
+    <!-- Jarvis line -->
+    <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:13px 15px; margin-bottom:12px; min-height:44px;">
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:9.5px; color:#7f95a8; margin-bottom:4px;">JARVIS</div>
+      <div style="font-size:14px; color:#dce8f0; line-height:1.55;">{{ jarvisLine }}</div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px;">
+      <button onClick="{{ simulateManeuver }}" style="background:rgba(90,209,255,0.1); border:1px solid rgba(90,209,255,0.35); color:#5ad1ff; font-size:12px; font-weight:600; padding:12px 6px; border-radius:11px; cursor:pointer; min-height:44px;">Simulate maneuver</button>
+      <button onClick="{{ simulateHazard }}" style="background:rgba(255,90,90,0.08); border:1px solid rgba(255,90,90,0.3); color:#ff8a8a; font-size:12px; font-weight:600; padding:12px 6px; border-radius:11px; cursor:pointer; min-height:44px;">Simulate hazard</button>
+      <button onClick="{{ toggleQuiet }}" style="background:{{ quietBg }}; border:1px solid rgba(255,255,255,0.14); color:#c9d6e0; font-size:12px; font-weight:600; padding:12px 6px; border-radius:11px; cursor:pointer; min-height:44px;">{{ quietLabel }}</button>
+    </div>
+  </div>
+
+  <!-- Safety override -->
+  <div style="background:{{ overrideBg }}; border:1px solid {{ overrideBorder }}; border-radius:16px; padding:16px; margin-bottom:14px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+      <div style="font-family:'Space Grotesk',sans-serif; font-size:13px; letter-spacing:1px; text-transform:uppercase; color:{{ overrideTitle }};">Safety Override</div>
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; color:{{ overrideTitle }};">{{ overrideState }}</div>
+    </div>
+    <div style="font-size:12px; color:#aebfcd; line-height:1.6;">Humor drops to zero automatically during maneuvers, hazards, emergencies, severe weather, "quiet", or "serious mode". Speaking order: navigation → safety → optional brief humor → silence during maneuver. This override can never be disabled.</div>
+  </div>
+
+  <!-- Drive personality -->
+  <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:16px; padding:16px; margin-bottom:14px;">
+    <div style="font-family:'Space Grotesk',sans-serif; font-size:13px; letter-spacing:1px; text-transform:uppercase; color:#7f95a8; margin-bottom:12px;">Drive Personality (separate from desktop)</div>
+
+    <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+      <span style="font-size:12.5px; color:#dce8f0;">Humor</span>
+      <span style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:{{ effHumorColor }};">{{ effHumorLabel }}</span>
+    </div>
+    <input type="range" min="0" max="10" step="1" value="{{ humor }}" onChange="{{ onHumor }}" aria-label="Drive humor" style="width:100%; margin-bottom:12px;" />
+
+    <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+      <span style="font-size:12.5px; color:#dce8f0;">Talk frequency</span>
+      <span style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#5ad1ff;">{{ talk }}</span>
+    </div>
+    <input type="range" min="0" max="10" step="1" value="{{ talk }}" onChange="{{ onTalk }}" aria-label="Talk frequency" style="width:100%; margin-bottom:12px;" />
+
+    <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+      <span style="font-size:12.5px; color:#dce8f0;">Sarcasm</span>
+      <span style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#ffb84d;">{{ sarcasm }}</span>
+    </div>
+    <input type="range" min="0" max="10" step="1" value="{{ sarcasm }}" onChange="{{ onSarcasm }}" aria-label="Sarcasm" style="width:100%; margin-bottom:14px;" />
+
+    <div style="display:flex; flex-direction:column; gap:9px;">
+      <sc-for list="{{ toggles }}" as="tg" hint-placeholder-count="3">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-size:12.5px; color:#dce8f0;">{{ tg.label }}</span>
+          <button onClick="{{ tg.toggle }}" disabled="{{ tg.locked }}" style="background:{{ tg.bg }}; border:1px solid {{ tg.border }}; color:{{ tg.color }}; font-size:11px; font-weight:600; padding:6px 14px; border-radius:13px; cursor:pointer; min-width:64px;">{{ tg.state }}</button>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="font-size:10px; color:#5f7284; line-height:1.65;">Jarvis coordinates with Waze as a separate intelligent assistant and pauses for critical navigation. It does not take over Waze internally. An optional custom recorded voice pack is a future concept. Stored in jarvis_drive_v1.</div>
+</div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 600, &quot;height&quot;: 900}}">
+const D_KEY = 'jarvis_drive_v1';
+
+class Component extends DCLogic {
+  state = {
+    humor: 9, talk: 5, sarcasm: 6,
+    familySafe: true, navCommentary: true, briefings: false,
+    quiet: false,
+    driveState: 'cruising', // cruising | maneuver | hazard
+    jarvisLine: 'Traffic is light. At this rate we arrive four minutes early — a personal record for punctuality, sir.'
+  };
+
+  componentDidMount() {
+    try {
+      const raw = localStorage.getItem(D_KEY);
+      if (raw) {
+        const p = JSON.parse(raw);
+        this.setState({
+          humor: p.humor ?? 9, talk: p.talk ?? 5, sarcasm: p.sarcasm ?? 6,
+          familySafe: p.familySafe !== false, navCommentary: p.navCommentary !== false, briefings: !!p.briefings
+        });
+      }
+    } catch (e) {}
+  }
+  componentWillUnmount() { clearTimeout(this._t); }
+
+  persist() {
+    const { humor, talk, sarcasm, familySafe, navCommentary, briefings } = this.state;
+    try { localStorage.setItem(D_KEY, JSON.stringify({ humor, talk, sarcasm, familySafe, navCommentary, briefings })); } catch (e) {}
+  }
+
+  onHumor = (e) => this.setState({ humor: +e.target.value }, () => this.persist());
+  onTalk = (e) => this.setState({ talk: +e.target.value }, () => this.persist());
+  onSarcasm = (e) => this.setState({ sarcasm: +e.target.value }, () => this.persist());
+  toggleQuiet = () => this.setState((s) => ({
+    quiet: !s.quiet,
+    jarvisLine: !s.quiet ? '(Quiet mode — Jarvis speaks only for navigation and safety.)' : 'Back with you, sir. The road remains stubbornly uneventful.'
+  }));
+
+  simulateManeuver = () => {
+    clearTimeout(this._t);
+    this.setState({ driveState: 'maneuver', jarvisLine: 'In 400 feet, turn right onto Harbor Boulevard. Two lanes merge after the turn.' });
+    this._t = setTimeout(() => {
+      if (this.state.driveState === 'maneuver') this.setState({ driveState: 'cruising', jarvisLine: 'Nicely done. Resuming our regularly scheduled banter — unless you\u2019d rather I didn\u2019t.' });
+    }, 4000);
+  };
+
+  simulateHazard = () => {
+    clearTimeout(this._t);
+    this.setState({ driveState: 'hazard', jarvisLine: 'Hazard reported ahead: debris in the right lane, half a mile out. Recommend moving left now.' });
+    this._t = setTimeout(() => {
+      if (this.state.driveState === 'hazard') this.setState({ driveState: 'cruising', jarvisLine: 'Hazard cleared. Everyone\u2019s bumpers remain where they belong.' });
+    }, 4500);
+  };
+
+  toggleFlag = (key) => () => this.setState((s) => ({ [key]: !s[key] }), () => this.persist());
+
+  renderVals() {
+    const s = this.state;
+    const overrideActive = s.driveState !== 'cruising' || s.quiet;
+    const effHumor = overrideActive ? 0 : s.humor;
+
+    const stateColor = s.driveState === 'hazard' ? '#ff8a8a' : s.driveState === 'maneuver' ? '#ffb84d' : '#5ad1ff';
+    const stateLabel = s.driveState === 'hazard' ? 'HAZARD — HUMOR 0' : s.driveState === 'maneuver' ? 'MANEUVER — HUMOR 0' : (s.quiet ? 'QUIET MODE' : 'CRUISING');
+
+    const toggles = [
+      { key: 'familySafe', label: 'Family-safe mode' },
+      { key: 'navCommentary', label: 'Navigation commentary' },
+      { key: 'briefings', label: 'Project briefings while driving' },
+      { key: 'safety', label: 'Safety override', locked: true }
+    ].map(t => {
+      const on = t.key === 'safety' ? true : s[t.key];
+      return {
+        label: t.label,
+        state: t.key === 'safety' ? 'ALWAYS ON' : (on ? 'ON' : 'OFF'),
+        locked: !!t.locked,
+        toggle: t.locked ? () => {} : this.toggleFlag(t.key),
+        bg: on ? 'rgba(90,209,138,0.12)' : 'rgba(255,255,255,0.04)',
+        border: on ? 'rgba(90,209,138,0.4)' : 'rgba(255,255,255,0.14)',
+        color: on ? '#5ad18a' : '#8fa2b3'
+      };
+    });
+
+    return {
+      hudBorder: stateColor === '#5ad1ff' ? 'rgba(90,209,255,0.3)' : stateColor,
+      stateColor, stateLabel,
+      coreAnim: s.driveState === 'cruising' && !s.quiet ? 'dpulse 3s ease-in-out infinite' : 'dpulse 1s ease-in-out infinite',
+      navInstruction: s.driveState === 'maneuver' ? 'Turn right — 400 ft' : s.driveState === 'hazard' ? 'Hazard ahead — 0.5 mi' : 'Continue straight — 2.3 mi',
+      navDetail: 'ETA 6:42 PM · via Waze (simulated)',
+      jarvisLine: s.jarvisLine,
+      simulateManeuver: this.simulateManeuver,
+      simulateHazard: this.simulateHazard,
+      toggleQuiet: this.toggleQuiet,
+      quietLabel: s.quiet ? 'Resume voice' : '"Quiet"',
+      quietBg: s.quiet ? 'rgba(255,184,77,0.12)' : 'rgba(255,255,255,0.04)',
+
+      overrideBg: overrideActive ? 'rgba(255,184,77,0.07)' : 'rgba(255,255,255,0.025)',
+      overrideBorder: overrideActive ? 'rgba(255,184,77,0.4)' : 'rgba(255,255,255,0.08)',
+      overrideTitle: overrideActive ? '#ffb84d' : '#7f95a8',
+      overrideState: overrideActive ? 'ACTIVE — HUMOR 0' : 'ARMED',
+
+      humor: s.humor, talk: s.talk, sarcasm: s.sarcasm,
+      effHumorLabel: overrideActive ? `0 (override) · saved: ${s.humor}` : String(s.humor),
+      effHumorColor: overrideActive ? '#ffb84d' : '#5ad1ff',
+      onHumor: this.onHumor, onTalk: this.onTalk, onSarcasm: this.onSarcasm,
+      toggles
+    };
+  }
+}
+
+</script>
+</body>
+</html>

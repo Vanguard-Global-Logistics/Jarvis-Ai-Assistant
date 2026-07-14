@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    body { margin:0; background:#05070a; }
+    @keyframes fspin { from{transform:rotate(0deg);} to{transform:rotate(360deg);} }
+    @keyframes fpulse { 0%,100%{transform:scale(1);} 50%{transform:scale(1.15);} }
+    ::-webkit-scrollbar{width:6px;} ::-webkit-scrollbar-thumb{background:rgba(140,190,255,0.25); border-radius:8px;}
+  </style>
+</helmet>
+
+<div style="height:100vh; background:#05070a; font-family:'Inter',sans-serif; color:#dce8f0; display:flex; justify-content:center; overflow:hidden;">
+<div style="width:100%; max-width:430px; height:100vh; position:relative; background:radial-gradient(circle at 50% 0%, rgba(80,140,255,0.07), transparent 40%), #070a0f; display:flex; flex-direction:column; box-sizing:border-box; overflow:hidden;">
+
+  <!-- Disclaimer -->
+  <div style="background:#1a1200; border-bottom:1px solid rgba(255,184,77,0.3); padding:6px 14px; text-align:center; font-family:'IBM Plex Mono',monospace; font-size:9.5px; color:#ffb84d; padding-top:calc(6px + env(safe-area-inset-top));">
+    FORGE PROTOTYPE — all GitHub, Vercel and Claude activity shown is SIMULATED PROTOTYPE DATA
+  </div>
+
+  <!-- Header -->
+  <div style="display:flex; align-items:center; justify-content:space-between; padding:14px 16px 10px;">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div style="position:relative; width:30px; height:30px;">
+        <div style="position:absolute; inset:0; border-radius:50%; border:1.5px solid #5ad1ff; opacity:0.6; animation:fspin 14s linear infinite;"></div>
+        <div style="position:absolute; inset:9px; border-radius:50%; background:#5ad1ff; box-shadow:0 0 10px #5ad1ff;"></div>
+      </div>
+      <div>
+        <div style="font-family:'Space Grotesk',sans-serif; font-size:16px; font-weight:600; color:#f2f8ff;">{{ headerTitle }}</div>
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:9.5px; color:#7f95a8;">Forge · project watchtower</div>
+      </div>
+    </div>
+    <div style="display:flex; align-items:center; gap:6px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.09); border-radius:16px; padding:5px 10px;">
+      <span style="width:7px; height:7px; border-radius:50%; background:{{ aegisColor }};"></span>
+      <span style="font-family:'IBM Plex Mono',monospace; font-size:9.5px; color:#8fa2b3;">AEGIS {{ aegisLabel }}</span>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div style="flex:1; overflow-y:auto; padding:0 16px 120px;">
+
+    <!-- HOME -->
+    <sc-if value="{{ showHome }}" hint-placeholder-val="{{ true }}">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px;">
+        <sc-for list="{{ homeStats }}" as="st" hint-placeholder-count="4">
+          <div onClick="{{ st.go }}" style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:12px 14px; cursor:pointer;">
+            <div style="font-family:'Space Grotesk',sans-serif; font-size:22px; font-weight:700; color:{{ st.color }};">{{ st.value }}</div>
+            <div style="font-size:11px; color:#8fa2b3; margin-top:2px;">{{ st.label }}</div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="background:rgba(90,209,255,0.05); border:1px solid rgba(90,209,255,0.25); border-radius:14px; padding:13px 14px; margin-bottom:14px;">
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:1px; color:#5ad1ff; margin-bottom:6px;">JARVIS BRIEF</div>
+        <div style="font-size:13px; line-height:1.55; color:#dce8f0;">{{ jarvisBrief }}</div>
+      </div>
+
+      <div style="font-family:'Space Grotesk',sans-serif; font-size:12px; letter-spacing:1px; text-transform:uppercase; color:#7f95a8; margin:16px 0 8px;">Needs your decision</div>
+      <sc-for list="{{ homeApprovals }}" as="ap" hint-placeholder-count="2">
+        <div onClick="{{ ap.open }}" style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,184,77,0.05); border:1px solid rgba(255,184,77,0.25); border-radius:12px; padding:12px 14px; margin-bottom:8px; cursor:pointer;">
+          <div>
+            <div style="font-size:13px; color:#f2f8ff;">{{ ap.title }}</div>
+            <div style="font-size:11px; color:#8fa2b3; margin-top:2px;">{{ ap.project }}</div>
+          </div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; color:#ffb84d;">DECIDE</div>
+        </div>
+      </sc-for>
+
+      <div style="font-family:'Space Grotesk',sans-serif; font-size:12px; letter-spacing:1px; text-transform:uppercase; color:#7f95a8; margin:16px 0 8px;">Alerts</div>
+      <sc-for list="{{ homeAlerts }}" as="al" hint-placeholder-count="2">
+        <div onClick="{{ al.open }}" style="display:flex; gap:10px; align-items:flex-start; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:11px 13px; margin-bottom:8px; cursor:pointer;">
+          <span style="width:8px; height:8px; border-radius:50%; background:{{ al.color }}; margin-top:4px; flex-shrink:0;"></span>
+          <div style="font-size:12.5px; color:#c9d6e0; line-height:1.5;">{{ al.text }}</div>
+        </div>
+      </sc-for>
+
+      <div style="font-family:'Space Grotesk',sans-serif; font-size:12px; letter-spacing:1px; text-transform:uppercase; color:#7f95a8; margin:16px 0 8px;">Latest verified milestone</div>
+      <div style="background:rgba(90,209,138,0.05); border:1px solid rgba(90,209,138,0.25); border-radius:12px; padding:11px 13px; font-size:12.5px; color:#c9d6e0;">{{ latestMilestone }}</div>
+    </sc-if>
+
+    <!-- PROJECTS -->
+    <sc-if value="{{ showProjects }}" hint-placeholder-val="{{ false }}">
+      <sc-for list="{{ projectCards }}" as="p" hint-placeholder-count="6">
+        <div onClick="{{ p.open }}" style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-left:3px solid {{ p.healthColor }}; border-radius:14px; padding:14px; margin-bottom:10px; cursor:pointer;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <div style="font-family:'Space Grotesk',sans-serif; font-size:14.5px; font-weight:600; color:#f2f8ff;">{{ p.name }}</div>
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:9.5px; font-weight:600; color:{{ p.healthColor }}; background:{{ p.statusBg }}; padding:3px 9px; border-radius:12px;">{{ p.status }}</div>
+          </div>
+          <div style="font-size:12px; color:#aebfcd; margin-bottom:8px;">{{ p.task }}</div>
+          <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;">
+            <span style="font-family:'IBM Plex Mono',monospace; font-size:9.5px; color:#8fa2b3; background:rgba(255,255,255,0.04); border-radius:10px; padding:3px 8px;">{{ p.env }}</span>
+            <span style="font-family:'IBM Plex Mono',monospace; font-size:9.5px; color:#8fa2b3; background:rgba(255,255,255,0.04); border-radius:10px; padding:3px 8px;">{{ p.model }}</span>
+            <span style="font-family:'IBM Plex Mono',monospace; font-size:9.5px; color:{{ p.ghColor }}; background:rgba(255,255,255,0.04); border-radius:10px; padding:3px 8px;">GH: {{ p.gh }}</span>
+            <span style="font-family:'IBM Plex Mono',monospace; font-size:9.5px; color:{{ p.vcColor }}; background:rgba(255,255,255,0.04); border-radius:10px; padding:3px 8px;">VC: {{ p.vc }}</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="font-size:11px; color:#7f95a8;">{{ p.lastVerified }}</div>
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:9.5px; color:#5f7284;">{{ p.updated }}</div>
+          </div>
+          <sc-if value="{{ p.hasDecision }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top:8px; font-size:11.5px; color:#ffb84d;">⚑ {{ p.decision }}</div>
+          </sc-if>
+        </div>
+      </sc-for>
+    </sc-if>
+
+    <!-- PROJECT DETAIL -->
+    <sc-if value="{{ showDetail }}" hint-placeholder-val="{{ false }}">
+      <button onClick="{{ goProjects }}" style="background:none; border:none; color:#5ad1ff; font-size:12.5px; cursor:pointer; padding:4px 0; margin-bottom:6px;">← Projects</button>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+        <div style="font-family:'Space Grotesk',sans-serif; font-size:19px; font-weight:700; color:#f2f8ff;">{{ det.name }}</div>
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:600; color:{{ det.healthColor }};">{{ det.status }}</div>
+      </div>
+      <div style="font-size:12.5px; color:#aebfcd; margin-bottom:12px;">{{ det.task }} · {{ det.env }} · {{ det.model }}</div>
+
+      <div style="display:flex; gap:6px; margin-bottom:14px;">
+        <sc-for list="{{ detailTabs }}" as="dt" hint-placeholder-count="3">
+          <button onClick="{{ dt.select }}" style="flex:1; background:{{ dt.bg }}; border:1px solid {{ dt.border }}; color:{{ dt.color }}; font-family:'Space Grotesk',sans-serif; font-size:12px; font-weight:600; padding:9px; border-radius:10px; cursor:pointer;">{{ dt.label }}</button>
+        </sc-for>
+      </div>
+
+      <!-- Timeline tab -->
+      <sc-if value="{{ showTimeline }}" hint-placeholder-val="{{ true }}">
+        <sc-for list="{{ det.timeline }}" as="tl" hint-placeholder-count="6">
+          <div style="display:flex; gap:12px; margin-bottom:2px;">
+            <div style="display:flex; flex-direction:column; align-items:center; width:14px; flex-shrink:0;">
+              <span style="width:10px; height:10px; border-radius:50%; background:{{ tl.dotColor }}; border:2px solid {{ tl.dotBorder }}; margin-top:3px;"></span>
+              <span style="flex:1; width:1.5px; background:rgba(255,255,255,0.08); min-height:26px;"></span>
+            </div>
+            <div style="padding-bottom:14px; flex:1;">
+              <div style="display:flex; justify-content:space-between; gap:8px;">
+                <div style="font-size:13px; color:#f2f8ff; font-weight:500;">{{ tl.stage }}</div>
+                <div style="font-family:'IBM Plex Mono',monospace; font-size:9.5px; color:#5f7284; flex-shrink:0;">{{ tl.time }}</div>
+              </div>
+              <div style="font-family:'IBM Plex Mono',monospace; font-size:9.5px; color:{{ tl.statusColor }}; margin:2px 0;">{{ tl.status }} · {{ tl.system }}</div>
+              <div style="font-size:11.5px; color:#8fa2b3; line-height:1.5;">{{ tl.evidence }}</div>
+              <sc-if value="{{ tl.hasError }}" hint-placeholder-val="{{ false }}">
+                <div style="margin-top:5px; background:rgba(255,90,90,0.07); border:1px solid rgba(255,90,90,0.3); border-radius:8px; padding:7px 9px; font-size:11px; color:#ff8a8a;">{{ tl.error }}</div>
+              </sc-if>
+            </div>
+          </div>
+        </sc-for>
+        <div style="background:rgba(90,209,255,0.05); border:1px solid rgba(90,209,255,0.2); border-radius:12px; padding:11px 13px; font-size:12px; color:#aecfe8; margin-top:4px;">Next: {{ det.nextAction }}</div>
+      </sc-if>
+
+      <!-- GitHub tab -->
+      <sc-if value="{{ showGithub }}" hint-placeholder-val="{{ false }}">
+        <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:14px; margin-bottom:10px;">
+          <sc-for list="{{ det.githubRows }}" as="gr" hint-placeholder-count="6">
+            <div style="display:flex; justify-content:space-between; gap:12px; padding:7px 0; border-bottom:1px solid rgba(255,255,255,0.05);">
+              <div style="font-size:11.5px; color:#7f95a8; flex-shrink:0;">{{ gr.k }}</div>
+              <div style="font-size:12px; color:{{ gr.color }}; text-align:right; font-family:'IBM Plex Mono',monospace;">{{ gr.v }}</div>
+            </div>
+          </sc-for>
+        </div>
+        <sc-if value="{{ det.ghWarning }}" hint-placeholder-val="{{ false }}">
+          <div style="background:rgba(255,184,77,0.07); border:1px solid rgba(255,184,77,0.35); border-radius:12px; padding:12px 14px; margin-bottom:10px;">
+            <div style="font-size:12.5px; color:#ffb84d; font-weight:500; margin-bottom:8px;">⚠ Claude reported completion, but no GitHub commit was found.</div>
+            <div style="font-size:11.5px; color:#c9b48a; line-height:1.5;">A Claude "complete" message is not evidence of delivered code. Forge only trusts detected commits.</div>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <button onClick="{{ prepareFollowUp }}" style="background:rgba(90,209,255,0.12); border:1px solid rgba(90,209,255,0.4); color:#5ad1ff; font-family:'Space Grotesk',sans-serif; font-size:13px; font-weight:600; padding:12px; border-radius:11px; cursor:pointer;">Prepare follow-up prompt</button>
+            <button style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.12); color:#c9d6e0; font-size:12.5px; padding:11px; border-radius:11px; cursor:pointer;">Open GitHub (simulated)</button>
+            <button onClick="{{ markExpected }}" style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.12); color:#c9d6e0; font-size:12.5px; padding:11px; border-radius:11px; cursor:pointer;">Mark as expected prototype behavior</button>
+          </div>
+        </sc-if>
+      </sc-if>
+
+      <!-- Vercel tab -->
+      <sc-if value="{{ showVercel }}" hint-placeholder-val="{{ false }}">
+        <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:14px; margin-bottom:10px;">
+          <sc-for list="{{ det.vercelRows }}" as="vr" hint-placeholder-count="6">
+            <div style="display:flex; justify-content:space-between; gap:12px; padding:7px 0; border-bottom:1px solid rgba(255,255,255,0.05);">
+              <div style="font-size:11.5px; color:#7f95a8; flex-shrink:0;">{{ vr.k }}</div>
+              <div style="font-size:12px; color:{{ vr.color }}; text-align:right; font-family:'IBM Plex Mono',monospace;">{{ vr.v }}</div>
+            </div>
+          </sc-for>
+        </div>
+
+        <sc-if value="{{ det.vcFailed }}" hint-placeholder-val="{{ false }}">
+          <div style="background:rgba(255,90,90,0.06); border:1px solid rgba(255,90,90,0.3); border-radius:12px; padding:13px 14px; margin-bottom:10px;">
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:1px; color:#ff8a8a; margin-bottom:7px;">FORGE EXPLANATION</div>
+            <div style="font-size:13px; color:#eedddd; line-height:1.6; margin-bottom:9px;">{{ det.failExplanation }}</div>
+            <div style="font-size:11.5px; color:#c9a2a2; line-height:1.55; margin-bottom:9px;">Safest next step: {{ det.failNextStep }}</div>
+            <button onClick="{{ toggleTech }}" style="background:none; border:none; color:#ff8a8a; font-size:11.5px; cursor:pointer; padding:0;">{{ techToggleLabel }}</button>
+            <sc-if value="{{ showTech }}" hint-placeholder-val="{{ false }}">
+              <div style="margin-top:8px; background:rgba(0,0,0,0.35); border-radius:8px; padding:10px; font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:#c9d6e0; line-height:1.6; word-break:break-all;">{{ det.failTechnical }}</div>
+            </sc-if>
+          </div>
+          <button onClick="{{ prepareRepair }}" style="width:100%; background:rgba(90,209,255,0.12); border:1px solid rgba(90,209,255,0.4); color:#5ad1ff; font-family:'Space Grotesk',sans-serif; font-size:13px; font-weight:600; padding:12px; border-radius:11px; cursor:pointer; margin-bottom:8px;">Prepare repair prompt</button>
+        </sc-if>
+
+        <sc-if value="{{ det.vcPreviewReady }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <button style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.12); color:#c9d6e0; font-size:12.5px; padding:11px; border-radius:11px; cursor:pointer;">Open Preview (simulated)</button>
+            <sc-if value="{{ det.previewNotApproved }}" hint-placeholder-val="{{ true }}">
+              <button onClick="{{ approvePreview }}" style="background:rgba(90,209,138,0.12); border:1px solid rgba(90,209,138,0.4); color:#5ad18a; font-family:'Space Grotesk',sans-serif; font-size:13px; font-weight:600; padding:12px; border-radius:11px; cursor:pointer;">Approve preview</button>
+            </sc-if>
+            <sc-if value="{{ det.previewApproved }}" hint-placeholder-val="{{ false }}">
+              <div style="background:rgba(90,209,138,0.07); border:1px solid rgba(90,209,138,0.3); border-radius:11px; padding:11px 13px; font-size:12px; color:#8fd1aa;">Preview approved. Production deployment remains a separate approval — nothing has been deployed.</div>
+              <button onClick="{{ holdDeployment }}" style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.12); color:#c9d6e0; font-size:12.5px; padding:11px; border-radius:11px; cursor:pointer;">Hold deployment</button>
+            </sc-if>
+          </div>
+        </sc-if>
+      </sc-if>
+    </sc-if>
+
+    <!-- TASK BRIDGE -->
+    <sc-if value="{{ showBridge }}" hint-placeholder-val="{{ false }}">
+      <button onClick="{{ goBackFromBridge }}" style="background:none; border:none; color:#5ad1ff; font-size:12.5px; cursor:pointer; padding:4px 0; margin-bottom:6px;">← Back</button>
+      <div style="font-family:'Space Grotesk',sans-serif; font-size:18px; font-weight:700; color:#f2f8ff; margin-bottom:2px;">Claude Task Bridge</div>
+      <div style="font-size:11.5px; color:#7f95a8; margin-bottom:14px;">Prompts are copied manually — Claude is not automatically controlled by this prototype.</div>
+
+      <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:14px; margin-bottom:12px;">
+        <sc-for list="{{ bridgeRows }}" as="br" hint-placeholder-count="7">
+          <div style="padding:7px 0; border-bottom:1px solid rgba(255,255,255,0.05);">
+            <div style="font-size:10.5px; color:#7f95a8; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:3px;">{{ br.k }}</div>
+            <div style="font-size:12.5px; color:#dce8f0; line-height:1.5;">{{ br.v }}</div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.09); border-radius:12px; padding:12px; font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:#c9d6e0; line-height:1.65; white-space:pre-wrap; margin-bottom:12px; max-height:220px; overflow-y:auto;">{{ bridgePrompt }}</div>
+
+      <div style="display:flex; gap:8px; margin-bottom:10px;">
+        <button onClick="{{ copyPrompt }}" style="flex:1; background:rgba(90,209,255,0.12); border:1px solid rgba(90,209,255,0.4); color:#5ad1ff; font-family:'Space Grotesk',sans-serif; font-size:13px; font-weight:600; padding:13px; border-radius:11px; cursor:pointer;">{{ copyLabel }}</button>
+        <button onClick="{{ markSent }}" disabled="{{ sentDisabled }}" style="flex:1; background:{{ sentBg }}; border:1px solid rgba(90,209,138,0.4); color:#5ad18a; font-family:'Space Grotesk',sans-serif; font-size:13px; font-weight:600; padding:13px; border-radius:11px; cursor:pointer; opacity:{{ sentOpacity }};">{{ sentLabel }}</button>
+      </div>
+
+      <sc-if value="{{ bridgeWaiting }}" hint-placeholder-val="{{ false }}">
+        <div style="background:rgba(90,209,255,0.05); border:1px solid rgba(90,209,255,0.2); border-radius:12px; padding:12px 13px; font-size:12px; color:#aecfe8; margin-bottom:10px;">Waiting for Claude response. Paste the response below when it arrives.</div>
+        <textarea placeholder="Paste Claude response here…" style="width:100%; box-sizing:border-box; min-height:90px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); border-radius:11px; padding:11px; color:#eaf2f8; font-family:'Inter',sans-serif; font-size:12.5px; outline:none; resize:vertical;"></textarea>
+        <button style="width:100%; margin-top:8px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.12); color:#c9d6e0; font-size:12.5px; padding:11px; border-radius:11px; cursor:pointer;">Analyze response (simulated)</button>
+      </sc-if>
+    </sc-if>
+
+    <!-- APPROVALS -->
+    <sc-if value="{{ showApprovals }}" hint-placeholder-val="{{ false }}">
+      <div style="font-family:'Space Grotesk',sans-serif; font-size:18px; font-weight:700; color:#f2f8ff; margin-bottom:12px;">Approval Inbox</div>
+      <sc-if value="{{ noApprovals }}" hint-placeholder-val="{{ false }}">
+        <div style="background:rgba(90,209,138,0.05); border:1px solid rgba(90,209,138,0.25); border-radius:12px; padding:14px; font-size:13px; color:#8fd1aa;">Nothing needs your decision right now.</div>
+      </sc-if>
+      <sc-for list="{{ approvalCards }}" as="ac" hint-placeholder-count="2">
+        <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,184,77,0.3); border-radius:14px; padding:14px; margin-bottom:12px;">
+          <div style="font-size:14px; color:#f2f8ff; font-weight:600; margin-bottom:3px;">{{ ac.title }}</div>
+          <div style="font-size:11.5px; color:#8fa2b3; margin-bottom:9px;">{{ ac.project }} · AEGIS {{ ac.aegis }}</div>
+          <div style="font-size:12px; color:#aebfcd; line-height:1.55; margin-bottom:7px;">{{ ac.evidence }}</div>
+          <div style="font-size:11.5px; color:#c9a96a; margin-bottom:7px;">Risk: {{ ac.risk }}</div>
+          <div style="font-size:11.5px; color:#8fc7e8; margin-bottom:12px;">Forge recommends: {{ ac.recommendation }}</div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+            <button onClick="{{ ac.approve }}" style="background:rgba(90,209,138,0.12); border:1px solid rgba(90,209,138,0.4); color:#5ad18a; font-size:12.5px; font-weight:600; padding:11px; border-radius:10px; cursor:pointer;">Approve</button>
+            <button onClick="{{ ac.reject }}" style="background:rgba(255,90,90,0.08); border:1px solid rgba(255,90,90,0.35); color:#ff8a8a; font-size:12.5px; font-weight:600; padding:11px; border-radius:10px; cursor:pointer;">Reject</button>
+            <button onClick="{{ ac.requestChanges }}" style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.12); color:#c9d6e0; font-size:12.5px; padding:11px; border-radius:10px; cursor:pointer;">Request changes</button>
+            <button onClick="{{ ac.pause }}" style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.12); color:#c9d6e0; font-size:12.5px; padding:11px; border-radius:10px; cursor:pointer;">Pause project</button>
+          </div>
+        </div>
+      </sc-for>
+    </sc-if>
+
+    <!-- ACTIVITY -->
+    <sc-if value="{{ showActivity }}" hint-placeholder-val="{{ false }}">
+      <div style="font-family:'Space Grotesk',sans-serif; font-size:18px; font-weight:700; color:#f2f8ff; margin-bottom:12px;">Activity</div>
+      <sc-for list="{{ activityRows }}" as="ev" hint-placeholder-count="8">
+        <div style="display:flex; gap:10px; padding:9px 0; border-bottom:1px solid rgba(255,255,255,0.05);">
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:9.5px; color:{{ ev.color }}; width:72px; flex-shrink:0; padding-top:2px;">{{ ev.source }}</div>
+          <div style="flex:1;">
+            <div style="font-size:12px; color:#c9d6e0; line-height:1.5;">{{ ev.text }}</div>
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:9px; color:#5f7284; margin-top:2px;">{{ ev.time }}</div>
+          </div>
+        </div>
+      </sc-for>
+    </sc-if>
+  </div>
+
+  <!-- Jarvis mini orb -->
+  <sc-if value="{{ jarvisClosed }}" hint-placeholder-val="{{ true }}">
+    <button onClick="{{ openJarvis }}" aria-label="Jarvis" style="position:absolute; right:16px; bottom:calc(86px + env(safe-area-inset-bottom)); width:54px; height:54px; border-radius:50%; background:rgba(10,13,18,0.9); border:1.5px solid #5ad1ff; cursor:pointer; z-index:30; display:flex; align-items:center; justify-content:center; box-shadow:0 6px 24px rgba(0,0,0,0.5);">
+      <span style="width:16px; height:16px; border-radius:50%; background:radial-gradient(circle at 35% 30%, #ffffff, #5ad1ff 65%); box-shadow:0 0 12px #5ad1ff; animation:fpulse 3s ease-in-out infinite;"></span>
+    </button>
+  </sc-if>
+
+  <!-- Jarvis sheet -->
+  <sc-if value="{{ jarvisOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute; left:8px; right:8px; bottom:calc(78px + env(safe-area-inset-bottom)); z-index:35; background:rgba(10,13,18,0.95); border:1px solid rgba(90,209,255,0.4); border-radius:18px; padding:14px; backdrop-filter:blur(10px); box-shadow:0 16px 48px rgba(0,0,0,0.6);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <div style="display:flex; align-items:center; gap:9px;">
+          <span style="width:14px; height:14px; border-radius:50%; background:radial-gradient(circle at 35% 30%, #fff, #5ad1ff 65%); box-shadow:0 0 10px #5ad1ff; animation:{{ jarvisOrbAnim }};"></span>
+          <span style="font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:1px; color:#5ad1ff;">{{ jarvisStateLabel }}</span>
+          <span style="width:6px; height:6px; border-radius:50%; background:{{ aegisColor }};"></span>
+        </div>
+        <button onClick="{{ closeJarvis }}" aria-label="Close" style="background:none; border:none; color:#7f95a8; cursor:pointer; font-size:16px;">×</button>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:7px; max-height:180px; overflow-y:auto; margin-bottom:10px;">
+        <sc-for list="{{ jarvisLines }}" as="jl" hint-placeholder-count="2">
+          <div style="align-self:{{ jl.align }}; max-width:88%; background:{{ jl.bg }}; border:1px solid {{ jl.border }}; border-radius:11px; padding:8px 11px; font-size:12.5px; color:#eaf2f8; line-height:1.5;">{{ jl.text }}</div>
+        </sc-for>
+      </div>
+      <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:9px;">
+        <button onClick="{{ askNeedsMe }}" style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.12); color:#c9d6e0; font-size:11px; padding:6px 10px; border-radius:14px; cursor:pointer;">What needs me?</button>
+        <button onClick="{{ askWorking }}" style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.12); color:#c9d6e0; font-size:11px; padding:6px 10px; border-radius:14px; cursor:pointer;">What is Claude working on?</button>
+        <button onClick="{{ askFailed }}" style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.12); color:#c9d6e0; font-size:11px; padding:6px 10px; border-radius:14px; cursor:pointer;">Show failed deployments</button>
+      </div>
+      <div style="display:flex; gap:7px;">
+        <input value="{{ jarvisDraft }}" onChange="{{ onJarvisDraft }}" onKeyDown="{{ onJarvisKey }}" placeholder="Ask Jarvis…" style="flex:1; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); border-radius:10px; padding:10px 12px; color:#eaf2f8; font-size:12.5px; outline:none;" />
+        <button onClick="{{ sendJarvis }}" style="background:#5ad1ff; border:none; color:#04070a; font-weight:600; border-radius:10px; padding:10px 15px; cursor:pointer; font-size:12.5px;">Send</button>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- Bottom nav -->
+  <div style="position:absolute; left:0; right:0; bottom:0; background:rgba(8,11,16,0.96); border-top:1px solid rgba(255,255,255,0.08); backdrop-filter:blur(10px); display:flex; padding:8px 6px calc(8px + env(safe-area-inset-bottom)); z-index:32;">
+    <sc-for list="{{ navItems }}" as="nv" hint-placeholder-count="5">
+      <button onClick="{{ nv.go }}" style="flex:1; background:none; border:none; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:4px; padding:6px 2px; position:relative;">
+        <span style="width:22px; height:22px; border-radius:7px; border:1.5px solid {{ nv.iconColor }}; display:flex; align-items:center; justify-content:center;">
+          <span style="width:8px; height:8px; border-radius:{{ nv.iconShape }}; background:{{ nv.iconColor }};"></span>
+        </span>
+        <span style="font-size:10px; color:{{ nv.color }}; font-family:'Space Grotesk',sans-serif;">{{ nv.label }}</span>
+        <sc-if value="{{ nv.hasBadge }}" hint-placeholder-val="{{ false }}">
+          <span style="position:absolute; top:2px; right:calc(50% - 20px); background:#ffb84d; color:#1a1200; font-size:9px; font-weight:700; border-radius:9px; padding:1px 5px; font-family:'IBM Plex Mono',monospace;">{{ nv.badge }}</span>
+        </sc-if>
+      </button>
+    </sc-for>
+  </div>
+
+</div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 430, &quot;height&quot;: 900}}">
+const FORGE_KEY = 'forge_mobile_v1';
+const AEGIS_KEY = 'aegis_console_v1';
+
+function stamp() {
+  return new Date().toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+}
+
+const HEALTH_COLORS = { good: '#5ad18a', warn: '#ffb84d', bad: '#ff5a5a', paused: '#7f95a8' };
+const SRC_COLORS = { William: '#f2f8ff', Jarvis: '#5ad1ff', Forge: '#8fb8ff', 'Claude Design': '#c9a2ff', 'Claude Code': '#c9a2ff', GitHub: '#8fa2b3', Checks: '#8fd1aa', Vercel: '#eaeaea', AEGIS: '#ffb84d' };
+
+function seedData() {
+  return {
+    projects: [
+      {
+        id: 'vanguard', name: 'Vanguard Performance Labs', status: 'Ready for review', health: 'good',
+        env: 'Claude Code', model: 'Sonnet 5', task: 'Athlete dashboard charts', updated: '14:26',
+        lastVerified: 'Vercel preview deployed 14:22',
+        gh: { s: 'Commit detected', ok: true }, vc: { s: 'Preview ready', ok: true },
+        decision: 'Review Vercel preview', previewApproved: false,
+        timeline: [
+          { stage: 'William request', status: 'DONE', time: '11:40', system: 'William', evidence: '"Add training-load charts to the athlete dashboard."' },
+          { stage: 'Forge task prepared', status: 'DONE', time: '11:42', system: 'Forge', evidence: 'Acceptance criteria + locked files list generated.' },
+          { stage: 'Sent to Claude Code', status: 'DONE', time: '11:45', system: 'William', evidence: 'Prompt copied manually into Claude Code.' },
+          { stage: 'Claude response received', status: 'DONE', time: '13:58', system: 'Claude Code', evidence: 'Claude says complete — treated as a claim, not evidence.' },
+          { stage: 'GitHub commit detected', status: 'DONE', time: '14:02', system: 'GitHub', evidence: 'feat: dashboard charts · 9 files · branch feature/charts' },
+          { stage: 'Automated checks', status: 'DONE', time: '14:15', system: 'Checks', evidence: '42/42 tests passed · lint clean · typecheck clean' },
+          { stage: 'Vercel preview', status: 'DONE', time: '14:22', system: 'Vercel', evidence: 'Build 52s · preview-8f3a ready' },
+          { stage: 'Visual review', status: 'WAITING', time: '—', system: 'William', evidence: 'Preview awaiting your review.' },
+          { stage: 'William approval', status: 'PENDING', time: '—', system: 'William', evidence: 'Production approval is a separate decision.' },
+          { stage: 'Production deployment', status: 'PENDING', time: '—', system: 'Vercel', evidence: 'Blocked until approval.' }
+        ],
+        nextAction: 'Review the Vercel preview, then approve or request changes.'
+      },
+      {
+        id: 'sips', name: 'Sophisticated Sips', status: 'Needs information', health: 'warn',
+        env: 'Claude Code', model: 'Fable 5', task: 'Checkout flow rework', updated: '13:05',
+        lastVerified: 'Claude response received 13:05',
+        gh: { s: 'No commit found', ok: false }, vc: { s: 'Waiting for commit', ok: null },
+        decision: 'Follow-up required — no commit detected', previewApproved: false,
+        timeline: [
+          { stage: 'William request', status: 'DONE', time: '10:12', system: 'William', evidence: '"Rework the checkout flow to two steps."' },
+          { stage: 'Forge task prepared', status: 'DONE', time: '10:14', system: 'Forge', evidence: 'Task brief with locked payment files.' },
+          { stage: 'Sent to Claude Code', status: 'DONE', time: '10:20', system: 'William', evidence: 'Prompt copied manually.' },
+          { stage: 'Claude response received', status: 'DONE', time: '13:05', system: 'Claude Code', evidence: 'Claude says complete.' },
+          { stage: 'GitHub commit detected', status: 'FAILED', time: '13:20', system: 'GitHub', evidence: 'Watched for 15 minutes after the claim.', error: 'Claude reported completion, but no GitHub commit was found.' },
+          { stage: 'Automated checks', status: 'PENDING', time: '—', system: 'Checks', evidence: 'Blocked — nothing to check.' },
+          { stage: 'Vercel preview', status: 'PENDING', time: '—', system: 'Vercel', evidence: 'Waiting for commit.' }
+        ],
+        nextAction: 'Send the prepared follow-up prompt asking Claude to actually commit and push.'
+      },
+      {
+        id: 'throne', name: 'Throne OS', status: 'Waiting', health: 'warn',
+        env: 'Claude Design', model: 'Opus reviewer', task: 'Choose database approach', updated: '09:48',
+        lastVerified: 'Two proposals delivered 09:45',
+        gh: { s: 'Not started', ok: null }, vc: { s: 'Not started', ok: null },
+        decision: 'Choose between two database designs', previewApproved: false,
+        timeline: [
+          { stage: 'William request', status: 'DONE', time: '08:30', system: 'William', evidence: '"Design the data layer for Throne OS."' },
+          { stage: 'Forge task prepared', status: 'DONE', time: '08:33', system: 'Forge', evidence: 'Architecture exploration brief.' },
+          { stage: 'Claude response received', status: 'DONE', time: '09:45', system: 'Claude Design', evidence: 'Option A: single Postgres. Option B: Postgres + event log.' },
+          { stage: 'William approval', status: 'WAITING', time: '—', system: 'William', evidence: 'Decision required before any code is written.' }
+        ],
+        nextAction: 'Pick a database approach in the Approval Inbox.'
+      },
+      {
+        id: 'bci', name: 'BCI PM Agent', status: 'Failed', health: 'bad',
+        env: 'Claude Code', model: 'Sonnet 5', task: 'Server sync feature', updated: '12:51',
+        lastVerified: 'GitHub commit detected 12:33',
+        gh: { s: 'Commit detected', ok: true }, vc: { s: 'Build failed', ok: false },
+        decision: null, previewApproved: false,
+        failTechnical: 'Error: Environment Variable "SUPABASE_SERVICE_ROLE_KEY" references Secret "supabase_service_role_key", which does not exist.\n\nBuild failed in 11s · vercel build · exit code 1',
+        failExplanation: 'Vercel cannot build the server feature because the required Supabase server credential has not been configured. The code reached GitHub, but the preview did not deploy. No production change occurred.',
+        failNextStep: 'Add the missing environment variable in Vercel project settings, or send the prepared repair prompt so Claude removes the dependency.',
+        timeline: [
+          { stage: 'William request', status: 'DONE', time: '11:05', system: 'William', evidence: '"Add background sync to the PM agent server."' },
+          { stage: 'Sent to Claude Code', status: 'DONE', time: '11:10', system: 'William', evidence: 'Prompt copied manually.' },
+          { stage: 'Claude response received', status: 'DONE', time: '12:28', system: 'Claude Code', evidence: 'Claude says complete.' },
+          { stage: 'GitHub commit detected', status: 'DONE', time: '12:33', system: 'GitHub', evidence: 'feat: background sync · 6 files' },
+          { stage: 'Automated checks', status: 'DONE', time: '12:44', system: 'Checks', evidence: '31/31 tests passed' },
+          { stage: 'Vercel preview', status: 'FAILED', time: '12:51', system: 'Vercel', evidence: 'Build exited after 11s.', error: 'Missing environment variable SUPABASE_SERVICE_ROLE_KEY — see Vercel tab.' }
+        ],
+        nextAction: 'Fix the environment variable or send the repair prompt.'
+      },
+      {
+        id: 'peptastic', name: 'Peptastic', status: 'Paused', health: 'paused',
+        env: 'Claude Design', model: 'Unknown', task: 'Brand refresh', updated: 'Yesterday',
+        lastVerified: 'Paused by William yesterday',
+        gh: { s: 'Idle', ok: null }, vc: { s: 'Idle', ok: null },
+        decision: null, previewApproved: false,
+        timeline: [
+          { stage: 'William request', status: 'DONE', time: 'Yesterday', system: 'William', evidence: '"Pause Peptastic until next month."' },
+          { stage: 'Project paused', status: 'DONE', time: 'Yesterday', system: 'Forge', evidence: 'No agents active. No pending work.' }
+        ],
+        nextAction: 'Resume when you are ready — nothing is running.'
+      },
+      {
+        id: 'saltline', name: 'Saltline', status: 'Failed', health: 'bad',
+        env: 'Claude Code', model: 'Opus reviewer', task: 'Payment webhook hardening', updated: '10:37',
+        lastVerified: 'Review completed 10:30',
+        gh: { s: 'PR open', ok: true }, vc: { s: 'Deployment blocked', ok: false },
+        decision: null, previewApproved: false,
+        timeline: [
+          { stage: 'Claude response received', status: 'DONE', time: '09:52', system: 'Claude Code', evidence: 'Webhook validation rewrite.' },
+          { stage: 'GitHub commit detected', status: 'DONE', time: '09:58', system: 'GitHub', evidence: 'PR #41 · 4 files' },
+          { stage: 'Code review', status: 'FAILED', time: '10:30', system: 'Checks', evidence: 'Independent Opus review.', error: 'High-severity defect: webhook signature check can be bypassed with an empty header. Deployment blocked.' },
+          { stage: 'Vercel preview', status: 'PENDING', time: '—', system: 'Vercel', evidence: 'Blocked by review.' }
+        ],
+        nextAction: 'Send the defect back to Claude Code for repair before any deployment.'
+      }
+    ],
+    activity: [
+      { source: 'Vercel', text: 'Vanguard preview-8f3a deployed successfully.', time: '14:22' },
+      { source: 'Checks', text: 'Vanguard: 42/42 tests passed.', time: '14:15' },
+      { source: 'GitHub', text: 'Vanguard: commit detected on feature/charts (9 files).', time: '14:02' },
+      { source: 'Forge', text: 'Sophisticated Sips: no commit found 15 min after Claude claimed completion. Follow-up recommended.', time: '13:20' },
+      { source: 'Claude Code', text: 'Sophisticated Sips: Claude reported checkout rework complete.', time: '13:05' },
+      { source: 'Vercel', text: 'BCI PM Agent build failed: missing environment variable.', time: '12:51' },
+      { source: 'AEGIS', text: 'No security incidents. All connectors nominal (simulated).', time: '12:00' },
+      { source: 'Claude Design', text: 'Throne OS: two database proposals delivered for decision.', time: '09:45' },
+      { source: 'William', text: 'Paused Peptastic.', time: 'Yesterday' }
+    ]
+  };
+}
+
+class Component extends DCLogic {
+  state = {
+    data: null,
+    view: 'home',
+    detailId: null,
+    detailTab: 'timeline',
+    showTech: false,
+    bridge: null, // {projectId, kind}
+    bridgeCopied: false,
+    bridgeSent: false,
+    jarvisOpen: false,
+    jarvisDraft: '',
+    jarvisLines: [{ speaker: 'jarvis', text: 'Forge watchtower online. Ask me what needs you.' }],
+    jarvisState: 'idle',
+    aegisLevel: 'green'
+  };
+
+  componentDidMount() {
+    let data = null;
+    try {
+      const raw = localStorage.getItem(FORGE_KEY);
+      if (raw) data = JSON.parse(raw);
+    } catch (e) {}
+    if (!data || !data.projects) data = seedData();
+    this.setState({ data });
+    this.readAegis();
+    this._poll = setInterval(this.readAegis, 2000);
+    window.addEventListener('storage', this.readAegis);
+  }
+
+  componentWillUnmount() {
+    clearInterval(this._poll);
+    window.removeEventListener('storage', this.readAegis);
+  }
+
+  readAegis = () => {
+    try {
+      const raw = localStorage.getItem(AEGIS_KEY);
+      const lvl = raw ? (JSON.parse(raw).level || 'green') : 'green';
+      if (lvl !== this.state.aegisLevel) this.setState({ aegisLevel: lvl });
+    } catch (e) {}
+  };
+
+  persist(data) {
+    try { localStorage.setItem(FORGE_KEY, JSON.stringify(data)); } catch (e) {}
+  }
+
+  update(mutator) {
+    this.setState((s) => {
+      const data = JSON.parse(JSON.stringify(s.data));
+      mutator(data);
+      this.persist(data);
+      return { data };
+    });
+  }
+
+  logEvent(data, source, text) {
+    data.activity.unshift({ source, text, time: stamp() });
+  }
+
+  nav = (view) => () => this.setState({ view, jarvisOpen: false });
+  openProject = (id) => () => this.setState({ view: 'detail', detailId: id, detailTab: 'timeline', showTech: false });
+  setDetailTab = (t) => () => this.setState({ detailTab: t });
+  goProjects = () => this.setState({ view: 'projects' });
+  toggleTech = () => this.setState((s) => ({ showTech: !s.showTech }));
+
+  approvePreview = () => {
+    this.update((d) => {
+      const p = d.projects.find(x => x.id === 'vanguard');
+      if (!p) return;
+      p.previewApproved = true;
+      p.decision = 'Approve production deployment';
+      p.status = 'Approved';
+      const tl = p.timeline.find(t => t.stage === 'Visual review');
+      if (tl) { tl.status = 'DONE'; tl.time = stamp(); tl.evidence = 'Preview approved by William.'; }
+      p.nextAction = 'Production deployment still requires a separate approval.';
+      this.logEvent(d, 'William', 'Approved Vanguard Vercel preview. Production approval remains pending.');
+    });
+  };
+
+  deployProduction = () => {
+    this.update((d) => {
+      const p = d.projects.find(x => x.id === 'vanguard');
+      if (!p) return;
+      p.decision = null; p.status = 'Deployed'; p.health = 'good';
+      const tl = p.timeline.find(t => t.stage === 'Production deployment');
+      const ap = p.timeline.find(t => t.stage === 'William approval');
+      if (ap) { ap.status = 'DONE'; ap.time = stamp(); ap.evidence = 'Production approved by William.'; }
+      if (tl) { tl.status = 'DONE'; tl.time = stamp(); tl.evidence = 'preview-8f3a promoted to production (simulated).'; }
+      p.nextAction = 'Deployed. Monitoring for runtime errors (simulated).';
+      this.logEvent(d, 'William', 'Approved Vanguard production deployment.');
+      this.logEvent(d, 'Vercel', 'Vanguard deployed to production (simulated).');
+    });
+  };
+
+  holdDeployment = () => {
+    this.update((d) => {
+      const p = d.projects.find(x => x.id === 'vanguard');
+      if (!p) return;
+      p.decision = null;
+      p.status = 'Paused';
+      p.health = 'paused';
+      this.logEvent(d, 'William', 'Held Vanguard deployment.');
+    });
+  };
+
+  prepareFollowUp = () => this.setState({ view: 'bridge', bridge: { projectId: 'sips', kind: 'followup' }, bridgeCopied: false, bridgeSent: false });
+  prepareRepair = () => this.setState({ view: 'bridge', bridge: { projectId: 'bci', kind: 'repair' }, bridgeCopied: false, bridgeSent: false });
+  goBackFromBridge = () => this.setState({ view: 'detail' });
+
+  markExpected = () => {
+    this.update((d) => {
+      const p = d.projects.find(x => x.id === 'sips');
+      if (p) { p.health = 'paused'; p.status = 'Waiting'; p.decision = null; }
+      this.logEvent(d, 'William', 'Marked Sophisticated Sips missing commit as expected prototype behavior.');
+    });
+  };
+
+  buildPrompt(bridge) {
+    if (!bridge) return '';
+    if (bridge.kind === 'followup') {
+      return `PROJECT: Sophisticated Sips (checkout rework)\n\nYou previously reported this task complete, but no commit was found on GitHub.\n\nDo not restate that the work is done. Instead:\n1. Verify whether the changes exist locally.\n2. Commit and push them to branch feature/checkout-two-step.\n3. Reply with the exact commit hash.\n4. If the work was not actually done, say so plainly and list what remains.\n\nDo not modify: src/payments/**, .env*, vercel.json\nEvidence required: commit hash visible on GitHub.`;
+    }
+    return `PROJECT: BCI PM Agent (server sync)\n\nThe Vercel build fails: Environment Variable "SUPABASE_SERVICE_ROLE_KEY" references a Secret that does not exist.\n\nEither:\nA) Remove the hard dependency on this variable with a safe runtime check and clear error, or\nB) Document the exact Vercel setting William must add, then stop.\n\nDo not touch other environment configuration.\nDo not modify: src/auth/**, vercel.json beyond the documented need.\nEvidence required: green Vercel preview build after the change.`;
+  }
+
+  copyPrompt = () => {
+    const text = this.buildPrompt(this.state.bridge);
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text);
+    } catch (e) {}
+    this.setState({ bridgeCopied: true });
+  };
+
+  markSent = () => {
+    if (!this.state.bridgeCopied) return;
+    const pid = this.state.bridge && this.state.bridge.projectId;
+    this.update((d) => {
+      const p = d.projects.find(x => x.id === pid);
+      if (p) {
+        p.status = 'Waiting';
+        p.health = 'warn';
+        p.lastVerified = 'Prompt sent ' + stamp();
+        if (pid === 'sips') p.decision = null;
+        p.nextAction = 'Waiting on Claude response. Paste it into the Task Bridge when it arrives.';
+      }
+      this.logEvent(d, 'Forge', `${pid === 'sips' ? 'Sophisticated Sips' : 'BCI PM Agent'}: prompt marked sent. Status → Waiting on Claude.`);
+    });
+    this.setState({ bridgeSent: true });
+  };
+
+  decideThrone = (verdict) => {
+    this.update((d) => {
+      const p = d.projects.find(x => x.id === 'throne');
+      if (!p) return;
+      if (verdict === 'approve') {
+        p.decision = null; p.status = 'Working'; p.health = 'good';
+        p.nextAction = 'Forge will prepare the implementation task for Claude Code.';
+        this.logEvent(d, 'William', 'Throne OS: chose Option A (single Postgres).');
+      } else if (verdict === 'reject') {
+        p.decision = null; p.status = 'Needs information';
+        this.logEvent(d, 'William', 'Throne OS: rejected both database proposals. Returned for new options.');
+      } else if (verdict === 'changes') {
+        p.decision = null; p.status = 'Repairing';
+        this.logEvent(d, 'William', 'Throne OS: requested changes to the proposals.');
+      } else {
+        p.decision = null; p.status = 'Paused'; p.health = 'paused';
+        this.logEvent(d, 'William', 'Paused Throne OS.');
+      }
+    });
+  };
+
+  decideVanguard = (verdict) => {
+    if (verdict === 'approve') { this.approvePreview(); return; }
+    this.update((d) => {
+      const p = d.projects.find(x => x.id === 'vanguard');
+      if (!p) return;
+      if (verdict === 'reject') { p.decision = null; p.status = 'Repairing'; p.health = 'warn'; this.logEvent(d, 'William', 'Rejected Vanguard preview — returned for repair.'); }
+      else if (verdict === 'changes') { p.decision = null; p.status = 'Repairing'; p.health = 'warn'; this.logEvent(d, 'William', 'Requested changes on Vanguard preview.'); }
+      else { p.decision = null; p.status = 'Paused'; p.health = 'paused'; this.logEvent(d, 'William', 'Paused Vanguard.'); }
+    });
+  };
+
+  openJarvis = () => this.setState({ jarvisOpen: true });
+  closeJarvis = () => this.setState({ jarvisOpen: false });
+  onJarvisDraft = (e) => this.setState({ jarvisDraft: e.target.value });
+  onJarvisKey = (e) => { if (e.key === 'Enter') this.sendJarvis(); };
+
+  jarvisSay(text) {
+    this.setState((s) => ({ jarvisLines: [...s.jarvisLines.slice(-6), { speaker: 'jarvis', text }], jarvisState: 'speaking' }));
+    clearTimeout(this._jt);
+    this._jt = setTimeout(() => this.setState({ jarvisState: 'idle' }), 1500);
+  }
+
+  needsMeSummary() {
+    const d = this.state.data;
+    const dec = d.projects.filter(p => p.decision);
+    if (!dec.length) return 'Nothing needs you right now. All projects are moving or paused.';
+    const bci = d.projects.find(p => p.id === 'bci');
+    let msg = `${dec.length} project${dec.length === 1 ? '' : 's'} require decisions: ` + dec.map(p => `${p.name} (${p.decision.toLowerCase()})`).join('; ') + '.';
+    if (bci && bci.vc.ok === false) msg += ' BCI PM Agent also failed its Vercel build — one environment variable is missing.';
+    return msg;
+  }
+
+  askNeedsMe = () => { this.pushUser('What needs me?'); this.jarvisSay(this.needsMeSummary()); };
+  askWorking = () => {
+    this.pushUser('What is Claude working on?');
+    this.jarvisSay('Claude Code (Sonnet 5) last delivered Vanguard charts — verified on GitHub with a green preview. Sophisticated Sips claims completion but produced no commit, so I do not count it as done.');
+  };
+  askFailed = () => {
+    this.pushUser('Show failed deployments');
+    this.setState({ view: 'projects', jarvisOpen: true });
+    this.jarvisSay('Two failures: BCI PM Agent (Vercel build — missing environment variable) and Saltline (deployment blocked by a high-severity review finding).');
+  };
+
+  pushUser(text) {
+    this.setState((s) => ({ jarvisLines: [...s.jarvisLines.slice(-6), { speaker: 'user', text }] }));
+  }
+
+  sendJarvis = () => {
+    const text = this.state.jarvisDraft.trim();
+    if (!text) return;
+    this.setState({ jarvisDraft: '' });
+    this.pushUser(text);
+    const lower = text.toLowerCase();
+    if (lower.includes('need')) { this.jarvisSay(this.needsMeSummary()); return; }
+    if (lower.includes('fail')) { this.askFailed(); return; }
+    if (lower.includes('working')) { this.askWorking(); return; }
+    if (lower.includes('vanguard')) { this.setState({ view: 'detail', detailId: 'vanguard', detailTab: 'timeline' }); this.jarvisSay('Opening Vanguard. The preview is ready for your review.'); return; }
+    if (lower.includes('approval') || lower.includes('approve')) { this.setState({ view: 'approvals' }); this.jarvisSay('Here is your approval inbox.'); return; }
+    if (lower.includes('why') && lower.includes('vercel')) { this.setState({ view: 'detail', detailId: 'bci', detailTab: 'vercel' }); this.jarvisSay('BCI PM Agent failed because a required Supabase credential is not configured in Vercel. Nothing reached production.'); return; }
+    this.jarvisSay('Noted. (Simulated response — try "what needs me" or "open Vanguard".)');
+  };
+
+  renderVals() {
+    const s = this.state;
+    const data = s.data || seedData();
+    const lvl = s.aegisLevel;
+    const aegisColor = lvl === 'green' ? '#5ad18a' : lvl === 'yellow' ? '#ffb84d' : '#ff5a5a';
+
+    const decisions = data.projects.filter(p => p.decision);
+    const waitingClaude = data.projects.filter(p => p.status === 'Waiting' || p.status === 'Needs information').length;
+    const failed = data.projects.filter(p => p.health === 'bad').length;
+    const active = data.projects.filter(p => p.health !== 'paused').length;
+
+    const homeStats = [
+      { value: String(active), label: 'Active projects', color: '#5ad1ff', go: this.nav('projects') },
+      { value: String(decisions.length), label: 'Need your decision', color: decisions.length ? '#ffb84d' : '#5ad18a', go: this.nav('approvals') },
+      { value: String(waitingClaude), label: 'Waiting on Claude', color: '#8fa2b3', go: this.nav('projects') },
+      { value: String(failed), label: 'Failed / blocked', color: failed ? '#ff5a5a' : '#5ad18a', go: this.nav('projects') }
+    ];
+
+    const homeApprovals = decisions.map(p => ({
+      title: p.decision, project: p.name, open: this.openProject(p.id)
+    }));
+
+    const homeAlerts = [];
+    const sips = data.projects.find(p => p.id === 'sips');
+    if (sips && sips.gh.ok === false) homeAlerts.push({ text: 'Sophisticated Sips: Claude reported completion, but no GitHub commit was found.', color: '#ffb84d', open: this.openProject('sips') });
+    const bci = data.projects.find(p => p.id === 'bci');
+    if (bci && bci.vc.ok === false) homeAlerts.push({ text: 'BCI PM Agent: Vercel build failed — missing environment variable. Repair prompt prepared.', color: '#ff5a5a', open: this.openProject('bci') });
+    const salt = data.projects.find(p => p.id === 'saltline');
+    if (salt) homeAlerts.push({ text: 'Saltline: high-severity review defect. Deployment blocked.', color: '#ff5a5a', open: this.openProject('saltline') });
+
+    const projectCards = data.projects.map(p => ({
+      name: p.name, task: p.task, env: p.env, model: p.model,
+      status: p.status.toUpperCase(), healthColor: HEALTH_COLORS[p.health],
+      statusBg: 'rgba(255,255,255,0.04)',
+      gh: p.gh.s, ghColor: p.gh.ok === true ? '#5ad18a' : p.gh.ok === false ? '#ff5a5a' : '#8fa2b3',
+      vc: p.vc.s, vcColor: p.vc.ok === true ? '#5ad18a' : p.vc.ok === false ? '#ff5a5a' : '#8fa2b3',
+      lastVerified: p.lastVerified, updated: p.updated,
+      hasDecision: !!p.decision, decision: p.decision || '',
+      open: this.openProject(p.id)
+    }));
+
+    const detP = data.projects.find(p => p.id === s.detailId) || data.projects[0];
+    const statusColor = (st) => st === 'DONE' ? '#5ad18a' : st === 'FAILED' ? '#ff5a5a' : st === 'WAITING' ? '#ffb84d' : '#5f7284';
+    const det = {
+      name: detP.name, status: detP.status.toUpperCase(), healthColor: HEALTH_COLORS[detP.health],
+      task: detP.task, env: detP.env, model: detP.model,
+      nextAction: detP.nextAction,
+      timeline: detP.timeline.map(t => ({
+        stage: t.stage, status: t.status, time: t.time, system: t.system,
+        evidence: t.evidence, error: t.error || '', hasError: !!t.error,
+        statusColor: statusColor(t.status),
+        dotColor: t.status === 'DONE' ? '#5ad18a' : t.status === 'FAILED' ? '#ff5a5a' : 'transparent',
+        dotBorder: statusColor(t.status)
+      })),
+      githubRows: [
+        { k: 'Repository', v: detP.id + '-app (simulated)', color: '#c9d6e0' },
+        { k: 'Default branch', v: 'main', color: '#c9d6e0' },
+        { k: 'Active branch', v: detP.id === 'vanguard' ? 'feature/charts' : detP.id === 'sips' ? 'feature/checkout-two-step' : detP.id === 'saltline' ? 'fix/webhooks (PR #41)' : '—', color: '#c9d6e0' },
+        { k: 'Commit status', v: detP.gh.s, color: detP.gh.ok === true ? '#5ad18a' : detP.gh.ok === false ? '#ff5a5a' : '#8fa2b3' },
+        { k: 'Checks', v: detP.id === 'vanguard' ? '42/42 passed' : detP.id === 'bci' ? '31/31 passed' : detP.id === 'saltline' ? 'Review failed (high severity)' : '—', color: detP.id === 'saltline' ? '#ff5a5a' : '#c9d6e0' },
+        { k: 'Merge conflicts', v: 'None detected', color: '#c9d6e0' },
+        { k: 'Security alerts', v: 'None (simulated)', color: '#c9d6e0' }
+      ],
+      ghWarning: detP.id === 'sips' && detP.gh.ok === false,
+      vercelRows: [
+        { k: 'Vercel project', v: detP.id + '-web (simulated)', color: '#c9d6e0' },
+        { k: 'Build status', v: detP.vc.s, color: detP.vc.ok === true ? '#5ad18a' : detP.vc.ok === false ? '#ff5a5a' : '#8fa2b3' },
+        { k: 'Build duration', v: detP.id === 'vanguard' ? '52s' : detP.id === 'bci' ? '11s (failed)' : '—', color: '#c9d6e0' },
+        { k: 'Preview URL', v: detP.id === 'vanguard' ? 'preview-8f3a.vercel.app' : '—', color: '#8fb8ff' },
+        { k: 'Production', v: detP.previewApproved ? 'Approval required' : 'Not deployed', color: '#c9d6e0' },
+        { k: 'Runtime errors', v: detP.id === 'vanguard' ? '0' : '—', color: '#c9d6e0' },
+        { k: 'Domain', v: 'OK (simulated)', color: '#c9d6e0' }
+      ],
+      vcFailed: detP.id === 'bci',
+      failExplanation: detP.failExplanation || '',
+      failNextStep: detP.failNextStep || '',
+      failTechnical: detP.failTechnical || '',
+      vcPreviewReady: detP.id === 'vanguard',
+      previewNotApproved: detP.id === 'vanguard' && !detP.previewApproved,
+      previewApproved: detP.id === 'vanguard' && detP.previewApproved
+    };
+
+    const detailTabs = ['timeline', 'github', 'vercel'].map(t => ({
+      label: t === 'timeline' ? 'Timeline' : t === 'github' ? 'GitHub' : 'Vercel',
+      select: this.setDetailTab(t),
+      bg: s.detailTab === t ? 'rgba(90,209,255,0.12)' : 'rgba(255,255,255,0.03)',
+      border: s.detailTab === t ? 'rgba(90,209,255,0.4)' : 'rgba(255,255,255,0.09)',
+      color: s.detailTab === t ? '#5ad1ff' : '#8fa2b3'
+    }));
+
+    const bridge = s.bridge || { projectId: 'sips', kind: 'followup' };
+    const bp = data.projects.find(p => p.id === bridge.projectId) || data.projects[0];
+    const bridgeRows = [
+      { k: 'Project', v: bp.name },
+      { k: 'Request', v: bridge.kind === 'followup' ? 'Verify and actually deliver the claimed checkout rework' : 'Repair the failed Vercel build' },
+      { k: 'Environment', v: 'Claude Code' },
+      { k: 'Model', v: bridge.kind === 'followup' ? 'Fable 5' : 'Sonnet 5' },
+      { k: 'Files to inspect', v: bridge.kind === 'followup' ? 'src/checkout/**, tests/checkout/**' : 'vercel.json, src/server/sync/**' },
+      { k: 'Files not to change', v: bridge.kind === 'followup' ? 'src/payments/**, .env*, vercel.json' : 'src/auth/**, other env config' },
+      { k: 'Locked requirements', v: 'No new dependencies. No security-policy changes. Evidence required before "complete".' },
+      { k: 'Acceptance criteria', v: bridge.kind === 'followup' ? 'Commit hash visible on GitHub; checks pass' : 'Green Vercel preview build' },
+      { k: 'Required checks', v: 'Lint · typecheck · unit tests · build' }
+    ];
+
+    const approvalCards = [];
+    const van = data.projects.find(p => p.id === 'vanguard');
+    if (van && van.decision === 'Review Vercel preview') {
+      approvalCards.push({
+        title: 'Approve Vanguard Vercel preview', project: 'Vanguard Performance Labs', aegis: lvl.toUpperCase(),
+        evidence: 'Commit detected · 42/42 tests passed · preview-8f3a built in 52s · 0 runtime errors.',
+        risk: 'Low — visual change only, no schema or payment paths touched.',
+        recommendation: 'Approve. Production remains a separate decision.',
+        approve: () => this.decideVanguard('approve'), reject: () => this.decideVanguard('reject'),
+        requestChanges: () => this.decideVanguard('changes'), pause: () => this.decideVanguard('pause')
+      });
+    }
+    if (van && van.decision === 'Approve production deployment') {
+      approvalCards.push({
+        title: 'Approve Vanguard production deployment', project: 'Vanguard Performance Labs', aegis: lvl.toUpperCase(),
+        evidence: 'Preview approved by you. Commit + tests + preview all verified. This promotes preview-8f3a to production.',
+        risk: 'Low-medium — first production change this week; rollback available via Vercel.',
+        recommendation: 'Approve if the preview matched your expectations.',
+        approve: () => this.deployProduction(), reject: () => this.decideVanguard('reject'),
+        requestChanges: () => this.decideVanguard('changes'), pause: () => this.decideVanguard('pause')
+      });
+    }
+    const thr = data.projects.find(p => p.id === 'throne');
+    if (thr && thr.decision) {
+      approvalCards.push({
+        title: 'Choose Throne OS database design', project: 'Throne OS', aegis: lvl.toUpperCase(),
+        evidence: 'Option A: single Postgres (simpler, cheaper). Option B: Postgres + event log (auditable, more complex).',
+        risk: 'Medium — hard to reverse after implementation begins.',
+        recommendation: 'Option A unless full audit history is a hard requirement.',
+        approve: () => this.decideThrone('approve'), reject: () => this.decideThrone('reject'),
+        requestChanges: () => this.decideThrone('changes'), pause: () => this.decideThrone('pause')
+      });
+    }
+
+    const activityRows = data.activity.map(ev => ({
+      source: ev.source.toUpperCase(), text: ev.text, time: ev.time,
+      color: SRC_COLORS[ev.source] || '#8fa2b3'
+    }));
+
+    const jarvisLines = s.jarvisLines.map(l => ({
+      text: l.text,
+      align: l.speaker === 'jarvis' ? 'flex-start' : 'flex-end',
+      bg: l.speaker === 'jarvis' ? 'rgba(90,209,255,0.07)' : 'rgba(255,255,255,0.04)',
+      border: l.speaker === 'jarvis' ? 'rgba(90,209,255,0.25)' : 'rgba(255,255,255,0.08)'
+    }));
+
+    const navDefs = [
+      { id: 'home', label: 'Command' },
+      { id: 'projects', label: 'Projects' },
+      { id: 'approvals', label: 'Approvals', badge: decisions.length },
+      { id: 'activity', label: 'Activity' }
+    ];
+    const navItems = navDefs.map(n => {
+      const activeView = (s.view === n.id) || (n.id === 'projects' && (s.view === 'detail' || s.view === 'bridge'));
+      return {
+        label: n.label, go: this.nav(n.id),
+        color: activeView ? '#5ad1ff' : '#7f95a8',
+        iconColor: activeView ? '#5ad1ff' : '#4a5b6a',
+        iconShape: n.id === 'home' ? '50%' : '2px',
+        hasBadge: !!n.badge, badge: String(n.badge || '')
+      };
+    });
+    navItems.push({
+      label: 'Jarvis', go: this.openJarvis,
+      color: s.jarvisOpen ? '#5ad1ff' : '#7f95a8',
+      iconColor: s.jarvisOpen ? '#5ad1ff' : '#4a5b6a',
+      iconShape: '50%', hasBadge: false, badge: ''
+    });
+
+    const titles = { home: 'Command', projects: 'Projects', detail: 'Project', bridge: 'Task Bridge', approvals: 'Approvals', activity: 'Activity' };
+
+    return {
+      headerTitle: titles[s.view] || 'Command',
+      aegisColor,
+      aegisLabel: lvl.toUpperCase(),
+
+      showHome: s.view === 'home',
+      showProjects: s.view === 'projects',
+      showDetail: s.view === 'detail',
+      showBridge: s.view === 'bridge',
+      showApprovals: s.view === 'approvals',
+      showActivity: s.view === 'activity',
+
+      homeStats, homeApprovals, homeAlerts,
+      jarvisBrief: this.needsMeSummary(),
+      latestMilestone: 'Vanguard Performance Labs: preview verified end-to-end (commit → tests → Vercel) at 14:22. (Simulated)',
+
+      projectCards,
+      det, detailTabs,
+      showTimeline: s.detailTab === 'timeline',
+      showGithub: s.detailTab === 'github',
+      showVercel: s.detailTab === 'vercel',
+      showTech: s.showTech,
+      techToggleLabel: s.showTech ? 'Hide technical details' : 'Show technical details',
+      goProjects: this.goProjects,
+      toggleTech: this.toggleTech,
+      approvePreview: this.approvePreview,
+      holdDeployment: this.holdDeployment,
+      prepareFollowUp: this.prepareFollowUp,
+      prepareRepair: this.prepareRepair,
+      markExpected: this.markExpected,
+
+      bridgeRows,
+      bridgePrompt: this.buildPrompt(bridge),
+      copyPrompt: this.copyPrompt,
+      copyLabel: s.bridgeCopied ? 'Copied ✓' : 'Copy Prompt',
+      markSent: this.markSent,
+      sentDisabled: !s.bridgeCopied || s.bridgeSent,
+      sentBg: (!s.bridgeCopied || s.bridgeSent) ? 'rgba(255,255,255,0.04)' : 'rgba(90,209,138,0.12)',
+      sentOpacity: (!s.bridgeCopied || s.bridgeSent) ? '0.5' : '1',
+      sentLabel: s.bridgeSent ? 'Sent ✓' : 'Mark Sent',
+      bridgeWaiting: s.bridgeSent,
+      goBackFromBridge: this.goBackFromBridge,
+
+      approvalCards,
+      noApprovals: approvalCards.length === 0,
+
+      activityRows,
+
+      jarvisOpen: s.jarvisOpen,
+      jarvisClosed: !s.jarvisOpen,
+      openJarvis: this.openJarvis,
+      closeJarvis: this.closeJarvis,
+      jarvisLines,
+      jarvisDraft: s.jarvisDraft,
+      onJarvisDraft: this.onJarvisDraft,
+      onJarvisKey: this.onJarvisKey,
+      sendJarvis: this.sendJarvis,
+      askNeedsMe: this.askNeedsMe,
+      askWorking: this.askWorking,
+      askFailed: this.askFailed,
+      jarvisStateLabel: s.jarvisState === 'speaking' ? 'SPEAKING' : 'JARVIS',
+      jarvisOrbAnim: s.jarvisState === 'speaking' ? 'fpulse 0.8s ease-in-out infinite' : 'fpulse 3s ease-in-out infinite',
+
+      navItems
+    };
+  }
+}
+
+</script>
+</body>
+</html>

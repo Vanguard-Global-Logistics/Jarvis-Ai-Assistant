@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    body { margin: 0; background: #0a0c10; }
+    @keyframes aegis-blink { 0%,100% { opacity:1; } 50% { opacity:0.35; } }
+    @keyframes aegis-pulse-ring { 0% { transform:scale(0.85); opacity:0.8;} 100% { transform:scale(1.9); opacity:0;} }
+    @keyframes aegis-scan { 0% { transform:translateY(-100%);} 100% { transform:translateY(100%);} }
+    ::-webkit-scrollbar { width:8px; } ::-webkit-scrollbar-thumb { background:rgba(140,170,255,0.25); border-radius:8px; }
+  </style>
+</helmet>
+
+<div style="min-height:100vh; width:100%; background:#0a0c10; font-family:'Inter',sans-serif; color:#dfe7ee; box-sizing:border-box;">
+
+  <!-- Persistent disclaimer -->
+  <div style="background:#1a1200; border-bottom:1px solid rgba(255,184,77,0.35); padding:8px 20px; text-align:center; font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.3px; color:#ffb84d;">
+    Interface prototype only. Security controls shown here are simulated and do not provide operating-system, network, antivirus or malware protection.
+  </div>
+
+  <sc-if value="{{ isBlack }}" hint-placeholder-val="{{ false }}">
+    <!-- BLACKOUT full takeover -->
+    <div style="min-height:calc(100vh - 37px); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:22px; padding:40px; text-align:center; position:relative; overflow:hidden;">
+      <div style="position:absolute; top:0; left:0; right:0; height:140px; background:linear-gradient(180deg, rgba(255,60,60,0.12), transparent); animation:aegis-scan 3.4s linear infinite;"></div>
+      <div style="width:88px; height:88px; border-radius:50%; border:3px solid #ff4d4d; display:flex; align-items:center; justify-content:center;">
+        <div style="width:28px; height:34px; border:3px solid #ff4d4d; border-bottom:none; border-radius:14px 14px 0 0; position:relative; top:8px;"></div>
+      </div>
+      <div style="font-family:'Space Grotesk',sans-serif; font-size:34px; font-weight:700; letter-spacing:1px; color:#ff5a5a;">BLACKOUT ACTIVE</div>
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:#9fb3c4; max-width:480px; line-height:1.6;">Jarvis runtime is offline. All connectors have been revoked. This state cannot be cleared by Jarvis. A development-only recovery workflow is required below.</div>
+      <div style="display:flex; gap:14px; font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:#7f95a8;">
+        <span>JARVIS: OFFLINE</span><span>·</span><span>CONNECTORS: REVOKED</span><span>·</span><span>SINCE: {{ blackoutSince }}</span>
+      </div>
+      <button onClick="{{ openRecovery }}" style="margin-top:10px; background:transparent; border:1.5px solid #ff5a5a; color:#ff5a5a; font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:13px; padding:12px 26px; border-radius:10px; cursor:pointer;" style-hover="background:rgba(255,90,90,0.08);">Begin Recovery (dev-only)</button>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isNotBlack }}" hint-placeholder-val="{{ true }}">
+  <div style="padding:24px; max-width:1360px; margin:0 auto;">
+
+    <!-- Header -->
+    <div style="display:flex; flex-wrap:wrap; gap:18px; align-items:center; justify-content:space-between; margin-bottom:22px;">
+      <div style="display:flex; align-items:center; gap:14px;">
+        <div style="position:relative; width:38px; height:38px; flex-shrink:0;">
+          <div style="position:absolute; inset:0; border-radius:8px; border:2px solid {{ levelColor }};"></div>
+          <div style="position:absolute; inset:9px; border-radius:3px; background:{{ levelColor }};"></div>
+        </div>
+        <div>
+          <div style="font-family:'Space Grotesk',sans-serif; font-size:19px; font-weight:600; color:#f2f8ff;">AEGIS Security Console</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:#7f95a8;">Independent monitoring &amp; containment — simulated prototype</div>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:10px; background:{{ levelBg }}; border:1px solid {{ levelColor }}; border-radius:20px; padding:8px 16px;">
+        <span style="width:9px; height:9px; border-radius:50%; background:{{ levelColor }}; animation: aegis-blink 1.6s infinite;"></span>
+        <span style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:13px; letter-spacing:1px; color:{{ levelColor }};">{{ levelLabel }}</span>
+      </div>
+    </div>
+
+    <!-- Runtime chips -->
+    <div style="display:flex; flex-wrap:wrap; gap:12px; margin-bottom:22px;">
+      <div style="display:flex; align-items:center; gap:8px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:9px 14px;">
+        <span style="width:8px; height:8px; border-radius:50%; background:{{ jarvisStatusColor }};"></span>
+        <span style="font-size:12.5px; color:#dce8f0;">Jarvis: {{ jarvisStatusLabel }}</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:9px 14px;">
+        <span style="width:8px; height:8px; border-radius:50%; background:#5ad18a;"></span>
+        <span style="font-size:12.5px; color:#dce8f0;">AEGIS: Running independently</span>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div style="display:flex; gap:6px; margin-bottom:20px; border-bottom:1px solid rgba(255,255,255,0.08); flex-wrap:wrap;">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="4">
+        <div onClick="{{ t.select }}" style="padding:10px 16px; cursor:pointer; font-family:'Space Grotesk',sans-serif; font-size:13px; color:{{ t.color }}; border-bottom:2px solid {{ t.borderColor }};">{{ t.label }}</div>
+      </sc-for>
+    </div>
+
+    <!-- OVERVIEW TAB -->
+    <sc-if value="{{ showOverview }}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex; flex-wrap:wrap; gap:20px; align-items:flex-start;">
+
+        <!-- Capability grid -->
+        <div style="flex:2 1 460px; min-width:340px; background:rgba(255,255,255,0.025); border:1px solid rgba(255,255,255,0.07); border-radius:16px; padding:20px;">
+          <div style="font-family:'Space Grotesk',sans-serif; font-size:13px; letter-spacing:1px; text-transform:uppercase; color:#7f95a8; margin-bottom:14px;">Capabilities</div>
+          <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:10px;">
+            <sc-for list="{{ capabilities }}" as="cap" hint-placeholder-count="7">
+              <div style="display:flex; align-items:center; justify-content:space-between; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); border-radius:10px; padding:10px 12px;">
+                <div style="display:flex; flex-direction:column; gap:2px;">
+                  <span style="font-size:12.5px; color:#dce8f0;">{{ cap.name }}</span>
+                  <span style="font-family:'IBM Plex Mono',monospace; font-size:9.5px; color:#5f7284;">simulated</span>
+                </div>
+                <span style="font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:600; color:{{ cap.color }};">{{ cap.state }}</span>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="font-family:'Space Grotesk',sans-serif; font-size:13px; letter-spacing:1px; text-transform:uppercase; color:#7f95a8; margin:22px 0 12px;">Recent Security Events</div>
+          <div style="display:flex; flex-direction:column; gap:8px; max-height:220px; overflow-y:auto;">
+            <sc-for list="{{ recentEvents }}" as="ev" hint-placeholder-count="3">
+              <div style="display:flex; gap:10px; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.05);">
+                <div style="font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:{{ ev.color }}; width:64px; flex-shrink:0;">{{ ev.time }}</div>
+                <div style="font-size:12.5px; color:#c9d6e0;">{{ ev.text }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <!-- Emergency controls -->
+        <div style="flex:1 1 300px; min-width:280px; display:flex; flex-direction:column; gap:16px;">
+          <div style="background:rgba(255,255,255,0.025); border:1px solid rgba(255,255,255,0.07); border-radius:16px; padding:18px;">
+            <div style="font-family:'Space Grotesk',sans-serif; font-size:13px; letter-spacing:1px; text-transform:uppercase; color:#7f95a8; margin-bottom:14px;">Emergency Controls</div>
+            <div style="display:flex; flex-direction:column; gap:9px;">
+              <button onClick="{{ restrictJarvis }}" disabled="{{ restrictDisabled }}" style="background:rgba(255,184,77,0.1); border:1px solid rgba(255,184,77,0.4); color:#ffb84d; font-family:'Space Grotesk',sans-serif; font-size:13px; font-weight:600; padding:11px; border-radius:10px; cursor:pointer; opacity:{{ restrictOpacity }};">Restrict Jarvis (Yellow)</button>
+              <button onClick="{{ confirmIsolate }}" disabled="{{ isolateDisabled }}" style="background:rgba(255,90,90,0.1); border:1px solid rgba(255,90,90,0.4); color:#ff7a7a; font-family:'Space Grotesk',sans-serif; font-size:13px; font-weight:600; padding:11px; border-radius:10px; cursor:pointer; opacity:{{ isolateOpacity }};">Isolate Jarvis (Red)</button>
+              <button onClick="{{ confirmBlackout }}" style="background:rgba(255,30,30,0.14); border:1px solid rgba(255,30,30,0.5); color:#ff4040; font-family:'Space Grotesk',sans-serif; font-size:13px; font-weight:700; padding:11px; border-radius:10px; cursor:pointer;">Initiate Blackout</button>
+              <button onClick="{{ confirmStopAll }}" style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.12); color:#c9d6e0; font-family:'Space Grotesk',sans-serif; font-size:13px; font-weight:600; padding:11px; border-radius:10px; cursor:pointer;">Stop All Activity</button>
+              <div style="display:flex; gap:9px;">
+                <button onClick="{{ openIncident }}" style="flex:1; background:transparent; border:1px solid rgba(255,255,255,0.12); color:#9fb3c4; font-family:'Inter',sans-serif; font-size:12px; padding:9px; border-radius:10px; cursor:pointer;">View Incident</button>
+                <button onClick="{{ openRecovery }}" disabled="{{ recoveryDisabled }}" style="flex:1; background:transparent; border:1px solid rgba(255,255,255,0.12); color:#9fb3c4; font-family:'Inter',sans-serif; font-size:12px; padding:9px; border-radius:10px; cursor:pointer; opacity:{{ recoveryOpacity }};">Begin Recovery</button>
+              </div>
+            </div>
+          </div>
+
+          <div style="background:rgba(255,255,255,0.025); border:1px solid rgba(255,255,255,0.07); border-radius:16px; padding:18px;">
+            <div style="font-family:'Space Grotesk',sans-serif; font-size:13px; letter-spacing:1px; text-transform:uppercase; color:#7f95a8; margin-bottom:10px;">Recovery Status</div>
+            <div style="font-size:12.5px; color:#aebfcd; line-height:1.6;">{{ recoveryStatusText }}</div>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- SOFTWARE REVIEW TAB -->
+    <sc-if value="{{ showReview }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex; flex-wrap:wrap; gap:20px; align-items:flex-start;">
+        <div style="flex:2 1 420px; min-width:340px; background:rgba(255,255,255,0.025); border:1px solid rgba(255,255,255,0.07); border-radius:16px; padding:20px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+            <div style="font-family:'Space Grotesk',sans-serif; font-size:15px; color:#f2f8ff;">{{ review.name }}</div>
+            <div style="background:{{ review.verdictBg }}; border:1px solid {{ review.verdictColor }}; color:{{ review.verdictColor }}; font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:600; padding:5px 12px; border-radius:20px;">{{ review.verdict }}</div>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px 20px;">
+            <div><div style="font-size:10.5px; color:#7f95a8; text-transform:uppercase; letter-spacing:0.5px;">Publisher</div><div style="font-size:13px; color:#dce8f0; margin-top:3px;">{{ review.publisher }}</div></div>
+            <div><div style="font-size:10.5px; color:#7f95a8; text-transform:uppercase; letter-spacing:0.5px;">Version</div><div style="font-size:13px; color:#dce8f0; margin-top:3px;">{{ review.version }}</div></div>
+            <div style="grid-column:1/-1;"><div style="font-size:10.5px; color:#7f95a8; text-transform:uppercase; letter-spacing:0.5px;">Source URL</div><div style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#8fb8ff; margin-top:3px;">{{ review.source }}</div></div>
+            <div style="grid-column:1/-1;"><div style="font-size:10.5px; color:#7f95a8; text-transform:uppercase; letter-spacing:0.5px;">Requested Permissions</div><div style="font-size:13px; color:#dce8f0; margin-top:3px;">{{ review.permissions }}</div></div>
+            <div><div style="font-size:10.5px; color:#7f95a8; text-transform:uppercase; letter-spacing:0.5px;">Digital Signature</div><div style="font-size:13px; color:#5ad18a; margin-top:3px;">{{ review.signature }}</div></div>
+            <div><div style="font-size:10.5px; color:#7f95a8; text-transform:uppercase; letter-spacing:0.5px;">Malware Scan</div><div style="font-size:13px; color:#5ad18a; margin-top:3px;">{{ review.malwareScan }}</div></div>
+            <div><div style="font-size:10.5px; color:#7f95a8; text-transform:uppercase; letter-spacing:0.5px;">Known Vulnerabilities</div><div style="font-size:13px; color:#dce8f0; margin-top:3px;">{{ review.vulns }}</div></div>
+            <div><div style="font-size:10.5px; color:#7f95a8; text-transform:uppercase; letter-spacing:0.5px;">Sandbox Test</div><div style="font-size:13px; color:#dce8f0; margin-top:3px;">{{ review.sandbox }}</div></div>
+            <div style="grid-column:1/-1;"><div style="font-size:10.5px; color:#7f95a8; text-transform:uppercase; letter-spacing:0.5px;">Network Activity</div><div style="font-size:13px; color:#dce8f0; margin-top:3px;">{{ review.network }}</div></div>
+          </div>
+          <div style="margin-top:14px; font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:#5f7284;">Demonstration data — no real scan was performed.</div>
+        </div>
+
+        <div style="flex:1 1 280px; min-width:260px; background:rgba(255,255,255,0.025); border:1px solid rgba(255,255,255,0.07); border-radius:16px; padding:18px;">
+          <div style="font-family:'Space Grotesk',sans-serif; font-size:13px; letter-spacing:1px; text-transform:uppercase; color:#7f95a8; margin-bottom:12px;">Review Queue</div>
+          <sc-for list="{{ queuedReviews }}" as="q" hint-placeholder-count="2">
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-bottom:1px solid rgba(255,255,255,0.05);">
+              <div style="font-size:12.5px; color:#dce8f0;">{{ q.name }}</div>
+              <div style="font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:{{ q.color }};">{{ q.verdict }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- THREAT INTEL TAB -->
+    <sc-if value="{{ showThreat }}" hint-placeholder-val="{{ false }}">
+      <div style="background:rgba(255,255,255,0.025); border:1px solid rgba(255,255,255,0.07); border-radius:16px; padding:20px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <div style="font-family:'Space Grotesk',sans-serif; font-size:14px; color:#f2f8ff;">Threat Intelligence Briefing</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:#5f7284;">demonstration data</div>
+        </div>
+        <div style="font-size:12px; color:#7f95a8; margin-bottom:16px;">Simulated monitoring summary — not connected to a live threat feed.</div>
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          <sc-for list="{{ threats }}" as="th" hint-placeholder-count="3">
+            <div style="border:1px solid rgba(255,255,255,0.07); border-radius:12px; padding:14px 16px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <div style="font-size:13.5px; color:#dce8f0; font-weight:500;">{{ th.title }}</div>
+                <div style="background:{{ th.riskBg }}; color:{{ th.riskColor }}; font-family:'IBM Plex Mono',monospace; font-size:10.5px; font-weight:600; padding:4px 10px; border-radius:20px;">{{ th.risk }}</div>
+              </div>
+              <div style="font-size:12px; color:#aebfcd; margin-bottom:6px;">Affects: {{ th.affected }}</div>
+              <div style="font-size:12px; color:#aebfcd; margin-bottom:6px;">Action taken: {{ th.action }}</div>
+              <div style="font-size:11.5px; color:{{ th.approvalColor }};">{{ th.approvalText }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- AUDIT LOG TAB -->
+    <sc-if value="{{ showAudit }}" hint-placeholder-val="{{ false }}">
+      <div style="background:rgba(255,255,255,0.025); border:1px solid rgba(255,255,255,0.07); border-radius:16px; padding:20px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+          <div style="font-family:'Space Grotesk',sans-serif; font-size:13px; letter-spacing:1px; text-transform:uppercase; color:#7f95a8;">Audit Log — Append Only</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:#5f7284;">{{ auditLog.length }} entries</div>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:0;">
+          <sc-for list="{{ auditLog }}" as="a" hint-placeholder-count="6">
+            <div style="display:flex; gap:16px; padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.05); font-family:'IBM Plex Mono',monospace; font-size:11.5px;">
+              <div style="color:#5f7284; width:150px; flex-shrink:0;">{{ a.timestamp }}</div>
+              <div style="color:{{ a.color }}; width:90px; flex-shrink:0;">{{ a.type }}</div>
+              <div style="color:#c9d6e0;">{{ a.detail }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+  </div>
+  </sc-if>
+
+  <!-- MODALS -->
+  <sc-if value="{{ modalOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeModal }}" style="position:fixed; inset:0; background:rgba(4,6,9,0.72); display:flex; align-items:center; justify-content:center; z-index:50; padding:20px;">
+      <div onClick="{{ stopPropagation }}" style="background:#12151b; border:1px solid rgba(255,255,255,0.1); border-radius:16px; padding:26px; max-width:440px; width:100%;">
+        <div style="font-family:'Space Grotesk',sans-serif; font-size:16px; color:#f2f8ff; margin-bottom:10px;">{{ modalTitle }}</div>
+        <div style="font-size:13px; color:#aebfcd; line-height:1.6; margin-bottom:18px;">{{ modalBody }}</div>
+
+        <sc-if value="{{ modalNeedsTyped }}" hint-placeholder-val="{{ false }}">
+          <input value="{{ blackoutInput }}" onChange="{{ onBlackoutInputChange }}" placeholder="Type BLACKOUT to confirm" style="width:100%; box-sizing:border-box; background:rgba(255,255,255,0.04); border:1px solid rgba(255,90,90,0.4); border-radius:10px; padding:11px 14px; color:#eaf2f8; font-family:'IBM Plex Mono',monospace; font-size:13px; margin-bottom:16px;" />
+        </sc-if>
+
+        <sc-if value="{{ modalIsRecovery }}" hint-placeholder-val="{{ false }}">
+          <input value="{{ recoveryKeyInput }}" onChange="{{ onRecoveryInputChange }}" placeholder="Development recovery key (any text)" style="width:100%; box-sizing:border-box; background:rgba(255,255,255,0.04); border:1px solid rgba(90,209,255,0.4); border-radius:10px; padding:11px 14px; color:#eaf2f8; font-family:'IBM Plex Mono',monospace; font-size:13px; margin-bottom:16px;" />
+        </sc-if>
+
+        <sc-if value="{{ modalIsIncident }}" hint-placeholder-val="{{ false }}">
+          <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:12px; font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:#c9d6e0; line-height:1.7; margin-bottom:16px;">{{ incidentDetail }}</div>
+        </sc-if>
+
+        <div style="display:flex; gap:10px; justify-content:flex-end;">
+          <button onClick="{{ closeModal }}" style="background:transparent; border:1px solid rgba(255,255,255,0.14); color:#9fb3c4; font-family:'Inter',sans-serif; font-size:13px; padding:9px 16px; border-radius:9px; cursor:pointer;">{{ modalCancelLabel }}</button>
+          <sc-if value="{{ modalHasConfirm }}" hint-placeholder-val="{{ false }}">
+            <button onClick="{{ modalConfirmAction }}" disabled="{{ modalConfirmDisabled }}" style="background:{{ modalConfirmBg }}; border:none; color:{{ modalConfirmColor }}; font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:13px; padding:9px 18px; border-radius:9px; cursor:pointer; opacity:{{ modalConfirmOpacity }};">{{ modalConfirmLabel }}</button>
+          </sc-if>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 1400, &quot;height&quot;: 900}}">
+const STORAGE_KEY = 'aegis_console_v1';
+
+function nowStamp() {
+  const d = new Date();
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+const DEFAULT_STATE = {
+  level: 'green',
+  blackoutSince: null,
+  auditLog: [
+    { timestamp: nowStamp(), type: 'SYSTEM', detail: 'AEGIS watchdog initialized. Baseline security level: GREEN.' }
+  ],
+  recentEvents: [
+    { time: 'now', text: 'AEGIS console initialized in GREEN state.' }
+  ]
+};
+
+const LEVELS = {
+  green:  { label: 'GREEN — NORMAL', color: '#5ad18a', bg: 'rgba(90,209,138,0.08)' },
+  yellow: { label: 'YELLOW — RESTRICTED', color: '#ffb84d', bg: 'rgba(255,184,77,0.08)' },
+  red:    { label: 'RED — ISOLATED', color: '#ff5a5a', bg: 'rgba(255,90,90,0.08)' },
+  black:  { label: 'BLACK — BLACKOUT', color: '#ff2b2b', bg: 'rgba(255,43,43,0.1)' }
+};
+
+class Component extends DCLogic {
+  state = {
+    data: null,
+    tab: 'overview',
+    modal: null,
+    blackoutInput: '',
+    recoveryKeyInput: ''
+  };
+
+  componentDidMount() {
+    let data = null;
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) data = JSON.parse(raw);
+    } catch (e) {}
+    if (!data) data = JSON.parse(JSON.stringify(DEFAULT_STATE));
+    this.setState({ data });
+  }
+
+  persist(data) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch (e) {}
+  }
+
+  update(mutator) {
+    this.setState((s) => {
+      const data = JSON.parse(JSON.stringify(s.data));
+      mutator(data);
+      this.persist(data);
+      return { data };
+    });
+  }
+
+  log(data, type, detail) {
+    data.auditLog.unshift({ timestamp: nowStamp(), type, detail });
+    data.recentEvents.unshift({ time: nowStamp().split(' ').slice(-1)[0], text: detail, color: type === 'LOCKDOWN' ? '#ff5a5a' : type === 'RECOVERY' ? '#5ad1ff' : '#7f95a8' });
+    data.recentEvents = data.recentEvents.slice(0, 8);
+  }
+
+  setTab = (tab) => () => this.setState({ tab });
+
+  restrictJarvis = () => {
+    if (this.state.data.level !== 'green') return;
+    this.update((d) => {
+      d.level = 'yellow';
+      this.log(d, 'LOCKDOWN', 'AEGIS restricted Jarvis to YELLOW. Computer control, downloads, sending and external connectors disabled.');
+    });
+  };
+
+  confirmIsolate = () => {
+    if (this.state.data.level === 'red' || this.state.data.level === 'black') return;
+    this.setState({ modal: 'isolate' });
+  };
+  doIsolate = () => {
+    this.update((d) => {
+      d.level = 'red';
+      this.log(d, 'LOCKDOWN', 'AEGIS isolated Jarvis to RED. Screen capture, microphone, agents and network access stopped.');
+    });
+    this.closeModal();
+  };
+
+  confirmBlackout = () => this.setState({ modal: 'blackout', blackoutInput: '' });
+  doBlackout = () => {
+    if (this.state.blackoutInput.trim().toUpperCase() !== 'BLACKOUT') return;
+    this.update((d) => {
+      d.level = 'black';
+      d.blackoutSince = nowStamp();
+      this.log(d, 'LOCKDOWN', 'AEGIS initiated BLACKOUT. Jarvis runtime terminated; all connectors revoked. Recovery required.');
+    });
+    this.closeModal();
+  };
+
+  confirmStopAll = () => this.setState({ modal: 'stopall' });
+  doStopAll = () => {
+    this.update((d) => {
+      if (d.level === 'green' || d.level === 'yellow') d.level = 'red';
+      this.log(d, 'LOCKDOWN', 'Manual "Stop All Activity" issued. Subordinate agents and external communications halted.');
+    });
+    this.closeModal();
+  };
+
+  openIncident = () => this.setState({ modal: 'incident' });
+
+  openRecovery = () => {
+    if (this.state.data.level === 'green') return;
+    this.setState({ modal: 'recovery', recoveryKeyInput: '' });
+  };
+  doRecovery = () => {
+    if (!this.state.recoveryKeyInput.trim()) return;
+    this.update((d) => {
+      const from = d.level;
+      d.level = 'green';
+      d.blackoutSince = null;
+      this.log(d, 'RECOVERY', `Development-only recovery executed by authenticated human action. Level reduced from ${from.toUpperCase()} to GREEN.`);
+    });
+    this.closeModal();
+  };
+
+  closeModal = () => this.setState({ modal: null, blackoutInput: '', recoveryKeyInput: '' });
+  stopPropagation = (e) => e.stopPropagation();
+  onBlackoutInputChange = (e) => this.setState({ blackoutInput: e.target.value });
+  onRecoveryInputChange = (e) => this.setState({ recoveryKeyInput: e.target.value });
+
+  renderVals() {
+    const data = this.state.data || DEFAULT_STATE;
+    const level = data.level;
+    const meta = LEVELS[level];
+    const isBlack = level === 'black';
+
+    const capDefs = [
+      { key: 'computer', name: 'Computer Control', offAt: ['yellow', 'red', 'black'] },
+      { key: 'downloads', name: 'Downloads', offAt: ['yellow', 'red', 'black'] },
+      { key: 'sending', name: 'Sending', offAt: ['yellow', 'red', 'black'] },
+      { key: 'connectors', name: 'External Connectors', offAt: ['yellow', 'red', 'black'] },
+      { key: 'screen', name: 'Screen Capture', offAt: ['red', 'black'] },
+      { key: 'mic', name: 'Microphone', offAt: ['red', 'black'] },
+      { key: 'agents', name: 'Subordinate Agents', offAt: ['red', 'black'] },
+      { key: 'network', name: 'Network Access', offAt: ['red', 'black'] }
+    ];
+    const capabilities = capDefs.map((c) => {
+      const off = c.offAt.includes(level);
+      return { name: c.name, state: off ? 'DISABLED' : 'ENABLED', color: off ? '#ff5a5a' : '#5ad18a' };
+    });
+
+    const recentEvents = (data.recentEvents || []).map((e) => ({ time: e.time, text: e.text, color: e.color || '#7f95a8' }));
+    const auditLog = (data.auditLog || []).map((e) => ({ timestamp: e.timestamp, type: e.type, detail: e.detail, color: e.type === 'LOCKDOWN' ? '#ff5a5a' : e.type === 'RECOVERY' ? '#5ad1ff' : '#7f95a8' }));
+
+    const tabDefs = [
+      { id: 'overview', label: 'Overview' },
+      { id: 'review', label: 'Software Review' },
+      { id: 'threat', label: 'Threat Intel' },
+      { id: 'audit', label: 'Audit Log' }
+    ];
+    const tabs = tabDefs.map((t) => ({
+      label: t.label,
+      select: this.setTab(t.id),
+      color: this.state.tab === t.id ? '#f2f8ff' : '#7f95a8',
+      borderColor: this.state.tab === t.id ? meta.color : 'transparent'
+    }));
+
+    let modalTitle = '', modalBody = '', modalConfirmLabel = 'Confirm', modalCancelLabel = 'Cancel',
+        modalHasConfirm = true, modalNeedsTyped = false, modalIsRecovery = false, modalIsIncident = false,
+        modalConfirmAction = () => {}, modalConfirmDisabled = false;
+
+    if (this.state.modal === 'isolate') {
+      modalTitle = 'Isolate Jarvis?';
+      modalBody = 'This stops subordinate agents and external communications, blocks screen capture, microphone and network access at the application level. This is a simulated UI transition only.';
+      modalConfirmLabel = 'Isolate (Red)';
+      modalConfirmAction = this.doIsolate;
+    } else if (this.state.modal === 'blackout') {
+      modalTitle = 'Initiate Blackout?';
+      modalBody = 'This terminates the Jarvis runtime and revokes all connectors. Jarvis cannot clear this state. Type BLACKOUT to confirm.';
+      modalConfirmLabel = 'Initiate Blackout';
+      modalNeedsTyped = true;
+      modalConfirmAction = this.doBlackout;
+      modalConfirmDisabled = this.state.blackoutInput.trim().toUpperCase() !== 'BLACKOUT';
+    } else if (this.state.modal === 'stopall') {
+      modalTitle = 'Stop All Activity?';
+      modalBody = 'Halts all subordinate agents and external communications immediately. This is a simulated UI transition only.';
+      modalConfirmLabel = 'Stop All';
+      modalConfirmAction = this.doStopAll;
+    } else if (this.state.modal === 'recovery') {
+      modalTitle = 'Begin Recovery (development-only)';
+      modalBody = 'This recovery path is for local development only and is not a production-grade credential. Enter any text to simulate an authenticated human recovery action.';
+      modalConfirmLabel = 'Recover to Green';
+      modalIsRecovery = true;
+      modalConfirmAction = this.doRecovery;
+      modalConfirmDisabled = !this.state.recoveryKeyInput.trim();
+    } else if (this.state.modal === 'incident') {
+      modalTitle = 'Latest Incident';
+      modalIsIncident = true;
+      modalHasConfirm = false;
+      modalCancelLabel = 'Close';
+    }
+
+    const incidentDetail = (auditLog[0] && auditLog[0].detail) || 'No incidents recorded yet.';
+
+    return {
+      isBlack,
+      isNotBlack: !isBlack,
+      blackoutSince: data.blackoutSince || nowStamp(),
+      levelColor: meta.color,
+      levelBg: meta.bg,
+      levelLabel: meta.label,
+      jarvisStatusColor: level === 'black' ? '#ff5a5a' : '#5ad18a',
+      jarvisStatusLabel: level === 'black' ? 'Offline (blackout)' : level === 'red' ? 'Running, isolated' : level === 'yellow' ? 'Running, restricted' : 'Running normally',
+
+      tabs,
+      showOverview: this.state.tab === 'overview',
+      showReview: this.state.tab === 'review',
+      showThreat: this.state.tab === 'threat',
+      showAudit: this.state.tab === 'audit',
+
+      capabilities,
+      recentEvents,
+      auditLog,
+
+      restrictJarvis: this.restrictJarvis,
+      restrictDisabled: level !== 'green',
+      restrictOpacity: level !== 'green' ? '0.4' : '1',
+      confirmIsolate: this.confirmIsolate,
+      isolateDisabled: level === 'red' || level === 'black',
+      isolateOpacity: (level === 'red' || level === 'black') ? '0.4' : '1',
+      confirmBlackout: this.confirmBlackout,
+      confirmStopAll: this.confirmStopAll,
+      openIncident: this.openIncident,
+      openRecovery: this.openRecovery,
+      recoveryDisabled: level === 'green',
+      recoveryOpacity: level === 'green' ? '0.4' : '1',
+
+      recoveryStatusText: level === 'green'
+        ? 'No active lockdown. Recovery is not required.'
+        : level === 'black'
+        ? 'BLACKOUT active. Awaiting development-only recovery action by an authenticated human.'
+        : `Lockdown active at ${level.toUpperCase()}. Only an authenticated human recovery action can reduce this level.`,
+
+      review: {
+        name: 'FocusFlow Desktop Widget',
+        publisher: 'Nimbus Software Ltd.',
+        version: '2.4.1',
+        source: 'https://get.focusflow.example/dl/win/2.4.1',
+        permissions: 'Notifications, local file read, background run',
+        signature: 'Valid — signed by publisher',
+        malwareScan: 'Clean — 0 detections',
+        vulns: 'None known (CVE database, demo)',
+        sandbox: 'No suspicious behavior observed',
+        network: 'Outbound to update server only',
+        verdict: 'APPROVED WITH RESTRICTIONS',
+        verdictColor: '#ffb84d',
+        verdictBg: 'rgba(255,184,77,0.1)'
+      },
+      queuedReviews: [
+        { name: 'CloudSync Agent v1.2', verdict: 'HIGH RISK', color: '#ff5a5a' },
+        { name: 'DevTools Helper v9.0', verdict: 'APPROVED', color: '#5ad18a' }
+      ],
+
+      threats: [
+        { title: 'Fake browser-update popup campaign', affected: 'Chromium-based browsers', risk: 'MEDIUM', riskColor: '#ffb84d', riskBg: 'rgba(255,184,77,0.1)', action: 'Blocked known distribution domains (demo).', approvalColor: '#7f95a8', approvalText: 'No approval required — informational only.' },
+        { title: 'Credential-stuffing wave targeting cloud storage', affected: 'Personal cloud accounts', risk: 'HIGH', riskColor: '#ff5a5a', riskBg: 'rgba(255,90,90,0.1)', action: 'Recommended MFA review (not yet actioned).', approvalColor: '#ffb84d', approvalText: 'William\u2019s approval required to proceed.' },
+        { title: 'Unpatched vulnerability in a monitored utility', affected: 'FocusFlow Desktop Widget 2.3.x', risk: 'LOW', riskColor: '#5ad18a', riskBg: 'rgba(90,209,138,0.1)', action: 'Flagged for update on next review cycle.', approvalColor: '#7f95a8', approvalText: 'No approval required — informational only.' }
+      ],
+
+      modalOpen: !!this.state.modal,
+      modalTitle, modalBody, modalConfirmLabel, modalCancelLabel,
+      modalHasConfirm, modalNeedsTyped, modalIsRecovery, modalIsIncident,
+      modalConfirmAction, modalConfirmDisabled,
+      modalConfirmBg: modalConfirmDisabled ? 'rgba(255,255,255,0.06)' : (this.state.modal === 'recovery' ? 'rgba(90,209,255,0.15)' : 'rgba(255,90,90,0.18)'),
+      modalConfirmColor: modalConfirmDisabled ? '#5f7284' : (this.state.modal === 'recovery' ? '#5ad1ff' : '#ff6a6a'),
+      modalConfirmOpacity: modalConfirmDisabled ? '0.5' : '1',
+      incidentDetail,
+      blackoutInput: this.state.blackoutInput,
+      recoveryKeyInput: this.state.recoveryKeyInput,
+      onBlackoutInputChange: this.onBlackoutInputChange,
+      onRecoveryInputChange: this.onRecoveryInputChange,
+      closeModal: this.closeModal,
+      stopPropagation: this.stopPropagation
+    };
+  }
+}
+
+</script>
+</body>
+</html>

@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    body { margin: 0; background: #05070a; }
+    @keyframes jarvis-pulse {
+      0% { transform: scale(0.9); opacity: 0.7; }
+      70% { transform: scale(1.6); opacity: 0; }
+      100% { transform: scale(1.6); opacity: 0; }
+    }
+    @keyframes jarvis-spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    @keyframes jarvis-blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-thumb { background: rgba(120,200,255,0.25); border-radius: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+  </style>
+</helmet>
+
+<div style="min-height:100vh; width:100%; background: radial-gradient(circle at 15% 0%, {{ accentGlow }} 0%, transparent 45%), radial-gradient(circle at 100% 100%, rgba(80,120,255,0.08) 0%, transparent 50%), #05070a; font-family:'Inter', sans-serif; color: #dce8f0; box-sizing:border-box; padding: 28px;">
+
+  <!-- Top bar -->
+  <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px; margin-bottom:24px;">
+    <div style="display:flex; align-items:center; gap:14px;">
+      <div style="position:relative; width:40px; height:40px; flex-shrink:0;">
+        <div style="position:absolute; inset:0; border-radius:50%; border:2px solid {{ accentColor }}; opacity:0.9;"></div>
+        <div style="position:absolute; inset:6px; border-radius:50%; border:1px solid {{ accentColor }}; opacity:0.5; animation: jarvis-spin 6s linear infinite;"></div>
+        <div style="position:absolute; inset:15px; border-radius:50%; background:{{ accentColor }}; box-shadow: 0 0 12px {{ accentColor }};"></div>
+      </div>
+      <div>
+        <div style="font-family:'Space Grotesk', sans-serif; font-size:20px; font-weight:600; letter-spacing:0.5px; color:#f2f8ff;">{{ systemName }}</div>
+        <div style="font-family:'IBM Plex Mono', monospace; font-size:11px; letter-spacing:1.5px; text-transform:uppercase; color:{{ accentColor }}; opacity:0.85;">{{ statusLine }}</div>
+      </div>
+    </div>
+
+    <div style="display:flex; align-items:center; gap:22px; flex-wrap:wrap;">
+      <div style="text-align:right;">
+        <div style="font-family:'Space Grotesk', sans-serif; font-size:15px; color:#f2f8ff;">{{ greeting }}</div>
+        <div style="font-family:'IBM Plex Mono', monospace; font-size:12px; color:#7f95a8;">{{ dateTimeLabel }}</div>
+      </div>
+      <button onClick="{{ toggleVoiceOutput }}" style="display:flex; align-items:center; gap:8px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:20px; padding:8px 14px; cursor:pointer; color:#9fb3c4; font-family:'IBM Plex Mono', monospace; font-size:11px; letter-spacing:0.5px;" style-hover="border-color: rgba(255,255,255,0.2); color:#dce8f0;">
+        <span style="width:7px; height:7px; border-radius:50%; background:{{ voiceIndicatorColor }};"></span>
+        {{ voiceOutputLabel }}
+      </button>
+    </div>
+  </div>
+
+  <!-- Main grid -->
+  <div style="display:flex; flex-wrap:wrap; gap:20px; align-items:flex-start;">
+
+    <!-- Chat column -->
+    <div style="flex:2 1 420px; min-width:340px; background:rgba(255,255,255,0.025); border:1px solid rgba(255,255,255,0.07); border-radius:18px; padding:22px; display:flex; flex-direction:column; height:640px; backdrop-filter: blur(6px);">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+        <div style="font-family:'Space Grotesk', sans-serif; font-size:14px; letter-spacing:1px; text-transform:uppercase; color:#7f95a8;">Conversation</div>
+        <div style="font-family:'IBM Plex Mono', monospace; font-size:11px; color:{{ accentColor }};">{{ memoryCountLabel }}</div>
+      </div>
+
+      <div ref="{{ scrollRef }}" style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:14px; padding-right:6px;">
+        <sc-for list="{{ messages }}" as="msg" hint-placeholder-count="3">
+          <div style="align-self: {{ msg.alignSelf }}; max-width:80%; display:flex; flex-direction:column; gap:4px;">
+            <div style="font-family:'IBM Plex Mono', monospace; font-size:10px; letter-spacing:1px; text-transform:uppercase; color:#5f7draggable; color:#647587; padding: 0 4px;">{{ msg.speakerLabel }}</div>
+            <div style="background:{{ msg.bubbleBg }}; border:1px solid {{ msg.bubbleBorder }}; border-radius:14px; padding:12px 16px; font-size:14.5px; line-height:1.5; color:#eaf2f8; white-space:pre-wrap;">{{ msg.text }}</div>
+          </div>
+        </sc-for>
+        <sc-if value="{{ isThinking }}" hint-placeholder-val="{{ false }}">
+          <div style="align-self:flex-start; display:flex; gap:5px; padding:10px 16px;">
+            <span style="width:6px; height:6px; border-radius:50%; background:{{ accentColor }}; animation: jarvis-blink 1s infinite;"></span>
+            <span style="width:6px; height:6px; border-radius:50%; background:{{ accentColor }}; animation: jarvis-blink 1s infinite 0.15s;"></span>
+            <span style="width:6px; height:6px; border-radius:50%; background:{{ accentColor }}; animation: jarvis-blink 1s infinite 0.3s;"></span>
+          </div>
+        </sc-if>
+      </div>
+
+      <div style="display:flex; align-items:center; gap:10px; margin-top:16px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.09); border-radius:14px; padding:8px 10px;">
+        <button onClick="{{ toggleListening }}" style="position:relative; flex-shrink:0; width:38px; height:38px; border-radius:50%; border:none; cursor:pointer; background:{{ micBg }}; display:flex; align-items:center; justify-content:center;">
+          <sc-if value="{{ isListening }}" hint-placeholder-val="{{ false }}">
+            <span style="position:absolute; inset:0; border-radius:50%; border:2px solid {{ accentColor }}; animation: jarvis-pulse 1.4s ease-out infinite;"></span>
+          </sc-if>
+          <div style="width:12px; height:12px; border-radius:3px; background:{{ micIconColor }};"></div>
+        </button>
+        <input value="{{ draft }}" onChange="{{ onDraftChange }}" onKeyDown="{{ onInputKeyDown }}" placeholder="{{ inputPlaceholder }}" style="flex:1; background:transparent; border:none; outline:none; color:#eaf2f8; font-family:'Inter', sans-serif; font-size:14.5px;" />
+        <button onClick="{{ sendMessage }}" style="flex-shrink:0; background:{{ accentColor }}; border:none; border-radius:10px; padding:9px 16px; color:#04070a; font-family:'Space Grotesk', sans-serif; font-weight:600; font-size:13px; cursor:pointer;">Send</button>
+      </div>
+    </div>
+
+    <!-- Sidebar cards -->
+    <div style="flex:1 1 300px; min-width:280px; display:grid; grid-template-columns:repeat(auto-fit, minmax(260px,1fr)); gap:16px; align-content:start;">
+
+      <!-- Schedule -->
+      <div style="background:rgba(255,255,255,0.025); border:1px solid rgba(255,255,255,0.07); border-radius:16px; padding:18px;">
+        <div style="font-family:'Space Grotesk', sans-serif; font-size:13px; letter-spacing:1px; text-transform:uppercase; color:#7f95a8; margin-bottom:12px;">Schedule</div>
+        <sc-for list="{{ schedule }}" as="ev" hint-placeholder-count="3">
+          <div style="display:flex; gap:10px; align-items:flex-start; padding:7px 0; border-bottom:1px solid rgba(255,255,255,0.05);">
+            <div style="font-family:'IBM Plex Mono', monospace; font-size:11.5px; color:{{ accentColor }}; width:52px; flex-shrink:0;">{{ ev.time }}</div>
+            <div style="font-size:13px; color:#dce8f0;">{{ ev.title }}</div>
+          </div>
+        </sc-for>
+      </div>
+
+      <!-- Tasks -->
+      <div style="background:rgba(255,255,255,0.025); border:1px solid rgba(255,255,255,0.07); border-radius:16px; padding:18px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <div style="font-family:'Space Grotesk', sans-serif; font-size:13px; letter-spacing:1px; text-transform:uppercase; color:#7f95a8;">Tasks</div>
+          <div style="font-family:'IBM Plex Mono', monospace; font-size:11px; color:{{ accentColor }};">{{ taskProgressLabel }}</div>
+        </div>
+        <sc-for list="{{ tasks }}" as="task" hint-placeholder-count="4">
+          <div onClick="{{ task.toggle }}" style="display:flex; align-items:center; gap:10px; padding:6px 0; cursor:pointer;">
+            <div style="width:15px; height:15px; border-radius:4px; border:1.5px solid {{ task.boxBorder }}; background:{{ task.boxBg }}; flex-shrink:0;"></div>
+            <div style="font-size:13px; color:{{ task.textColor }}; text-decoration:{{ task.textDecoration }};">{{ task.label }}</div>
+          </div>
+        </sc-for>
+      </div>
+
+      <!-- Health -->
+      <div style="background:rgba(255,255,255,0.025); border:1px solid rgba(255,255,255,0.07); border-radius:16px; padding:18px;">
+        <div style="font-family:'Space Grotesk', sans-serif; font-size:13px; letter-spacing:1px; text-transform:uppercase; color:#7f95a8; margin-bottom:12px;">Health</div>
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#aebfcd;"><span>Sleep</span><span style="color:#eaf2f8; font-family:'IBM Plex Mono', monospace;">{{ health.sleep }}</span></div>
+          <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#aebfcd;"><span>Steps</span><span style="color:#eaf2f8; font-family:'IBM Plex Mono', monospace;">{{ health.steps }}</span></div>
+          <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#aebfcd;"><span>Resting HR</span><span style="color:#eaf2f8; font-family:'IBM Plex Mono', monospace;">{{ health.hr }}</span></div>
+          <div style="height:6px; border-radius:4px; background:rgba(255,255,255,0.06); overflow:hidden; margin-top:4px;">
+            <div style="height:100%; width:{{ health.trainingPct }}; background:{{ accentColor }};"></div>
+          </div>
+          <div style="font-size:11.5px; color:#7f95a8;">{{ health.trainingLabel }}</div>
+        </div>
+      </div>
+
+      <!-- Finance -->
+      <div style="background:rgba(255,255,255,0.025); border:1px solid rgba(255,255,255,0.07); border-radius:16px; padding:18px;">
+        <div style="font-family:'Space Grotesk', sans-serif; font-size:13px; letter-spacing:1px; text-transform:uppercase; color:#7f95a8; margin-bottom:12px;">Finance</div>
+        <div style="font-family:'IBM Plex Mono', monospace; font-size:22px; color:#f2f8ff; margin-bottom:6px;">{{ finance.balance }}</div>
+        <div style="font-size:12px; color:#7f95a8; margin-bottom:10px;">{{ finance.spendLabel }}</div>
+        <div style="height:6px; border-radius:4px; background:rgba(255,255,255,0.06); overflow:hidden;">
+          <div style="height:100%; width:{{ finance.budgetPct }}; background:{{ accentColor }};"></div>
+        </div>
+        <div style="font-size:11.5px; color:#7f95a8; margin-top:6px;">{{ finance.budgetLabel }}</div>
+      </div>
+
+      <!-- Work -->
+      <div style="background:rgba(255,255,255,0.025); border:1px solid rgba(255,255,255,0.07); border-radius:16px; padding:18px;">
+        <div style="font-family:'Space Grotesk', sans-serif; font-size:13px; letter-spacing:1px; text-transform:uppercase; color:#7f95a8; margin-bottom:12px;">Work</div>
+        <div style="font-size:13px; color:#dce8f0; margin-bottom:8px;">{{ work.project }}</div>
+        <div style="display:flex; justify-content:space-between; font-size:12px; color:#aebfcd; margin-bottom:4px;"><span>Build</span><span style="color:{{ work.buildColor }};">{{ work.buildStatus }}</span></div>
+        <div style="display:flex; justify-content:space-between; font-size:12px; color:#aebfcd;"><span>Reviews pending</span><span style="color:#eaf2f8; font-family:'IBM Plex Mono', monospace;">{{ work.reviews }}</span></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1400,&quot;height&quot;:860},&quot;greetingName&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;William Lavold&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;accentColor&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#7c8cff&quot;,&quot;options&quot;:[&quot;#5ad1ff&quot;,&quot;#7c8cff&quot;,&quot;#5ad18a&quot;,&quot;#ffb84d&quot;],&quot;tsType&quot;:&quot;string&quot;},&quot;personality&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;formal&quot;,&quot;options&quot;:[&quot;formal&quot;,&quot;casual&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Behavior&quot;}}">
+const STORAGE_KEY = 'jarvis_memory_v1';
+
+const DEFAULT_MEMORY = {
+  facts: [
+    "Prefers standing-desk breaks every 90 minutes.",
+    "Training for a half-marathon in October.",
+    "Dislikes meetings before 9am.",
+    "Goal: save 20% of income this quarter."
+  ],
+  messages: [
+    { speaker: 'jarvis', text: "Good to have you back. Systems are nominal and your day is queued up whenever you're ready." }
+  ],
+  tasks: [
+    { id: 't1', label: 'Review Q3 budget draft', done: false },
+    { id: 't2', label: 'Reply to Chen re: contract', done: false },
+    { id: 't3', label: 'Book dentist appointment', done: true },
+    { id: 't4', label: 'Push staging build', done: false }
+  ]
+};
+
+class Component extends DCLogic {
+  state = {
+    memory: null,
+    draft: '',
+    isThinking: false,
+    isListening: false,
+    voiceOutput: false,
+    now: new Date()
+  };
+
+  componentDidMount() {
+    let mem = null;
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) mem = JSON.parse(raw);
+    } catch (e) {}
+    if (!mem) mem = JSON.parse(JSON.stringify(DEFAULT_MEMORY));
+    this.setState({ memory: mem });
+    this._clock = setInterval(() => this.setState({ now: new Date() }), 30000);
+
+    if (typeof window !== 'undefined') {
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SR) {
+        this.recognition = new SR();
+        this.recognition.continuous = false;
+        this.recognition.interimResults = false;
+        this.recognition.onresult = (e) => {
+          const text = e.results[0][0].transcript;
+          this.setState({ draft: text, isListening: false }, () => this.sendMessage());
+        };
+        this.recognition.onend = () => this.setState({ isListening: false });
+        this.recognition.onerror = () => this.setState({ isListening: false });
+      }
+    }
+  }
+
+  componentWillUnmount() {
+    if (this._clock) clearInterval(this._clock);
+    if (this._speakTimeout) clearTimeout(this._speakTimeout);
+  }
+
+  persist(mem) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(mem)); } catch (e) {}
+  }
+
+  updateMemory(mutator) {
+    this.setState((s) => {
+      const mem = JSON.parse(JSON.stringify(s.memory));
+      mutator(mem);
+      this.persist(mem);
+      return { memory: mem };
+    });
+  }
+
+  onDraftChange = (e) => {
+    this.setState({ draft: e.target.value });
+  };
+
+  onInputKeyDown = (e) => {
+    if (e.key === 'Enter') this.sendMessage();
+  };
+
+  toggleListening = () => {
+    if (!this.recognition) {
+      this.setState((s) => ({ isListening: !s.isListening }));
+      if (!this.state.isListening) {
+        setTimeout(() => this.setState({ isListening: false }), 2200);
+      }
+      return;
+    }
+    if (this.state.isListening) {
+      this.recognition.stop();
+      this.setState({ isListening: false });
+    } else {
+      try {
+        this.recognition.start();
+        this.setState({ isListening: true });
+      } catch (e) {}
+    }
+  };
+
+  toggleVoiceOutput = () => {
+    this.setState((s) => ({ voiceOutput: !s.voiceOutput }));
+  };
+
+  speak(text) {
+    if (!this.state.voiceOutput || typeof window === 'undefined' || !window.speechSynthesis) return;
+    try {
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.rate = 0.98;
+      utter.pitch = 0.9;
+      window.speechSynthesis.speak(utter);
+    } catch (e) {}
+  }
+
+  craftReply(input, mem) {
+    const lower = input.toLowerCase();
+
+    if (lower.includes('remember') || lower.startsWith('note') || lower.includes("don't forget")) {
+      mem.facts.push(input.replace(/^(please )?remember( that)?/i, '').trim() || input);
+      return "Noted, sir. I've filed that away and won't forget it.";
+    }
+    if (lower.includes('schedule') || lower.includes('calendar') || lower.includes('meeting')) {
+      return "Your next commitment is on the calendar this afternoon. Shall I clear time around it?";
+    }
+    if (lower.includes('task') || lower.includes('to-do') || lower.includes('todo')) {
+      const open = mem.tasks.filter(t => !t.done).length;
+      return `You have ${open} outstanding task${open === 1 ? '' : 's'}. Want me to prioritise them?`;
+    }
+    if (lower.includes('health') || lower.includes('sleep') || lower.includes('run') || lower.includes('workout')) {
+      return "Recovery looks reasonable. Given the half-marathon in October, I'd suggest an easy run today.";
+    }
+    if (lower.includes('money') || lower.includes('budget') || lower.includes('finance') || lower.includes('spend')) {
+      return "You're tracking slightly under budget this month — comfortably on pace for that 20% savings goal.";
+    }
+    if (lower.includes('work') || lower.includes('code') || lower.includes('build') || lower.includes('pr') || lower.includes('review')) {
+      return "The last build passed clean. A couple of reviews are still waiting on you.";
+    }
+    if (lower.includes('who am i') || lower.includes('what do you know') || lower.includes('memory')) {
+      return mem.facts.length ? `Off the top of my head: ${mem.facts[mem.facts.length - 1]}` : "I'm still building a picture of you, sir.";
+    }
+    if (lower.includes('hello') || lower.includes('hi ') || lower === 'hi') {
+      return "At your service, as ever.";
+    }
+    return "Understood. I'll keep an eye on it and let you know if anything needs your attention.";
+  }
+
+  sendMessage = () => {
+    const text = this.state.draft.trim();
+    if (!text) return;
+    this.setState({ draft: '', isThinking: true });
+
+    this.updateMemory((mem) => {
+      mem.messages.push({ speaker: 'user', text });
+    });
+
+    if (this._speakTimeout) clearTimeout(this._speakTimeout);
+    this._speakTimeout = setTimeout(() => {
+      let replyText = '';
+      this.updateMemory((mem) => {
+        replyText = this.craftReply(text, mem);
+        mem.messages.push({ speaker: 'jarvis', text: replyText });
+      });
+      this.setState({ isThinking: false });
+      this.speak(replyText);
+      this.scrollToBottom();
+    }, 700 + Math.random() * 500);
+
+    this.scrollToBottom();
+  };
+
+  scrollToBottom() {
+    setTimeout(() => {
+      if (this._scrollEl) this._scrollEl.scrollTop = this._scrollEl.scrollHeight;
+    }, 50);
+  }
+
+  toggleTask(id) {
+    this.updateMemory((mem) => {
+      const t = mem.tasks.find(x => x.id === id);
+      if (t) t.done = !t.done;
+    });
+  }
+
+  renderVals() {
+    const accentColor = this.props.accentColor || '#5ad1ff';
+    const personality = this.props.personality || 'formal';
+    const mem = this.state.memory || DEFAULT_MEMORY;
+    const now = this.state.now;
+
+    const hour = now.getHours();
+    const timeGreeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+    const name = this.props.greetingName || 'sir';
+    const greeting = personality === 'casual'
+      ? `Hey, ${timeGreeting.split(' ')[1].toLowerCase()} vibes`
+      : `${timeGreeting}, ${name}.`;
+
+    const dateTimeLabel = now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }) +
+      '  ·  ' + now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+
+    const messages = mem.messages.map((m, i) => ({
+      speakerLabel: m.speaker === 'jarvis' ? 'JARVIS' : 'YOU',
+      text: m.text,
+      alignSelf: m.speaker === 'jarvis' ? 'flex-start' : 'flex-end',
+      bubbleBg: m.speaker === 'jarvis' ? 'rgba(90,209,255,0.07)' : 'rgba(255,255,255,0.04)',
+      bubbleBorder: m.speaker === 'jarvis' ? 'rgba(90,209,255,0.25)' : 'rgba(255,255,255,0.08)'
+    }));
+
+    const tasks = mem.tasks.map(t => ({
+      label: t.label,
+      textColor: t.done ? '#5f7284' : '#dce8f0',
+      textDecoration: t.done ? 'line-through' : 'none',
+      boxBg: t.done ? accentColor : 'transparent',
+      boxBorder: t.done ? accentColor : '#4a5b6a',
+      toggle: () => this.toggleTask(t.id)
+    }));
+    const doneCount = mem.tasks.filter(t => t.done).length;
+
+    return {
+      systemName: 'J.A.R.V.I.S.',
+      statusLine: 'All systems nominal',
+      accentColor,
+      accentGlow: accentColor.replace('#', 'rgba(').length ? accentColor : accentColor,
+      greeting,
+      dateTimeLabel,
+      voiceOutputLabel: this.state.voiceOutput ? 'Voice on' : 'Voice off',
+      voiceIndicatorColor: this.state.voiceOutput ? accentColor : '#3a4753',
+      toggleVoiceOutput: this.toggleVoiceOutput,
+      memoryCountLabel: `${mem.facts.length} things remembered`,
+      messages,
+      isThinking: this.state.isThinking,
+      scrollRef: (el) => { this._scrollEl = el; },
+      draft: this.state.draft,
+      onDraftChange: this.onDraftChange,
+      onInputKeyDown: this.onInputKeyDown,
+      inputPlaceholder: 'Ask Jarvis anything, or tell him what to remember…',
+      sendMessage: this.sendMessage,
+      toggleListening: this.toggleListening,
+      isListening: this.state.isListening,
+      micBg: this.state.isListening ? accentColor : 'rgba(255,255,255,0.06)',
+      micIconColor: this.state.isListening ? '#04070a' : accentColor,
+
+      schedule: [
+        { time: '09:30', title: 'Standup with product team' },
+        { time: '13:00', title: 'Lunch — no meetings' },
+        { time: '15:00', title: '1:1 with Chen' },
+        { time: '18:30', title: 'Easy run, 5k' }
+      ],
+      tasks,
+      taskProgressLabel: `${doneCount}/${mem.tasks.length} done`,
+
+      health: {
+        sleep: '7h 12m',
+        steps: '6,240',
+        hr: '58 bpm',
+        trainingPct: '64%',
+        trainingLabel: 'Half-marathon training — week 6 of 10'
+      },
+
+      finance: {
+        balance: '$18,240.55',
+        spendLabel: 'Spent $412 today across 3 categories',
+        budgetPct: '71%',
+        budgetLabel: '71% of monthly budget used'
+      },
+
+      work: {
+        project: 'Atlas — API migration',
+        buildStatus: 'Passing',
+        buildColor: '#5ad18a',
+        reviews: 2
+      }
+    };
+  }
+}
+
+</script>
+</body>
+</html>

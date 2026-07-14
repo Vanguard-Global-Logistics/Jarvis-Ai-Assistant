@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    body { margin:0; background:#05070a; }
+    input[type=range] { accent-color: #5ad1ff; }
+  </style>
+</helmet>
+
+<div style="min-height:100vh; background:radial-gradient(circle at 30% 0%, rgba(80,140,255,0.06), transparent 45%), #05070a; font-family:'Inter',sans-serif; color:#dce8f0; display:flex; justify-content:center; box-sizing:border-box; padding:24px 16px 60px;">
+<div style="width:100%; max-width:560px;">
+
+  <div style="background:#1a1200; border:1px solid rgba(255,184,77,0.3); border-radius:10px; padding:7px 14px; text-align:center; font-family:'IBM Plex Mono',monospace; font-size:9.5px; color:#ffb84d; margin-bottom:18px;">
+    PERSONALITY PROTOTYPE — humor settings shape simulated replies only
+  </div>
+
+  <div style="display:flex; align-items:center; gap:12px; margin-bottom:20px;">
+    <div style="position:relative; width:36px; height:36px;">
+      <div style="position:absolute; inset:0; border-radius:50%; border:1.5px solid #5ad1ff; opacity:0.6;"></div>
+      <div style="position:absolute; inset:11px; border-radius:50%; background:#5ad1ff; box-shadow:0 0 12px #5ad1ff;"></div>
+    </div>
+    <div>
+      <div style="font-family:'Space Grotesk',sans-serif; font-size:20px; font-weight:600; color:#f2f8ff;">Jarvis Personality</div>
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; color:#7f95a8;">Humor engine · Serious Mode · feedback</div>
+    </div>
+  </div>
+
+  <!-- Humor dial -->
+  <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:16px; padding:18px; margin-bottom:14px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+      <div style="font-family:'Space Grotesk',sans-serif; font-size:13px; letter-spacing:1px; text-transform:uppercase; color:#7f95a8;">Humor Dial</div>
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:{{ humorColor }};">{{ humorValue }} — {{ humorBand }}</div>
+    </div>
+    <input type="range" min="0" max="10" step="1" value="{{ humorValue }}" onChange="{{ onHumorChange }}" aria-label="Humor level" style="width:100%;" />
+    <div style="display:flex; justify-content:space-between; font-family:'IBM Plex Mono',monospace; font-size:9px; color:#5f7284; margin-top:4px;">
+      <span>0 NONE</span><span>2 DRY</span><span>4 BALANCED</span><span>6 PLAYFUL</span><span>8 HIGH</span><span>10 MAX WIT</span>
+    </div>
+    <sc-if value="{{ seriousActive }}" hint-placeholder-val="{{ false }}">
+      <div style="margin-top:12px; background:rgba(255,184,77,0.07); border:1px solid rgba(255,184,77,0.35); border-radius:10px; padding:10px 12px; font-size:12px; color:#ffb84d;">{{ seriousReason }} Effective humor is 0. Your saved preference ({{ humorValue }}) is preserved.</div>
+    </sc-if>
+    <div style="margin-top:14px; background:rgba(90,209,255,0.05); border:1px solid rgba(90,209,255,0.2); border-radius:10px; padding:11px 13px;">
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:9.5px; color:#5ad1ff; margin-bottom:5px;">SAMPLE REPLY AT THIS LEVEL</div>
+      <div style="font-size:13px; color:#dce8f0; line-height:1.55; font-style:italic;">{{ sampleReply }}</div>
+    </div>
+    <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:12px;">
+      <sc-for list="{{ quickCommands }}" as="qc" hint-placeholder-count="5">
+        <button onClick="{{ qc.run }}" style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.12); color:#c9d6e0; font-size:11px; padding:6px 11px; border-radius:14px; cursor:pointer;">{{ qc.label }}</button>
+      </sc-for>
+    </div>
+  </div>
+
+  <!-- Serious mode -->
+  <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:16px; padding:18px; margin-bottom:14px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+      <div style="font-family:'Space Grotesk',sans-serif; font-size:13px; letter-spacing:1px; text-transform:uppercase; color:#7f95a8;">Serious Mode</div>
+      <button onClick="{{ toggleSerious }}" disabled="{{ seriousForced }}" style="background:{{ seriousBg }}; border:1px solid {{ seriousBorder }}; color:{{ seriousText }}; font-size:12px; font-weight:600; padding:7px 16px; border-radius:14px; cursor:pointer; opacity:{{ seriousOpacity }};">{{ seriousBtnLabel }}</button>
+    </div>
+    <div style="font-size:12px; color:#8fa2b3; line-height:1.6; margin-bottom:10px;">Sets effective humor to zero without overwriting your saved preference. Activates automatically during:</div>
+    <div style="display:flex; flex-wrap:wrap; gap:6px;">
+      <sc-for list="{{ seriousTriggers }}" as="tr" hint-placeholder-count="8">
+        <span style="font-family:'IBM Plex Mono',monospace; font-size:9.5px; color:{{ tr.color }}; background:rgba(255,255,255,0.04); border-radius:10px; padding:4px 9px;">{{ tr.label }}</span>
+      </sc-for>
+    </div>
+    <div style="font-size:11px; color:#5f7284; line-height:1.65; margin-top:12px;">Humor never hides bad news, replaces the answer, distorts facts, delays urgent action, mocks anyone, pressures approval, or jokes during Red or Black. Pipeline: factual response → validate facts → assess risk → determine permitted level → optional humor → clarity check.</div>
+  </div>
+
+  <!-- Feedback -->
+  <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:16px; padding:18px; margin-bottom:14px;">
+    <div style="font-family:'Space Grotesk',sans-serif; font-size:13px; letter-spacing:1px; text-transform:uppercase; color:#7f95a8; margin-bottom:10px;">Feedback</div>
+    <div style="display:flex; flex-wrap:wrap; gap:7px;">
+      <sc-for list="{{ feedbackButtons }}" as="fb" hint-placeholder-count="6">
+        <button onClick="{{ fb.run }}" style="background:{{ fb.bg }}; border:1px solid rgba(255,255,255,0.12); color:#c9d6e0; font-size:11.5px; padding:8px 13px; border-radius:14px; cursor:pointer; min-height:36px;">{{ fb.label }}</button>
+      </sc-for>
+    </div>
+    <div style="font-size:11px; color:#5f7284; margin-top:10px;">{{ feedbackNote }} Preference categories are stored — not sensitive transcripts.</div>
+  </div>
+
+  <div style="font-size:10px; color:#5f7284; line-height:1.6;">Stored in its own namespace (jarvis_personality_v1). AEGIS Yellow/Red/Black forces Serious Mode without rewriting these preferences.</div>
+</div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 600, &quot;height&quot;: 900}}">
+const P_KEY = 'jarvis_personality_v1';
+const AEGIS_KEY = 'aegis_console_v1';
+
+const BANDS = [
+  { max: 0, band: 'NO HUMOR', sample: 'The Vercel build failed. One environment variable is missing. I recommend adding it before retrying.' },
+  { max: 2, band: 'DRY', sample: 'The Vercel build failed — one missing environment variable. The machines remain undefeated.' },
+  { max: 4, band: 'BALANCED', sample: 'The build failed over a single missing environment variable. An entire deployment, held hostage by one line of configuration. I\u2019ve prepared the fix.' },
+  { max: 6, band: 'PLAYFUL', sample: 'Bad news: the build failed. Good news: it\u2019s one environment variable, not your code. Even better news: I already wrote the repair prompt while you were reading this.' },
+  { max: 8, band: 'HIGH PERSONALITY', sample: 'Sir, the deployment has been bested by a single environment variable — a humbling day for us both. The fix is prepared; your dignity remains intact, mostly.' },
+  { max: 10, band: 'MAXIMUM WIT', sample: 'The build collapsed at the sight of one undefined variable, which frankly is the most relatable thing Vercel has ever done. Repair prompt ready. Shall we restore order, or let it sulk?' }
+];
+
+class Component extends DCLogic {
+  state = { humor: 4, seriousManual: false, feedback: null, aegisLevel: 'green' };
+
+  componentDidMount() {
+    try {
+      const raw = localStorage.getItem(P_KEY);
+      if (raw) {
+        const p = JSON.parse(raw);
+        this.setState({ humor: typeof p.humor === 'number' ? p.humor : 4, seriousManual: !!p.seriousManual });
+      }
+    } catch (e) {}
+    this.readAegis();
+    this._poll = setInterval(this.readAegis, 2000);
+    window.addEventListener('storage', this.readAegis);
+  }
+  componentWillUnmount() {
+    clearInterval(this._poll);
+    window.removeEventListener('storage', this.readAegis);
+  }
+  readAegis = () => {
+    try {
+      const raw = localStorage.getItem(AEGIS_KEY);
+      const lvl = raw ? (JSON.parse(raw).level || 'green') : 'green';
+      if (lvl !== this.state.aegisLevel) this.setState({ aegisLevel: lvl });
+    } catch (e) {}
+  };
+  persist() {
+    try { localStorage.setItem(P_KEY, JSON.stringify({ humor: this.state.humor, seriousManual: this.state.seriousManual })); } catch (e) {}
+  }
+  setHumor(v) {
+    this.setState({ humor: Math.max(0, Math.min(10, v)) }, () => this.persist());
+  }
+  onHumorChange = (e) => this.setHumor(parseInt(e.target.value, 10));
+  toggleSerious = () => this.setState((s) => ({ seriousManual: !s.seriousManual }), () => this.persist());
+  giveFeedback = (label) => () => {
+    this.setState({ feedback: label });
+    if (label === 'Too much' || label === 'Less sarcasm') this.setHumor(this.state.humor - 1);
+    if (label === 'More like this') this.setHumor(this.state.humor + 1);
+  };
+
+  renderVals() {
+    const s = this.state;
+    const forced = s.aegisLevel !== 'green';
+    const seriousActive = forced || s.seriousManual;
+    const effective = seriousActive ? 0 : s.humor;
+    const band = BANDS.find(b => effective <= b.max) || BANDS[0];
+    const prefBand = BANDS.find(b => s.humor <= b.max) || BANDS[0];
+
+    return {
+      humorValue: s.humor,
+      humorBand: prefBand.band,
+      humorColor: s.humor === 0 ? '#8fa2b3' : s.humor <= 4 ? '#5ad1ff' : s.humor <= 8 ? '#ffb84d' : '#ff8a8a',
+      onHumorChange: this.onHumorChange,
+      sampleReply: band.sample,
+
+      seriousActive,
+      seriousForced: forced,
+      seriousReason: forced ? `AEGIS is at ${s.aegisLevel.toUpperCase()} — Serious Mode is forced.` : 'Serious Mode is on.',
+      seriousBtnLabel: forced ? 'Forced by AEGIS' : (s.seriousManual ? 'On — tap to disable' : 'Off — tap to enable'),
+      seriousBg: seriousActive ? 'rgba(255,184,77,0.14)' : 'rgba(255,255,255,0.04)',
+      seriousBorder: seriousActive ? 'rgba(255,184,77,0.45)' : 'rgba(255,255,255,0.14)',
+      seriousText: seriousActive ? '#ffb84d' : '#c9d6e0',
+      seriousOpacity: forced ? '0.7' : '1',
+      toggleSerious: this.toggleSerious,
+
+      seriousTriggers: [
+        { label: 'AEGIS YELLOW/RED/BLACK', color: '#ffb84d' },
+        { label: 'SECURITY INCIDENT', color: '#ff8a8a' },
+        { label: 'EMERGENCY', color: '#ff8a8a' },
+        { label: 'MEDICAL CONCERN', color: '#ffb84d' },
+        { label: 'LEGAL DECISION', color: '#ffb84d' },
+        { label: 'FINANCIAL TRANSFER', color: '#ffb84d' },
+        { label: 'PRODUCTION INCIDENT', color: '#ff8a8a' },
+        { label: 'URGENT REQUEST', color: '#8fa2b3' },
+        { label: 'USER DISTRESS', color: '#8fa2b3' }
+      ],
+
+      quickCommands: [
+        { label: '"Humor level zero"', run: () => this.setHumor(0) },
+        { label: '"Humor level four"', run: () => this.setHumor(4) },
+        { label: '"Humor level ten"', run: () => this.setHumor(10) },
+        { label: '"Turn humor up"', run: () => this.setHumor(s.humor + 1) },
+        { label: '"Turn humor down"', run: () => this.setHumor(s.humor - 1) },
+        { label: '"Serious mode"', run: () => this.setState({ seriousManual: true }, () => this.persist()) },
+        { label: '"Normal mode"', run: () => this.setState({ seriousManual: false }, () => this.persist()) }
+      ],
+
+      feedbackButtons: ['Funny', 'Too much', 'Not appropriate', 'More like this', 'Less sarcasm', 'Keep concise'].map(label => ({
+        label,
+        bg: s.feedback === label ? 'rgba(90,209,255,0.14)' : 'rgba(255,255,255,0.04)',
+        run: this.giveFeedback(label)
+      })),
+      feedbackNote: s.feedback ? `Recorded: "${s.feedback}".` : 'Tap to teach Jarvis your taste.'
+    };
+  }
+}
+
+</script>
+</body>
+</html>

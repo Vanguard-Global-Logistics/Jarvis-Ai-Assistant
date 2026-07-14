@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <meta name="design_doc_mode" content="canvas">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    body { margin:0; background:#05070a; }
+    @keyframes xspin { from{transform:rotate(0deg);} to{transform:rotate(360deg);} }
+    @keyframes xpulse { 0%,100%{transform:scale(1);} 50%{transform:scale(1.12);} }
+  </style>
+</helmet>
+
+<div style="min-height:100vh; background:#05070a; font-family:'Inter',sans-serif; color:#dce8f0; padding:32px; box-sizing:border-box;">
+
+  <div style="max-width:1240px; margin:0 auto;">
+    <div style="font-family:'Space Grotesk',sans-serif; font-size:24px; font-weight:700; color:#f2f8ff;">Jarvis Cross-Device Design System</div>
+    <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:#7f95a8; margin:6px 0 8px;">Windows desktop · iPhone 15 Pro Max · Apple Watch Ultra — visual blueprint, all functionality simulated</div>
+    <div style="display:inline-block; background:#1a1200; border:1px solid rgba(255,184,77,0.3); border-radius:8px; padding:5px 12px; font-family:'IBM Plex Mono',monospace; font-size:9.5px; color:#ffb84d; margin-bottom:24px;">Native iOS, watchOS, Siri, widgets and notifications are design concepts only</div>
+
+    <!-- Shared state colors -->
+    <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:14px 18px; margin-bottom:28px; display:flex; flex-wrap:wrap; gap:14px;">
+      <sc-for list="{{ stateColors }}" as="st" hint-placeholder-count="8">
+        <div style="display:flex; align-items:center; gap:7px;">
+          <span style="width:11px; height:11px; border-radius:50%; background:{{ st.color }}; box-shadow:0 0 8px {{ st.color }};"></span>
+          <span style="font-family:'IBM Plex Mono',monospace; font-size:10px; color:#aebfcd;">{{ st.label }}</span>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="display:flex; flex-wrap:wrap; gap:28px; align-items:flex-start;">
+
+      <!-- DESKTOP -->
+      <div style="flex:1.4 1 460px; min-width:400px;">
+        <div style="font-family:'Space Grotesk',sans-serif; font-size:14px; letter-spacing:1px; text-transform:uppercase; color:#7f95a8; margin-bottom:12px;">Windows Desktop — floating orb, always-on-top concept</div>
+        <div style="position:relative; border:1px solid rgba(255,255,255,0.1); border-radius:14px; background:linear-gradient(180deg, #10141b, #0a0d13); height:340px; overflow:hidden;">
+          <!-- fake desktop -->
+          <div style="position:absolute; top:14px; left:14px; right:14px; height:200px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-radius:10px; padding:12px;">
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; color:#5f7284;">active application window</div>
+          </div>
+          <!-- taskbar -->
+          <div style="position:absolute; left:0; right:0; bottom:0; height:38px; background:rgba(8,11,16,0.9); border-top:1px solid rgba(255,255,255,0.07); display:flex; align-items:center; padding:0 12px; gap:10px;">
+            <span style="width:14px; height:14px; border-radius:4px; background:rgba(255,255,255,0.12);"></span>
+            <span style="width:14px; height:14px; border-radius:4px; background:rgba(255,255,255,0.12);"></span>
+            <span style="flex:1;"></span>
+            <span title="Jarvis tray icon" style="width:12px; height:12px; border-radius:50%; border:1.5px solid #5ad1ff; display:inline-flex; align-items:center; justify-content:center;"><span style="width:4px; height:4px; border-radius:50%; background:#5ad1ff;"></span></span>
+            <span style="font-family:'IBM Plex Mono',monospace; font-size:9px; color:#5f7284;">tray · Ctrl+Shift+J</span>
+          </div>
+          <!-- orb -->
+          <div style="position:absolute; right:26px; bottom:64px; display:flex; flex-direction:column; align-items:center; gap:6px;">
+            <div style="position:relative; width:74px; height:74px;">
+              <div style="position:absolute; inset:0; border-radius:50%; border:1px dashed #5ad1ff; opacity:0.35; animation:xspin 30s linear infinite;"></div>
+              <div style="position:absolute; inset:8px; border-radius:50%; border:1.5px solid #5ad1ff; opacity:0.5; animation:xspin 16s linear infinite;"></div>
+              <div style="position:absolute; inset:26px; border-radius:50%; background:radial-gradient(circle at 35% 30%, #fff, #5ad1ff 60%); box-shadow:0 0 24px #5ad1ff; animation:xpulse 3.2s ease-in-out infinite;"></div>
+            </div>
+            <div style="background:rgba(10,13,18,0.6); border-radius:9px; padding:3px 9px; font-family:'IBM Plex Mono',monospace; font-size:8px; color:#8fa2b3;">AEGIS — PROTECTED</div>
+          </div>
+        </div>
+        <div style="font-size:11px; color:#5f7284; line-height:1.65; margin-top:10px;">Global hotkey summons the orb over any window. Conversation panel, Forge, Ledger and AEGIS console open as separate surfaces — see the live prototypes: <a href="Jarvis Ambient.dc.html" style="color:#5ad1ff;">Ambient</a> · <a href="Forge Mobile.dc.html" style="color:#5ad1ff;">Forge</a> · <a href="Ledger Mobile.dc.html" style="color:#5ad1ff;">Ledger</a> · <a href="Aegis Console.dc.html" style="color:#5ad1ff;">AEGIS</a>.</div>
+      </div>
+
+      <!-- IPHONE -->
+      <div style="flex:1 1 300px; min-width:280px; display:flex; flex-direction:column; align-items:center;">
+        <div style="font-family:'Space Grotesk',sans-serif; font-size:14px; letter-spacing:1px; text-transform:uppercase; color:#7f95a8; margin-bottom:12px; align-self:flex-start;">iPhone 15 Pro Max — voice session + widgets</div>
+        <div style="width:250px; border:3px solid #232a33; border-radius:38px; background:#05070a; padding:10px; box-sizing:border-box;">
+          <div style="width:86px; height:22px; background:#000; border-radius:12px; margin:2px auto 10px;"></div>
+          <!-- Lock screen widget -->
+          <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.09); border-radius:14px; padding:10px 12px; margin-bottom:10px; display:flex; align-items:center; gap:9px;">
+            <span style="width:18px; height:18px; border-radius:50%; background:radial-gradient(circle at 35% 30%, #fff, #5ad1ff 65%); box-shadow:0 0 8px #5ad1ff; flex-shrink:0;"></span>
+            <div>
+              <div style="font-size:10.5px; color:#f2f8ff; font-weight:600;">Jarvis · 2 decisions waiting</div>
+              <div style="font-family:'IBM Plex Mono',monospace; font-size:8px; color:#7f95a8;">Lock Screen widget · tap to open</div>
+            </div>
+          </div>
+          <!-- Voice session -->
+          <div style="background:rgba(90,209,255,0.05); border:1px solid rgba(90,209,255,0.25); border-radius:16px; padding:16px 12px; text-align:center; margin-bottom:10px;">
+            <div style="position:relative; width:64px; height:64px; margin:0 auto 8px;">
+              <div style="position:absolute; inset:0; border-radius:50%; border:1.5px solid #5ad1ff; opacity:0.5; animation:xspin 14s linear infinite;"></div>
+              <div style="position:absolute; inset:22px; border-radius:50%; background:radial-gradient(circle at 35% 30%, #fff, #5ad1ff 60%); box-shadow:0 0 18px #5ad1ff; animation:xpulse 1s ease-in-out infinite;"></div>
+            </div>
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:9px; letter-spacing:1.5px; color:#5ad1ff; margin-bottom:5px;">LISTENING</div>
+            <div style="font-size:11px; color:#dce8f0; line-height:1.5;">"What needs me today?"</div>
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:7.5px; color:#5f7284; margin-top:7px;">Siri / Action Button opens Jarvis · "Goodbye Jarvis" ends session</div>
+          </div>
+          <!-- Notification -->
+          <div style="background:rgba(255,184,77,0.06); border:1px solid rgba(255,184,77,0.3); border-radius:12px; padding:9px 11px; margin-bottom:10px;">
+            <div style="font-size:10px; color:#ffb84d; font-weight:600;">Forge · Approval required</div>
+            <div style="font-size:9.5px; color:#c9d6e0; margin-top:2px;">Vanguard preview is ready for review.</div>
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:7.5px; color:#7f95a8; margin-top:3px;">push notification → deep link to Approval Inbox</div>
+          </div>
+          <!-- Home screen widget -->
+          <div style="display:flex; gap:8px;">
+            <div style="flex:1; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.09); border-radius:12px; padding:9px;">
+              <div style="font-family:'IBM Plex Mono',monospace; font-size:7.5px; color:#7f95a8; margin-bottom:3px;">FORGE</div>
+              <div style="font-size:10px; color:#5ad18a;">6 projects · 1 failed</div>
+            </div>
+            <div style="flex:1; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.09); border-radius:12px; padding:9px;">
+              <div style="font-family:'IBM Plex Mono',monospace; font-size:7.5px; color:#7f95a8; margin-bottom:3px;">LEDGER</div>
+              <div style="font-size:10px; color:#5ad18a;">$1,185 safe</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- WATCH -->
+      <div style="flex:1 1 280px; min-width:260px; display:flex; flex-direction:column; align-items:center;">
+        <div style="font-family:'Space Grotesk',sans-serif; font-size:14px; letter-spacing:1px; text-transform:uppercase; color:#7f95a8; margin-bottom:12px; align-self:flex-start;">Apple Watch Ultra — glanceable, battery-conscious</div>
+        <div style="display:flex; flex-direction:column; gap:16px; align-items:center;">
+          <!-- Watch main -->
+          <div style="width:180px; height:210px; border:3px solid #2a323c; border-radius:42px; background:#000; padding:16px 12px; box-sizing:border-box; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; position:relative;">
+            <div style="position:absolute; right:-9px; top:70px; width:6px; height:34px; background:#3a4450; border-radius:3px;"></div>
+            <div style="position:relative; width:56px; height:56px;">
+              <div style="position:absolute; inset:0; border-radius:50%; border:1.5px solid #5ad1ff; opacity:0.5;"></div>
+              <div style="position:absolute; inset:19px; border-radius:50%; background:radial-gradient(circle at 35% 30%, #fff, #5ad1ff 60%); box-shadow:0 0 14px #5ad1ff; animation:xpulse 2.4s ease-in-out infinite;"></div>
+            </div>
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:8px; letter-spacing:1.5px; color:#5ad1ff;">LISTENING</div>
+            <div style="display:flex; gap:6px; align-items:center;">
+              <span style="width:9px; height:9px; border-radius:3px; border:1.5px solid #5ad18a;"></span>
+              <span style="font-family:'IBM Plex Mono',monospace; font-size:7.5px; color:#8fa2b3;">AEGIS OK</span>
+            </div>
+          </div>
+          <!-- Watch alert -->
+          <div style="width:180px; height:210px; border:3px solid #2a323c; border-radius:42px; background:#000; padding:16px 14px; box-sizing:border-box; display:flex; flex-direction:column; justify-content:center; gap:7px; position:relative;">
+            <div style="position:absolute; right:-9px; top:70px; width:6px; height:34px; background:#3a4450; border-radius:3px;"></div>
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:7.5px; color:#ffb84d;">FORGE ALERT</div>
+            <div style="font-size:11px; color:#f2f8ff; line-height:1.4; font-weight:600;">Vercel build failed — BCI PM Agent</div>
+            <div style="font-size:9px; color:#8fa2b3; line-height:1.45;">GitHub OK · env var missing</div>
+            <div style="display:flex; flex-direction:column; gap:5px; margin-top:4px;">
+              <div style="background:rgba(90,209,255,0.12); border:1px solid rgba(90,209,255,0.35); border-radius:9px; padding:6px; text-align:center; font-size:9px; color:#5ad1ff; font-weight:600;">Open on iPhone</div>
+              <div style="background:rgba(255,184,77,0.1); border:1px solid rgba(255,184,77,0.3); border-radius:9px; padding:6px; text-align:center; font-size:9px; color:#ffb84d; font-weight:600;">Restrict Jarvis</div>
+              <div style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); border-radius:9px; padding:6px; text-align:center; font-size:9px; color:#c9d6e0;">Start voice note</div>
+            </div>
+          </div>
+        </div>
+        <div style="font-size:10px; color:#5f7284; line-height:1.6; margin-top:12px;">Complication shows project status dot. No dashboard on watch — simplified core, single pulse animation, actions route to iPhone.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 1300, &quot;height&quot;: 900}}">
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      stateColors: [
+        { label: 'BLUE — NORMAL', color: '#5ad1ff' },
+        { label: 'CYAN PULSE — LISTENING', color: '#7ee4ff' },
+        { label: 'COUNTER-ROTATION — THINKING', color: '#8fb8ff' },
+        { label: 'REACTIVE GLOW — SPEAKING', color: '#b8ecff' },
+        { label: 'LENS — SCREEN VISION', color: '#5ad1ff' },
+        { label: 'AMBER — RESTRICTED', color: '#ffb84d' },
+        { label: 'RED — ISOLATED', color: '#ff5a5a' },
+        { label: 'COLLAPSED CORE — BLACKOUT', color: '#ff2b2b' }
+      ]
+    };
+  }
+}
+
+</script>
+</body>
+</html>
