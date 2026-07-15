@@ -1,0 +1,12 @@
+{
+  // Renderer: DOM only. No Node types — deliberately. The renderer is untrusted
+  // and must not be able to reference Node APIs even at the type level.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "types": ["vite/client"]
+  },
+  "include": ["src/renderer/**/*.ts", "src/renderer/**/*.tsx", "src/preload/index.d.ts"]
+}

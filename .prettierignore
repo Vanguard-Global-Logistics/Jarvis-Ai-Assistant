@@ -1,0 +1,18 @@
+# The archived design handoff is immutable — never reformat it (CLAUDE.md §0).
+reference/
+
+# Authoritative prose documents. Prettier's markdown table alignment rewrites
+# these wholesale, which buries real edits in reformatting noise and makes the
+# git history of the project's contract harder to read. They are prose reviewed
+# by a human, not code — formatting them buys nothing.
+CLAUDE.md
+docs/CURRENT-STATE-AUDIT.md
+docs/VISUAL-DESIGN-TARGET.md
+
+# Build output and dependencies
+dist/
+out/
+node_modules/
+coverage/
+.vite/
+package-lock.json

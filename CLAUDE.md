@@ -15,15 +15,20 @@ Repository: `github.com/Vanguard-Global-Logistics/Jarvis-Ai-Assistant`.
 - **GitHub is the source of truth.** Not this conversation, not chat history, not a
   previous session's memory. If this file and the code disagree, the code wins — and
   this file must then be corrected.
-- **The repository is currently documentation-only. There is zero production code.**
-  No `package.json`, no `src/`, no workspaces. Do not describe any part of Jarvis as
-  built, working, or tested. Nothing is.
+- **The repository is a foundation with zero application features.** As of Stage 5 it
+  has a monorepo, toolchain, CI, an env layer, a SQLite migration runner, and a hardened
+  but empty Electron shell. It has **no** AEGIS, no orchestrator, no Forge, no Ledger,
+  no memory, no voice, no vision, no IPC channels, and no feature schema. Do not describe
+  any part of Jarvis as built, working, or protected. **`docs/KNOWN-LIMITATIONS.md` is
+  the authoritative list of what does not exist — read it before claiming anything works.**
 - **Authoritative documents**, in precedence order:
   1. `reference/design-handoff/*.md` — the behavioral contract (11 spec files).
      **Archived and immutable. Never edit these.**
   2. `docs/CURRENT-STATE-AUDIT.md` — the 20-section audit of what exists and what does not.
   3. `docs/VISUAL-DESIGN-TARGET.md` — the approved visual north star.
-  4. This file.
+  4. `docs/KNOWN-LIMITATIONS.md` — the honest gap list. Updated whenever a gap opens or closes.
+  5. `docs/DECISIONS/` — ADRs. A decision recorded here does not get silently reversed.
+  6. This file.
 - `reference/design-handoff/*.dc.html` and `support.js` are **design prototypes, not
   source to port**. `support.js` is explicitly marked "do not ship". Recreate the
   designs in real code; do not copy the prototype implementation.
@@ -141,19 +146,40 @@ plainly in `docs/KNOWN-LIMITATIONS.md` when that file is created — never impli
 - **Audit logs are append-only** and not editable or deletable from the normal UI —
   including AEGIS transitions and memory deletions.
 
-### Planned structure (from the audit, §16 — not yet built)
+### Structure (from the audit §16 — scaffolded in Stage 5)
+
+The directories exist and the toolchain runs. **Most of them are empty**, and the status
+column is the part that matters:
 
 ```
-apps/desktop        Electron shell (main / preload / renderer)
-apps/pwa            PWA shell (placeholder in Phase 1)
-services/jarvis-core   Orchestration, isolated from renderer
-services/aegis      AEGIS state engine — independent boundary, no GenAI
-packages/contracts  Zod schemas + shared types
-packages/ui         Design-system components
-packages/config     Env validation + structured logging
-packages/database   SQLite schema, migrations, typed queries
-docs/DECISIONS/     ADRs
+apps/desktop           Electron shell (main / preload / renderer)  PARTIAL — hardened, no features
+apps/pwa               PWA shell                                   NOT IMPLEMENTED — empty, out of scope
+services/jarvis-core   Orchestration, isolated from renderer       NOT IMPLEMENTED — empty
+services/aegis         AEGIS engine — independent, no GenAI        NOT IMPLEMENTED — empty
+packages/contracts     Zod schemas + shared types                  NOT IMPLEMENTED — empty
+packages/ui            Design-system components                    NOT IMPLEMENTED — visual work deferred
+packages/config        Env validation + structured logging         IMPLEMENTED, unit-tested
+packages/database      SQLite connection + migration runner        PARTIAL — runner works, zero migrations
+docs/DECISIONS/        ADRs                                        0001–0003
 ```
+
+An empty package is a deliberate state, not an unfinished one. `services/aegis` in
+particular is empty **by choice**: a stub returning GREEN would be mock security, and a
+security control that appears to work is more dangerous than one visibly absent (§8).
+
+### Working on the foundation
+
+```bash
+npm install          # one install at the root links every workspace
+npm run verify       # format + lint + typecheck + test — run before every commit
+npm run dev:desktop  # launch the Electron shell (untested on Linux; Windows is the target)
+```
+
+The boundary rules in §2 are enforced at **authoring time** by `eslint.config.js`: it is
+an error for `jarvis-core`, the apps, or the renderer to import AEGIS internals; an error
+for `services/aegis` to import a generative-AI SDK; and an error for the renderer to
+import `electron`, `node:*`, or `@jarvis/database`. **This is not runtime enforcement** —
+a compiled bundle contains no ESLint. See ADR 0002 and `docs/KNOWN-LIMITATIONS.md` §1.
 
 ---
 

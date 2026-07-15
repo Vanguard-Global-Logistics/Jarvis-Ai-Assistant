@@ -1,0 +1,21 @@
+{
+  "name": "@jarvis/aegis",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "AEGIS — independent, deterministic security and containment runtime. Not implemented.",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@jarvis/contracts": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "@jarvis/pwa",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Installable PWA shell for the future mobile surfaces. Not implemented — deferred beyond Phase 1.",
+  "scripts": {},
+  "devDependencies": {}
+}

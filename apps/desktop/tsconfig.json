@@ -1,0 +1,7 @@
+{
+  // Split by trust level: the main/preload processes and the renderer have
+  // different globals and must not share a lib surface. The renderer having
+  // Node types in scope is how `fs` accidentally gets imported.
+  "files": [],
+  "references": [{ "path": "./tsconfig.node.json" }, { "path": "./tsconfig.web.json" }]
+}

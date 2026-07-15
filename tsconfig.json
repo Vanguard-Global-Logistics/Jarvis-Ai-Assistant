@@ -1,0 +1,12 @@
+{
+  // Root-level tooling config only. Each workspace owns its own tsconfig.
+  //
+  // This exists so root config files belong to a real, strict project. Without
+  // it, typescript-eslint falls back to an inferred default project that has
+  // strictNullChecks off, which silently disables its most valuable rules.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "include": ["vitest.config.ts"]
+}
