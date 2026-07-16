@@ -89,6 +89,32 @@ export default tseslint.config(
     },
   },
 
+  // --- The preload is sandboxed (`sandbox: true`). Its `require` is a polyfill
+  //     limited to `electron` and a few Node builtins, so a value import that
+  //     survives bundling as a bare require makes the bridge fail to load and
+  //     `window.jarvis` silently `undefined`. The `@jarvis/contracts` barrel
+  //     re-exports the Zod contracts and drags zod in; the dependency-free
+  //     `@jarvis/contracts/ipc/channels` subpath exists for this. Type-only
+  //     imports are erased at compile time and are therefore safe. ---
+  {
+    files: ['apps/desktop/src/preload/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@jarvis/contracts',
+              message:
+                'The preload is sandboxed and cannot require npm packages. The @jarvis/contracts barrel pulls in zod. Import channel names from "@jarvis/contracts/ipc/channels" instead; type-only imports from the barrel are fine. See apps/desktop/src/preload/index.ts and docs/IPC-SURFACE.md.',
+              allowTypeImports: true,
+            },
+          ],
+        },
+      ],
+    },
+  },
+
   // --- Renderer is untrusted. Secrets are server-side only (CLAUDE.md §3). ---
   {
     files: ['apps/desktop/src/renderer/**/*.{ts,tsx}'],

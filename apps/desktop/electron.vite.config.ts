@@ -25,6 +25,12 @@ export default defineConfig({
 
   preload: {
     build: {
+      // A sandboxed preload cannot `require` arbitrary packages — only
+      // `electron` and a small set of polyfills are resolvable at runtime. The
+      // default externalization would leave `@jarvis/contracts` as a bare
+      // require and the bridge would fail to load. Excluding it forces it to be
+      // bundled in, which is what a sandboxed preload needs.
+      externalizeDeps: { exclude: ['@jarvis/contracts'] },
       rollupOptions: {
         input: { index: resolve(__dirname, 'src/preload/index.ts') },
         // A sandboxed preload must be CommonJS — Electron does not load an ESM

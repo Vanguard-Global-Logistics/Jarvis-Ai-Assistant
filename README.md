@@ -5,8 +5,12 @@ Personal AI assistant and orchestrator for William Lavold. Private, single-user.
 > **Status: production foundation. Zero application features.**
 >
 > This repository builds, lints, typechecks, and tests. It does **not** do anything yet.
-> There is no AEGIS, no orchestrator, no Forge, no Ledger, no memory, no voice, no vision,
-> and no IPC channels. Nothing here is protected by AEGIS — AEGIS does not exist.
+> There is no AEGIS, no orchestrator, no Forge, no Ledger, no memory, no voice, and no
+> vision. Nothing here is protected by AEGIS — AEGIS does not exist.
+>
+> One typed IPC channel exists (`app:get-info`, static host facts, no authority granted).
+> It proves the renderer↔main boundary end to end and is the only thing `window.jarvis`
+> exposes — see `docs/IPC-SURFACE.md`.
 >
 > `docs/KNOWN-LIMITATIONS.md` is the authoritative list of what is missing. Read it before
 > concluding anything works.
@@ -19,6 +23,7 @@ Personal AI assistant and orchestrator for William Lavold. Private, single-user.
 | `docs/CURRENT-STATE-AUDIT.md`  | 20-section audit of what exists and what does not.              |
 | `docs/VISUAL-DESIGN-TARGET.md` | The approved visual north star. Visual work is deferred.        |
 | `docs/KNOWN-LIMITATIONS.md`    | The honest gap list.                                            |
+| `docs/IPC-SURFACE.md`          | Every channel crossing the renderer/main trust boundary.        |
 | `docs/DECISIONS/`              | ADRs.                                                           |
 | `reference/design-handoff/`    | The behavioral contract. **Archived and immutable.**            |
 
@@ -49,11 +54,11 @@ expressed in a monorepo — including a precise account of what is and is not en
 ## Layout
 
 ```
-apps/desktop           Electron shell (Windows target)     PARTIAL — hardened, no features
+apps/desktop           Electron shell (Windows target)     PARTIAL — hardened, one IPC channel
 apps/pwa               PWA shell                           NOT IMPLEMENTED — out of scope
 services/jarvis-core   Orchestration                       NOT IMPLEMENTED
 services/aegis         Security engine                     NOT IMPLEMENTED
-packages/contracts     Shared Zod schemas + types          NOT IMPLEMENTED
+packages/contracts     Shared Zod schemas + types          PARTIAL — IPC only
 packages/ui            Design-system components            NOT IMPLEMENTED
 packages/config        Env validation + logging            IMPLEMENTED, unit-tested
 packages/database      SQLite + migration runner           PARTIAL — zero migrations

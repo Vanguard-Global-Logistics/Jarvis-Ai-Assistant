@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import { BrowserWindow, app } from 'electron';
 import { createLogger, describeEnv, parseEnv } from '@jarvis/config';
+import { registerAppInfoHandler } from './handlers/app-info.js';
 import { applyContentSecurityPolicy, denyAllPermissions, lockNavigation } from './security.js';
 
 /**
@@ -62,6 +63,10 @@ function createWindow(): BrowserWindow {
 void app.whenReady().then(() => {
   log.info('starting', { env: describeEnv(env) });
 
+  // Handlers are registered before the first window exists, so no renderer can
+  // invoke a channel that is not yet listening.
+  registerAppInfoHandler();
+
   createWindow();
 
   app.on('activate', () => {
@@ -75,9 +80,9 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-// No IPC handlers are registered. Deliberately.
-//
-// A channel is a hole in the trust boundary. Each one gets opened only when a
-// feature needs it, with a Zod-validated payload from @jarvis/contracts and an
-// explicit entry in the preload allowlist. There is no generic invoke bridge and
-// there must never be one — see docs/DECISIONS/0002.
+// Every IPC channel is registered above via `registerAppInfoHandler` and its
+// successors. A channel is a hole in the trust boundary: each one is opened only
+// when a feature needs it, with a Zod-validated request AND response from
+// @jarvis/contracts and an explicit named function in the preload allowlist.
+// There is no generic invoke bridge and there must never be one — see
+// docs/DECISIONS/0002.

@@ -1,33 +1,44 @@
+import { contextBridge, ipcRenderer } from 'electron';
+import { CHANNELS } from '@jarvis/contracts/ipc/channels';
+import type { AppInfo } from '@jarvis/contracts';
+
 /**
  * Preload — the only bridge between the untrusted renderer and the trusted main
  * process.
  *
- * STATUS: NOT IMPLEMENTED. It exposes NOTHING, and that is the finished state
- * for this stage, not an oversight.
+ * The audit (CURRENT-STATE-AUDIT.md §19) names this file as the highest-risk
+ * surface in Phase 1: an over-exposed bridge "silently reintroduces the exact
+ * boundary violation the spec forbids."
  *
- * The audit (CURRENT-STATE-AUDIT.md §19) names this file as the single
- * highest-risk surface in Phase 1: an over-exposed bridge "silently reintroduces
- * the exact boundary violation the spec forbids." The safest bridge is an empty
- * one, so the foundation ships with zero attack surface and each channel has to
- * be argued for individually.
+ * Two rules govern everything added here, and neither is negotiable:
  *
- * The pattern every future channel must follow — no exceptions:
+ *   1. **Named functions only.** There is no `invoke(channel, ...args)` and
+ *      there must never be one. A generic passthrough hands the renderer the
+ *      whole main process and turns the allowlist into decoration. Each
+ *      function below names exactly one operation.
+ *   2. **No authority.** Nothing here executes shell, opens a path, reads a
+ *      secret, or touches AEGIS. Adding such a channel is a boundary change
+ *      requiring an ADR (ADR 0002).
  *
- *   1. Define the request and response schemas in @jarvis/contracts (Zod).
- *   2. Register a named handler in main that validates the payload BEFORE acting.
- *      Reject on failure; never coerce.
- *   3. Expose ONE narrow, purpose-named function here. Never `invoke(channel,
- *      ...args)` — a generic passthrough hands the renderer the whole main
- *      process and makes the allowlist meaningless.
- *   4. Declare its type in ./index.d.ts so the renderer is typed against the
- *      real contract.
+ * Note this file imports only `CHANNELS` — the Zod schemas stay in main. The
+ * preload's job is to name a channel, not to validate; main validates, because
+ * main is the side that must not trust the caller. Validating here too would
+ * imply the renderer's copy is trustworthy, which it is not.
  *
- * Explicitly forbidden on this bridge, from SECURITY-BOUNDARIES.md and
- * CLAUDE.md §3: shell execution, arbitrary filesystem paths, raw SQL, secrets,
- * config patches, and anything that could lower an AEGIS level.
- *
- * `contextBridge` is intentionally not called yet — there is nothing to expose,
- * and exposing an empty namespace would only invite someone to fill it.
+ * The `@jarvis/contracts/ipc/channels` subpath is deliberate and must not be
+ * "tidied" back to the `@jarvis/contracts` barrel. The barrel re-exports the Zod
+ * contracts, so importing from it pulls zod into this bundle as a bare
+ * `require("zod")`. This preload is sandboxed (`sandbox: true`), and a sandboxed
+ * preload's `require` is a polyfill limited to `electron` and a few Node
+ * builtins — an npm package is unresolvable, so the bridge would fail to load
+ * and `window.jarvis` would silently be `undefined`. `channels.ts` is
+ * dependency-free precisely so this import costs nothing.
  */
+const api = {
+  /** Static host facts: versions, platform, packaged state. */
+  getAppInfo: (): Promise<AppInfo> => ipcRenderer.invoke(CHANNELS.appGetInfo) as Promise<AppInfo>,
+} as const;
 
-export {};
+export type JarvisApi = typeof api;
+
+contextBridge.exposeInMainWorld('jarvis', api);

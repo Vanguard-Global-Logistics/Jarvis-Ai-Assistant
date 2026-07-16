@@ -1,7 +1,7 @@
 # Known Limitations
 
-Date: 2026-07-15
-Scope: the Stage 5 production foundation.
+Date: 2026-07-16
+Scope: the Stage 6 production foundation (adds the typed IPC boundary).
 
 Per `CLAUDE.md` §8, gaps are stated plainly here rather than implied to be solved.
 This file is the honest counterweight to the scaffold: it records what the foundation
@@ -34,14 +34,26 @@ storage, separate credentials. Phase 1 will not deliver OS-level enforcement. Wh
 state engine ships, this gap must be restated wherever AEGIS is described — not quietly
 dropped once the UI looks convincing.
 
-## 3. The IPC bridge exposes nothing
+## 3. The IPC bridge exposes exactly one channel, and it does nothing useful
 
-**Status: intended for this stage.**
+**Status: PARTIAL — intended for this stage.**
 
-`apps/desktop/src/preload/index.ts` calls `contextBridge` zero times. The renderer has no
-`window.jarvis`. This is the finished state of the foundation, not an unfinished one — the
-audit names an over-exposed preload as the single highest-risk failure in Phase 1, so the
-bridge starts empty and each channel must be argued for individually.
+`window.jarvis` now exists and exposes a single function, `getAppInfo()`, backed by the
+`app:get-info` channel. It returns versions, platform, and packaged state. That is all it
+does. It grants no authority: no filesystem, shell, environment, user data, or AEGIS.
+
+It exists to prove the boundary machinery — allowlist, schema validation in both
+directions, named-function bridge — against a channel where a mistake costs nothing. **No
+feature is reachable through it.** The audit names an over-exposed preload as the single
+highest-risk failure in Phase 1, so every further channel must still be argued for
+individually (ADR 0002) and recorded in `docs/IPC-SURFACE.md`.
+
+What is genuinely enforced: the bridge test
+(`apps/desktop/src/preload/index.test.ts`) asserts an exact allowlist and fails if a
+generic `invoke` passthrough is added. That guard was verified red-green — it was
+confirmed to fail against a deliberately injected passthrough, not merely to pass. It is
+a **unit test against a mocked `electron`**; it constrains what the code intends to
+expose, and proves nothing about what Electron enforces at runtime (§7, §9).
 
 ## 4. SQLite is not wired to Electron
 
@@ -78,8 +90,16 @@ is read, and none is required.
 The app has **not** been launched and observed rendering, because this environment is a
 headless Linux container and Phase 1 targets Windows. The security configuration in
 `src/main/security.ts` is therefore **verified as compiling and bundling, not as enforcing
-at runtime**. First launch on Windows must confirm: the window renders; the CSP header is
-present; `window.jarvis` is `undefined`; and a permission request is denied.
+at runtime**.
+
+This now extends to the IPC channel: `app:get-info` has never been exercised in a real
+Electron window. Its tests mock `electron`, so the round trip is **verified in unit tests,
+not observed end to end**. The renderer displaying live host values is what the code
+should do, not something anyone has watched happen.
+
+First launch on Windows must confirm: the window renders; the CSP header is present; a
+permission request is denied; `window.jarvis` exists and exposes **only** `getAppInfo`;
+and `getAppInfo()` returns real host values rather than throwing.
 
 ## 8. CI does not verify the desktop app runs
 
