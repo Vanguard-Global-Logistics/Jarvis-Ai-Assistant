@@ -1,27 +1,51 @@
 # Windows Runtime Acceptance Test
 
 Date: 2026-07-16
-Status: **ATTEMPTED — FAILED AT STEP 1. Fixed; retest required.**
+Status: **IN PROGRESS — two failures found and fixed. Retest required.**
 Gate for: the Phase 1 Foundation milestone (ADR 0004).
 
 ## Run log
 
-| Date       | Commit    | Result                                                                                                                                                                                                                                           |
-| ---------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 2026-07-16 | `20ffb86` | **FAILED at Step 1 (launch).** Electron started, then threw `ERR_MODULE_NOT_FOUND: Cannot find module packages/config/src/env.js imported from packages/config/src/index.ts`. No window reached a usable state, so Steps 2–7 were never reached. |
+| Date       | Commit    | Result                                                                                                                                                                                                                                                             |
+| ---------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 2026-07-16 | `20ffb86` | **FAILED at Step 1 (launch).** Electron started, then threw `ERR_MODULE_NOT_FOUND: Cannot find module packages/config/src/env.js imported from packages/config/src/index.ts`. No window reached a usable state; Steps 2–7 never reached.                           |
+| 2026-07-16 | `ff3672d` | **FAILED at Step 1.2 (render).** Window launched — the module error was gone. But the renderer stayed blank: `#root` empty, React never mounted. DevTools: "Executing inline script violates ... script-src 'self'", "@vitejs/plugin-react can't detect preamble". |
 
-**Root cause:** the main bundle left `@jarvis/config` and `@jarvis/contracts` external, so
-Electron resolved them to raw TypeScript source at runtime (ADR 0003 amendment). Fixed by
-bundling internal packages into the main output, plus
-`scripts/assert-electron-bundle.mjs`, which now fails the build if any internal package
-is reachable as a runtime import.
+### Failure 1 — raw TypeScript at runtime (`20ffb86`)
 
-**This is the test doing its job.** Every automated check passed on `20ffb86` — build,
-typecheck, lint, 49 tests, audit, CI. The failure was invisible to all of them and
-required a human launching the app. That is precisely why this gate exists and why no
+The main bundle left `@jarvis/config` and `@jarvis/contracts` external, so Electron
+resolved them to raw TypeScript source at runtime (ADR 0003 amendment). Fixed by bundling
+internal packages into the main output, guarded by `scripts/assert-electron-bundle.mjs`.
+
+### Failure 2 — the development CSP blocked Vite's preamble (`ff3672d`)
+
+Two CSP policies were enforced at once — the response header from `main/security.ts` and a
+static `<meta>` in `index.html` — and browsers apply the **intersection** of every policy
+delivered. Both said `script-src 'self'`, which does not admit inline scripts. In
+development `@vitejs/plugin-react` injects the React Refresh preamble as an inline module
+script, so both policies blocked it; `__vite_plugin_react_preamble_installed__` was never
+set, the module graph failed, and React never mounted. **The "can't detect preamble" error
+was a symptom, not a second bug.**
+
+Production was never affected — a packaged build has no preamble. The defect was the
+absence of a dev/prod split, plus a static meta tag that cannot carry a per-run nonce.
+
+Fixed by defining the policy once (`apps/desktop/src/shared/csp.ts`) and giving
+development a nonce: Vite tags every script it injects via `html.cspNonce`, and the dev
+CSP names that nonce. That admits exactly Vite's tags — strictly narrower than
+`'unsafe-inline'`, which would admit any inline script. Production is unchanged and still
+strict. `frame-ancestors` was also dropped from the meta tag, where the spec ignores it;
+it is enforced on the header, where it works.
+
+### Why both failures reached a human
+
+**Every automated check passed on both commits** — build, typecheck, lint, tests, audit,
+CI. Neither failure is visible to any of them: one needed Electron's module resolver, the
+other needed a Chromium renderer enforcing CSP. That is what this gate is for, and why no
 amount of green CI substitutes for it.
 
-**Retest from Step 1 on the fix commit.** Steps 2–7 have still never been executed.
+**Retest from Step 1.** Steps 2–7 have still never been executed: the app has never
+rendered, and `window.jarvis` has never been observed in a live renderer.
 
 ## Why this exists
 
@@ -122,12 +146,19 @@ the config says, and the renderer is not actually untrusted.
 
 ## Step 4 — Content Security Policy
 
-| #   | Run                                                         | Expected                                                                                                                                      |
-| --- | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| 4.1 | DevTools → Network → select the document → Response Headers | `Content-Security-Policy` present, starting `default-src 'self'`                                                                              |
-| 4.2 | `eval('1+1')`                                               | Throws `EvalError` (CSP has no `'unsafe-eval'`)                                                                                               |
-| 4.3 | `fetch('https://example.com')`                              | Blocked. **Note:** in dev, `connect-src` is `'self' ws://localhost:*`, so this is refused; in a **packaged** build `connect-src` is `'none'`. |
-| 4.4 | Console after load                                          | No CSP violations from the app's own assets                                                                                                   |
+`npm run dev:desktop` runs the **development** policy. It differs from production in
+exactly two ways, and no others: `script-src` carries a per-run nonce (so Vite's inline
+React Refresh preamble can execute), and `connect-src` permits the HMR websocket. See
+`apps/desktop/src/shared/csp.ts` — one definition, both modes.
+
+| #   | Run                                                                            | Expected                                                                                                                                               |
+| --- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 4.1 | DevTools → Network → select the document → Response Headers                    | `Content-Security-Policy` present, starting `default-src 'self'`, and including `frame-ancestors 'none'`                                               |
+| 4.2 | `eval('1+1')`                                                                  | Throws `EvalError`. **No `'unsafe-eval'` in either mode** — Vite serves ES modules and Fast Refresh does not eval.                                     |
+| 4.3 | `fetch('https://example.com')`                                                 | Blocked. In dev `connect-src` is `'self' ws://localhost:* http://localhost:*`; in a **packaged** build it is `'none'`.                                 |
+| 4.4 | Console after load                                                             | **No CSP violations at all.** In particular, no "Executing inline script violates..." and no "@vitejs/plugin-react can't detect preamble" (Failure 2). |
+| 4.5 | Console after load                                                             | No "frame-ancestors is ignored when delivered via a meta element" — it now appears only on the header.                                                 |
+| 4.6 | `document.querySelector('meta[http-equiv="Content-Security-Policy"]').content` | In dev, contains `'nonce-<uuid>'` in `script-src`. **The uuid must match** the `nonce` attribute on the preamble `<script>` in Elements.               |
 
 ---
 

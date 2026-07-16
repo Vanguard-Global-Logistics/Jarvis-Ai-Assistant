@@ -4,14 +4,23 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!--
-      The main process sets the real CSP on the response headers (src/main/security.ts).
-      This meta tag is a second, independent declaration so the policy still applies
-      if the window is ever loaded by a path that bypasses the header handler.
+      The Content-Security-Policy meta tag is NOT written here. It is injected at
+      build time by the `jarvis:csp-meta` plugin in electron.vite.config.ts, from
+      the single definition in src/shared/csp.ts — the same module that produces
+      the response header in src/main/security.ts. Both are enforced; browsers
+      apply the intersection of every policy delivered, so they must agree, and
+      the only way to guarantee that is to have one source.
+
+      It is injected rather than static because the development and production
+      policies differ: Vite's React Refresh preamble is an inline script, and
+      admitting it needs a per-run nonce that cannot exist in a static file. A
+      hand-written tag here would have to be permanently loosened to cover dev —
+      weakening the shipped policy to serve the dev server.
+
+      Do not add a Content-Security-Policy meta tag to this file. A second policy
+      would silently intersect with the injected one, and the stricter of the two
+      would win without saying so.
     -->
-    <meta
-      http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
-    />
     <title>Jarvis</title>
   </head>
   <body>

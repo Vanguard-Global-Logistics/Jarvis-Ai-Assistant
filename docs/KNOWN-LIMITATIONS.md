@@ -101,18 +101,30 @@ First launch on Windows must confirm: the window renders; the CSP header is pres
 permission request is denied; `window.jarvis` exists and exposes **only** `getAppInfo`;
 and `getAppInfo()` returns real host values rather than throwing.
 
-`docs/WINDOWS-ACCEPTANCE-TEST.md` is the exact step-by-step gate. It was **attempted on
-2026-07-16 at commit `20ffb86` and failed at Step 1**: Electron launched and immediately
-threw `ERR_MODULE_NOT_FOUND`, because the main bundle left `@jarvis/config` external and
-Electron resolved it to raw TypeScript source (ADR 0003 amendment). That is fixed and
-guarded by `scripts/assert-electron-bundle.mjs`, but **Steps 2–7 have still never been
-executed** — the app has never rendered, and `window.jarvis` has never been observed in a
-live renderer. Until the gate passes end to end, nothing in the shell may be described as
-working (ADR 0004).
+`docs/WINDOWS-ACCEPTANCE-TEST.md` is the exact step-by-step gate. It is **in progress** and
+has already found **two** real defects, neither visible to any automated check:
 
-The lesson is worth keeping: every automated check passed on the commit that could not
-launch. Build, typecheck, lint, 49 tests, audit, and CI were all green. **Green CI is not
-evidence that the application runs.**
+1. `20ffb86` — failed to launch. The main bundle left `@jarvis/config` external, so
+   Electron resolved it to raw TypeScript source (`ERR_MODULE_NOT_FOUND`; ADR 0003
+   amendment).
+2. `ff3672d` — launched, but the renderer stayed blank. The CSP (`script-src 'self'`,
+   delivered by both a header and a static meta tag, intersected) blocked Vite's inline
+   React Refresh preamble, so React never mounted. Development-only; production was never
+   affected.
+
+Both are fixed and guarded — `scripts/assert-electron-bundle.mjs` fails the build if a
+workspace package is reachable at runtime or if the shipped CSP is not strict, and
+`apps/desktop/src/shared/csp.test.ts` pins the production policy.
+
+**Steps 2–7 have still never been executed.** The app has never rendered, and
+`window.jarvis` has never been observed in a live renderer. Until the gate passes end to
+end, nothing in the shell may be described as working (ADR 0004).
+
+The lesson is worth keeping, and it has now been demonstrated twice: **every automated
+check passed on both broken commits** — build, typecheck, lint, every test, audit, and CI,
+all green, on a build that could not launch and then on one that rendered nothing. One
+defect needed Electron's module resolver to surface; the other needed a Chromium renderer
+enforcing CSP. **Green CI is not evidence that the application runs.**
 
 ## 8. CI does not verify the desktop app runs
 

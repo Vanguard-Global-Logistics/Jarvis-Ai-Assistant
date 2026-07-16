@@ -19,6 +19,40 @@ const env = parseEnv();
 
 const RENDERER_DEV_URL = process.env.ELECTRON_RENDERER_URL ?? null;
 
+/**
+ * The CSP nonce Vite used to tag its injected dev scripts, or `null` when the
+ * renderer is built HTML and no nonce should exist.
+ *
+ * `ELECTRON_RENDERER_URL` — not `app.isPackaged` — is the right signal: it is set
+ * only when the Vite dev server is serving the renderer, which is exactly when
+ * the React Refresh preamble exists and needs admitting. Running built HTML
+ * unpackaged (`electron .`) is not development for CSP purposes and must get the
+ * strict policy.
+ *
+ * `electron.vite.config.ts` generates the nonce and puts it in the environment;
+ * electron-vite spawns Electron with `spawn(..., { stdio: 'inherit' })` and no
+ * `env` override, so the child inherits it.
+ */
+function resolveDevCspNonce(rendererDevUrl: string | null): string | null {
+  if (rendererDevUrl === null) return null;
+
+  const nonce = process.env.JARVIS_DEV_CSP_NONCE;
+  if (nonce === undefined || nonce === '') {
+    // Throw rather than fall back to the production policy. The fallback would
+    // block Vite's inline preamble, React would never mount, and the window
+    // would be blank with nothing naming the cause — the worst possible failure
+    // (CLAUDE.md §8: fail loudly, never render a plausible-looking blank).
+    throw new Error(
+      'ELECTRON_RENDERER_URL is set, so the renderer is served by the Vite dev server, ' +
+        'but JARVIS_DEV_CSP_NONCE is not set. The nonce did not propagate from ' +
+        'electron.vite.config.ts to this process. Without it the dev CSP would block ' +
+        "Vite's React Refresh preamble and the window would render blank.",
+    );
+  }
+
+  return nonce;
+}
+
 function createWindow(): BrowserWindow {
   const window = new BrowserWindow({
     width: 1440,
@@ -43,7 +77,7 @@ function createWindow(): BrowserWindow {
     },
   });
 
-  applyContentSecurityPolicy(window.webContents);
+  applyContentSecurityPolicy(window.webContents, resolveDevCspNonce(RENDERER_DEV_URL));
   denyAllPermissions(window.webContents);
   lockNavigation(window, RENDERER_DEV_URL !== null ? new URL(RENDERER_DEV_URL).origin : null);
 

@@ -1,5 +1,6 @@
-import { app, shell } from 'electron';
+import { shell } from 'electron';
 import type { BrowserWindow, WebContents } from 'electron';
+import { contentSecurityPolicy } from '../shared/csp.js';
 
 /**
  * Application-wide hardening.
@@ -10,46 +11,36 @@ import type { BrowserWindow, WebContents } from 'electron';
  *
  * These are deny-by-default controls applied to every window, so a future window
  * created by someone who has not read this file still inherits them.
+ *
+ * The policy itself lives in ../shared/csp.ts — one definition, shared with the
+ * build (CLAUDE.md §3). This file only decides which mode applies and delivers it.
  */
-
-const isDev = !app.isPackaged;
 
 /**
- * Content Security Policy.
+ * Apply the CSP to every response in this session.
  *
- * No 'unsafe-eval' (CLAUDE.md §3). 'unsafe-inline' for styles only, and only
- * because React injects style attributes; scripts get no inline allowance.
+ * `devNonce` selects the mode, and it is not a boolean by accident: a
+ * development policy is only valid *with* the nonce Vite used to tag its
+ * injected scripts, so the two travel together and cannot be set inconsistently.
+ * Pass `null` for a packaged build.
  *
- * `connect-src` permits the Vite HMR websocket in development only. In a
- * packaged build the renderer may not open a network connection at all — it has
- * nothing legitimate to talk to, since every privileged action goes through the
- * main process.
+ * A header is used rather than only the meta tag because `frame-ancestors` is
+ * ignored in meta. The renderer HTML additionally carries a meta CSP, injected
+ * at build time from the same module, in case a load path ever bypasses this
+ * handler — both are enforced, and both come from one source.
  */
-function contentSecurityPolicy(): string {
-  const connect = isDev ? "connect-src 'self' ws://localhost:*" : "connect-src 'none'";
+export function applyContentSecurityPolicy(contents: WebContents, devNonce: string | null): void {
+  const policy = contentSecurityPolicy(
+    devNonce === null
+      ? { mode: 'production', delivery: 'header' }
+      : { mode: 'development', delivery: 'header', nonce: devNonce },
+  );
 
-  return [
-    "default-src 'self'",
-    "script-src 'self'",
-    "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data:",
-    "font-src 'self'",
-    connect,
-    "object-src 'none'",
-    "frame-src 'none'",
-    "worker-src 'self'",
-    "base-uri 'none'",
-    "form-action 'none'",
-    "frame-ancestors 'none'",
-  ].join('; ');
-}
-
-export function applyContentSecurityPolicy(contents: WebContents): void {
   contents.session.webRequest.onHeadersReceived((details, callback) => {
     callback({
       responseHeaders: {
         ...details.responseHeaders,
-        'Content-Security-Policy': [contentSecurityPolicy()],
+        'Content-Security-Policy': [policy],
       },
     });
   });

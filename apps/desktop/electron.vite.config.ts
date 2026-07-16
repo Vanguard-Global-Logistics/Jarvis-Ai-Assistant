@@ -1,6 +1,9 @@
+import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 import { defineConfig } from 'electron-vite';
+import type { Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
+import { contentSecurityPolicy } from './src/shared/csp.js';
 
 /**
  * Three build targets, three trust levels — this file is where that separation
@@ -45,46 +48,118 @@ const INTERNAL_PACKAGES = [
   '@jarvis/ui',
 ];
 
-export default defineConfig({
-  main: {
-    build: {
-      // Main runs on full Node, so an external import *resolves* — it just
-      // resolves to TypeScript, which Node cannot execute. Bundle them.
-      externalizeDeps: { exclude: INTERNAL_PACKAGES },
-      rollupOptions: {
-        input: { index: resolve(__dirname, 'src/main/index.ts') },
-      },
-    },
-  },
+/**
+ * The dev-server CSP nonce, generated once per `electron-vite dev` run.
+ *
+ * Why it exists: in development `@vitejs/plugin-react` injects the React Refresh
+ * preamble as an **inline** module script, which `script-src 'self'` blocks. Vite
+ * tags every script it injects with `html.cspNonce`, so naming that nonce in the
+ * dev CSP admits exactly those tags — strictly narrower than `'unsafe-inline'`,
+ * which would admit any inline script at all.
+ *
+ * How the main process learns it: through the environment. electron-vite spawns
+ * Electron with `spawn(electronPath, args, { stdio: 'inherit' })` and no `env`
+ * override, so the child inherits `process.env` from this process, and this
+ * config is evaluated before that spawn.
+ *
+ * `??=` matters: electron-vite may evaluate this config more than once per run,
+ * and a second `randomUUID()` would hand the renderer a nonce the already-spawned
+ * main process never saw. Assign once, reuse.
+ *
+ * Never generated for a build. Production carries no nonce, and `csp.ts` throws
+ * if one is passed.
+ */
+function devCspNonce(): string {
+  process.env.JARVIS_DEV_CSP_NONCE ??= randomUUID();
+  return process.env.JARVIS_DEV_CSP_NONCE;
+}
 
-  preload: {
-    build: {
-      // A sandboxed preload cannot `require` arbitrary packages — only
-      // `electron` and a small set of polyfills are resolvable at runtime. The
-      // default externalization would leave `@jarvis/contracts` as a bare
-      // require and the bridge would fail to load. Excluding it forces it to be
-      // bundled in, which is what a sandboxed preload needs.
-      //
-      // Shares one list with main so the two cannot drift (CLAUDE.md §3): the
-      // rule is identical on both sides, for different underlying reasons.
-      externalizeDeps: { exclude: INTERNAL_PACKAGES },
-      rollupOptions: {
-        input: { index: resolve(__dirname, 'src/preload/index.ts') },
-        // A sandboxed preload must be CommonJS — Electron does not load an ESM
-        // preload when `sandbox: true`. The root package is `"type": "module"`,
-        // so the .cjs extension is required for Node to treat it as CJS.
-        output: { format: 'cjs', entryFileNames: '[name].cjs' },
-      },
-    },
-  },
+/**
+ * Inject the CSP as a `<meta http-equiv>` into the renderer HTML.
+ *
+ * This is a second, independent declaration alongside the response header set in
+ * `src/main/security.ts`, so the policy still applies if the window is ever
+ * loaded by a path that bypasses the header handler. Both are enforced; browsers
+ * apply the intersection of every policy delivered.
+ *
+ * It is injected rather than hand-written in index.html so that the policy has
+ * exactly one definition (`src/shared/csp.ts`) instead of two that can drift —
+ * and so the dev and production variants can differ without index.html carrying
+ * a permanently weakened policy.
+ */
+function cspMetaTag(nonce: string | null): Plugin {
+  const policy = contentSecurityPolicy(
+    nonce === null
+      ? { mode: 'production', delivery: 'meta' }
+      : { mode: 'development', delivery: 'meta', nonce },
+  );
 
-  renderer: {
-    root: resolve(__dirname, 'src/renderer'),
-    plugins: [react()],
-    build: {
-      rollupOptions: {
-        input: { index: resolve(__dirname, 'src/renderer/index.html') },
+  return {
+    name: 'jarvis:csp-meta',
+    transformIndexHtml: {
+      order: 'pre',
+      handler: () => [
+        {
+          tag: 'meta',
+          injectTo: 'head-prepend',
+          attrs: { 'http-equiv': 'Content-Security-Policy', content: policy },
+        },
+      ],
+    },
+  };
+}
+
+export default defineConfig(({ command }) => {
+  // 'serve' is the Vite dev server; 'build' produces the packaged renderer.
+  // Everything development-only hangs off this one discriminator.
+  const nonce = command === 'serve' ? devCspNonce() : null;
+
+  return {
+    main: {
+      build: {
+        // Main runs on full Node, so an external import *resolves* — it just
+        // resolves to TypeScript, which Node cannot execute. Bundle them.
+        externalizeDeps: { exclude: INTERNAL_PACKAGES },
+        rollupOptions: {
+          input: { index: resolve(__dirname, 'src/main/index.ts') },
+        },
       },
     },
-  },
+
+    preload: {
+      build: {
+        // A sandboxed preload cannot `require` arbitrary packages — only
+        // `electron` and a small set of polyfills are resolvable at runtime. The
+        // default externalization would leave `@jarvis/contracts` as a bare
+        // require and the bridge would fail to load. Excluding it forces it to be
+        // bundled in, which is what a sandboxed preload needs.
+        //
+        // Shares one list with main so the two cannot drift (CLAUDE.md §3): the
+        // rule is identical on both sides, for different underlying reasons.
+        externalizeDeps: { exclude: INTERNAL_PACKAGES },
+        rollupOptions: {
+          input: { index: resolve(__dirname, 'src/preload/index.ts') },
+          // A sandboxed preload must be CommonJS — Electron does not load an ESM
+          // preload when `sandbox: true`. The root package is `"type": "module"`,
+          // so the .cjs extension is required for Node to treat it as CJS.
+          output: { format: 'cjs', entryFileNames: '[name].cjs' },
+        },
+      },
+    },
+
+    renderer: {
+      root: resolve(__dirname, 'src/renderer'),
+      plugins: [react(), cspMetaTag(nonce)],
+      // Tags every script Vite injects — the React Refresh preamble and the HMR
+      // client — with this nonce, which is the only reason the dev CSP can admit
+      // them without 'unsafe-inline'. `null` in a build: the production HTML has
+      // no inline scripts and must carry no nonce.
+      ...(nonce !== null ? { html: { cspNonce: nonce } } : {}),
+      build: {
+        rollupOptions: {
+          input: { index: resolve(__dirname, 'src/renderer/index.html') },
+        },
+      },
+    },
+  };
 });

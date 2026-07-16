@@ -130,14 +130,81 @@ for (const { name, file, allowed } of TARGETS) {
   }
 }
 
+/**
+ * The shipped renderer HTML must carry the strict production CSP.
+ *
+ * `src/shared/csp.test.ts` proves the policy *builder* is strict. This proves the
+ * strict policy actually reached the artifact — the two are different claims, and
+ * the gap between them is where the last bug lived. A development affordance
+ * (the Vite nonce, the HMR websocket) leaking into a packaged build would be a
+ * real weakening that no unit test on the builder would catch.
+ */
+const rendererHtmlPath = join(root, 'apps/desktop/out/renderer/index.html');
+
+if (!existsSync(rendererHtmlPath)) {
+  failures.push(`renderer: build artifact missing at ${rendererHtmlPath}`);
+} else {
+  const html = readFileSync(rendererHtmlPath, 'utf8');
+
+  // Extract the attribute from the RAW html, then unescape — not the other way
+  // round. A CSP is full of single quotes (`'self'`), and the HTML serialiser
+  // writes them as `&#39;` inside a double-quoted attribute. Unescaping first
+  // would inject real quotes into the attribute value and any quote-aware regex
+  // would then stop at the first `'self'`, silently capturing `default-src` and
+  // nothing else.
+  const metaTag = /<meta[^>]*http-equiv=["']Content-Security-Policy["'][^>]*>/i.exec(html)?.[0];
+  const rawContent =
+    metaTag === undefined
+      ? undefined
+      : (/content="([^"]*)"/i.exec(metaTag)?.[1] ?? /content='([^']*)'/i.exec(metaTag)?.[1]);
+  const csp = rawContent?.replaceAll('&#39;', "'").replaceAll('&quot;', '"').trim();
+
+  if (csp === undefined) {
+    failures.push(
+      'renderer: built index.html carries no Content-Security-Policy meta tag.\n' +
+        '      The jarvis:csp-meta plugin in apps/desktop/electron.vite.config.ts should inject it.',
+    );
+  } else {
+    const scriptSrc = csp.split(';').find((d) => d.trim().startsWith('script-src'));
+
+    if (scriptSrc?.trim() !== "script-src 'self'") {
+      failures.push(
+        `renderer: production script-src is "${String(scriptSrc?.trim())}", expected "script-src 'self'".`,
+      );
+    }
+
+    // Development affordances that must never ship.
+    for (const forbidden of ['nonce-', 'unsafe-eval', 'localhost', 'ws://', 'http://']) {
+      if (csp.includes(forbidden)) {
+        failures.push(
+          `renderer: production CSP contains "${forbidden}" — a development affordance leaked into the build.\n` +
+            `      Policy: ${csp}`,
+        );
+      }
+    }
+
+    if (!csp.includes("connect-src 'none'")) {
+      failures.push(
+        `renderer: production CSP must set connect-src 'none' — a packaged renderer has nothing to talk to.\n` +
+          `      Policy: ${csp}`,
+      );
+    }
+  }
+}
+
 if (failures.length > 0) {
-  console.error('\n✗ Electron bundle assertion FAILED\n');
+  console.error('\n✗ Electron artifact assertion FAILED\n');
   for (const failure of failures) console.error(`  - ${failure}`);
   console.error(
-    '\n  Electron must not depend on raw workspace TypeScript at runtime.\n' +
+    '\n  Two guarantees are enforced here, and both are invisible to `npm run verify`:\n' +
+      '    1. Electron must not depend on raw workspace TypeScript at runtime.\n' +
+      '    2. The shipped renderer must carry the strict production CSP.\n' +
       '  See docs/IPC-SURFACE.md and docs/DECISIONS/0003.\n',
   );
   process.exit(1);
 }
 
-console.log('✓ Electron bundle assertion passed — no workspace TypeScript reachable at runtime');
+console.log(
+  '✓ Electron artifact assertion passed — no workspace TypeScript reachable at runtime, ' +
+    'production CSP strict',
+);
