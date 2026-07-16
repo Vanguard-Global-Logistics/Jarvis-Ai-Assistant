@@ -65,8 +65,34 @@ if [ -x "$ELECTRON_BIN" ]; then
     exit 1
   fi
   echo "✓ Electron's shared libraries all resolve."
-  echo -n "✓ Electron reports: "
-  xvfb-run -a "$ELECTRON_BIN" --version 2>/dev/null || echo "(version check failed)"
+
+  # --no-sandbox is required here, and only here. Chromium's SUID sandbox helper
+  # must be owned by root with mode 4755; on a CI runner it is not, so Electron
+  # aborts with a FATAL error before printing anything. That is an artefact of
+  # running as an unprivileged user in a container, not a fault in the app — and
+  # it does NOT weaken the app: `webPreferences.sandbox` (the renderer/preload
+  # sandbox this project depends on) is a different mechanism and stays on.
+  #
+  # An earlier version of this script omitted the flag and printed "✓ Electron
+  # reports:" immediately followed by that FATAL error — a success marker in front
+  # of a failure, which is worse than no check at all (CLAUDE.md §8).
+  # Electron chatters about dbus on a container with no session bus. That noise is
+  # harmless, so pick the version line out rather than echoing everything after a
+  # "✓" and calling it a success.
+  if OUTPUT="$(xvfb-run -a "$ELECTRON_BIN" --no-sandbox --version 2>&1)"; then
+    VERSION="$(printf '%s\n' "$OUTPUT" | grep -m1 '^v[0-9]' || true)"
+    if [ -n "$VERSION" ]; then
+      echo "✓ Electron runs here: $VERSION"
+    else
+      echo "✗ Electron started but printed no version. Output was:"
+      printf '%s\n' "$OUTPUT" | tail -3
+      exit 1
+    fi
+  else
+    echo "✗ Electron's libraries resolve but it would not start:"
+    printf '%s\n' "$OUTPUT" | tail -3
+    exit 1
+  fi
 else
   echo "Note: $ELECTRON_BIN not present and could not be downloaded."
   echo "Run \`npm install\` (for the package), then \`node node_modules/electron/install.js\`."
