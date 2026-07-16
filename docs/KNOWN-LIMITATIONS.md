@@ -154,18 +154,37 @@ defect needed Electron's module resolver to surface; the other needed a Chromium
 enforcing CSP. **Green CI is not evidence that the application runs** — which is exactly
 why `npm run probe:runtime` now exists, and why it is not enough on its own.
 
-## 8. CI does not verify the desktop app runs
+## 8. CI runs the app on Linux, but has no Windows runner
 
-The `verify` job runs format, lint, typecheck, test, and build on Ubuntu. It does not
-launch Electron and has no Windows runner. A green CI proves the code compiles and the
-unit tests pass — it is the _tested_ fact in Forge's five-fact model
-(claimed ≠ committed ≠ tested ≠ previewed ≠ approved), and nothing more.
+**Status: PARTIAL.**
 
-`npm run probe:runtime` **can** now run in CI: it needs only the Electron GUI libraries and
-Xvfb (`scripts/install-electron-runtime-deps.sh`), both installable on `ubuntu-latest`.
-Wiring it into the workflow would have caught both of the defects above before they
-reached a human. It is deliberately **not** wired in yet — that is a change to the CI
-contract (runtime, flake surface) and needs approval, not a silent addition.
+Two jobs, and the distinction matters:
+
+- **`verify`** — format, lint, typecheck, test, build. Proves the code is well-formed.
+  It **cannot** see whether the application runs, and twice it was green on a build that
+  did not.
+- **`runtime`** — installs Electron's GUI libraries and Xvfb, builds, then runs
+  `npm run probe:runtime`: launches the real app (packaged path **and** `dev:desktop`) and
+  asserts React mounts, the bridge exposes exactly `getAppInfo`, the renderer has no Node
+  globals, and the console is clean. It is verified red-green against the CSP defect.
+
+A red `verify` means the code is wrong. A red `runtime` means the code is fine and the app
+is broken. Both of the defects in §7 would now be caught here rather than by a human.
+
+**What CI still does not do:**
+
+- **No Windows runner.** Everything runs on `ubuntu-latest`, so `platform` reports `linux`.
+  Windows path handling, `loadFile` on a drive letter, and the packaged installer are
+  never exercised. `docs/WINDOWS-ACCEPTANCE-TEST.md` remains the gate and still requires a
+  human (ADR 0004).
+- **No permission or navigation checks** (acceptance test Steps 5–6) — not automated.
+- **No sandbox-escape attempt.** The probe shows the renderer has no Node globals, which
+  is strong evidence the isolation flags work, not proof.
+
+Green CI is now meaningfully stronger than it was — it is the _tested_ fact in Forge's
+five-fact model (claimed ≠ committed ≠ tested ≠ previewed ≠ approved), and it now includes
+"the app actually starts and renders on Linux". It is still not _previewed_ and not
+_approved_.
 
 ## 9. No test covers the security configuration
 

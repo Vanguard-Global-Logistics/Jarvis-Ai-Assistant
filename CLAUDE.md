@@ -206,6 +206,9 @@ values, the renderer has no Node globals, and the console is clean. **Run it bef
 claiming any runtime behaviour.** On Linux it needs Electron's GUI libraries once:
 `bash scripts/install-electron-runtime-deps.sh`.
 
+CI runs it too, as the `runtime` job, separate from `verify`. A red `verify` means the code
+is wrong; a red `runtime` means the code is fine and the app is broken.
+
 Electron **does** run in this Codespace. A previous version of `docs/KNOWN-LIMITATIONS.md`
 claimed it could not; that claim was never tested, and believing it is why runtime
 behaviour was inferred from build artifacts twice, wrongly. The probe is not the Windows

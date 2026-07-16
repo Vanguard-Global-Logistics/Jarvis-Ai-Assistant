@@ -52,6 +52,56 @@ jobs:
       - name: Build
         run: npm run build
 
+  runtime:
+    name: Runtime probe
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # `verify` cannot see whether the application runs, and twice it did not: a build
+    # that could not launch (a workspace package left external resolved to raw
+    # TypeScript) and a build that rendered nothing (the CSP blocked Vite's inline
+    # React Refresh preamble) were both fully green here. Both reached a human on
+    # Windows before anyone noticed.
+    #
+    # This job launches the real Electron app — packaged path and `dev:desktop` — and
+    # asserts React mounts, the bridge exposes exactly `getAppInfo`, the renderer has
+    # no Node globals, and the console is clean. It is verified red-green against the
+    # CSP defect specifically.
+    #
+    # It runs on Linux, so it is NOT the Windows acceptance gate
+    # (docs/WINDOWS-ACCEPTANCE-TEST.md, ADR 0004). It closes the cheap gap — the one
+    # that should never have reached a human twice — and nothing more.
+    #
+    # Deliberately a separate job from `verify`: it needs system libraries and a
+    # virtual display, and its failures mean something different. A red `verify` says
+    # the code is wrong; a red `runtime` says the code is fine and the app is broken.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # Electron links ~12 GUI libraries that a CI runner does not necessarily have,
+      # and Chromium needs a display. Without these it dies before any of our code runs.
+      - name: Install Electron's runtime libraries and Xvfb
+        run: bash scripts/install-electron-runtime-deps.sh
+
+      - name: Build
+        run: npm run build
+
+      # The probe supplies its own Xvfb (no DISPLAY here) and passes --no-sandbox,
+      # which Chromium requires in a container. `webPreferences.sandbox` is untouched
+      # — that is the renderer/preload sandbox and it stays on.
+      - name: Probe the running app
+        run: npm run probe:runtime
+
   handoff-integrity:
     name: Archived handoff integrity
     runs-on: ubuntu-latest

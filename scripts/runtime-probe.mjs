@@ -135,7 +135,12 @@ async function assertPortFree(port, mode) {
   }
 }
 
-/** @param {number} port */
+/**
+ * @typedef {{ type: string, url: string, webSocketDebuggerUrl: string }} PageTarget
+ *
+ * @param {number} port
+ * @returns {Promise<PageTarget | null>}
+ */
 async function waitForCdp(port, timeoutMs = 60_000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -143,8 +148,10 @@ async function waitForCdp(port, timeoutMs = 60_000) {
       const res = await fetch(`http://127.0.0.1:${port}/json/list`);
       /** @type {{ type: string, url: string, webSocketDebuggerUrl?: string }[]} */
       const targets = await res.json();
-      const page = targets.find((t) => t.type === 'page');
-      if (page?.webSocketDebuggerUrl) return page;
+      const page = targets.find(
+        (t) => t.type === 'page' && typeof t.webSocketDebuggerUrl === 'string',
+      );
+      if (page !== undefined) return /** @type {PageTarget} */ (page);
     } catch {
       // Not up yet.
     }
@@ -215,6 +222,33 @@ async function cdp(url) {
   };
 
   return { send, evaluate, consoleErrors, close: () => ws.close() };
+}
+
+/**
+ * Wait for the page to finish mounting, then briefly for its console output.
+ *
+ * Polling beats a fixed sleep in both directions. A fixed sleep long enough for a
+ * loaded CI runner wastes that time on every healthy run; one short enough to feel
+ * fast reports "React did not mount" on a slow machine — a false failure, which
+ * would train everyone to ignore this probe.
+ *
+ * A genuinely broken app never satisfies the condition and costs the full timeout.
+ * That is the right trade: the slow path is the one that found a real bug.
+ *
+ * @param {{ evaluate: (e: string) => Promise<any> }} page
+ */
+async function settle(page, timeoutMs = 20_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const r = await page.evaluate(
+      'document.readyState === "complete" && (document.getElementById("root")?.innerHTML.length ?? 0) > 0',
+    );
+    if (r.value === true) break;
+    await new Promise((r2) => setTimeout(r2, 250));
+  }
+  // A CSP violation is reported after the blocked script would have run, so give
+  // the console a moment to deliver it even once the DOM looks settled.
+  await new Promise((r) => setTimeout(r, 1000));
 }
 
 // --- the acceptance criteria ----------------------------------------------
@@ -363,7 +397,7 @@ async function probe(mode) {
     await page.send('Page.enable');
     // Reload so this load's console output is captured rather than missed.
     await page.send('Page.reload', { ignoreCache: true });
-    await new Promise((r) => setTimeout(r, 3000));
+    await settle(page);
 
     const checks = await runChecks(page, mode);
     page.close();
