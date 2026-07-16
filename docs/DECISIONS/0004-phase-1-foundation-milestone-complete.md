@@ -55,21 +55,29 @@ this repository is protected by AEGIS, because AEGIS does not exist.**
 
 ## Consequences
 
-**The milestone is complete but not accepted.** Two gates remain open, and neither is
-satisfied by this ADR:
+**The milestone is complete but not yet accepted.** Two gates were opened by this ADR.
+One is now closed; one remains open.
 
-1. **Runtime acceptance.** Every check that exists has been run and passes, but this is a
-   headless Linux container with no Electron binary and no display, so the app has never
-   been launched. The IPC tests mock `electron`. `docs/WINDOWS-ACCEPTANCE-TEST.md` is the
-   required manual gate; until it passes on Windows, the shell and the channel are
-   `IMPLEMENTED, NOT YET VERIFIED` — not "working".
-2. **Independent approval.** `CLAUDE.md` §5: a builder model is never the sole approver of
-   its own work. This milestone was authored and reviewed within Claude contexts, which is
-   not independent under §5.
+1. **Runtime acceptance — OPEN.** Every check that exists has been run and passes, but
+   this is a headless Linux container with no Electron binary and no display, so the app
+   has never been launched. The IPC tests mock `electron`.
+   `docs/WINDOWS-ACCEPTANCE-TEST.md` is the required manual gate; until it passes on
+   Windows, the shell and the channel are `IMPLEMENTED, NOT YET VERIFIED` — not "working".
+2. **Independent review — CLOSED, 2026-07-16.** `CLAUDE.md` §5: a builder model is never
+   the sole approver of its own work, and §5's table names ChatGPT as the independent
+   architecture reviewer — deliberately outside the Claude family so it is not reviewing
+   its own reasoning. William recorded that ChatGPT performed that review and that the
+   implementation review is complete.
 
-The honest status is therefore: **built, verified as far as this environment allows, and
-awaiting acceptance.** It is not approved, and no session may describe it as approved
-until both gates close.
+   Recorded on William's instruction, per §5's own framing of this as a **build-process
+   governance rule** whose arbiter is the owner. The reviewer's findings were not
+   transacted through this repository, so no session should cite this line as evidence of
+   _what_ was reviewed — only that the owner recorded the review as done. Attributed, not
+   independently witnessed (`CLAUDE.md` §8: never claim a review that was not performed).
+
+The honest status is therefore: **built, independently reviewed, verified as far as this
+environment allows, and awaiting runtime acceptance on Windows.** No session may describe
+the shell or the channel as _working_ until gate 1 closes.
 
 ## Alternatives considered
 

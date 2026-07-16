@@ -41,10 +41,11 @@ Repository: `github.com/Vanguard-Global-Logistics/Jarvis-Ai-Assistant`.
   CRUD, and Jarvis orchestration are **separate later milestones**, each needing its own
   approval — §7 still lists them as Phase 1 requirements, and that has not changed. Do not
   start any of them because "Phase 1 isn't done". Ask.
-- **Complete is not accepted.** Every check this environment can run passes, but the app
-  has never been launched (no Electron binary, no display here), and §5 forbids a builder
-  model being the sole approver of its own work. The milestone is *awaiting acceptance*,
-  not approved.
+- **Complete is not accepted.** The §5 independent review is done — ChatGPT reviewed the
+  architecture, recorded 2026-07-16 (ADR 0004). One gate remains: the app has **never been
+  launched** (no Electron binary, no display here), so the shell and the IPC channel are
+  `IMPLEMENTED, NOT YET VERIFIED`. `docs/WINDOWS-ACCEPTANCE-TEST.md` is the gate and it has
+  not been run. Do not call them working until it passes.
 - `reference/design-handoff/*.dc.html` and `support.js` are **design prototypes, not
   source to port**. `support.js` is explicitly marked "do not ship". Recreate the
   designs in real code; do not copy the prototype implementation.

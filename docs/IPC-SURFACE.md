@@ -177,7 +177,7 @@ and rendering a blank window.
   _enforced_ needs a live `BrowserWindow` (`KNOWN-LIMITATIONS.md` §9).
 - **That the preload cannot be bypassed.** No test attempts a real escape. The bridge
   test asserts the intended surface is small; it does not prove Electron enforces it.
-- **Independent approval.** `CLAUDE.md` §5: a builder model is never the sole approver of
-  its own work. This channel was authored and reviewed within Claude contexts. Security-
-  critical sign-off still requires an independent reviewer — per §5's table, ChatGPT for
-  architecture review — before this is treated as approved.
+  **Independently reviewed:** ChatGPT — the reviewer named in `CLAUDE.md` §5, deliberately
+  outside the Claude family — completed the architecture review, recorded by William on
+  2026-07-16 (ADR 0004). §5's never-sole-approver rule is satisfied. This does not make the
+  runtime gate above any less open.
