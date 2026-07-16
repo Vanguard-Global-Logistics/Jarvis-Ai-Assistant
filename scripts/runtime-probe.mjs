@@ -1,0 +1,405 @@
+// @ts-check
+import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+/**
+ * Runtime probe — launches the real Electron app and asserts what it actually does.
+ *
+ * This exists because `npm run verify` cannot see the failures that matter here, and
+ * twice it did not: the app shipped green while it could not launch (a workspace package
+ * left external resolved to raw TypeScript), and again while it rendered nothing (the CSP
+ * blocked Vite's inline React Refresh preamble). Both passed build, typecheck, lint, every
+ * unit test, audit, and CI. Both were found by a human opening the app on Windows.
+ *
+ * `docs/KNOWN-LIMITATIONS.md` used to say a headless Linux container could not prove the
+ * window launches. That was wrong: Electron runs here under Xvfb, and this drives it over
+ * the DevTools protocol — the same evidence a human reads in the console, gathered
+ * automatically.
+ *
+ * WHAT THIS IS NOT: it is not the Windows acceptance test. It runs on Linux, so
+ * `platform` reports `linux`, and nothing Windows-specific is exercised.
+ * `docs/WINDOWS-ACCEPTANCE-TEST.md` remains the gate and still requires a human on
+ * Windows. This closes the cheap gap, not the real one.
+ *
+ * Usage:
+ *   node scripts/runtime-probe.mjs            # both modes
+ *   node scripts/runtime-probe.mjs --prod     # built HTML (file://), production CSP
+ *   node scripts/runtime-probe.mjs --dev      # real `dev:desktop`, Vite + dev CSP
+ *
+ * Both modes matter. The module-resolution bug only appeared in a real launch; the CSP bug
+ * only appeared in dev. A probe that ran one mode would have missed one of them.
+ */
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const args = process.argv.slice(2);
+const wantProd = args.includes('--prod') || !args.includes('--dev');
+const wantDev = args.includes('--dev') || !args.includes('--prod');
+
+/** Electron needs a display. Codespaces has none, so borrow one. */
+const NEEDS_XVFB = !process.env.DISPLAY;
+
+/**
+ * @typedef {{ name: string, ok: boolean, detail: string }} Check
+ */
+
+/**
+ * @param {string} message
+ * @returns {never}
+ */
+function fail(message) {
+  console.error(`\n✗ runtime probe: ${message}\n`);
+  process.exit(1);
+}
+
+// --- preflight -------------------------------------------------------------
+
+const electronBin = join(root, 'node_modules/electron/dist/electron');
+if (!existsSync(electronBin)) {
+  fail('Electron binary not installed. Run `npm install`.');
+}
+
+if (NEEDS_XVFB) {
+  const which = spawn('which', ['xvfb-run']);
+  const found = await new Promise((r) => which.on('close', (c) => r(c === 0)));
+  if (!found) {
+    fail(
+      'No DISPLAY and no xvfb-run. Electron cannot open a window.\n' +
+        '  Run: bash scripts/install-electron-runtime-deps.sh',
+    );
+  }
+}
+
+// --- process helpers -------------------------------------------------------
+
+/**
+ * @param {string} command
+ * @param {string[]} cmdArgs
+ * @param {Record<string, string>} env
+ */
+function launch(command, cmdArgs, env) {
+  const [bin, binArgs] = NEEDS_XVFB
+    ? ['xvfb-run', ['-a', command, ...cmdArgs]]
+    : [command, cmdArgs];
+
+  return spawn(bin, binArgs, {
+    cwd: root,
+    env: { ...process.env, ...env },
+    // Own process group, so the whole tree dies on teardown. `dev:desktop` is
+    // npm -> electron-vite -> electron; killing only the parent orphans Electron
+    // and the next run collides on the debugging port.
+    detached: true,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+}
+
+/** @param {import('node:child_process').ChildProcess} child */
+function kill(child) {
+  try {
+    if (child.pid !== undefined) process.kill(-child.pid, 'SIGKILL');
+  } catch {
+    // Already gone.
+  }
+}
+
+/**
+ * Refuse to start if something is already listening on the debugging port.
+ *
+ * This is not defensiveness for its own sake — it caught a false green while this
+ * script was being written. An orphaned Electron from an earlier run was still
+ * holding the port, the probe attached to *that* process, and reported every check
+ * passing against code that had been deliberately broken. A probe that silently
+ * measures a stale app is worse than no probe: it manufactures confidence
+ * (CLAUDE.md §8).
+ *
+ * @param {number} port
+ * @param {string} mode
+ */
+async function assertPortFree(port, mode) {
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}/json/list`, {
+      signal: AbortSignal.timeout(1000),
+    });
+    if (res.ok) {
+      fail(
+        `[${mode}] port ${port} is already serving a DevTools endpoint.\n` +
+          '  A stale Electron is running, and probing it would measure the WRONG BUILD.\n' +
+          '  Kill it first:\n' +
+          '    pkill -9 -f "node_modules/electron/dist/electron"\n' +
+          '    pkill -9 -f "node_modules/.bin/vite"',
+      );
+    }
+  } catch {
+    // Nothing listening: the state we want.
+  }
+}
+
+/** @param {number} port */
+async function waitForCdp(port, timeoutMs = 60_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/json/list`);
+      /** @type {{ type: string, url: string, webSocketDebuggerUrl?: string }[]} */
+      const targets = await res.json();
+      const page = targets.find((t) => t.type === 'page');
+      if (page?.webSocketDebuggerUrl) return page;
+    } catch {
+      // Not up yet.
+    }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  return null;
+}
+
+// --- CDP client ------------------------------------------------------------
+
+let nextId = 1;
+
+/** @param {string} url */
+async function cdp(url) {
+  /** @type {Map<number, (msg: any) => void>} */
+  const pending = new Map();
+  /** @type {string[]} */
+  const consoleErrors = [];
+
+  const ws = new WebSocket(url);
+  await new Promise((res, rej) => {
+    ws.addEventListener('open', res, { once: true });
+    ws.addEventListener('error', rej, { once: true });
+  });
+
+  ws.addEventListener('message', (ev) => {
+    const msg = JSON.parse(String(ev.data));
+    if (msg.id !== undefined && pending.has(msg.id)) {
+      const settle = pending.get(msg.id);
+      pending.delete(msg.id);
+      if (settle) settle(msg);
+      return;
+    }
+    // Only errors are collected. Vite's "[vite] connected" and React's DevTools
+    // notice are normal and would be noise.
+    if (msg.method === 'Log.entryAdded' && msg.params.entry.level === 'error') {
+      consoleErrors.push(msg.params.entry.text);
+    }
+    if (msg.method === 'Runtime.exceptionThrown') {
+      const d = msg.params.exceptionDetails;
+      consoleErrors.push(d.exception?.description ?? d.text);
+    }
+  });
+
+  /**
+   * @param {string} method
+   * @param {Record<string, unknown>} [params]
+   * @returns {Promise<any>}
+   */
+  const send = (method, params = {}) => {
+    const id = nextId++;
+    ws.send(JSON.stringify({ id, method, params }));
+    return new Promise((res) => pending.set(id, res));
+  };
+
+  /** @param {string} expression */
+  const evaluate = async (expression) => {
+    const res = await send('Runtime.evaluate', {
+      expression: `(async () => (${expression}))()`,
+      awaitPromise: true,
+      returnByValue: true,
+    });
+    const r = res.result;
+    if (r?.exceptionDetails) {
+      return { error: r.exceptionDetails.exception?.description ?? r.exceptionDetails.text };
+    }
+    return { value: r?.result?.value };
+  };
+
+  return { send, evaluate, consoleErrors, close: () => ws.close() };
+}
+
+// --- the acceptance criteria ----------------------------------------------
+
+const PLATFORMS = ['win32', 'darwin', 'linux'];
+
+/**
+ * @param {{ evaluate: (e: string) => Promise<any>, consoleErrors: string[] }} page
+ * @param {'prod' | 'dev'} mode
+ * @returns {Promise<Check[]>}
+ */
+async function runChecks(page, mode) {
+  /** @type {Check[]} */
+  const checks = [];
+  /**
+   * @param {string} name
+   * @param {unknown} ok
+   * @param {unknown} detail
+   */
+  const add = (name, ok, detail) => checks.push({ name, ok: Boolean(ok), detail: String(detail) });
+
+  // Prove we are looking at the app this run launched, in the mode requested —
+  // not a survivor of an earlier run. `assertPortFree` should make this
+  // impossible; this is the assertion that says so out loud.
+  const href = await page.evaluate('location.href');
+  const url = String(href.value ?? '');
+  const urlOk = mode === 'prod' ? url.startsWith('file://') : url.startsWith('http://');
+  add(
+    `Correct page for ${mode} mode`,
+    urlOk,
+    url || '(no url)' + (urlOk ? '' : ` — expected ${mode === 'prod' ? 'file://' : 'http://'}`),
+  );
+
+  // Printed as evidence rather than asserted: the strict-production assertions
+  // live in scripts/assert-electron-bundle.mjs and src/shared/csp.test.ts. Seeing
+  // the live policy is what makes a CSP failure below diagnosable at a glance.
+  const csp = await page.evaluate(
+    'document.querySelector(\'meta[http-equiv="Content-Security-Policy"]\')?.content ?? "(none)"',
+  );
+  add('CSP present', String(csp.value) !== '(none)', String(csp.value).slice(0, 110) + '…');
+
+  const h1 = await page.evaluate('document.querySelector("h1")?.textContent ?? null');
+  add('React mounts into #root', h1.value === 'Jarvis', `h1 = ${JSON.stringify(h1.value)}`);
+
+  const text = await page.evaluate('document.body.innerText');
+  const rendersTitle = typeof text.value === 'string' && text.value.includes('Jarvis');
+  const rendersPhase =
+    typeof text.value === 'string' && /Phase 1 foundation/i.test(String(text.value));
+  add('Window renders "Jarvis"', rendersTitle, rendersTitle ? 'present' : 'MISSING');
+  add('Window renders "Phase 1 Foundation"', rendersPhase, rendersPhase ? 'present' : 'MISSING');
+
+  const typeofJarvis = await page.evaluate('typeof window.jarvis');
+  add(
+    'typeof window.jarvis === "object"',
+    typeofJarvis.value === 'object',
+    `got ${JSON.stringify(typeofJarvis.value)}`,
+  );
+
+  const keys = await page.evaluate('window.jarvis ? Object.keys(window.jarvis) : null');
+  const keysOk = JSON.stringify(keys.value) === JSON.stringify(['getAppInfo']);
+  add('Object.keys is exactly ["getAppInfo"]', keysOk, JSON.stringify(keys.value));
+
+  const info = await page.evaluate('window.jarvis ? await window.jarvis.getAppInfo() : null');
+  const i = info.value;
+  const infoOk =
+    i !== null &&
+    typeof i === 'object' &&
+    typeof i.appVersion === 'string' &&
+    i.appVersion.length > 0 &&
+    typeof i.electronVersion === 'string' &&
+    i.electronVersion.length > 0 &&
+    typeof i.chromeVersion === 'string' &&
+    typeof i.nodeVersion === 'string' &&
+    PLATFORMS.includes(i.platform) &&
+    typeof i.arch === 'string' &&
+    typeof i.isPackaged === 'boolean';
+  add(
+    'getAppInfo() returns real platform info',
+    infoOk,
+    info.error ? `THREW: ${String(info.error).split('\n')[0]}` : JSON.stringify(i),
+  );
+
+  // The bridge must stay narrow. A generic passthrough here would hand the
+  // renderer the whole main process (ADR 0002).
+  const invoke = await page.evaluate('window.jarvis ? typeof window.jarvis.invoke : "no-bridge"');
+  add('No generic invoke passthrough', invoke.value === 'undefined', `got ${invoke.value}`);
+
+  for (const global of ['require', 'process', 'module', 'Buffer', 'ipcRenderer', 'electron']) {
+    const r = await page.evaluate(`typeof window.${global}`);
+    add(`Renderer isolated: window.${global}`, r.value === 'undefined', `got ${r.value}`);
+  }
+
+  // A CSP violation lands here. So does the "can't detect preamble" cascade.
+  add(
+    'No console errors',
+    page.consoleErrors.length === 0,
+    page.consoleErrors.length === 0 ? 'clean' : page.consoleErrors.join(' | ').slice(0, 300),
+  );
+
+  return checks;
+}
+
+// --- modes -----------------------------------------------------------------
+
+/**
+ * @param {'prod' | 'dev'} mode
+ * @returns {Promise<Check[]>}
+ */
+async function probe(mode) {
+  const port = mode === 'prod' ? 9222 : 9223;
+
+  if (mode === 'prod' && !existsSync(join(root, 'apps/desktop/out/main/index.js'))) {
+    fail('No build output. Run `npm run build` first.');
+  }
+
+  await assertPortFree(port, mode);
+
+  const child =
+    mode === 'prod'
+      ? // Built HTML over file://, production CSP, no dev server.
+        launch(electronBin, ['apps/desktop', `--remote-debugging-port=${port}`, '--no-sandbox'], {})
+      : // The REAL `npm run dev:desktop`. electron-vite forwards
+        // REMOTE_DEBUGGING_PORT and NO_SANDBOX to Electron itself, so this
+        // exercises the actual dev path — including the CSP nonce travelling
+        // through electron-vite's spawn — rather than a reconstruction of it.
+        launch('npm', ['run', 'dev:desktop'], {
+          REMOTE_DEBUGGING_PORT: String(port),
+          NO_SANDBOX: '1',
+        });
+
+  /** @type {string[]} */
+  const output = [];
+  child.stdout?.on('data', (d) => output.push(String(d)));
+  child.stderr?.on('data', (d) => output.push(String(d)));
+
+  try {
+    const target = await waitForCdp(port);
+    if (!target) {
+      const log = output.join('').split('\n').filter(Boolean).slice(-15).join('\n      ');
+      fail(`[${mode}] Electron never exposed a page. Last output:\n      ${log}`);
+    }
+
+    const page = await cdp(target.webSocketDebuggerUrl);
+    await page.send('Runtime.enable');
+    await page.send('Log.enable');
+    await page.send('Page.enable');
+    // Reload so this load's console output is captured rather than missed.
+    await page.send('Page.reload', { ignoreCache: true });
+    await new Promise((r) => setTimeout(r, 3000));
+
+    const checks = await runChecks(page, mode);
+    page.close();
+    return checks;
+  } finally {
+    kill(child);
+    // Let the port free before the next mode.
+    await new Promise((r) => setTimeout(r, 1500));
+  }
+}
+
+// --- report ----------------------------------------------------------------
+
+let failed = 0;
+
+for (const mode of /** @type {const} */ (['prod', 'dev'])) {
+  if (mode === 'prod' && !wantProd) continue;
+  if (mode === 'dev' && !wantDev) continue;
+
+  const label = mode === 'prod' ? 'PRODUCTION (built HTML, file://)' : 'DEVELOPMENT (dev:desktop)';
+  console.log(`\n──────── ${label} ────────\n`);
+
+  const checks = await probe(mode);
+  for (const c of checks) {
+    console.log(`  ${c.ok ? '✓' : '✗'} ${c.name.padEnd(38)} ${c.detail}`);
+    if (!c.ok) failed++;
+  }
+}
+
+console.log('');
+if (failed > 0) {
+  console.error(`✗ runtime probe FAILED — ${failed} check(s) did not pass.\n`);
+  process.exit(1);
+}
+
+console.log(
+  '✓ runtime probe passed — the app launches, React mounts, and the bridge works.\n' +
+    '  This is Linux. It is NOT the Windows acceptance test; see docs/WINDOWS-ACCEPTANCE-TEST.md.\n',
+);

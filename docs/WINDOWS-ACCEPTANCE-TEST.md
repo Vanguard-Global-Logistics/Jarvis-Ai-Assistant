@@ -6,10 +6,11 @@ Gate for: the Phase 1 Foundation milestone (ADR 0004).
 
 ## Run log
 
-| Date       | Commit    | Result                                                                                                                                                                                                                                                             |
-| ---------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 2026-07-16 | `20ffb86` | **FAILED at Step 1 (launch).** Electron started, then threw `ERR_MODULE_NOT_FOUND: Cannot find module packages/config/src/env.js imported from packages/config/src/index.ts`. No window reached a usable state; Steps 2–7 never reached.                           |
-| 2026-07-16 | `ff3672d` | **FAILED at Step 1.2 (render).** Window launched — the module error was gone. But the renderer stayed blank: `#root` empty, React never mounted. DevTools: "Executing inline script violates ... script-src 'self'", "@vitejs/plugin-react can't detect preamble". |
+| Date       | Commit    | Result                                                                                                                                                                                                                                                                                                                                                                            |
+| ---------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-07-16 | `20ffb86` | **FAILED at Step 1 (launch).** Electron started, then threw `ERR_MODULE_NOT_FOUND: Cannot find module packages/config/src/env.js imported from packages/config/src/index.ts`. No window reached a usable state; Steps 2–7 never reached.                                                                                                                                          |
+| 2026-07-16 | `ff3672d` | **FAILED at Step 1.2 (render).** Window launched — the module error was gone. But the renderer stayed blank: `#root` empty, React never mounted. DevTools: "Executing inline script violates ... script-src 'self'", "@vitejs/plugin-react can't detect preamble".                                                                                                                |
+| 2026-07-16 | `ba1554f` | **Not run on Windows.** Run on **Linux** via `npm run probe:runtime`: all functional checks pass in both the packaged and `dev:desktop` paths — React mounts, `window.jarvis` → `["getAppInfo"]`, `getAppInfo()` returns real values, renderer isolated, console clean. `platform` reports `linux`, so **this is not the Windows gate.** Steps 1–7 on Windows remain outstanding. |
 
 ### Failure 1 — raw TypeScript at runtime (`20ffb86`)
 
@@ -41,33 +42,39 @@ it is enforced on the header, where it works.
 
 **Every automated check passed on both commits** — build, typecheck, lint, tests, audit,
 CI. Neither failure is visible to any of them: one needed Electron's module resolver, the
-other needed a Chromium renderer enforcing CSP. That is what this gate is for, and why no
-amount of green CI substitutes for it.
+other needed a Chromium renderer enforcing CSP.
 
-**Retest from Step 1.** Steps 2–7 have still never been executed: the app has never
-rendered, and `window.jarvis` has never been observed in a live renderer.
+Both also reached a human for a reason that was avoidable: this repository believed it
+could not run Electron in a Linux container, so runtime behaviour was inferred from build
+artifacts instead of observed. **That belief was never tested and turned out to be false.**
+`npm run probe:runtime` now runs the app here and catches both classes; it is verified
+red-green against the CSP bug specifically. Nothing should reach Windows without it.
+
+**Retest from Step 1 on Windows.** As of `ba1554f` the app renders and `window.jarvis`
+works — **observed on Linux, never on Windows**. `platform` must report `win32`, and only
+this gate can show that.
 
 ## Why this exists
 
-Everything in this repository is verified by unit tests, a typechecker, a linter, a build,
-and artifact inspection. **None of that proves the application runs.** Development happens
-in a headless Linux Codespace with no Electron binary and no display, so the app has never
-been launched, and the IPC tests mock `electron` rather than exercising it.
+**Run `npm run probe:runtime` before touching Windows.** It launches the real app on Linux
+and asserts every functional item below — React mounts, `window.jarvis` exposes exactly
+`["getAppInfo"]`, `getAppInfo()` returns real values, the renderer has no Node globals, the
+console is clean — in both the packaged and `dev:desktop` paths. It catches both classes of
+defect found so far. Do not bring a build here that the probe has not passed; that is what
+wasted two rounds.
 
-Two specific things Codespaces **cannot** prove, and this test must:
+This document covers what the probe **cannot**:
 
-1. That the Electron window launches at all.
-2. That `window.jarvis` exists in a live renderer — i.e. that the preload actually loaded
-   and `contextBridge` actually ran.
+1. **Windows itself.** The probe reports `platform: "linux"`. Only a Windows run reports
+   `"win32"`, and only Windows exercises Windows path handling, `loadFile` on a drive
+   letter, and the real window manager.
+2. **Permissions and navigation locking** (Steps 5–6) — not automated anywhere.
+3. **The hardening flags as enforced**, rather than merely configured (Step 3 is strong
+   evidence, not proof).
 
-That second one is not hypothetical. A preload that emits a bare `require()` the sandbox
-cannot resolve throws at load, `contextBridge` never runs, and `window.jarvis` is silently
-`undefined` — while `npm run verify` stays green. That exact bug existed in this codebase
-and was caught by inspecting the built bundle, not by any test. **Nothing but a real
-launch closes this gap.**
-
-Until every step below passes on Windows, the shell and the IPC channel are
-`IMPLEMENTED, NOT YET VERIFIED`. Do not call them working (`CLAUDE.md` §8).
+Until every step below passes **on Windows**, the shell and the IPC channel are
+`IMPLEMENTED, NOT YET VERIFIED` on the target platform. Do not call them working
+(`CLAUDE.md` §8).
 
 > The expectations below are derived from the code
 > (`apps/desktop/src/main/security.ts`, `src/main/index.ts`, `src/preload/index.ts`).

@@ -35,9 +35,21 @@ Requires Node 22+.
 ```bash
 npm install          # one install at the root links every workspace
 npm run verify       # format + lint + typecheck + test
+npm run build        # build every workspace, and assert the Electron artifacts
 npm run dev:desktop  # launch the Electron shell
-npm run build        # build every workspace
+npm run probe:runtime  # launch the app for real and assert what it does
 ```
+
+`npm run verify` cannot see whether the app runs — twice it was green on a build that
+could not launch. `npm run probe:runtime` drives the real window over the DevTools
+protocol and is the check that catches that. On Linux it needs Electron's GUI libraries
+once:
+
+```bash
+bash scripts/install-electron-runtime-deps.sh
+```
+
+It is **not** the Windows acceptance gate — see `docs/WINDOWS-ACCEPTANCE-TEST.md`.
 
 ## Architecture
 

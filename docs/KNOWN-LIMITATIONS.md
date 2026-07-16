@@ -82,27 +82,54 @@ The provider-neutral model abstraction and its deterministic mock provider
 (`CURRENT-STATE-AUDIT.md` §20) are not built. `services/jarvis-core` is empty. No API key
 is read, and none is required.
 
-## 7. The desktop shell is verified as building, not as running
+## 7. The shell runs and is observed on Linux — but not on Windows
 
-**Status: IMPLEMENTED, NOT YET VERIFIED end-to-end.**
+**Status: PARTIAL. Verified running on Linux; NOT YET VERIFIED on Windows.**
 
-`npm run build` produces main, preload, and renderer bundles, and that has been run.
-The app has **not** been launched and observed rendering, because this environment is a
-headless Linux container and Phase 1 targets Windows. The security configuration in
-`src/main/security.ts` is therefore **verified as compiling and bundling, not as enforcing
-at runtime**.
+### Correction, 2026-07-16
 
-This now extends to the IPC channel: `app:get-info` has never been exercised in a real
-Electron window. Its tests mock `electron`, so the round trip is **verified in unit tests,
-not observed end to end**. The renderer displaying live host values is what the code
-should do, not something anyone has watched happen.
+This section previously claimed the app "has **not** been launched and observed rendering,
+because this environment is a headless Linux container". **That was false, and the false
+claim was expensive.** Electron runs here perfectly well once its GUI libraries and Xvfb
+are installed — `bash scripts/install-electron-runtime-deps.sh`, then
+`npm run probe:runtime`.
 
-First launch on Windows must confirm: the window renders; the CSP header is present; a
-permission request is denied; `window.jarvis` exists and exposes **only** `getAppInfo`;
-and `getAppInfo()` returns real host values rather than throwing.
+Believing that claim is why two broken builds shipped: with no way to run the app, every
+statement about runtime behaviour was inferred from build artifacts, and both times the
+inference was wrong. A limitation nobody tested became a limitation nobody had.
 
-`docs/WINDOWS-ACCEPTANCE-TEST.md` is the exact step-by-step gate. It is **in progress** and
-has already found **two** real defects, neither visible to any automated check:
+### What is now actually observed
+
+`npm run probe:runtime` launches the real app — both the packaged path (`file://`, strict
+CSP) and the real `npm run dev:desktop` (Vite, dev CSP) — drives it over the DevTools
+protocol, and asserts: React mounts, the window renders "Jarvis" / "Phase 1 foundation",
+`window.jarvis` is an object exposing exactly `["getAppInfo"]`, `getAppInfo()` returns real
+host values, no generic `invoke` passthrough exists, `require`/`process`/`module`/`Buffer`/
+`ipcRenderer`/`electron` are all `undefined` in the renderer, and the console is free of
+errors. All of it passes, in both modes.
+
+Verified red-green: reintroducing the CSP bug makes it fail 4 checks while `npm run build`
+stays green — which is precisely the gap it exists to close.
+
+### What is still NOT verified
+
+- **Windows.** The probe reports `platform: "linux"`. Windows must report `"win32"`, and
+  nothing Windows-specific — path handling, `loadFile` on a drive letter, the packaged
+  installer — is exercised here. `docs/WINDOWS-ACCEPTANCE-TEST.md` remains the gate and
+  still requires a human on Windows (ADR 0004).
+- **The hardening flags as enforced.** The probe shows the renderer has no Node globals,
+  which is strong evidence `contextIsolation`/`nodeIntegration`/`sandbox` are doing their
+  job. It does not attempt a real sandbox escape.
+- **Permissions and navigation locking.** Steps 5 and 6 of the acceptance test are not
+  automated; nothing has confirmed a permission prompt is denied at runtime.
+
+The probe does **not** replace the Windows gate. It closes the cheap gap — the one that
+should never have reached a human twice.
+
+### History
+
+`docs/WINDOWS-ACCEPTANCE-TEST.md` has already found **two** real defects, neither visible
+to any automated check:
 
 1. `20ffb86` — failed to launch. The main bundle left `@jarvis/config` external, so
    Electron resolved it to raw TypeScript source (`ERR_MODULE_NOT_FOUND`; ADR 0003
@@ -113,18 +140,19 @@ has already found **two** real defects, neither visible to any automated check:
    affected.
 
 Both are fixed and guarded — `scripts/assert-electron-bundle.mjs` fails the build if a
-workspace package is reachable at runtime or if the shipped CSP is not strict, and
-`apps/desktop/src/shared/csp.test.ts` pins the production policy.
+workspace package is reachable at runtime or if the shipped CSP is not strict,
+`apps/desktop/src/shared/csp.test.ts` pins the production policy, and
+`npm run probe:runtime` now catches either class at its source.
 
-**Steps 2–7 have still never been executed.** The app has never rendered, and
-`window.jarvis` has never been observed in a live renderer. Until the gate passes end to
-end, nothing in the shell may be described as working (ADR 0004).
+**On Windows, steps 1–7 have still never passed end to end.** Until they do, nothing in the
+shell may be described as working on the target platform (ADR 0004).
 
 The lesson is worth keeping, and it has now been demonstrated twice: **every automated
 check passed on both broken commits** — build, typecheck, lint, every test, audit, and CI,
 all green, on a build that could not launch and then on one that rendered nothing. One
 defect needed Electron's module resolver to surface; the other needed a Chromium renderer
-enforcing CSP. **Green CI is not evidence that the application runs.**
+enforcing CSP. **Green CI is not evidence that the application runs** — which is exactly
+why `npm run probe:runtime` now exists, and why it is not enough on its own.
 
 ## 8. CI does not verify the desktop app runs
 
@@ -132,6 +160,12 @@ The `verify` job runs format, lint, typecheck, test, and build on Ubuntu. It doe
 launch Electron and has no Windows runner. A green CI proves the code compiles and the
 unit tests pass — it is the _tested_ fact in Forge's five-fact model
 (claimed ≠ committed ≠ tested ≠ previewed ≠ approved), and nothing more.
+
+`npm run probe:runtime` **can** now run in CI: it needs only the Electron GUI libraries and
+Xvfb (`scripts/install-electron-runtime-deps.sh`), both installable on `ubuntu-latest`.
+Wiring it into the workflow would have caught both of the defects above before they
+reached a human. It is deliberately **not** wired in yet — that is a change to the CI
+contract (runtime, flake surface) and needs approval, not a silent addition.
 
 ## 9. No test covers the security configuration
 

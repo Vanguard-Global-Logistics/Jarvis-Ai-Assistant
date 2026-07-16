@@ -189,8 +189,27 @@ security control that appears to work is more dangerous than one visibly absent 
 ```bash
 npm install          # one install at the root links every workspace
 npm run verify       # format + lint + typecheck + test — run before every commit
-npm run dev:desktop  # launch the Electron shell (untested on Linux; Windows is the target)
+npm run build        # build every workspace, and assert the Electron artifacts
+npm run probe:runtime  # launch the real app and assert what it actually does
+npm run dev:desktop  # launch the Electron shell
 ```
+
+**`npm run verify` cannot tell you whether the app runs, and twice it did not.** It was
+green on a build that could not launch (a workspace package left external resolved to raw
+TypeScript) and green again on one that rendered nothing (the CSP blocked Vite's inline
+React Refresh preamble). Both reached William before anyone noticed.
+
+**`npm run probe:runtime` is the check that catches those.** It launches the real app —
+packaged path and `dev:desktop` — drives it over the DevTools protocol, and asserts React
+mounts, `window.jarvis` exposes exactly `["getAppInfo"]`, `getAppInfo()` returns real
+values, the renderer has no Node globals, and the console is clean. **Run it before
+claiming any runtime behaviour.** On Linux it needs Electron's GUI libraries once:
+`bash scripts/install-electron-runtime-deps.sh`.
+
+Electron **does** run in this Codespace. A previous version of `docs/KNOWN-LIMITATIONS.md`
+claimed it could not; that claim was never tested, and believing it is why runtime
+behaviour was inferred from build artifacts twice, wrongly. The probe is not the Windows
+gate — it reports `platform: "linux"` — but nothing should reach Windows without passing it.
 
 The boundary rules in §2 are enforced at **authoring time** by `eslint.config.js`: it is
 an error for `jarvis-core`, the apps, or the renderer to import AEGIS internals; an error
