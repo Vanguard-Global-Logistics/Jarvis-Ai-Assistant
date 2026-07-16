@@ -33,8 +33,18 @@ Repository: `github.com/Vanguard-Global-Logistics/Jarvis-Ai-Assistant`.
   3. `docs/VISUAL-DESIGN-TARGET.md` — the approved visual north star.
   4. `docs/KNOWN-LIMITATIONS.md` — the honest gap list. Updated whenever a gap opens or closes.
   5. `docs/IPC-SURFACE.md` — every channel crossing the renderer/main trust boundary.
-  6. `docs/DECISIONS/` — ADRs. A decision recorded here does not get silently reversed.
-  7. This file.
+  6. `docs/WINDOWS-ACCEPTANCE-TEST.md` — the manual runtime gate. **Not yet run.**
+  7. `docs/DECISIONS/` — ADRs. A decision recorded here does not get silently reversed.
+  8. This file.
+- **The Phase 1 Foundation milestone is complete; Phase 1 is not.** ADR 0004 closes the
+  Foundation milestone at the typed IPC/Desktop foundation. The AEGIS state engine, Memory
+  CRUD, and Jarvis orchestration are **separate later milestones**, each needing its own
+  approval — §7 still lists them as Phase 1 requirements, and that has not changed. Do not
+  start any of them because "Phase 1 isn't done". Ask.
+- **Complete is not accepted.** Every check this environment can run passes, but the app
+  has never been launched (no Electron binary, no display here), and §5 forbids a builder
+  model being the sole approver of its own work. The milestone is *awaiting acceptance*,
+  not approved.
 - `reference/design-handoff/*.dc.html` and `support.js` are **design prototypes, not
   source to port**. `support.js` is explicitly marked "do not ship". Recreate the
   designs in real code; do not copy the prototype implementation.

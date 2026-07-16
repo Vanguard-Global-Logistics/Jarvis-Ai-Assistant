@@ -101,6 +101,9 @@ First launch on Windows must confirm: the window renders; the CSP header is pres
 permission request is denied; `window.jarvis` exists and exposes **only** `getAppInfo`;
 and `getAppInfo()` returns real host values rather than throwing.
 
+`docs/WINDOWS-ACCEPTANCE-TEST.md` is the exact step-by-step gate, and it has **not been
+run**. Until it passes, nothing in the shell may be described as working (ADR 0004).
+
 ## 8. CI does not verify the desktop app runs
 
 The `verify` job runs format, lint, typecheck, test, and build on Ubuntu. It does not
