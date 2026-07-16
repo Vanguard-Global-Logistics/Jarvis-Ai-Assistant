@@ -47,6 +47,16 @@ if ! $SUDO apt-get install -y -qq $NOBLE_PKGS $COMMON_PKGS 2>/dev/null; then
 fi
 
 ELECTRON_BIN="node_modules/electron/dist/electron"
+
+# `npm ci`/`npm install` do NOT download this. Electron 43 ships no postinstall
+# script and fetches the ~220MB executable lazily on first `npx electron`, so a
+# fresh checkout has the package and no binary. Fetch it explicitly: this script's
+# job is to make Electron runnable, and a missing binary is exactly that problem.
+if [ ! -x "$ELECTRON_BIN" ] && [ -f "node_modules/electron/install.js" ]; then
+  echo "Electron binary not present; downloading it (npm does not)..."
+  node node_modules/electron/install.js
+fi
+
 if [ -x "$ELECTRON_BIN" ]; then
   MISSING="$(ldd "$ELECTRON_BIN" 2>/dev/null | grep -c 'not found' || true)"
   if [ "$MISSING" -ne 0 ]; then
@@ -58,7 +68,8 @@ if [ -x "$ELECTRON_BIN" ]; then
   echo -n "✓ Electron reports: "
   xvfb-run -a "$ELECTRON_BIN" --version 2>/dev/null || echo "(version check failed)"
 else
-  echo "Note: $ELECTRON_BIN not present. Run \`npm install\` first, then re-run this script."
+  echo "Note: $ELECTRON_BIN not present and could not be downloaded."
+  echo "Run \`npm install\` (for the package), then \`node node_modules/electron/install.js\`."
 fi
 
 echo

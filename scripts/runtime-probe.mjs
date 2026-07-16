@@ -1,6 +1,7 @@
 // @ts-check
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -55,9 +56,41 @@ function fail(message) {
 
 // --- preflight -------------------------------------------------------------
 
-const electronBin = join(root, 'node_modules/electron/dist/electron');
-if (!existsSync(electronBin)) {
-  fail('Electron binary not installed. Run `npm install`.');
+/**
+ * Ask the `electron` package where its binary is, rather than assuming a path — it
+ * records the platform-specific name in `path.txt` (`electron`, `electron.exe`).
+ *
+ * Requiring it can take a while on a cold checkout. Electron 43 ships **no
+ * postinstall script**, so `npm ci` installs the package without its ~220MB
+ * executable; `electron/index.js` downloads it on first require. That is why an
+ * earlier version of this preflight — which checked a hardcoded path and told you
+ * to run `npm install` — failed in CI: `npm install` was never going to fetch it.
+ *
+ * CI downloads it in its own step so the cost is visible and attributed there
+ * rather than hidden inside this probe's runtime.
+ */
+/** @type {unknown} */
+let electronBin;
+try {
+  electronBin = createRequire(import.meta.url)('electron');
+} catch (cause) {
+  fail(
+    'Electron binary is unavailable and could not be downloaded.\n' +
+      `  ${cause instanceof Error ? cause.message.split('\n')[0] : String(cause)}\n` +
+      '  Try: node node_modules/electron/install.js',
+  );
+}
+
+const electronPath =
+  typeof electronBin === 'string'
+    ? electronBin
+    : fail(`Electron reported a non-path binary location: ${String(electronBin)}`);
+
+if (!existsSync(electronPath)) {
+  fail(
+    `Electron reported its binary at ${electronPath}, but nothing is there.\n` +
+      '  Try: node node_modules/electron/install.js',
+  );
 }
 
 if (NEEDS_XVFB) {
@@ -369,7 +402,11 @@ async function probe(mode) {
   const child =
     mode === 'prod'
       ? // Built HTML over file://, production CSP, no dev server.
-        launch(electronBin, ['apps/desktop', `--remote-debugging-port=${port}`, '--no-sandbox'], {})
+        launch(
+          electronPath,
+          ['apps/desktop', `--remote-debugging-port=${port}`, '--no-sandbox'],
+          {},
+        )
       : // The REAL `npm run dev:desktop`. electron-vite forwards
         // REMOTE_DEBUGGING_PORT and NO_SANDBOX to Electron itself, so this
         // exercises the actual dev path — including the CSP nonce travelling

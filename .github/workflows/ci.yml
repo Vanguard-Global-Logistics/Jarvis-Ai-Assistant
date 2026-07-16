@@ -88,6 +88,14 @@ jobs:
       - name: Install
         run: npm ci
 
+      # `npm ci` installs the electron package but NOT its binary: Electron 43 ships
+      # no postinstall script and downloads the ~220MB executable lazily, on first
+      # `require('electron')`. Doing it here rather than letting the probe trigger it
+      # keeps the download visible as its own step — a network failure reports as
+      # "Download the Electron binary", not as a mysteriously slow or failing probe.
+      - name: Download the Electron binary
+        run: node node_modules/electron/install.js
+
       # Electron links ~12 GUI libraries that a CI runner does not necessarily have,
       # and Chromium needs a display. Without these it dies before any of our code runs.
       - name: Install Electron's runtime libraries and Xvfb
