@@ -59,16 +59,16 @@ of arriving in the UI. Every response schema is `.strict()` for the same reason.
 
 ### `app:get-info`
 
-|                       |                                                                                                        |
-| --------------------- | ------------------------------------------------------------------------------------------------------ |
-| **Status**            | IMPLEMENTED AND VERIFIED (unit-tested; not yet observed on Windows — see §7 of `KNOWN-LIMITATIONS.md`) |
-| **Renderer call**     | `window.jarvis.getAppInfo(): Promise<AppInfo>`                                                         |
-| **Request**           | `z.undefined()` — no payload. A renderer that sends one is rejected.                                   |
-| **Response**          | `AppInfoSchema`, `.strict()`                                                                           |
-| **Handler**           | `registerAppInfoHandler()` in `apps/desktop/src/main/handlers/app-info.ts`                             |
-| **Contract**          | `appGetInfoContract` in `packages/contracts/src/ipc/contracts.ts`                                      |
-| **Side effects**      | None. Reads Electron metadata only.                                                                    |
-| **Authority granted** | None. No filesystem, no shell, no env, no user data, no AEGIS.                                         |
+|                       |                                                                                                                                                                                     |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Status**            | IMPLEMENTED, NOT YET VERIFIED — unit-tested only. Never exercised in a live Electron window; the first launch attempt never reached it (`docs/WINDOWS-ACCEPTANCE-TEST.md` run log). |
+| **Renderer call**     | `window.jarvis.getAppInfo(): Promise<AppInfo>`                                                                                                                                      |
+| **Request**           | `z.undefined()` — no payload. A renderer that sends one is rejected.                                                                                                                |
+| **Response**          | `AppInfoSchema`, `.strict()`                                                                                                                                                        |
+| **Handler**           | `registerAppInfoHandler()` in `apps/desktop/src/main/handlers/app-info.ts`                                                                                                          |
+| **Contract**          | `appGetInfoContract` in `packages/contracts/src/ipc/contracts.ts`                                                                                                                   |
+| **Side effects**      | None. Reads Electron metadata only.                                                                                                                                                 |
+| **Authority granted** | None. No filesystem, no shell, no env, no user data, no AEGIS.                                                                                                                      |
 
 Response fields:
 
@@ -127,18 +127,42 @@ Two rules follow, and both are enforced:
 - **Type-only imports are free.** `import type { AppInfo } from '@jarvis/contracts'` costs
   nothing at runtime.
 
-After changing preload imports, inspect the artifact rather than trusting the build:
-
-```bash
-npm run build
-grep -oE 'require\("[^"]*"\)' apps/desktop/out/preload/index.cjs | sort -u
-# must print exactly: require("electron")
-```
-
 Correspondingly, the renderer must treat `window.jarvis` as **possibly undefined**
 (`apps/desktop/src/preload/index.d.ts` types it optional). A preload that fails to load is
 a real state, and the renderer must say so rather than dying on a synchronous TypeError
 and rendering a blank window.
+
+### The same trap in main, for a different reason
+
+Main is **not** sandboxed, so a bare import there _resolves_ — it just resolves to the
+wrong thing. Internal packages point at TypeScript source (ADR 0003), so an externalized
+`@jarvis/*` sends Electron to raw `.ts` and it dies with `ERR_MODULE_NOT_FOUND`. That is
+how the first Windows launch failed (ADR 0003 amendment).
+
+One rule covers both sides: **no internal workspace package may ever be a runtime import.**
+`INTERNAL_PACKAGES` in `apps/desktop/electron.vite.config.ts` bundles them into main and
+preload alike.
+
+Do not trust the build to tell you. It cannot — Rollup emits the external import happily,
+and every check passes. `npm run build` therefore runs an assertion over the artifacts:
+
+```bash
+npm run build   # runs scripts/assert-electron-bundle.mjs
+```
+
+It fails if any `@jarvis/*` survives as a runtime import in `out/main/index.js` or
+`out/preload/index.cjs`, if the preload requires anything but `electron`, or if either
+artifact names a `.ts` file. To check by hand:
+
+```bash
+grep -oE 'from *"[^"./][^"]*"' apps/desktop/out/main/index.js | sort -u
+# expect only: electron, node:module, node:path, zod
+grep -oE 'require\("[^"]*"\)' apps/desktop/out/preload/index.cjs | sort -u
+# must print exactly: require("electron")
+```
+
+`zod` and `better-sqlite3` stay external on purpose: they ship real compiled JavaScript,
+and `better-sqlite3` is a native module that must not be bundled.
 
 ---
 

@@ -101,8 +101,18 @@ First launch on Windows must confirm: the window renders; the CSP header is pres
 permission request is denied; `window.jarvis` exists and exposes **only** `getAppInfo`;
 and `getAppInfo()` returns real host values rather than throwing.
 
-`docs/WINDOWS-ACCEPTANCE-TEST.md` is the exact step-by-step gate, and it has **not been
-run**. Until it passes, nothing in the shell may be described as working (ADR 0004).
+`docs/WINDOWS-ACCEPTANCE-TEST.md` is the exact step-by-step gate. It was **attempted on
+2026-07-16 at commit `20ffb86` and failed at Step 1**: Electron launched and immediately
+threw `ERR_MODULE_NOT_FOUND`, because the main bundle left `@jarvis/config` external and
+Electron resolved it to raw TypeScript source (ADR 0003 amendment). That is fixed and
+guarded by `scripts/assert-electron-bundle.mjs`, but **Steps 2–7 have still never been
+executed** — the app has never rendered, and `window.jarvis` has never been observed in a
+live renderer. Until the gate passes end to end, nothing in the shell may be described as
+working (ADR 0004).
+
+The lesson is worth keeping: every automated check passed on the commit that could not
+launch. Build, typecheck, lint, 49 tests, audit, and CI were all green. **Green CI is not
+evidence that the application runs.**
 
 ## 8. CI does not verify the desktop app runs
 

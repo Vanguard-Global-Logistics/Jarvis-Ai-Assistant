@@ -1,8 +1,27 @@
 # Windows Runtime Acceptance Test
 
 Date: 2026-07-16
-Status: **NOT YET RUN.**
+Status: **ATTEMPTED — FAILED AT STEP 1. Fixed; retest required.**
 Gate for: the Phase 1 Foundation milestone (ADR 0004).
+
+## Run log
+
+| Date       | Commit    | Result                                                                                                                                                                                                                                           |
+| ---------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 2026-07-16 | `20ffb86` | **FAILED at Step 1 (launch).** Electron started, then threw `ERR_MODULE_NOT_FOUND: Cannot find module packages/config/src/env.js imported from packages/config/src/index.ts`. No window reached a usable state, so Steps 2–7 were never reached. |
+
+**Root cause:** the main bundle left `@jarvis/config` and `@jarvis/contracts` external, so
+Electron resolved them to raw TypeScript source at runtime (ADR 0003 amendment). Fixed by
+bundling internal packages into the main output, plus
+`scripts/assert-electron-bundle.mjs`, which now fails the build if any internal package
+is reachable as a runtime import.
+
+**This is the test doing its job.** Every automated check passed on `20ffb86` — build,
+typecheck, lint, 49 tests, audit, CI. The failure was invisible to all of them and
+required a human launching the app. That is precisely why this gate exists and why no
+amount of green CI substitutes for it.
+
+**Retest from Step 1 on the fix commit.** Steps 2–7 have still never been executed.
 
 ## Why this exists
 

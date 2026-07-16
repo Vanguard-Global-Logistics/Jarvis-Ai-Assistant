@@ -138,10 +138,12 @@ export default tseslint.config(
     },
   },
 
-  // This file is plain JS and is not part of a typed project. Type-aware rules
-  // can only see `any` here, so they report noise rather than defects.
+  // Plain JS — this config and the build scripts. Not part of a typed project, so
+  // type-aware rules can only see `any` here and report noise rather than defects.
+  // (`scripts/*.mjs` carry `// @ts-check` + JSDoc instead, which is checked by the
+  // editor and by `tsc` if they are ever added to a project.)
   {
-    files: ['**/*.js'],
+    files: ['**/*.js', '**/*.mjs', '**/*.cjs'],
     extends: [tseslint.configs.disableTypeChecked],
   },
 
