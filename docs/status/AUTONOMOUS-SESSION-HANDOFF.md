@@ -4,8 +4,9 @@
 > the session at every milestone. Durable execution ledger: `.superpowers/sdd/progress.md`
 > (git-ignored scratch — this file is the committed record).
 
-**Session:** 2026-07-17 (second resume; the prior session's context was lost mid-Task-5
-review — state reconstructed from the repository, the ledger, and `git log`)
+**Session:** 2026-07-17 (third resume; state reconstructed from the repository, the
+ledger, and `git log` — the recovery clues in the resume instruction were stale, and the
+repository showed Checkpoint 1 already complete)
 **Branch:** `feature/jarvis-phase-1-foundation` (ahead of origin — pushing requires
 William's approval and has not happened)
 
@@ -16,71 +17,96 @@ William's approval and has not happened)
 - **Phase 1 Foundation** — complete (ADR 0004); Windows dev-runtime gate passed 2026-07-16.
 - **Documentation layer** — foundation docs, ADRs 0005/0006, Master Blueprint, Backlog,
   `docs/vision/OWNER-OBJECTIVES.md`, both Stage 1A plans.
-- **Renderer exploration preserved** — commit `7465aa5`, tag
-  `archive/renderer-exploration-2026-07-17`. ARCHIVED; superseded by the Experience Shell.
-- **Checkpoint 1 COMPLETE — all six tasks implemented, reviewed, committed:**
-  - Task 1 (model contracts): `0d1683a`..`582104f` — spec ✅, Approved.
-  - Task 2 (provider interface + MockProvider): `..d62f768` — spec ✅, Approved.
-  - Task 3 (amplifier prompt builder): `..b62662e` — spec ✅, Approved.
-  - Task 4 (Anthropic adapter): `..e26186e` — elevated review completed: spec ✅,
-    Approved; SDK surface and boundary rules verified; four lint-driven deviations
-    from the brief accepted (behavior, interface, and key-handling preserved).
-  - Task 5 (provider factory + barrel): `..612b4fd` — reviewed this session after the
-    crash interrupted the prior review: spec ✅, Approved (one Minor parked).
-  - Task 6 (docs truth pass): `..24eb3eb` — spec ✅, Approved (minors parked).
+- **Checkpoint 1 COMPLETE — all six tasks implemented, reviewed, committed**
+  (`0d1683a`..`24eb3eb`; detail in the previous revision of this file and the ledger).
+- **E1 COMPLETE — both tasks implemented, reviewed, committed:**
+  - E1a (experience contracts): `2c52a0d` — orb states (11, closed), demo scripts with
+    schema-enforced `mockDisclosure: literal(true)`, mission control, ventures. Spec ✅,
+    Approved.
+  - E1b (design tokens + motion language): `2b5eb80` — `packages/ui` ACTIVATED with
+    `tokens/colors|typography|motion` (PARTIAL — tokens only, no components until E2);
+    orb state grammar for all eleven states with reduced-motion fallbacks; ESLint
+    boundary block making `packages/ui` presentational-pure. Spec ✅, Approved.
+- **Final whole-branch review (Checkpoint 1 + E1)** — opus, fresh context, over
+  `2d302f0..2b5eb80`: **Ready to merge — Yes.** 0 Critical, 1 Important, 5 Minor; all
+  parked per-task minors triaged. Findings closed by the fix wave below.
+- **Fix wave after the final review:**
+  - `3a20cc0` — the `packages/ui` ESLint block now bars AEGIS internals (the Important);
+    CLAUDE.md contracts row updated; barrel alphabetical order; `text.*` token hexes
+    pinned in tests; `docs/KNOWN-LIMITATIONS.md` §6 wrap/voice/cross-ref nits.
+  - `6b00191` — CLAUDE.md `packages/ui` row → PARTIAL (tokens landed).
+- **Re-review of the fix wave** (`2b5eb80..680ced1`, same opus reviewer): all three
+  commits RESOLVED, no new findings, App.tsx restoration verified byte-identical to the
+  foundation shell — **"Ready to merge — Yes" now stands unconditionally.**
+- **Runtime defect found and fixed:** `npm run probe:runtime` had never been run after
+  the preservation commit `7465aa5`, which left the unreviewed design exploration wired
+  in as the live `App.tsx` — unlabeled MOCKED metrics, including an
+  "AEGIS: Security watch stable" module while AEGIS is NOT IMPLEMENTED (CLAUDE.md §6/§8
+  violations), and a broken probe content assertion in both modes. Fixed in `680ced1`:
+  `App.tsx` restored to the verified foundation shell (byte-identical to `86b7705`'s
+  version). The exploration remains preserved three ways — in the tree
+  (`components/`, `styles/`), in commit `7465aa5`, and under tag
+  `archive/renderer-exploration-2026-07-17`. E2's Shell supersedes the page properly,
+  behind its screenshot gate.
 
 ## Current work
 
-- **E1 (Experience workstream): experience contracts + design tokens + motion
-  language** — pure, fully tested, no UI. Briefs authored this session; executing via
-  subagent-driven development with per-task review gates.
-- Remaining approved queue after E1: E2 (Orb + primitives + Shell) requires its own
-  screenshot gate; C2 (IPC + conversation) is BLOCKED until its plan is written and
-  approved (ADR 0002 — session-fixed exclusion).
+- Checkpoint 1 + E1 are complete and reviewed; the branch is stable and awaiting
+  William. Nothing is in flight.
 
-## Tests — last verified results
+## Tests — last verified results (at `680ced1`, 2026-07-17)
 
-- `npm run verify` at `24eb3eb` (Task 6 head): **green — format, lint, typecheck,
-  11 test files, 83 tests passing** (run 2026-07-17, this session and by the Task 6
-  implementer).
+- `npm run verify`: **green** — format, lint, typecheck, 13 test files, **135 tests
+  passing**.
+- `npm run build`: **green**, including the Electron bundle assertion (no workspace
+  TypeScript reachable at runtime, production CSP strict).
+- `npm run probe:runtime`: **passed** — both PRODUCTION (built HTML) and DEVELOPMENT
+  modes; React mounts, `window.jarvis` is exactly `["getAppInfo"]`, renderer isolated,
+  console clean. This is Linux — it is NOT the Windows acceptance gate.
 
-## Review findings parked for the final whole-branch review
+## Review findings carried into C2 planning
 
-- Task 1 report over-counted new tests (claimed 9, actual 6) — process note only.
-- `create-provider.ts` empty-string guard is unreachable (EnvSchema uses
-  `z.string().min(1).optional()`) — harmless redundancy.
+- Parse `ChatRequestSchema` at the IPC boundary before invoking a provider
+  (both-directions rule applies at the trust boundary).
+- Never log provider/SDK errors verbatim — sanitize before any logging the C2 wiring
+  introduces.
+- Validate the live Anthropic request/response shape (adaptive thinking, refusal
+  `stop_reason`, `max_tokens`) with a real key before calling the real path working.
 - `mock-provider.ts` hardcodes the `ANTHROPIC_API_KEY` name in reply copy
   (plan-mandated) — revisit if a second real provider is added.
-- CLAUDE.md structure table `packages/contracts` row now stale ("IPC contracts only";
-  model contracts exist too) — next truth pass.
-- `docs/KNOWN-LIMITATIONS.md` §6 new paragraph is unwrapped vs the file's prevailing
-  wrap width; heading voice drifted from declarative siblings; audit §20 cross-ref
-  dropped — cosmetic.
-- C2 planning note: the IPC layer must parse `ChatRequestSchema` before calling
-  providers (both-directions rule applies at the boundary).
+- **Process discipline (from the re-review):** run `probe:runtime`, not just `verify`,
+  after any commit that changes what the renderer mounts — `verify` was green while the
+  live page shipped unlabeled mock AEGIS metrics, exactly the failure mode CLAUDE.md
+  warns about.
 
 ## Blockers / required approvals
 
 - **Push to origin** — local commits await William's approval to push.
+- **E2 (Orb + primitives + ambient Shell)** — requires William's explicit go; first
+  visual build must pass his screenshot review before the experience advances.
 - **Checkpoint 2 (IPC channels)** — no plan exists; writing it is a session-fixed
   exclusion. No IPC work until planned and approved (ADR 0002).
-- **E2 screenshot gate** — the first visual build requires William's screenshot review
-  before the experience advances past E2.
+- **Approved motion benchmark video** — not yet uploaded. Destination when William
+  provides it: `reference/design/approved-motion/jarvis-approved-motion-benchmark-v1.mp4`.
+  E1 is complete, so E2 motion-reference analysis is unblocked as soon as the file
+  arrives and E2 is approved.
 
 ## Preview commands
 
 ```bash
 npm install
 npm run verify          # format + lint + typecheck + tests
+npm run build           # build all workspaces + Electron bundle assertion
 npm run probe:runtime   # launches the real app, asserts runtime behaviour
 npm run dev:desktop     # Electron shell (Linux needs scripts/install-electron-runtime-deps.sh once)
 ```
 
 ## Next three recommended actions
 
-1. Finish E1 (experience contracts, design tokens, motion language) with per-task
-   reviews, then the whole-branch final review of Checkpoint 1 + E1.
-2. Present the branch to William: push approval, E2 go-ahead, and the Checkpoint 2
-   plan proposal (IPC channels + conversation UI inside the Shell).
-3. E2 only after William's explicit go: Orb + primitives + ambient Shell behind the
-   existing runtime probe, screenshot gate before anything further.
+1. Present the branch to William: push approval, the E2 go-ahead (screenshot gate), and
+   the Checkpoint 2 plan proposal (IPC channels + conversation UI inside the Shell).
+2. On the E2 go: William uploads the approved motion benchmark to
+   `reference/design/approved-motion/`, then E2 begins — Orb + primitives + ambient
+   Shell behind the existing runtime probe.
+3. Write the Checkpoint 2 plan (a new session task requiring its own approval),
+   carrying the three C2 review notes above into its Global Constraints.
