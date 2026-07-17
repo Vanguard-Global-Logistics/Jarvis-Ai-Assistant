@@ -9,6 +9,10 @@ CLAUDE.md
 docs/CURRENT-STATE-AUDIT.md
 docs/VISUAL-DESIGN-TARGET.md
 
+# Git-ignored subagent scratch space (briefs, reports, review packages) —
+# working files, not source; they must never gate `npm run verify`.
+.superpowers/
+
 # Build output and dependencies
 dist/
 out/
