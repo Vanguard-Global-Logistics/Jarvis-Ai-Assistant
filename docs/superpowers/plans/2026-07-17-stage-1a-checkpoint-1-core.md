@@ -16,6 +16,19 @@
 - No IPC, no Electron, no renderer, no SQLite in this checkpoint.
 - Every schema is `.strict()`. Both directions of every future boundary validate (existing repo rule).
 - `npm run verify` green before every commit. Stage 1A exclusions (ADR 0006) are binding; new ideas go to `docs/BACKLOG.md`.
+- **`docs/vision/OWNER-OBJECTIVES.md` governs prioritization.** Every scope question in
+  this plan resolves toward William's six objectives — especially 4 (recover time) and
+  6 (freedom over complexity). Anything that doesn't serve the daily loop is backlog.
+
+---
+
+### Task 0: Land the Owner Objectives (COMPLETE — done at plan revision, 2026-07-17)
+
+`docs/vision/OWNER-OBJECTIVES.md` created as the first Layer 1 document — William's six
+standing objectives, drafted from his dictation, DRAFT pending his approval. The
+Constitution's Standing section and References now point at it; it is the referent for
+Decision Engine dimension 1 and Chief Architect question 2 until the North Star is
+authored. No code preceded it.
 
 ---
 

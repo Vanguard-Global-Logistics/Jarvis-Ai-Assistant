@@ -29,8 +29,9 @@ versioned promotion.
 flowchart TB
     SEC["SECURITY AUTHORITY — outranks every layer<br/>reference/design-handoff/ (immutable) · surfaced via 07-SECURITY-REFERENCE<br/>Jarvis never controls AEGIS. AEGIS can restrict Jarvis."]
 
-    subgraph L1["LAYER 1 — VISION · docs/vision/ · changes very rarely"]
-        NS["NORTH-STAR.md — CONCEPTUAL, authored from an interview with William<br/>mission · 5-year vision · core objectives ·<br/>success definition · strategic priorities · anti-goals"]
+    subgraph L1["LAYER 1 — VISION · docs/vision/ · changes very rarely · authored only by William"]
+        OO["OWNER-OBJECTIVES.md — DRAFT<br/>protect livelihood · exceptional at profession ·<br/>reusable businesses · recover time ·<br/>ethical sustainable wealth · freedom over complexity"]
+        NS["NORTH-STAR.md — CONCEPTUAL, from an interview with William, seeded by OWNER-OBJECTIVES<br/>mission · 5-year vision · core objectives ·<br/>success definition · strategic priorities · anti-goals"]
     end
 
     subgraph L2["LAYER 2 — FOUNDATION · docs/foundation/ · how Jarvis thinks, learns, decides"]

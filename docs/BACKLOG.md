@@ -80,7 +80,7 @@ its architecture doc drafted and approved · Chief Architect gate · explicit ap
 
 | Item | User value | Dependency | Complexity | Recurring cost | Why later |
 |---|---|---|---|---|---|
-| Foundation docs 03, 04, 05, 08 + North Star interview | The remaining thinking/deciding rules; the referent for every review | William's time (North Star is his content) | low–medium (documents) | $0 | Recommended first work of the next documentation wave — North Star interview first |
+| Foundation docs 03, 04, 05, 08 + North Star interview | The remaining thinking/deciding rules; the referent for every review | William's time (North Star is his content; now seeded by `docs/vision/OWNER-OBJECTIVES.md`) | low–medium (documents) | $0 | Recommended first work of the next documentation wave — North Star interview first |
 | Agent Factory (+ Executive Council pattern) | Governed creation of agents, smallest capable team, on demand | 05, 08 approved; AEGIS capability model | high | per-agent model usage | No agents before the standard exists |
 | Jarvis Academy + Mentor DNA | Governed learning; principles, never personas | Academy source-licensing definition (open question); Memory v1 | high | source + model costs | Ingestion touches YELLOW-restricted capabilities — after AEGIS |
 | Evolution Engine | Measured, approved agent improvement — a lifecycle across layers, not a layer | Agent Factory + Innovation Lab | high | benchmark model usage | Nothing to evolve yet |

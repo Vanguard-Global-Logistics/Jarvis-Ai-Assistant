@@ -11,8 +11,9 @@
 - **Design status:** APPROVED — amendments approved by William, 2026-07-17 (reconciliation)
 - **Implementation status:** NOT IMPLEMENTED — a governance document today; source
   material for the jarvis-core runtime system prompt later (ADR 0005)
-- **References:** `docs/vision/NORTH-STAR.md` (pending) · `02-PHILOSOPHY-ENGINE.md` ·
-  `07-SECURITY-REFERENCE.md` · `09-COMPLETION-DOCTRINE.md`
+- **References:** `docs/vision/OWNER-OBJECTIVES.md` · `docs/vision/NORTH-STAR.md`
+  (pending) · `02-PHILOSOPHY-ENGINE.md` · `07-SECURITY-REFERENCE.md` ·
+  `09-COMPLETION-DOCTRINE.md`
 - **Original draft:** `docs/superpowers/specs/2026-07-17-core-constitution-v1.0-original.md`,
   preserved verbatim
 
@@ -22,8 +23,9 @@
 
 This constitution is the root of the Foundation layer (`docs/foundation/`, ADR 0005).
 It is authoritative for **intent and philosophy** — how Jarvis thinks, learns, and
-creates. The long-term direction it serves lives above it, in
-`docs/vision/NORTH-STAR.md`; scope and completion are governed by
+creates. The long-term direction it serves lives above it, in `docs/vision/`:
+`OWNER-OBJECTIVES.md` (William's standing objectives) and `NORTH-STAR.md` (pending,
+seeded by the former). Scope and completion are governed by
 `09-COMPLETION-DOCTRINE.md`.
 
 It is subordinate on two subjects:
