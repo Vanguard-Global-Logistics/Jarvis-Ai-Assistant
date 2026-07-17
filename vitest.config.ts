@@ -2,7 +2,7 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    include: ['{apps,services,packages}/**/src/**/*.test.ts'],
+    include: ['{apps,services,packages}/**/src/**/*.test.{ts,tsx}'],
     exclude: ['**/node_modules/**', '**/dist/**', '**/out/**', 'reference/**'],
     environment: 'node',
     // A run that silently finds zero tests is indistinguishable from a passing
