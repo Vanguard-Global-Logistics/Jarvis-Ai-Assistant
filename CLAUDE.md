@@ -178,7 +178,7 @@ column is the part that matters:
 ```
 apps/desktop           Electron shell (main / preload / renderer)  PARTIAL — hardened, one IPC channel
 apps/pwa               PWA shell                                   NOT IMPLEMENTED — empty, out of scope
-services/jarvis-core   Orchestration, isolated from renderer       NOT IMPLEMENTED — empty
+services/jarvis-core   Orchestration, isolated from renderer       PARTIAL — model provider + amplifier logic, not wired to the app
 services/aegis         AEGIS engine — independent, no GenAI        NOT IMPLEMENTED — empty
 packages/contracts     Zod schemas + shared types                  PARTIAL — IPC contracts only
 packages/ui            Design-system components                    NOT IMPLEMENTED — visual work deferred

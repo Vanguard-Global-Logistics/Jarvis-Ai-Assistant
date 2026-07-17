@@ -21,7 +21,7 @@
 - **Recurring cost:** $0/month infra; optional usage-billed API key.
 - **Why now:** the first usable improvement for William; everything before it was
   documentation. Fully local on a trusted machine, so it safely precedes AEGIS v1.
-- **Status: implementation NOT started — awaiting William's explicit approval.**
+- **Status: Checkpoint 1 of 4 complete (model contracts + jarvis-core providers; not wired to the app).**
 
 ---
 
