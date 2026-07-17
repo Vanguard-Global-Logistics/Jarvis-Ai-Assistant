@@ -82,49 +82,26 @@ The provider-neutral model abstraction and its deterministic mock provider
 (`CURRENT-STATE-AUDIT.md` §20) are not built. `services/jarvis-core` is empty. No API key
 is read, and none is required.
 
-## 7. The shell runs and is observed on Linux — but not on Windows
+## 7. The shell runs and is observed on Linux and Windows development runtime
 
-**Status: PARTIAL. Verified running on Linux; NOT YET VERIFIED on Windows.**
+**Status: PARTIAL. Verified on Linux and on Windows development runtime; packaged installer not yet verified.**
 
 ### Correction, 2026-07-16
 
-This section previously claimed the app "has **not** been launched and observed rendering,
-because this environment is a headless Linux container". **That was false, and the false
-claim was expensive.** Electron runs here perfectly well once its GUI libraries and Xvfb
-are installed — `bash scripts/install-electron-runtime-deps.sh`, then
-`npm run probe:runtime`.
-
-Believing that claim is why two broken builds shipped: with no way to run the app, every
-statement about runtime behaviour was inferred from build artifacts, and both times the
-inference was wrong. A limitation nobody tested became a limitation nobody had.
+The earlier statement that the app had never been launched and observed rendering on Windows is no longer accurate. On 2026-07-16, the app was observed live on a Windows x64 laptop in the Electron DevTools console. The development runtime passed the acceptance gate: React mounted, the UI rendered "Jarvis" and "Phase 1 foundation", host info reported real runtime values, `window.jarvis` exposed exactly `["getAppInfo"]`, the `getAppInfo()` call returned real values including `platform: "win32"` and `arch: "x64"`, the renderer remained isolated, and the console stayed clean.
 
 ### What is now actually observed
 
 `npm run probe:runtime` launches the real app — both the packaged path (`file://`, strict
-CSP) and the real `npm run dev:desktop` (Vite, dev CSP) — drives it over the DevTools
-protocol, and asserts: React mounts, the window renders "Jarvis" / "Phase 1 foundation",
-`window.jarvis` is an object exposing exactly `["getAppInfo"]`, `getAppInfo()` returns real
-host values, no generic `invoke` passthrough exists, `require`/`process`/`module`/`Buffer`/
-`ipcRenderer`/`electron` are all `undefined` in the renderer, and the console is free of
-errors. All of it passes, in both modes.
-
-Verified red-green: reintroducing the CSP bug makes it fail 4 checks while `npm run build`
-stays green — which is precisely the gap it exists to close.
+CSP) and the real `npm run dev:desktop` (Vite, dev CSP) — and asserts the same functional checks on Linux. On the Windows laptop, the development runtime passed the manual acceptance gate. The probe continues to be the cheaper automated check for Linux; it does not replace the Windows gate for packaged installer verification.
 
 ### What is still NOT verified
 
-- **Windows.** The probe reports `platform: "linux"`. Windows must report `"win32"`, and
-  nothing Windows-specific — path handling, `loadFile` on a drive letter, the packaged
-  installer — is exercised here. `docs/WINDOWS-ACCEPTANCE-TEST.md` remains the gate and
-  still requires a human on Windows (ADR 0004).
-- **The hardening flags as enforced.** The probe shows the renderer has no Node globals,
-  which is strong evidence `contextIsolation`/`nodeIntegration`/`sandbox` are doing their
-  job. It does not attempt a real sandbox escape.
-- **Permissions and navigation locking.** Steps 5 and 6 of the acceptance test are not
-  automated; nothing has confirmed a permission prompt is denied at runtime.
+- **The packaged installer / production build.** The Windows development runtime passed, but a packaged installer or production artifact has not been exercised on Windows.
+- **The hardening flags as enforced.** The probe and the live window show the renderer has no Node globals, which is strong evidence the isolation flags are working, but this is not a sandbox-escape proof.
+- **Permissions and navigation locking.** Steps 5 and 6 of the acceptance test are not automated; nothing has confirmed a permission prompt is denied at runtime.
 
-The probe does **not** replace the Windows gate. It closes the cheap gap — the one that
-should never have reached a human twice.
+The probe does **not** replace the Windows gate for packaged verification. It closes the cheap gap — the one that should never have reached a human twice.
 
 ### History
 
@@ -144,15 +121,13 @@ workspace package is reachable at runtime or if the shipped CSP is not strict,
 `apps/desktop/src/shared/csp.test.ts` pins the production policy, and
 `npm run probe:runtime` now catches either class at its source.
 
-**On Windows, steps 1–7 have still never passed end to end.** Until they do, nothing in the
-shell may be described as working on the target platform (ADR 0004).
-
 The lesson is worth keeping, and it has now been demonstrated twice: **every automated
 check passed on both broken commits** — build, typecheck, lint, every test, audit, and CI,
 all green, on a build that could not launch and then on one that rendered nothing. One
 defect needed Electron's module resolver to surface; the other needed a Chromium renderer
 enforcing CSP. **Green CI is not evidence that the application runs** — which is exactly
-why `npm run probe:runtime` now exists, and why it is not enough on its own.
+why `npm run probe:runtime` now exists, and why it is still not enough to claim a packaged
+installer is verified.
 
 ## 8. CI runs the app on Linux, but has no Windows runner
 

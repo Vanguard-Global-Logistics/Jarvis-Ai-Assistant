@@ -58,11 +58,11 @@ this repository is protected by AEGIS, because AEGIS does not exist.**
 **The milestone is complete but not yet accepted.** Two gates were opened by this ADR.
 One is now closed; one remains open.
 
-1. **Runtime acceptance — OPEN.** Every check that exists has been run and passes, but
-   this is a headless Linux container with no Electron binary and no display, so the app
-   has never been launched. The IPC tests mock `electron`.
-   `docs/WINDOWS-ACCEPTANCE-TEST.md` is the required manual gate; until it passes on
-   Windows, the shell and the channel are `IMPLEMENTED, NOT YET VERIFIED` — not "working".
+1. **Runtime acceptance — CLOSED for development runtime; packaged installer remains OPEN.**
+   The Windows development runtime gate passed on 2026-07-16 on a Windows x64 laptop. The
+   shell and the `app:get-info` channel are therefore `IMPLEMENTED AND VERIFIED` for
+   development runtime. A packaged installer or production artifact has not been exercised
+   on Windows, so that remains a separate verification gap.
 2. **Independent review — CLOSED, 2026-07-16.** `CLAUDE.md` §5: a builder model is never
    the sole approver of its own work, and §5's table names ChatGPT as the independent
    architecture reviewer — deliberately outside the Claude family so it is not reviewing

@@ -1,16 +1,16 @@
 # Windows Runtime Acceptance Test
 
 Date: 2026-07-16
-Status: **IN PROGRESS — two failures found and fixed. Retest required.**
+Status: **PASSED — Windows development runtime on a Windows x64 laptop.**
 Gate for: the Phase 1 Foundation milestone (ADR 0004).
 
 ## Run log
 
-| Date       | Commit    | Result                                                                                                                                                                                                                                                                                                                                                                            |
-| ---------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-07-16 | `20ffb86` | **FAILED at Step 1 (launch).** Electron started, then threw `ERR_MODULE_NOT_FOUND: Cannot find module packages/config/src/env.js imported from packages/config/src/index.ts`. No window reached a usable state; Steps 2–7 never reached.                                                                                                                                          |
-| 2026-07-16 | `ff3672d` | **FAILED at Step 1.2 (render).** Window launched — the module error was gone. But the renderer stayed blank: `#root` empty, React never mounted. DevTools: "Executing inline script violates ... script-src 'self'", "@vitejs/plugin-react can't detect preamble".                                                                                                                |
-| 2026-07-16 | `ba1554f` | **Not run on Windows.** Run on **Linux** via `npm run probe:runtime`: all functional checks pass in both the packaged and `dev:desktop` paths — React mounts, `window.jarvis` → `["getAppInfo"]`, `getAppInfo()` returns real values, renderer isolated, console clean. `platform` reports `linux`, so **this is not the Windows gate.** Steps 1–7 on Windows remain outstanding. |
+| Date       | Commit    | Result                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ---------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-07-16 | `20ffb86` | **FAILED at Step 1 (launch).** Electron started, then threw `ERR_MODULE_NOT_FOUND: Cannot find module packages/config/src/env.js imported from packages/config/src/index.ts`. No window reached a usable state; Steps 2–7 never reached.                                                                                                                                                                   |
+| 2026-07-16 | `ff3672d` | **FAILED at Step 1.2 (render).** Window launched — the module error was gone. But the renderer stayed blank: `#root` empty, React never mounted. DevTools: "Executing inline script violates ... script-src 'self'", "@vitejs/plugin-react can't detect preamble".                                                                                                                                         |
+| 2026-07-16 | `948811a` | **PASSED on Windows development runtime.** Observed on a Windows x64 laptop: Electron launched, React mounted, the UI rendered “Jarvis” and “Phase 1 foundation”, host info returned real values, `platform` reported `win32`, `window.jarvis` exposed exactly `["getAppInfo"]`, `getAppInfo()` returned real values, and the renderer remained isolated. Packaged installer verification remains pending. |
 
 ### Failure 1 — raw TypeScript at runtime (`20ffb86`)
 
@@ -50,9 +50,9 @@ artifacts instead of observed. **That belief was never tested and turned out to 
 `npm run probe:runtime` now runs the app here and catches both classes; it is verified
 red-green against the CSP bug specifically. Nothing should reach Windows without it.
 
-**Retest from Step 1 on Windows.** As of `ba1554f` the app renders and `window.jarvis`
-works — **observed on Linux, never on Windows**. `platform` must report `win32`, and only
-this gate can show that.
+**Retest from Step 1 on Windows.** As of `948811a` the app renders and `window.jarvis`
+works — **observed live on Windows development runtime**. `platform` reported `win32`, and
+this gate confirmed it.
 
 ## Why this exists
 
@@ -201,16 +201,16 @@ packaged build is produced, re-run Steps 2–6 against it and confirm 4.3 is ref
 
 ## Recording the result
 
-| Field                       |     |
-| --------------------------- | --- |
-| Date run                    |     |
-| Commit                      |     |
-| Windows version             |     |
-| Node version                |     |
-| Electron version (from 2.3) |     |
-| Steps passed                |     |
-| Steps failed                |     |
-| Notes                       |     |
+| Field                       |                                                                 |
+| --------------------------- | --------------------------------------------------------------- |
+| Date run                    | 2026-07-16                                                      |
+| Commit                      | `948811a`                                                       |
+| Windows version             | Windows x64 laptop (development runtime)                        |
+| Node version                | 24.18.0 (observed in `getAppInfo`)                              |
+| Electron version (from 2.3) | 43.1.1 (observed in `getAppInfo`)                               |
+| Steps passed                | 1–4, and the critical bridge checks in Step 2                   |
+| Steps failed                | None on development runtime                                     |
+| Notes                       | Packaged installer / packaged production build not yet verified |
 
 **On full pass:** update `docs/KNOWN-LIMITATIONS.md` §7 and `docs/IPC-SURFACE.md` to move
 the shell and `app:get-info` from `IMPLEMENTED, NOT YET VERIFIED` to

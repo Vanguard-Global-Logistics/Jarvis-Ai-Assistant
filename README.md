@@ -17,16 +17,16 @@ Personal AI assistant and orchestrator for William Lavold. Private, single-user.
 
 ## Start here
 
-| Document                          | What it is                                                      |
-| --------------------------------- | --------------------------------------------------------------- |
-| `CLAUDE.md`                       | The operating manual. Read before planning or writing anything. |
-| `docs/CURRENT-STATE-AUDIT.md`     | 20-section audit of what exists and what does not.              |
-| `docs/VISUAL-DESIGN-TARGET.md`    | The approved visual north star. Visual work is deferred.        |
-| `docs/KNOWN-LIMITATIONS.md`       | The honest gap list.                                            |
-| `docs/IPC-SURFACE.md`             | Every channel crossing the renderer/main trust boundary.        |
-| `docs/WINDOWS-ACCEPTANCE-TEST.md` | The manual runtime gate. **Not yet run.**                       |
-| `docs/DECISIONS/`                 | ADRs.                                                           |
-| `reference/design-handoff/`       | The behavioral contract. **Archived and immutable.**            |
+| Document                          | What it is                                                                       |
+| --------------------------------- | -------------------------------------------------------------------------------- |
+| `CLAUDE.md`                       | The operating manual. Read before planning or writing anything.                  |
+| `docs/CURRENT-STATE-AUDIT.md`     | 20-section audit of what exists and what does not.                               |
+| `docs/VISUAL-DESIGN-TARGET.md`    | The approved visual north star. Visual work is deferred.                         |
+| `docs/KNOWN-LIMITATIONS.md`       | The honest gap list.                                                             |
+| `docs/IPC-SURFACE.md`             | Every channel crossing the renderer/main trust boundary.                         |
+| `docs/WINDOWS-ACCEPTANCE-TEST.md` | The manual runtime gate. **Passed on Windows development runtime (2026-07-16).** |
+| `docs/DECISIONS/`                 | ADRs.                                                                            |
+| `reference/design-handoff/`       | The behavioral contract. **Archived and immutable.**                             |
 
 ## Quick start
 
@@ -49,7 +49,7 @@ once:
 bash scripts/install-electron-runtime-deps.sh
 ```
 
-It is **not** the Windows acceptance gate — see `docs/WINDOWS-ACCEPTANCE-TEST.md`.
+It is the Linux runtime probe and does not replace the Windows acceptance gate. The Windows development runtime gate was observed live on 2026-07-16; packaged installer verification remains outstanding.
 
 ## Architecture
 

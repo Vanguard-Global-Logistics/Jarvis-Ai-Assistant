@@ -1,7 +1,7 @@
 # The IPC Surface
 
 Date: 2026-07-16
-Status: **PARTIAL** — one channel implemented and tested.
+Status: **IMPLEMENTED AND VERIFIED** — one channel implemented and observed live on Windows development runtime.
 
 `CLAUDE.md` §9 requires every API to be documented, "including the internal typed IPC
 surface, which is the highest-risk boundary in the Electron shell." This file is that
@@ -59,16 +59,16 @@ of arriving in the UI. Every response schema is `.strict()` for the same reason.
 
 ### `app:get-info`
 
-|                       |                                                                                                                                                                                     |
-| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Status**            | IMPLEMENTED, NOT YET VERIFIED — unit-tested only. Never exercised in a live Electron window; the first launch attempt never reached it (`docs/WINDOWS-ACCEPTANCE-TEST.md` run log). |
-| **Renderer call**     | `window.jarvis.getAppInfo(): Promise<AppInfo>`                                                                                                                                      |
-| **Request**           | `z.undefined()` — no payload. A renderer that sends one is rejected.                                                                                                                |
-| **Response**          | `AppInfoSchema`, `.strict()`                                                                                                                                                        |
-| **Handler**           | `registerAppInfoHandler()` in `apps/desktop/src/main/handlers/app-info.ts`                                                                                                          |
-| **Contract**          | `appGetInfoContract` in `packages/contracts/src/ipc/contracts.ts`                                                                                                                   |
-| **Side effects**      | None. Reads Electron metadata only.                                                                                                                                                 |
-| **Authority granted** | None. No filesystem, no shell, no env, no user data, no AEGIS.                                                                                                                      |
+|                       |                                                                                                                                         |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| **Status**            | IMPLEMENTED AND VERIFIED — observed live on Windows development runtime on 2026-07-16. Packaged installer verification remains pending. |
+| **Renderer call**     | `window.jarvis.getAppInfo(): Promise<AppInfo>`                                                                                          |
+| **Request**           | `z.undefined()` — no payload. A renderer that sends one is rejected.                                                                    |
+| **Response**          | `AppInfoSchema`, `.strict()`                                                                                                            |
+| **Handler**           | `registerAppInfoHandler()` in `apps/desktop/src/main/handlers/app-info.ts`                                                              |
+| **Contract**          | `appGetInfoContract` in `packages/contracts/src/ipc/contracts.ts`                                                                       |
+| **Side effects**      | None. Reads Electron metadata only.                                                                                                     |
+| **Authority granted** | None. No filesystem, no shell, no env, no user data, no AEGIS.                                                                          |
 
 Response fields:
 
@@ -191,11 +191,7 @@ and `better-sqlite3` is a native module that must not be bundled.
 
 **NOT proven:**
 
-- **Runtime behaviour on Windows.** The channel has never been exercised in a real
-  Electron window — this environment has no Electron binary and no display, so it cannot
-  be launched here (`BLOCKED BY ENVIRONMENT`). The tests mock `electron`. First launch
-  must confirm `window.jarvis` exists, exposes only `getAppInfo`, and returns real host
-  values.
+- **Packaged installer behaviour on Windows.** The development runtime was observed live on Windows; a packaged installer or production artifact has not been exercised there.
 - **The hardening flags.** `contextIsolation`, `nodeIntegration: false`, sandbox, and the
   CSP are present in the built bundle but not asserted by any test — proving they are
   _enforced_ needs a live `BrowserWindow` (`KNOWN-LIMITATIONS.md` §9).
@@ -204,4 +200,4 @@ and `better-sqlite3` is a native module that must not be bundled.
   **Independently reviewed:** ChatGPT — the reviewer named in `CLAUDE.md` §5, deliberately
   outside the Claude family — completed the architecture review, recorded by William on
   2026-07-16 (ADR 0004). §5's never-sole-approver rule is satisfied. This does not make the
-  runtime gate above any less open.
+  packaged installer gate any less open.

@@ -7,6 +7,8 @@ Scope: everything present in `reference/design-handoff/` at commit `7583616` pri
 Status labels used throughout this document (per instruction, exhaustive set):
 `IMPLEMENTED AND VERIFIED` · `IMPLEMENTED, NOT YET VERIFIED` · `PARTIAL` · `MOCKED` · `NOT IMPLEMENTED` · `BLOCKED BY ENVIRONMENT`
 
+Runtime acceptance note (2026-07-16): the Windows development runtime gate passed on a Windows x64 laptop. The shell and the `app:get-info` IPC channel are now `IMPLEMENTED AND VERIFIED` for development runtime only; packaged installer verification remains pending.
+
 ---
 
 ## 1. Every relevant file found

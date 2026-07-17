@@ -33,7 +33,7 @@ Repository: `github.com/Vanguard-Global-Logistics/Jarvis-Ai-Assistant`.
   3. `docs/VISUAL-DESIGN-TARGET.md` — the approved visual north star.
   4. `docs/KNOWN-LIMITATIONS.md` — the honest gap list. Updated whenever a gap opens or closes.
   5. `docs/IPC-SURFACE.md` — every channel crossing the renderer/main trust boundary.
-  6. `docs/WINDOWS-ACCEPTANCE-TEST.md` — the manual runtime gate. **Not yet run.**
+  6. `docs/WINDOWS-ACCEPTANCE-TEST.md` — the manual runtime gate. **Passed on Windows development runtime on 2026-07-16.**
   7. `docs/DECISIONS/` — ADRs. A decision recorded here does not get silently reversed.
   8. This file.
 - **The Phase 1 Foundation milestone is complete; Phase 1 is not.** ADR 0004 closes the
@@ -42,10 +42,10 @@ Repository: `github.com/Vanguard-Global-Logistics/Jarvis-Ai-Assistant`.
   approval — §7 still lists them as Phase 1 requirements, and that has not changed. Do not
   start any of them because "Phase 1 isn't done". Ask.
 - **Complete is not accepted.** The §5 independent review is done — ChatGPT reviewed the
-  architecture, recorded 2026-07-16 (ADR 0004). One gate remains: the app has **never been
-  launched** (no Electron binary, no display here), so the shell and the IPC channel are
-  `IMPLEMENTED, NOT YET VERIFIED`. `docs/WINDOWS-ACCEPTANCE-TEST.md` is the gate and it has
-  not been run. Do not call them working until it passes.
+  architecture, recorded 2026-07-16 (ADR 0004). The Windows development runtime gate has
+  now been observed live on a Windows x64 laptop. The shell and the IPC channel are
+  `IMPLEMENTED AND VERIFIED` for development runtime; packaged installer verification
+  remains pending. Do not call packaged production builds verified unless they are.
 - `reference/design-handoff/*.dc.html` and `support.js` are **design prototypes, not
   source to port**. `support.js` is explicitly marked "do not ship". Recreate the
   designs in real code; do not copy the prototype implementation.
