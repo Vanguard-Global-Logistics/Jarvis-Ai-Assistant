@@ -181,7 +181,7 @@ apps/pwa               PWA shell                                   NOT IMPLEMENT
 services/jarvis-core   Orchestration, isolated from renderer       PARTIAL — model provider + amplifier logic, not wired to the app
 services/aegis         AEGIS engine — independent, no GenAI        NOT IMPLEMENTED — empty
 packages/contracts     Zod schemas + shared types                  PARTIAL — IPC, model, and experience contracts; no feature schema
-packages/ui            Design-system components                    NOT IMPLEMENTED — visual work deferred
+packages/ui            Design-system components                    PARTIAL — design tokens + motion language; no components yet
 packages/config        Env validation + structured logging         IMPLEMENTED, unit-tested
 packages/database      SQLite connection + migration runner        PARTIAL — runner works, zero migrations
 docs/DECISIONS/        ADRs                                        0001–0006
