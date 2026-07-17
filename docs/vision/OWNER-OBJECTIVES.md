@@ -48,7 +48,7 @@ then, objective 1 is treated as the floor beneath the rest.
   exists, this document is the referent.
 - **Chief Architect (08), question 2:** "Does it support the North Star?" is answered
   against this document (and later the North Star it seeds).
-- **The governed backlog (`docs/BACKLOG.md`):** an item's *user value* field must trace
+- **The governed backlog (`docs/BACKLOG.md`):** an item's _user value_ field must trace
   to at least one objective; priority reasoning cites which.
 - **The Completion Doctrine (09):** objectives 4 and 6 are why the doctrine exists —
   a Jarvis that never ships, or that grows complexity without freedom, fails the

@@ -15,7 +15,7 @@ William, converging with the brain at Checkpoint 2 (the conversation UI renders 
 the experience shell, and real chat states drive the Orb). One milestone, two
 coordinated workstreams, one definition of done. Subagent execution stays a **single
 sequential queue with interleaved tasks** (parallel implementation subagents conflict);
-"parallel" means neither workstream waits for the other to *finish*, not simultaneous
+"parallel" means neither workstream waits for the other to _finish_, not simultaneous
 writes.
 
 Honesty rules carry over hard: every metric, feed, ranking, and email in the demos is
@@ -71,41 +71,42 @@ responsive foundation.
 ## 3. Contracts (summary — full Zod in task briefs)
 
 - **`OrbState`** — closed enum: `idle · wake · listening · thinking · reasoning ·
-  speaking · success · warning · critical · offline · aegisLockdown`.
+speaking · success · warning · critical · offline · aegisLockdown`.
 - **`DemoScript`** — `{ id, title, mockDisclosure: literal(true), scenes: DemoScene[] }`;
   `DemoScene` — `{ id, title, orbState: OrbState, narration, advance: 'auto'|'manual',
-  durationMs?, panels: DemoPanel[] }`; `DemoPanel` — discriminated union over the scene
+durationMs?, panels: DemoPanel[] }`; `DemoPanel` — discriminated union over the scene
   payload schemas below. `mockDisclosure` is a schema-enforced literal: a script that
   doesn't declare itself mock does not parse.
 - **Mission Control** — `Project { id, name, client, urgency: 1..5, status, dueDate,
-  riskLevel }`, `Risk { projectId, severity, summary, mitigation }`, `MeetingBrief
-  { time, attendees, objective, talkingPoints[] }`, `PreparedEmail { to, subject,
-  body, intent }`, `ActionPlan { items: { title, why, estimateMin }[] }`.
+riskLevel }`, `Risk { projectId, severity, summary, mitigation }`, `MeetingBrief
+{ time, attendees, objective, talkingPoints[] }`, `PreparedEmail { to, subject,
+body, intent }`, `ActionPlan { items: { title, why, estimateMin }[] }`.
 - **Ventures** — `Venture { id, name, phase, health }` (BCI, VPL, Peptastic,
   Sophisticated Sips — names only, per §7 charters), `AutomationProgress { area,
-  percentAutomated, trend }`, `TimeRecovered { hoursPerWeek, series[] }`,
+percentAutomated, trend }`, `TimeRecovered { hoursPerWeek, series[] }`,
   `GrowthRoadmap { horizon, milestones[] }`.
 - All `.strict()`, all client-agnostic, all barrel-exported — the same contracts a live
   Mission Control service must satisfy later, which is what makes the mock replaceable.
 
 ## 4. Design architecture
 
-**Direction (original, not Iron Man / ChatGPT / SaaS-admin):** a *calm instrument*,
+**Direction (original, not Iron Man / ChatGPT / SaaS-admin):** a _calm instrument_,
 not a dashboard — one intelligence at the center of a deep, quiet room. Near-black
 navy stage (`#05070a → #070a0f`) with slow radial light that responds to the Orb's
-state; content surfaces are glass panels that *emerge from the depth* (opacity + blur
-+ 12px rise) rather than pop; the Orb is the single bright object and the only thing
-that ever demands attention. Typography carries the premium feel: Space Grotesk
-display, Inter body, IBM Plex Mono for data — bundled locally via `@fontsource` (the
-strict CSP forbids CDNs, so fonts ship in the app). Hexagon badges mark the AI
-modules; left-edge health accents mark list items. Everything per the approved visual
-target — `docs/VISUAL-DESIGN-TARGET.md` remains the authority.
+state; content surfaces are glass panels that _emerge from the depth_ (opacity + blur
+
+- 12px rise) rather than pop; the Orb is the single bright object and the only thing
+  that ever demands attention. Typography carries the premium feel: Space Grotesk
+  display, Inter body, IBM Plex Mono for data — bundled locally via `@fontsource` (the
+  strict CSP forbids CDNs, so fonts ship in the app). Hexagon badges mark the AI
+  modules; left-edge health accents mark list items. Everything per the approved visual
+  target — `docs/VISUAL-DESIGN-TARGET.md` remains the authority.
 
 **The motion language (`packages/ui/src/tokens/motion.ts`)** — motion communicates
 meaning, nothing moves for decoration:
 
 - **Duration scale:** `instant 120ms · quick 240ms · surface 400ms · scene 700ms ·
-  ambient 4–9s loops`. **Easing:** standard / enter / exit curves defined once.
+ambient 4–9s loops`. **Easing:** standard / enter / exit curves defined once.
 - **Choreography rules (enforced by convention + review):** one primary motion at a
   time; ambient motion never exceeds 3% opacity variance; scene transitions stagger
   children ≤ 60ms; nothing loops except the Orb and the ambient light.
@@ -156,7 +157,7 @@ on a side branch. **William's call — flagged for the approval.**
 4. **Runtime probe extension** — the real app: shell mounts, Orb present with its
    ARIA label, a demo starts and advances, console clean, and the IPC bridge surface
    is **unchanged** by experience tasks (the experience adds no channels).
-5. **Human gates** — screenshot review at each experience checkpoint (the *previewed*
+5. **Human gates** — screenshot review at each experience checkpoint (the _previewed_
    rung); William's keyboard-only and reduced-motion pass in acceptance; final quality
    bar is his: purposeful, calm, "never seen software like this."
 6. **Review gates** — code-review skill on each checkpoint's diff; the pr-review
@@ -164,16 +165,16 @@ on a side branch. **William's call — flagged for the approval.**
 
 ## 6. Implementation sequence (single interleaved queue)
 
-| # | Task | Workstream | Deliverable |
-|---|---|---|---|
-| C1 | Tasks 1–6 (in flight now) | Brain | Contracts, providers, amplifier — tested |
-| E1 | Experience contracts + design tokens + motion language | Experience | Pure, fully tested; no UI yet |
-| E2 | Orb + primitives + ambient Shell | Experience | **First "feel it" build** — orb breathing in the app, state switcher behind a dev flag |
-| C2 | IPC channels + conversation **inside the Shell** | Convergence | First William-testable milestone: talk to Jarvis in the real experience; chat drives listening/thinking/speaking |
-| E3 | Mock provider + DemoPlayer + "Prepare Me For Work" | Experience | The scripted morning demo, end to end |
-| C3 | Persistence + history surface in the Shell | Brain | Explicit-save sessions |
-| E4 | "The Road To Freedom" + polish + a11y audit | Experience | Second demo; lighting/particle tuning |
-| C4 | Acceptance — both workstreams, one gate | Both | ADR 0006 DoD + demo acceptance, Windows gate |
+| #   | Task                                                   | Workstream  | Deliverable                                                                                                      |
+| --- | ------------------------------------------------------ | ----------- | ---------------------------------------------------------------------------------------------------------------- |
+| C1  | Tasks 1–6 (in flight now)                              | Brain       | Contracts, providers, amplifier — tested                                                                         |
+| E1  | Experience contracts + design tokens + motion language | Experience  | Pure, fully tested; no UI yet                                                                                    |
+| E2  | Orb + primitives + ambient Shell                       | Experience  | **First "feel it" build** — orb breathing in the app, state switcher behind a dev flag                           |
+| C2  | IPC channels + conversation **inside the Shell**       | Convergence | First William-testable milestone: talk to Jarvis in the real experience; chat drives listening/thinking/speaking |
+| E3  | Mock provider + DemoPlayer + "Prepare Me For Work"     | Experience  | The scripted morning demo, end to end                                                                            |
+| C3  | Persistence + history surface in the Shell             | Brain       | Explicit-save sessions                                                                                           |
+| E4  | "The Road To Freedom" + polish + a11y audit            | Experience  | Second demo; lighting/particle tuning                                                                            |
+| C4  | Acceptance — both workstreams, one gate                | Both        | ADR 0006 DoD + demo acceptance, Windows gate                                                                     |
 
 Estimates (doctrine rule 3): E1 ~4–6h · E2 ~8–12h · E3 ~6–8h · E4 ~5–8h of
 supervised subagent work; moderate-to-high complexity concentrated in E2 (canvas +

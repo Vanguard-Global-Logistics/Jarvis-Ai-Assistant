@@ -48,7 +48,7 @@ opt-in, main-process-only, and usage-billed separately from his subscriptions.
 pass; the runtime probe is extended and green in CI; the Windows development-runtime
 gate is re-passed; `docs/IPC-SURFACE.md` documents every new channel;
 `docs/KNOWN-LIMITATIONS.md` is updated; and William uses it for one real task and
-explicitly **accepts** it — the top of the evidence ladder, distinct from *built*.
+explicitly **accepts** it — the top of the evidence ladder, distinct from _built_.
 
 ## What this ADR does NOT decide
 
@@ -65,7 +65,7 @@ explicitly **accepts** it — the top of the evidence ladder, distinct from *bui
   (no Electron types) — the Stage 1 "shared core contracts" requirement, so future
   clients consume the same contracts.
 - When the milestone is accepted, the closing rule applies before any expansion:
-  *"This is sufficient for the current mission. Ship it before expanding it."*
+  _"This is sufficient for the current mission. Ship it before expanding it."_
 
 ## Alternatives considered
 

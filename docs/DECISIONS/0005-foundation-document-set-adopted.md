@@ -10,7 +10,7 @@
 ## Context
 
 William drafted a **Jarvis Core Constitution v1.0** — the first document describing how
-Jarvis should *think*. The existing hierarchy had no layer for philosophy: the design
+Jarvis should _think_. The existing hierarchy had no layer for philosophy: the design
 handoff defines boundaries, the audit defines state, CLAUDE.md defines build process.
 The draft also named many subsystems that appeared nowhere in the hierarchy.
 
@@ -28,12 +28,12 @@ the multi-client platform principle with the F15 sequencing ruling.
 
 ### 1. Four layers, intentionally separated
 
-| Layer | Purpose | Home |
-|---|---|---|
-| **1 — Vision** | Long-term mission, North Star, direction — changes very rarely | `docs/vision/` |
-| **2 — Foundation** | How Jarvis thinks, collaborates, learns, and decides | `docs/foundation/` |
-| **3 — Architecture** | System designs — no code, no status claims | `docs/architecture/` |
-| **4 — Implementation** | The software, and the state docs describing its reality | code + `docs/` root |
+| Layer                  | Purpose                                                        | Home                 |
+| ---------------------- | -------------------------------------------------------------- | -------------------- |
+| **1 — Vision**         | Long-term mission, North Star, direction — changes very rarely | `docs/vision/`       |
+| **2 — Foundation**     | How Jarvis thinks, collaborates, learns, and decides           | `docs/foundation/`   |
+| **3 — Architecture**   | System designs — no code, no status claims                     | `docs/architecture/` |
+| **4 — Implementation** | The software, and the state docs describing its reality        | code + `docs/` root  |
 
 Rules: lower layers conform to higher ones; **higher layers never authorize lower-layer
 work** — every transition requires William's explicit approval; no layer skipping; every
@@ -70,8 +70,8 @@ undrafted.
 The **Completion Doctrine** (09) governs scope across all layers: one milestone at a
 time, written definitions of done, estimates required, a governed backlog
 (`docs/BACKLOG.md`), usable value per phase, simplification actively recommended, and a
-six-stage completion evidence ladder (*drafted / committed / built / tested / previewed
-/ accepted*) defined as an explicit extension of the handoff's Forge five-fact model.
+six-stage completion evidence ladder (_drafted / committed / built / tested / previewed
+/ accepted_) defined as an explicit extension of the handoff's Forge five-fact model.
 
 ### 4. The Layer 3 catalog (all CONCEPTUAL, all undrafted)
 

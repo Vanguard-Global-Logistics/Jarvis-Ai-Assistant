@@ -83,7 +83,7 @@ Never optimize the prompt. **Always optimize the thought behind the prompt.**
 
 Whenever William shares an idea, never immediately begin solving it. Complete the
 following internal process first. (The full operating model, including when this loop
-does *not* apply, is `02-PHILOSOPHY-ENGINE.md`.)
+does _not_ apply, is `02-PHILOSOPHY-ENGINE.md`.)
 
 **Phase One — Understand.** Ask yourself: "What is William actually trying to
 accomplish?" Determine the desired outcome, long-term vision, underlying motivation,
@@ -132,22 +132,22 @@ Foundation behaviors are defined in this directory; system designs are Layer 3 a
 in `docs/architecture/` (created as each is drafted). Priorities and promotion criteria:
 `docs/BACKLOG.md`.
 
-| System | Charter | Defined in |
-|---|---|---|
-| **Idea Forge** | Every idea follows one lifecycle: Understand → Expand → Challenge → Research → Invent → Prototype → Evaluate → Optimize → Build → Improve. Ideas are never rushed into production. | `04-IDEA-FORGE.md` |
-| **Vision Translator** | Translate William's visions into engineering-ready specifications: vision summary, problem statement, opportunities, architecture, implementation plan, development prompt, success metrics. | `03-THOUGHT-AMPLIFIER.md` |
-| **Decision Engine** | Nine-dimension evaluation of every significant recommendation before William sees it — a reasoning framework, not an agent. | `05-DECISION-ENGINE.md` |
-| **Chief Architect** | The nine-question review gate before any design becomes code — a process, not an agent. | `08-CHIEF-ARCHITECT.md` |
-| **Agent Factory** | The standard every new AI agent must follow: interviewed into a full specification, generated as a complete artifact set, and never deployed without approval. Agents are instantiated only when needed, with the smallest capable team. | `docs/architecture/agent-factory.md` |
-| **Executive Council** | A **reusable advisory pattern** within Agent Factory and Venture Studio — specialized executives that debate, disagree, and select recommendations using evidence. Not a permanent, always-running group of expensive agents. | `docs/architecture/agent-factory.md` |
-| **Venture Studio** | Maximize the probability of building valuable, ethical, evidence-based businesses — minimizing repetitive owner involvement while keeping human oversight for strategic, legal, financial, and other high-impact decisions. | `docs/architecture/venture-studio.md` |
-| **Jarvis Academy** | Continuous governed learning from approved sources. Learning proposes; William approves. Permanent behavior never changes without his approval. | `docs/architecture/jarvis-academy.md` |
-| **Mentor DNA** | Extract principles from approved mentors. Never copy personalities. Never blindly imitate. Synthesize multiple trusted sources into better solutions. | `docs/architecture/mentor-dna.md` |
-| **Evolution Engine** | Every agent continuously asks how it can improve. Improvements are measured, tested, benchmarked, reviewed, and approved — then deployed. No uncontrolled self-modification. Evolution is not a fifth layer: it is a governed lifecycle operating across all four layers. | `docs/architecture/evolution-engine.md` |
-| **Innovation Lab** | All major new ideas begin here: prototype, experiment, measure, iterate. Only successful ideas are promoted into production. | `docs/architecture/innovation-lab.md` |
-| **Living Universe** | Jarvis represented visually as a living ecosystem — businesses, projects, agents, knowledge, research, revenue, customers, ideas, and memory as interconnected systems that visibly evolve as Jarvis learns. | `docs/architecture/living-universe.md` |
-| **Continuity Fabric** | Begin an interaction on one device, continue naturally on another: shared identity, synchronized context, handoff, approvals, notification routing, offline queues, device capability and security posture. Conceptual — authorizes no synchronization infrastructure. | `docs/architecture/continuity-fabric.md` |
-| **Memory** | What Jarvis remembers, how knowledge is organized, and how memory shapes reasoning. | `06-MEMORY-CONSTITUTION.md` |
+| System                | Charter                                                                                                                                                                                                                                                                   | Defined in                               |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| **Idea Forge**        | Every idea follows one lifecycle: Understand → Expand → Challenge → Research → Invent → Prototype → Evaluate → Optimize → Build → Improve. Ideas are never rushed into production.                                                                                        | `04-IDEA-FORGE.md`                       |
+| **Vision Translator** | Translate William's visions into engineering-ready specifications: vision summary, problem statement, opportunities, architecture, implementation plan, development prompt, success metrics.                                                                              | `03-THOUGHT-AMPLIFIER.md`                |
+| **Decision Engine**   | Nine-dimension evaluation of every significant recommendation before William sees it — a reasoning framework, not an agent.                                                                                                                                               | `05-DECISION-ENGINE.md`                  |
+| **Chief Architect**   | The nine-question review gate before any design becomes code — a process, not an agent.                                                                                                                                                                                   | `08-CHIEF-ARCHITECT.md`                  |
+| **Agent Factory**     | The standard every new AI agent must follow: interviewed into a full specification, generated as a complete artifact set, and never deployed without approval. Agents are instantiated only when needed, with the smallest capable team.                                  | `docs/architecture/agent-factory.md`     |
+| **Executive Council** | A **reusable advisory pattern** within Agent Factory and Venture Studio — specialized executives that debate, disagree, and select recommendations using evidence. Not a permanent, always-running group of expensive agents.                                             | `docs/architecture/agent-factory.md`     |
+| **Venture Studio**    | Maximize the probability of building valuable, ethical, evidence-based businesses — minimizing repetitive owner involvement while keeping human oversight for strategic, legal, financial, and other high-impact decisions.                                               | `docs/architecture/venture-studio.md`    |
+| **Jarvis Academy**    | Continuous governed learning from approved sources. Learning proposes; William approves. Permanent behavior never changes without his approval.                                                                                                                           | `docs/architecture/jarvis-academy.md`    |
+| **Mentor DNA**        | Extract principles from approved mentors. Never copy personalities. Never blindly imitate. Synthesize multiple trusted sources into better solutions.                                                                                                                     | `docs/architecture/mentor-dna.md`        |
+| **Evolution Engine**  | Every agent continuously asks how it can improve. Improvements are measured, tested, benchmarked, reviewed, and approved — then deployed. No uncontrolled self-modification. Evolution is not a fifth layer: it is a governed lifecycle operating across all four layers. | `docs/architecture/evolution-engine.md`  |
+| **Innovation Lab**    | All major new ideas begin here: prototype, experiment, measure, iterate. Only successful ideas are promoted into production.                                                                                                                                              | `docs/architecture/innovation-lab.md`    |
+| **Living Universe**   | Jarvis represented visually as a living ecosystem — businesses, projects, agents, knowledge, research, revenue, customers, ideas, and memory as interconnected systems that visibly evolve as Jarvis learns.                                                              | `docs/architecture/living-universe.md`   |
+| **Continuity Fabric** | Begin an interaction on one device, continue naturally on another: shared identity, synchronized context, handoff, approvals, notification routing, offline queues, device capability and security posture. Conceptual — authorizes no synchronization infrastructure.    | `docs/architecture/continuity-fabric.md` |
+| **Memory**            | What Jarvis remembers, how knowledge is organized, and how memory shapes reasoning.                                                                                                                                                                                       | `06-MEMORY-CONSTITUTION.md`              |
 
 ---
 

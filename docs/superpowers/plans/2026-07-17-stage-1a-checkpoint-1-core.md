@@ -35,11 +35,13 @@ authored. No code preceded it.
 ### Task 1: Model contracts in `@jarvis/contracts`
 
 **Files:**
+
 - Create: `packages/contracts/src/model/contracts.ts`
 - Test: `packages/contracts/src/model/contracts.test.ts`
 - Modify: `packages/contracts/src/index.ts` (barrel exports; update the status header comment from "model-provider contracts are NOT defined" to name this module)
 
 **Interfaces:**
+
 - Consumes: `zod` (existing dependency).
 - Produces: `ChatMessageSchema`, `ChatRequestSchema`, `ChatReplySchema`, `AmplifierResultSchema`, `PROVIDER_IDS`, and inferred types `ChatMessage`, `ChatRequest`, `ChatReply`, `AmplifierResult`, `ProviderId`. Later tasks and Checkpoint 2's IPC contracts import exactly these names.
 
@@ -48,11 +50,7 @@ authored. No code preceded it.
 ```typescript
 // packages/contracts/src/model/contracts.test.ts
 import { describe, expect, it } from 'vitest';
-import {
-  AmplifierResultSchema,
-  ChatReplySchema,
-  ChatRequestSchema,
-} from './contracts.js';
+import { AmplifierResultSchema, ChatReplySchema, ChatRequestSchema } from './contracts.js';
 
 describe('ChatRequestSchema', () => {
   it('accepts a minimal valid request', () => {
@@ -82,12 +80,8 @@ describe('ChatRequestSchema', () => {
 
 describe('ChatReplySchema', () => {
   it('requires a provider id from the closed set', () => {
-    expect(
-      ChatReplySchema.safeParse({ text: 'hi', provider: 'mock' }).success,
-    ).toBe(true);
-    expect(
-      ChatReplySchema.safeParse({ text: 'hi', provider: 'openai' }).success,
-    ).toBe(false);
+    expect(ChatReplySchema.safeParse({ text: 'hi', provider: 'mock' }).success).toBe(true);
+    expect(ChatReplySchema.safeParse({ text: 'hi', provider: 'openai' }).success).toBe(false);
   });
 });
 
@@ -107,9 +101,7 @@ describe('AmplifierResultSchema', () => {
   it('rejects a missing field and an empty questions list', () => {
     const { buildReadyPrompt: _omitted, ...missing } = valid;
     expect(AmplifierResultSchema.safeParse(missing).success).toBe(false);
-    expect(
-      AmplifierResultSchema.safeParse({ ...valid, missingQuestions: [] }).success,
-    ).toBe(false);
+    expect(AmplifierResultSchema.safeParse({ ...valid, missingQuestions: [] }).success).toBe(false);
   });
 });
 ```
@@ -219,11 +211,13 @@ git add packages/contracts && git commit -m "feat(contracts): define the chat an
 ### Task 2: `JarvisModelProvider` interface + deterministic mock provider
 
 **Files:**
+
 - Create: `services/jarvis-core/src/model/provider.ts`
 - Create: `services/jarvis-core/src/model/mock-provider.ts`
 - Test: `services/jarvis-core/src/model/mock-provider.test.ts`
 
 **Interfaces:**
+
 - Consumes: `ChatRequest`, `ChatReply`, `AmplifierResult`, `ProviderId` from `@jarvis/contracts` (Task 1).
 - Produces: `interface JarvisModelProvider { readonly id: ProviderId; chat(request: ChatRequest): Promise<ChatReply>; amplify(idea: string): Promise<AmplifierResult>; }` and `class MockProvider implements JarvisModelProvider`. Tasks 4–5 implement/select against this exact interface.
 
@@ -354,10 +348,12 @@ git add services/jarvis-core && git commit -m "feat(jarvis-core): provider inter
 ### Task 3: Amplifier prompt builder
 
 **Files:**
+
 - Create: `services/jarvis-core/src/amplifier/prompt.ts`
 - Test: `services/jarvis-core/src/amplifier/prompt.test.ts`
 
 **Interfaces:**
+
 - Consumes: nothing beyond the standard library.
 - Produces: `AMPLIFIER_SYSTEM_PROMPT: string` and `buildAmplifierUserMessage(idea: string): string`. Task 4's Anthropic adapter imports both.
 
@@ -402,7 +398,7 @@ Run: `npx vitest run services/jarvis-core/src/amplifier` — Expected: FAIL — 
  * the boundary; this prompt teaches the model what belongs in each.
  */
 export const AMPLIFIER_SYSTEM_PROMPT = [
-  'You are the Thought Amplifier inside Jarvis, William Lavold\'s executive',
+  "You are the Thought Amplifier inside Jarvis, William Lavold's executive",
   'partner. William gives you a rough, incomplete idea. Your job is not to',
   'answer it — it is to help him discover the best version of his own thinking.',
   '',
@@ -441,11 +437,13 @@ git add services/jarvis-core/src/amplifier && git commit -m "feat(jarvis-core): 
 ### Task 4: Anthropic provider adapter
 
 **Files:**
+
 - Modify: `services/jarvis-core/package.json` (add `"@anthropic-ai/sdk"` to dependencies; run `npm install` at the repo root so the workspace lockfile updates)
 - Create: `services/jarvis-core/src/model/anthropic-provider.ts`
 - Test: `services/jarvis-core/src/model/anthropic-provider.test.ts`
 
 **Interfaces:**
+
 - Consumes: `JarvisModelProvider` (Task 2), `AMPLIFIER_SYSTEM_PROMPT` / `buildAmplifierUserMessage` (Task 3), contracts (Task 1).
 - Produces: `class AnthropicProvider implements JarvisModelProvider`, constructor `new AnthropicProvider({ apiKey: string, model?: string, client?: AnthropicLikeClient })` — the injectable `client` exists so tests never touch the network. `DEFAULT_MODEL = 'claude-opus-4-8'` is exported for the factory and future config.
 
@@ -593,11 +591,7 @@ export class AnthropicProvider implements JarvisModelProvider {
   private readonly client: AnthropicLikeClient;
   private readonly model: string;
 
-  public constructor(options: {
-    apiKey: string;
-    model?: string;
-    client?: AnthropicLikeClient;
-  }) {
+  public constructor(options: { apiKey: string; model?: string; client?: AnthropicLikeClient }) {
     // The key goes into the SDK client and nowhere else — not a field, not a
     // log, not an error. Main process only (enforced at wiring in Checkpoint 2).
     this.client =
@@ -670,11 +664,13 @@ git add services/jarvis-core package-lock.json && git commit -m "feat(jarvis-cor
 ### Task 5: Provider factory + package barrel
 
 **Files:**
+
 - Create: `services/jarvis-core/src/model/create-provider.ts`
 - Test: `services/jarvis-core/src/model/create-provider.test.ts`
 - Modify: `services/jarvis-core/src/index.ts` (replace the empty-package placeholder with real exports; rewrite the status comment honestly: PARTIAL — provider abstraction + amplifier exist; orchestration, personality, memory do not)
 
 **Interfaces:**
+
 - Consumes: `Env` and `createLogger` from `@jarvis/config`; Tasks 2 and 4.
 - Produces: `createProvider(env: Env): JarvisModelProvider`. Checkpoint 2's main-process wiring calls exactly this. Barrel exports: `createProvider`, `MockProvider`, `AnthropicProvider`, `ModelRefusalError`, `DEFAULT_MODEL`, `AMPLIFIER_SYSTEM_PROMPT`, `buildAmplifierUserMessage`, and the `JarvisModelProvider` type.
 
@@ -757,6 +753,7 @@ git add services/jarvis-core && git commit -m "feat(jarvis-core): provider facto
 ### Task 6: Documentation truth pass
 
 **Files:**
+
 - Modify: `docs/KNOWN-LIMITATIONS.md` §6 — the provider abstraction now exists in jarvis-core with a deterministic mock default; it is NOT wired to the desktop app (that is Checkpoint 2); no key is required.
 - Modify: `CLAUDE.md` structure table — `services/jarvis-core` row: `NOT IMPLEMENTED — empty` → `PARTIAL — model provider + amplifier logic, not wired to the app`.
 - Modify: `docs/BACKLOG.md` NOW entry — status note: Checkpoint 1 of 4 complete.
@@ -777,4 +774,4 @@ Each gets its own plan file, grounded in the code the previous checkpoint actual
 
 - **Checkpoint 2 — The boundary and the conversation (first William-testable milestone).** IPC channels `jarvis:chat` and `jarvis:amplify` following the existing pattern exactly (CHANNELS entry → contract → `handleContract` → named preload function → IPC-SURFACE.md entry, one commit per channel per ADR 0002); minimal conversation UI + amplifier card in the renderer; probe extended to the new bridge surface and key-material assertion. **Exit test: William converses with labeled mock output offline, flips on his key, and amplifies one real idea.**
 - **Checkpoint 3 — Persistence.** First migrations (`sessions`, `messages`); `@electron/rebuild` wiring; `history:save/list/get/delete` channels; history panel; explicit-save semantics (quit-without-save leaves nothing).
-- **Checkpoint 4 — Acceptance.** All eight ADR 0006 acceptance tests; Windows dev-runtime gate re-run by William; docs truth pass; his real-task acceptance — the *accepted* rung of the evidence ladder.
+- **Checkpoint 4 — Acceptance.** All eight ADR 0006 acceptance tests; Windows dev-runtime gate re-run by William; docs truth pass; his real-task acceptance — the _accepted_ rung of the evidence ladder.

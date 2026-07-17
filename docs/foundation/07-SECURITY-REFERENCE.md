@@ -20,13 +20,13 @@ restated verbatim.
 This document states no security rules of its own. Everything beyond the two sentences
 above is a pointer:
 
-| Subject | Authority |
-|---|---|
-| The complete security boundary contract | `reference/design-handoff/SECURITY-BOUNDARIES.md` — archived, immutable |
-| Ownership, permissions, AEGIS levels, recovery | `reference/design-handoff/JARVIS-MASTER-SPEC.md` — archived, immutable — and `CLAUDE.md` §2 |
-| Every channel crossing the renderer/main trust boundary | `docs/IPC-SURFACE.md` |
-| What is *not* enforced today — including the app-layer AEGIS enforcement gap | `docs/KNOWN-LIMITATIONS.md` |
-| Boundary decisions and their rationale | `docs/DECISIONS/` — ADR 0002 in particular |
+| Subject                                                                      | Authority                                                                                   |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| The complete security boundary contract                                      | `reference/design-handoff/SECURITY-BOUNDARIES.md` — archived, immutable                     |
+| Ownership, permissions, AEGIS levels, recovery                               | `reference/design-handoff/JARVIS-MASTER-SPEC.md` — archived, immutable — and `CLAUDE.md` §2 |
+| Every channel crossing the renderer/main trust boundary                      | `docs/IPC-SURFACE.md`                                                                       |
+| What is _not_ enforced today — including the app-layer AEGIS enforcement gap | `docs/KNOWN-LIMITATIONS.md`                                                                 |
+| Boundary decisions and their rationale                                       | `docs/DECISIONS/` — ADR 0002 in particular                                                  |
 
 ## The standing rule for library documents
 

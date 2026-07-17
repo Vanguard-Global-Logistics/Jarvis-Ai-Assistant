@@ -31,15 +31,15 @@ With no API key configured, the deterministic mock provider answers — clearly 
 
 ## Files and packages affected
 
-| Where | What |
-|---|---|
-| `services/jarvis-core` | First real code: provider abstraction + deterministic mock provider + Anthropic adapter + amplifier logic. Runs in the **main process only.** |
-| `packages/contracts` | Zod schemas for the new IPC channels and the five-field amplifier output. **Client-agnostic — no Electron types** (the Stage 1 shared-contracts requirement). |
-| `packages/database` | First migrations: `sessions`, `messages`. `@electron/rebuild` wiring for `better-sqlite3` against Electron's ABI. |
-| `apps/desktop` | Main: wire jarvis-core + SQLite (single writer). Preload: allowlist additions. Renderer: conversation UI, amplifier card, history panel. |
-| `docs/IPC-SURFACE.md` | Every new channel documented individually (ADR 0002). |
-| `scripts/` + `docs/WINDOWS-ACCEPTANCE-TEST.md` | Probe extended to the new bridge surface; acceptance steps added. |
-| `docs/KNOWN-LIMITATIONS.md` | Updated when gaps open or close. |
+| Where                                          | What                                                                                                                                                          |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `services/jarvis-core`                         | First real code: provider abstraction + deterministic mock provider + Anthropic adapter + amplifier logic. Runs in the **main process only.**                 |
+| `packages/contracts`                           | Zod schemas for the new IPC channels and the five-field amplifier output. **Client-agnostic — no Electron types** (the Stage 1 shared-contracts requirement). |
+| `packages/database`                            | First migrations: `sessions`, `messages`. `@electron/rebuild` wiring for `better-sqlite3` against Electron's ABI.                                             |
+| `apps/desktop`                                 | Main: wire jarvis-core + SQLite (single writer). Preload: allowlist additions. Renderer: conversation UI, amplifier card, history panel.                      |
+| `docs/IPC-SURFACE.md`                          | Every new channel documented individually (ADR 0002).                                                                                                         |
+| `scripts/` + `docs/WINDOWS-ACCEPTANCE-TEST.md` | Probe extended to the new bridge surface; acceptance steps added.                                                                                             |
+| `docs/KNOWN-LIMITATIONS.md`                    | Updated when gaps open or close.                                                                                                                              |
 
 ## Security boundary
 
@@ -83,8 +83,8 @@ surface carefully.
 
 Every acceptance test below passes; probe extended and green in CI; the Windows
 development-runtime gate re-passed; IPC-SURFACE and KNOWN-LIMITATIONS updated; and
-William uses it for one real task and explicitly **accepts** it — the *accepted* stage
-of the evidence ladder, distinct from *built* (`09-COMPLETION-DOCTRINE.md`).
+William uses it for one real task and explicitly **accepts** it — the _accepted_ stage
+of the evidence ladder, distinct from _built_ (`09-COMPLETION-DOCTRINE.md`).
 
 ## Acceptance tests
 

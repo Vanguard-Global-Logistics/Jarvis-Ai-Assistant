@@ -23,12 +23,12 @@ versions live in this file's git history (`ecb4202`, `f477324`). On approval of 
 Jarvis intentionally separates **Vision, Foundation, Architecture, and Implementation.**
 This is an explicit architectural principle, binding on every future document and system.
 
-| Layer | Purpose | Home | Changes |
-|---|---|---|---|
-| **1 — Vision** | Long-term mission, goals, North Star, overall direction | `docs/vision/` | Very rarely |
-| **2 — Foundation** | Constitution, philosophy, security principles, memory philosophy, decision engine, core behavioral rules — how Jarvis thinks, collaborates, learns, and decides | `docs/foundation/` | Rarely, only with William's approval |
-| **3 — Architecture** | Design of the major systems (Agent Factory, Jarvis Academy, Venture Studio, Living Universe, Forge, Ledger, AEGIS, UI architecture, API architecture, …) | `docs/architecture/` | When a system is designed or redesigned |
-| **4 — Implementation** | The actual software — Electron, React, TypeScript, databases, APIs, MCP integrations, automation — and the docs that describe its real state | code + existing `docs/` state files | Continuously |
+| Layer                  | Purpose                                                                                                                                                         | Home                                | Changes                                 |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | --------------------------------------- |
+| **1 — Vision**         | Long-term mission, goals, North Star, overall direction                                                                                                         | `docs/vision/`                      | Very rarely                             |
+| **2 — Foundation**     | Constitution, philosophy, security principles, memory philosophy, decision engine, core behavioral rules — how Jarvis thinks, collaborates, learns, and decides | `docs/foundation/`                  | Rarely, only with William's approval    |
+| **3 — Architecture**   | Design of the major systems (Agent Factory, Jarvis Academy, Venture Studio, Living Universe, Forge, Ledger, AEGIS, UI architecture, API architecture, …)        | `docs/architecture/`                | When a system is designed or redesigned |
+| **4 — Implementation** | The actual software — Electron, React, TypeScript, databases, APIs, MCP integrations, automation — and the docs that describe its real state                    | code + existing `docs/` state files | Continuously                            |
 
 **Rules between layers:**
 
@@ -70,7 +70,7 @@ architectural decision references it.**
 - **Priority:** P0 — must exist before the first Chief Architect review can be
   meaningful.
 - **Status:** CONCEPTUAL. **The content is William's, and only his.** Jarvis's role is
-  to draft it *from a structured interview with him* (mission, five-year picture,
+  to draft it _from a structured interview with him_ (mission, five-year picture,
   objectives, success, priorities, anti-goals — one question at a time), then he
   approves. Jarvis never invents the North Star.
 - **Future phases:** Permanent. Reviewed rarely — on his initiative or a genuine
@@ -83,8 +83,8 @@ framework** Jarvis applies before presenting any significant recommendation. Thi
 resolves v2's open question: the Decision Engine is a standalone Foundation document,
 not a footnote to other docs.
 
-- **Purpose:** Define the evaluation every important recommendation passes *before
-  William sees it*, across nine dimensions:
+- **Purpose:** Define the evaluation every important recommendation passes _before
+  William sees it_, across nine dimensions:
   1. **Mission alignment** — does it serve the North Star, and touch no anti-goal?
   2. **Evidence** — what supports it, in which epistemic register (per 02)?
   3. **Alternatives** — what else was genuinely considered, and why did it lose?
@@ -116,14 +116,14 @@ not a footnote to other docs.
 
 These deliberately rhyme — same discipline, different gate:
 
-| Framework | Applied by | Applied when | Governs |
-|---|---|---|---|
-| **Idea Forge** (04) | Jarvis | Continuously — the lifecycle every idea moves through | Ideas |
-| **Decision Engine** (05) | Jarvis | Before presenting any significant recommendation | Recommendations |
-| **Chief Architect** (08) | William, or a reviewer he designates | Before any Layer 3 → 4 transition | Implementations |
+| Framework                | Applied by                           | Applied when                                          | Governs         |
+| ------------------------ | ------------------------------------ | ----------------------------------------------------- | --------------- |
+| **Idea Forge** (04)      | Jarvis                               | Continuously — the lifecycle every idea moves through | Ideas           |
+| **Decision Engine** (05) | Jarvis                               | Before presenting any significant recommendation      | Recommendations |
+| **Chief Architect** (08) | William, or a reviewer he designates | Before any Layer 3 → 4 transition                     | Implementations |
 
-The Decision Engine runs *inside* Jarvis before William sees a recommendation; the
-Chief Architect runs *outside* Jarvis before a design becomes code. A recommendation
+The Decision Engine runs _inside_ Jarvis before William sees a recommendation; the
+Chief Architect runs _outside_ Jarvis before a design becomes code. A recommendation
 that arrives with an honest decision brief makes the Chief Architect review fast; it
 never replaces it.
 
@@ -141,8 +141,8 @@ implementation begins.
 starts:
 
 1. Does it align with the Constitution?
-2. Does it support the North Star? *(answered against `docs/vision/NORTH-STAR.md`,
-   including its anti-goals)*
+2. Does it support the North Star? _(answered against `docs/vision/NORTH-STAR.md`,
+   including its anti-goals)_
 3. Does it duplicate existing functionality?
 4. Can it be simplified?
 5. Will it scale?
@@ -179,7 +179,7 @@ stays immutable and outside the library entirely.
 
 - **Purpose:** The North Star. Why Jarvis exists and where it is going.
 - **Belongs:** `NORTH-STAR.md` (§2). Later, at most a handful of direction documents —
-  e.g. Throne OS's *intent*, to whatever extent William defines it.
+  e.g. Throne OS's _intent_, to whatever extent William defines it.
 - **Does NOT belong:** Behavioral rules (Foundation), system designs (Architecture),
   anything with a timeline shorter than years.
 - **Referenced how:** Everything below cites it; it cites nothing below it. Only
@@ -191,7 +191,7 @@ stays immutable and outside the library entirely.
 - **Belongs:** Constitution, Philosophy Engine, Thought Amplifier, Idea Forge, Decision
   Engine, Memory Constitution, Security Reference, Chief Architect.
 - **Does NOT belong:** System designs, module specifications, agent specs, anything
-  describing *a system* rather than *a behavior*. No security rules beyond the two
+  describing _a system_ rather than _a behavior_. No security rules beyond the two
   verbatim sentences — pointers only.
 - **Referenced how:** Architecture docs cite foundation docs they conform to.
   Foundation docs cite Vision and the Security Reference. Changed only by William's
@@ -219,7 +219,7 @@ stays immutable and outside the library entirely.
 
 ### `docs/knowledge/` — distilled, durable reference
 
-- **Purpose:** What Jarvis *knows* — stable, reusable, source-attributed.
+- **Purpose:** What Jarvis _knows_ — stable, reusable, source-attributed.
 - **Belongs:** Extracted principles, frameworks, mental models, glossaries — including
   the future outputs of Jarvis Academy and Mentor DNA (each entry attributed to its
   approved source).
@@ -280,17 +280,17 @@ stays immutable and outside the library entirely.
 numbers are frozen forever after — identifiers, not sequence; future gaps are history,
 not errors.
 
-| # | Document | Layer | From | Priority | Status |
-|---|---|---|---|---|---|
-| — | `vision/NORTH-STAR.md` | 1 | new in v3 | P0 | CONCEPTUAL — interview with William |
-| 01 | `CONSTITUTION.md` | 2 | v1 01 | P0 | Drafted — amendments pending William's change-by-change approval |
-| 02 | `PHILOSOPHY-ENGINE.md` | 2 | v1 02 | P0 | Drafted |
-| 03 | `THOUGHT-AMPLIFIER.md` | 2 | v1 03 | P1 | CONCEPTUAL |
-| 04 | `IDEA-FORGE.md` | 2 | v1 04 | P1 | CONCEPTUAL |
-| 05 | `DECISION-ENGINE.md` | 2 | new in v3 | P1 | CONCEPTUAL |
-| 06 | `MEMORY-CONSTITUTION.md` | 2 | v1 12 | P1 | CONCEPTUAL |
-| 07 | `SECURITY-REFERENCE.md` | 2 | v1 13 | P0 | Drafted — renames from `13-…` at reconciliation |
-| 08 | `CHIEF-ARCHITECT.md` | 2 | new in v2 | P1 | CONCEPTUAL |
+| #   | Document                 | Layer | From      | Priority | Status                                                           |
+| --- | ------------------------ | ----- | --------- | -------- | ---------------------------------------------------------------- |
+| —   | `vision/NORTH-STAR.md`   | 1     | new in v3 | P0       | CONCEPTUAL — interview with William                              |
+| 01  | `CONSTITUTION.md`        | 2     | v1 01     | P0       | Drafted — amendments pending William's change-by-change approval |
+| 02  | `PHILOSOPHY-ENGINE.md`   | 2     | v1 02     | P0       | Drafted                                                          |
+| 03  | `THOUGHT-AMPLIFIER.md`   | 2     | v1 03     | P1       | CONCEPTUAL                                                       |
+| 04  | `IDEA-FORGE.md`          | 2     | v1 04     | P1       | CONCEPTUAL                                                       |
+| 05  | `DECISION-ENGINE.md`     | 2     | new in v3 | P1       | CONCEPTUAL                                                       |
+| 06  | `MEMORY-CONSTITUTION.md` | 2     | v1 12     | P1       | CONCEPTUAL                                                       |
+| 07  | `SECURITY-REFERENCE.md`  | 2     | v1 13     | P0       | Drafted — renames from `13-…` at reconciliation                  |
+| 08  | `CHIEF-ARCHITECT.md`     | 2     | new in v2 | P1       | CONCEPTUAL                                                       |
 
 **Layer 3 — `docs/architecture/` (unnumbered, kebab-case):** `venture-studio.md` (v1
 05), `agent-factory.md` (v1 06, Executive Council as a pattern within it),
@@ -311,8 +311,8 @@ v1 priorities).
 Every library document begins with:
 
 ```markdown
-- **Layer:** 2 — Foundation            (1 Vision · 2 Foundation · 3 Architecture · 4 Implementation)
-- **Category:** foundation             (vision | foundation | architecture | knowledge | playbooks | research | experiments | decisions | state)
+- **Layer:** 2 — Foundation (1 Vision · 2 Foundation · 3 Architecture · 4 Implementation)
+- **Category:** foundation (vision | foundation | architecture | knowledge | playbooks | research | experiments | decisions | state)
 - **Design status:** CONCEPTUAL | DRAFT | APPROVED | SUPERSEDED
 - **Implementation status:** per CLAUDE.md §8 vocabulary, or "not applicable"
 - **References:** the documents this one depends on, by repo-relative path
@@ -347,8 +347,8 @@ committing to any tooling now.
 4. **Academy source licensing** (carried): what "approved sources" means legally,
    before `jarvis-academy.md` is drafted.
 
-*(Resolved since v2: the Decision Engine is a standalone document — your direction;
-renumbering happens once now — proceeding as recommended unless you object.)*
+_(Resolved since v2: the Decision Engine is a standalone document — your direction;
+renumbering happens once now — proceeding as recommended unless you object.)_
 
 ## 10. The single reconciliation (executed only after your approval)
 

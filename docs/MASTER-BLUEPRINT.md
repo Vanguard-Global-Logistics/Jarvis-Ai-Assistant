@@ -7,7 +7,7 @@
 - **Audience:** humans and AI coding agents. If you are an AI agent: read `CLAUDE.md`
   first, then this map. GitHub is the source of truth, not this map.
 
-> **READ THIS BEFORE THE DIAGRAMS.** This is a map of the *intended* system. Almost
+> **READ THIS BEFORE THE DIAGRAMS.** This is a map of the _intended_ system. Almost
 > nothing on it exists. The only running software is a hardened Electron shell with one
 > IPC channel (`app:get-info`). Every box marked CONCEPTUAL or NOT IMPLEMENTED is a
 > name and an intent — **this map is never authorization to build any of it**
@@ -97,7 +97,7 @@ flowchart TB
 ```
 
 The two rules that override everything: **Jarvis never controls AEGIS. AEGIS can
-restrict Jarvis.** Jarvis may request a *stricter* level, never a looser one. Full
+restrict Jarvis.** Jarvis may request a _stricter_ level, never a looser one. Full
 contract: the immutable handoff, via `07-SECURITY-REFERENCE.md`.
 
 Also chartered, all NOT IMPLEMENTED: BCI Agent, Sophisticated Sips (Amy Lavold —
@@ -111,12 +111,12 @@ mobile, watch, and browser are interfaces to **one governed Jarvis identity**, n
 separate Jarvis systems. All client documents are CONCEPTUAL; nothing below is built or
 authorized. Full charters: `docs/superpowers/specs/2026-07-17-cross-device-architecture.md`.
 
-| Interface | Role | Trust example | Status |
-|---|---|---|---|
-| **Desktop** | Full command center — deep work, approvals, supervision | Personal Dell: full client | Shell exists (PARTIAL); everything else CONCEPTUAL |
-| **Mobile** | Portable Jarvis — voice, capture, approvals, Drive Mode | Only the permissions its workflows need | CONCEPTUAL — permanent commitment, outside the MVP |
-| **Watch** | Glanceable rapid response — never duplicates desktop | Minimal permission set | CONCEPTUAL — after mobile is stable |
-| **Browser** | Zero-install access for managed computers | Managed HP: browser only, visible trust level, no assumed local access | CONCEPTUAL — **gated behind AEGIS v1 (F15 ruling)** |
+| Interface   | Role                                                    | Trust example                                                          | Status                                              |
+| ----------- | ------------------------------------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------- |
+| **Desktop** | Full command center — deep work, approvals, supervision | Personal Dell: full client                                             | Shell exists (PARTIAL); everything else CONCEPTUAL  |
+| **Mobile**  | Portable Jarvis — voice, capture, approvals, Drive Mode | Only the permissions its workflows need                                | CONCEPTUAL — permanent commitment, outside the MVP  |
+| **Watch**   | Glanceable rapid response — never duplicates desktop    | Minimal permission set                                                 | CONCEPTUAL — after mobile is stable                 |
+| **Browser** | Zero-install access for managed computers               | Managed HP: browser only, visible trust level, no assumed local access | CONCEPTUAL — **gated behind AEGIS v1 (F15 ruling)** |
 
 **Continuity Fabric** (CONCEPTUAL — no sync infrastructure authorized) is the
 connective tissue: shared identity, synchronized context, device handoff, pending
@@ -151,17 +151,17 @@ flowchart LR
     S["State docs (docs/ root)<br/>incl. BACKLOG + this map"] -.->|"reality check on everything"| AR
 ```
 
-| Category | One rule that keeps it honest |
-|---|---|
-| `vision/` | Only William authors it; cites nothing below it |
-| `foundation/` | Behaviors only, never system designs; security by pointer only |
-| `architecture/` | Designs only, never code or status claims |
-| `knowledge/` | Only evidence-grade material graduates here, always source-attributed |
-| `playbooks/` | Must be followable as steps; CONCEPTUAL if the system isn't built |
-| `research/` | Date-prefixed, immutable once concluded — new finding, new file |
-| `experiments/` | Append-only, failures included |
-| `DECISIONS/` | Every category points into it; nothing reversed silently |
-| State (docs root) | Describes what IS — never what's intended |
+| Category          | One rule that keeps it honest                                         |
+| ----------------- | --------------------------------------------------------------------- |
+| `vision/`         | Only William authors it; cites nothing below it                       |
+| `foundation/`     | Behaviors only, never system designs; security by pointer only        |
+| `architecture/`   | Designs only, never code or status claims                             |
+| `knowledge/`      | Only evidence-grade material graduates here, always source-attributed |
+| `playbooks/`      | Must be followable as steps; CONCEPTUAL if the system isn't built     |
+| `research/`       | Date-prefixed, immutable once concluded — new finding, new file       |
+| `experiments/`    | Append-only, failures included                                        |
+| `DECISIONS/`      | Every category points into it; nothing reversed silently              |
+| State (docs root) | Describes what IS — never what's intended                             |
 
 ## 5. The decision pipeline — how an idea becomes software
 
@@ -189,16 +189,16 @@ boundaries, other people, or irreversibility goes to William **undecided**.
 
 ## 6. What exists today (2026-07-17) — the honest inventory
 
-| Component | Status |
-|---|---|
-| Electron shell, hardened (contextIsolation, CSP, sandbox) | IMPLEMENTED AND VERIFIED — dev runtime; packaged installer pending |
-| Typed IPC boundary — one channel, `app:get-info` | IMPLEMENTED AND VERIFIED — dev runtime |
-| `packages/config` (env + logging) | IMPLEMENTED, unit-tested |
-| `packages/database` (migration runner) | PARTIAL — zero migrations |
-| Foundation docs 01 · 02 · 07 · 09 | 01 APPROVED; 02, 07, 09 DRAFT |
-| ADRs 0001–0006 · `docs/BACKLOG.md` · this map | Committed documentation |
-| Daily-Use MVP (Stage 1A, ADR 0006) | **Defined — implementation NOT started, awaiting explicit approval** |
-| **Everything else on this map** | **CONCEPTUAL / NOT IMPLEMENTED** |
+| Component                                                 | Status                                                               |
+| --------------------------------------------------------- | -------------------------------------------------------------------- |
+| Electron shell, hardened (contextIsolation, CSP, sandbox) | IMPLEMENTED AND VERIFIED — dev runtime; packaged installer pending   |
+| Typed IPC boundary — one channel, `app:get-info`          | IMPLEMENTED AND VERIFIED — dev runtime                               |
+| `packages/config` (env + logging)                         | IMPLEMENTED, unit-tested                                             |
+| `packages/database` (migration runner)                    | PARTIAL — zero migrations                                            |
+| Foundation docs 01 · 02 · 07 · 09                         | 01 APPROVED; 02, 07, 09 DRAFT                                        |
+| ADRs 0001–0006 · `docs/BACKLOG.md` · this map             | Committed documentation                                              |
+| Daily-Use MVP (Stage 1A, ADR 0006)                        | **Defined — implementation NOT started, awaiting explicit approval** |
+| **Everything else on this map**                           | **CONCEPTUAL / NOT IMPLEMENTED**                                     |
 
 ## 7. How to use this map (for AI coding agents)
 

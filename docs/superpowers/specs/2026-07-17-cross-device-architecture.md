@@ -11,7 +11,7 @@
 interfaces — desktop, mobile, watch, browser — are coordinated views of **one governed
 Jarvis identity and shared platform**. They are not separate Jarvis systems. This is
 permanent product vision (a North Star strategic priority when the North Star is
-authored) and it changes the *shape* of everything built from Stage 1A onward: shared,
+authored) and it changes the _shape_ of everything built from Stage 1A onward: shared,
 client-agnostic contracts first.
 
 ## A — Desktop experience (`docs/architecture/desktop-client.md`, CONCEPTUAL)
@@ -78,14 +78,14 @@ cross-device synchronization, and possible access from the managed HP; those
 capabilities must not be implemented before a minimum enforceable security boundary
 exists.
 
-| Stage | Content | Gate to enter |
-|---|---|---|
-| **1A** | Daily-Use Desktop MVP on the personal Dell (ADR 0006): conversation · Thought Amplifier v1 · explicit local saving. Dev-only safeguards clearly labeled; never claims AEGIS. Shared client-agnostic contracts. | Explicit implementation approval (pending) |
-| **1B** | AEGIS v1 — minimum deterministic foundation: authenticated identity · device registration · device trust classification · permission scopes · session expiration and revocation · approval requirements · audit events · work/personal context separation · denial by default · emergency restriction. Independent from Jarvis; Jarvis may request stricter, never lower. | Stage 1A **accepted**; own definition ADR |
-| **2** | Responsive browser client per §D. | Stage 1B implemented, tested, **explicitly accepted** |
-| **3** | Mobile-responsive experience + Continuity Fabric v1. | Stage 2 accepted |
-| **4** | Native mobile capabilities only where browser capabilities are insufficient. | Stage 3 accepted; per-capability justification |
-| **5** | Watch companion. | Mobile workflows stable |
+| Stage  | Content                                                                                                                                                                                                                                                                                                                                                                   | Gate to enter                                         |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| **1A** | Daily-Use Desktop MVP on the personal Dell (ADR 0006): conversation · Thought Amplifier v1 · explicit local saving. Dev-only safeguards clearly labeled; never claims AEGIS. Shared client-agnostic contracts.                                                                                                                                                            | Explicit implementation approval (pending)            |
+| **1B** | AEGIS v1 — minimum deterministic foundation: authenticated identity · device registration · device trust classification · permission scopes · session expiration and revocation · approval requirements · audit events · work/personal context separation · denial by default · emergency restriction. Independent from Jarvis; Jarvis may request stricter, never lower. | Stage 1A **accepted**; own definition ADR             |
+| **2**  | Responsive browser client per §D.                                                                                                                                                                                                                                                                                                                                         | Stage 1B implemented, tested, **explicitly accepted** |
+| **3**  | Mobile-responsive experience + Continuity Fabric v1.                                                                                                                                                                                                                                                                                                                      | Stage 2 accepted                                      |
+| **4**  | Native mobile capabilities only where browser capabilities are insufficient.                                                                                                                                                                                                                                                                                              | Stage 3 accepted; per-capability justification        |
+| **5**  | Watch companion.                                                                                                                                                                                                                                                                                                                                                          | Mobile workflows stable                               |
 
 The mobile and watch vision is preserved by this document **without expanding the
 current MVP scope** — Stage 1A's exclusions (ADR 0006) are binding.

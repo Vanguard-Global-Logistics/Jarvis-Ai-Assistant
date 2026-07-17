@@ -55,17 +55,17 @@ in this repository.
 ## The evidence ladder
 
 Six stages, defined as an explicit extension of the Forge five-fact model
-(*claimed ≠ committed ≠ tested ≠ previewed ≠ approved*), so the two vocabularies can
+(_claimed ≠ committed ≠ tested ≠ previewed ≠ approved_), so the two vocabularies can
 never drift — this table is the only place the mapping lives:
 
-| Doctrine stage | Forge fact | What it proves |
-|---|---|---|
-| **drafted** | claimed | The artifact exists. Nothing else is proven. |
-| **committed** | committed | Recorded in git on the branch. |
-| **built** | *(new stage)* | The artifact compiles, launches, and runs. Green CI alone has never proven this — twice this repository had all checks green on an app that could not run (`docs/KNOWN-LIMITATIONS.md` §7). |
-| **tested** | tested | Automated checks pass, including runtime probes, not only static ones. |
-| **previewed** | previewed | A human observed it working. |
-| **accepted** | approved | William explicitly accepted it against the milestone's written definition of done. |
+| Doctrine stage | Forge fact    | What it proves                                                                                                                                                                              |
+| -------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **drafted**    | claimed       | The artifact exists. Nothing else is proven.                                                                                                                                                |
+| **committed**  | committed     | Recorded in git on the branch.                                                                                                                                                              |
+| **built**      | _(new stage)_ | The artifact compiles, launches, and runs. Green CI alone has never proven this — twice this repository had all checks green on an app that could not run (`docs/KNOWN-LIMITATIONS.md` §7). |
+| **tested**     | tested        | Automated checks pass, including runtime probes, not only static ones.                                                                                                                      |
+| **previewed**  | previewed     | A human observed it working.                                                                                                                                                                |
+| **accepted**   | approved      | William explicitly accepted it against the milestone's written definition of done.                                                                                                          |
 
 A claim of completion must name the highest stage actually reached — and no higher.
 
