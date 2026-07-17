@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@jarvis/contracts": "*"
+    "@jarvis/contracts": "*",
+    "motion": "^12.42.2"
   },
   "peerDependencies": {
     "react": "^19.0.0",
