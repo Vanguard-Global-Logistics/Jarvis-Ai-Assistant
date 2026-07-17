@@ -7,8 +7,10 @@
 **Session:** 2026-07-17 (third resume; state reconstructed from the repository, the
 ledger, and `git log` — the recovery clues in the resume instruction were stale, and the
 repository showed Checkpoint 1 already complete)
-**Branch:** `feature/jarvis-phase-1-foundation` (ahead of origin — pushing requires
-William's approval and has not happened)
+**Branch:** `feature/jarvis-phase-1-foundation` — **pushed to origin 2026-07-17 with
+William's explicit approval** (`31c742b..50e987f`); CI green on the pushed head
+(Archived handoff integrity ✓, Verify ✓, Runtime probe ✓). Not merged to main; not
+deployed.
 
 ---
 
@@ -81,9 +83,15 @@ William's approval and has not happened)
 
 ## Blockers / required approvals
 
-- **Push to origin** — local commits await William's approval to push.
-- **E2 (Orb + primitives + ambient Shell)** — requires William's explicit go; first
-  visual build must pass his screenshot review before the experience advances.
+- **E2 implementation awaits William's approval of the revised E2 plan.** The approved
+  motion benchmark arrived 2026-07-17 and is preserved at
+  `reference/design/approved-motion/jarvis-approved-motion-benchmark-v1.mp4`
+  (SHA-256 `d73229d9…f039`; it first landed inside the immutable
+  `reference/design-handoff/` archive and was relocated byte-identically). It has been
+  analyzed: extracted references in `reference/design/approved-motion/extracted/`,
+  full analysis in `docs/design/JARVIS-MOTION-BENCHMARK.md`, and the 13-point E2
+  architecture review was presented to William in-session. The first visual build
+  still requires his screenshot review before the experience advances.
 - **Checkpoint 2 (IPC channels)** — no plan exists; writing it is a session-fixed
   exclusion. No IPC work until planned and approved (ADR 0002).
 - **Approved motion benchmark video** — not yet uploaded. Destination when William
@@ -103,10 +111,10 @@ npm run dev:desktop     # Electron shell (Linux needs scripts/install-electron-r
 
 ## Next three recommended actions
 
-1. Present the branch to William: push approval, the E2 go-ahead (screenshot gate), and
-   the Checkpoint 2 plan proposal (IPC channels + conversation UI inside the Shell).
-2. On the E2 go: William uploads the approved motion benchmark to
-   `reference/design/approved-motion/`, then E2 begins — Orb + primitives + ambient
-   Shell behind the existing runtime probe.
+1. William reviews the benchmark analysis and the revised E2 plan proposal; on his
+   approval, E2 begins — Orb + primitives + ambient Shell behind the existing runtime
+   probe, screenshot gate before anything further.
+2. Push approval for the local commits made after the approved push (benchmark
+   preservation, extracted references, benchmark analysis doc, this handoff).
 3. Write the Checkpoint 2 plan (a new session task requiring its own approval),
    carrying the three C2 review notes above into its Global Constraints.
