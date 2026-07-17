@@ -1,6 +1,9 @@
 # Jarvis Experience Prototype — Workstream Plan
 
-- **Status:** PROPOSED — awaiting William's approval. **No experience code before it.**
+- **Status:** APPROVED — William's 2026-07-17 autonomous-session instruction approved
+  the workstream direction (recorded in the session ledger alongside commit `7465aa5`
+  and reconfirmed in the 2026-07-17 resume instruction). Header updated 2026-07-17;
+  the E2 screenshot gate and all per-checkpoint approvals below remain binding.
 - **Workstream:** JARVIS EXPERIENCE PROTOTYPE — the second Stage 1A workstream,
   parallel to the brain (Checkpoints 1–4). Governance note below.
 - **Prime directive:** the experience layer never compromises the architecture. It
