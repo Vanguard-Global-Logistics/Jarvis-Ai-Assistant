@@ -1,10 +1,9 @@
 /**
  * @jarvis/jarvis-core — the Jarvis orchestration runtime.
  *
- * STATUS: NOT IMPLEMENTED.
- *
- * No orchestration, no personality, no memory, no model provider. This package
- * is a boundary and a name, nothing more.
+ * STATUS: PARTIAL — model provider abstraction and Thought Amplifier v1 logic
+ * implemented; orchestration, personality, memory, and sub-agent coordination
+ * NOT IMPLEMENTED.
  *
  * Why it exists as its own workspace rather than living in apps/desktop: the
  * orchestrator must run isolated from the renderer (CURRENT-STATE-AUDIT.md §16).
@@ -16,8 +15,6 @@
  *     speaking/vision/delegating/aegisReview)
  *   - The personality pipeline: facts → validation → risk → permitted level →
  *     optional humor → clarity check
- *   - The provider-neutral model abstraction, defaulting to a deterministic mock
- *     provider so Phase 1 runs with no API key
  *   - Sub-agent coordination
  *
  * Two rules that bind this package specifically:
@@ -28,4 +25,8 @@
  *     exists it will consume it only through @jarvis/contracts.
  */
 
-export {};
+export { AMPLIFIER_SYSTEM_PROMPT, buildAmplifierUserMessage } from './amplifier/prompt.js';
+export { AnthropicProvider, DEFAULT_MODEL, ModelRefusalError } from './model/anthropic-provider.js';
+export { createProvider } from './model/create-provider.js';
+export { MockProvider } from './model/mock-provider.js';
+export type { JarvisModelProvider } from './model/provider.js';
