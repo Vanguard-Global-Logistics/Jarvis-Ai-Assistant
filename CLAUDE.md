@@ -35,7 +35,14 @@ Repository: `github.com/Vanguard-Global-Logistics/Jarvis-Ai-Assistant`.
   5. `docs/IPC-SURFACE.md` — every channel crossing the renderer/main trust boundary.
   6. `docs/WINDOWS-ACCEPTANCE-TEST.md` — the manual runtime gate. **Passed on Windows development runtime on 2026-07-16.**
   7. `docs/DECISIONS/` — ADRs. A decision recorded here does not get silently reversed.
-  8. This file.
+  8. `docs/vision/` → `docs/foundation/` → `docs/architecture/` — the layered document
+     library (ADR 0005), authoritative for **intent and philosophy** in that internal
+     order: how Jarvis should think, learn, and create. On any conflict about security
+     or boundaries, items 1–7 win; on current state, the audit and the gap list win.
+     Every subsystem the library names is CONCEPTUAL, and no document in it — even an
+     APPROVED one — authorizes implementation. Scope and completion are governed by
+     `docs/foundation/09-COMPLETION-DOCTRINE.md`; priorities live in `docs/BACKLOG.md`.
+  9. This file.
 - **The Phase 1 Foundation milestone is complete; Phase 1 is not.** ADR 0004 closes the
   Foundation milestone at the typed IPC/Desktop foundation. The AEGIS state engine, Memory
   CRUD, and Jarvis orchestration are **separate later milestones**, each needing its own
@@ -177,7 +184,8 @@ packages/contracts     Zod schemas + shared types                  PARTIAL — I
 packages/ui            Design-system components                    NOT IMPLEMENTED — visual work deferred
 packages/config        Env validation + structured logging         IMPLEMENTED, unit-tested
 packages/database      SQLite connection + migration runner        PARTIAL — runner works, zero migrations
-docs/DECISIONS/        ADRs                                        0001–0003
+docs/DECISIONS/        ADRs                                        0001–0006
+docs/foundation/       Layer 2 foundation documents (ADR 0005)     PARTIAL — 01 APPROVED; 02, 07, 09 DRAFT; rest CONCEPTUAL
 ```
 
 An empty package is a deliberate state, not an unfinished one. `services/aegis` in
@@ -371,6 +379,28 @@ Three constraints that already apply to them, inherited from the rules above:
 - **Sophisticated Sips serves a second person** (Amy Lavold). Every rule in this repo
   currently assumes William is the sole operator and no multi-user auth is in scope. That
   assumption does not survive contact with this module; the access model is **undefined**.
+
+### Conceptual systems from the document library
+
+The layered document library (ADR 0005) names further concepts: Thought Amplifier,
+Vision Translator, Idea Forge, Decision Engine, the Chief Architect review process,
+Agent Factory, the Executive Council pattern, Venture Studio, Jarvis Academy, Mentor
+DNA, Evolution Engine, Innovation Lab, Living Universe, and Continuity Fabric. **All
+are design-status CONCEPTUAL and implementation-status NOT IMPLEMENTED.** None is
+promoted into the official module tables above — promotion is a separate decision
+William makes per concept. A library document existing, even APPROVED, is never
+authorization to build its subsystem.
+
+Standing rulings recorded in ADR 0005: Jarvis is an **anywhere-accessible,
+multi-client platform** — desktop, mobile, watch, and browser are coordinated
+interfaces to one governed Jarvis identity, staged per `docs/BACKLOG.md`, with
+**AEGIS v1 required before any browser-accessible surface** (the F15 ruling).
+**Evolution is not a fifth layer** — it is a governed lifecycle across the four
+layers. The **Executive Council** is a reusable advisory pattern inside Agent Factory
+and Venture Studio, not a permanent always-running group: agents are instantiated only
+when needed, with the smallest capable team. The single active milestone is the
+Daily-Use Desktop MVP (ADR 0006); its implementation has not started and requires its
+own explicit approval.
 
 ---
 
