@@ -141,6 +141,37 @@ export default tseslint.config(
     },
   },
 
+  // --- packages/ui is props-in/pixels-out and must stay re-hostable in any
+  //     client (desktop, mobile, watch, browser). It never talks to Electron,
+  //     Node, the database, or the jarvis-core runtime directly — data reaches
+  //     it only through typed contracts (plan
+  //     `docs/superpowers/plans/2026-07-17-experience-prototype-plan.md` §2). ---
+  {
+    files: ['packages/ui/**/*.ts', 'packages/ui/**/*.tsx'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                'electron',
+                'electron/*',
+                'node:*',
+                '@jarvis/database',
+                '**/packages/database/src/**',
+                '@jarvis/jarvis-core',
+                '**/services/jarvis-core/src/**',
+              ],
+              message:
+                'packages/ui is props-in/pixels-out and must stay re-hostable in any client. It never imports Electron, Node, the database, or the jarvis-core runtime directly — data reaches it only through typed contracts (@jarvis/contracts). See CLAUDE.md §2 and the experience prototype plan §2.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
   // Plain JS — this config and the build scripts. Not part of a typed project, so
   // type-aware rules can only see `any` here and report noise rather than defects.
   // (`scripts/*.mjs` carry `// @ts-check` + JSDoc instead, which is checked by the
