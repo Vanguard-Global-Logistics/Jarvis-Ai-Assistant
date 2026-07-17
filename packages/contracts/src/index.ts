@@ -72,5 +72,5 @@ export type {
   Venture,
 } from './experience/ventures.js';
 
-export { DemoPanelSchema, DemoScriptSchema, DemoSceneSchema } from './experience/demo.js';
+export { DemoPanelSchema, DemoSceneSchema, DemoScriptSchema } from './experience/demo.js';
 export type { DemoPanel, DemoScene, DemoScript } from './experience/demo.js';

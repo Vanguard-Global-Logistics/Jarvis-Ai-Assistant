@@ -74,11 +74,16 @@ and no feature schema.
 `migrations` in `@jarvis/database` is an empty array. No tables exist for memory,
 projects, tasks, or the audit log. Those are feature design work and are not approved.
 
-## 6. Model provider abstraction
+## 6. The model provider abstraction exists, but is not wired to the app
 
 **Status: PARTIAL — implemented and unit-tested, not wired to the app.**
 
-The provider-neutral model abstraction with a deterministic mock provider (MockProvider) and real Anthropic provider (AnthropicProvider) now exists in `services/jarvis-core` alongside the amplifier prompt builder. Both are covered by unit tests. The provider framework is **not** wired to the desktop app (integration is Checkpoint 2). No API key is required to run or verify the foundation.
+The provider-neutral model abstraction named in `CURRENT-STATE-AUDIT.md` §20 now exists: a
+deterministic mock provider (`MockProvider`) and a real Anthropic provider
+(`AnthropicProvider`) live in `services/jarvis-core` alongside the amplifier prompt
+builder. Both are covered by unit tests. The provider framework is **not** wired to the
+desktop app (integration is Checkpoint 2). No API key is required to run or verify the
+foundation.
 
 ## 7. The shell runs and is observed on Linux and Windows development runtime
 

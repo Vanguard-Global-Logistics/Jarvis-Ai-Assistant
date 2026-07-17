@@ -166,6 +166,7 @@ export default tseslint.config(
               message:
                 'packages/ui is props-in/pixels-out and must stay re-hostable in any client. It never imports Electron, Node, the database, or the jarvis-core runtime directly — data reaches it only through typed contracts (@jarvis/contracts). See CLAUDE.md §2 and the experience prototype plan §2.',
             },
+            AEGIS_INTERNALS.patterns[0],
           ],
         },
       ],

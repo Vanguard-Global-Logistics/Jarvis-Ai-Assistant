@@ -23,6 +23,14 @@ describe('colors', () => {
     expect(surface.glass).toBe('rgba(255,255,255,0.03)');
     expect(surface.hairline).toBe('rgba(255,255,255,0.08)');
   });
+
+  it('pins every approved text hex', () => {
+    expect(text.heading).toBe('#f2f8ff');
+    expect(text.body).toBe('#dce8f0');
+    expect(text.secondary).toBe('#aebfcd');
+    expect(text.secondaryDim).toBe('#8fa2b3');
+    expect(text.faint).toBe('#5f7284');
+  });
 });
 
 describe('typography', () => {
