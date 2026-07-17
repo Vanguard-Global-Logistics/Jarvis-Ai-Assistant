@@ -53,7 +53,10 @@ export default tseslint.config(
     rules: {
       // Accuracy rules (CLAUDE.md §8): an unfinished path must fail loudly,
       // never return a plausible value that reads as working.
-      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
       '@typescript-eslint/explicit-module-boundary-types': 'error',
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-non-null-assertion': 'error',
