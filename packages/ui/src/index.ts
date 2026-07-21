@@ -1,7 +1,7 @@
 /**
  * @jarvis/ui — shared design-system tokens and React components.
  *
- * STATUS: PARTIAL — tokens, a11y utilities, and primitives; Orb and Shell in
+ * STATUS: PARTIAL — tokens, a11y, primitives, and the Orb; Shell in
  * progress (E2). Tokens are pure TypeScript modules: colors, typography, and
  * the motion grammar for the eleven orb states. The a11y utilities and
  * primitives are the first React in this package — props in, pixels out,
@@ -34,3 +34,8 @@ export type { GlassPanelProps } from './primitives/GlassPanel.js';
 export { SectionLabel } from './primitives/SectionLabel.js';
 export { HexBadge } from './primitives/HexBadge.js';
 export type { HexBadgeProps } from './primitives/HexBadge.js';
+
+export { Orb } from './orb/Orb.js';
+export type { OrbProps } from './orb/Orb.js';
+export { LUMINOUS_WHITE, orbTiming, orbVisualConfig, toBezier } from './orb/orb-visuals.js';
+export type { OrbVisualConfig } from './orb/orb-visuals.js';
