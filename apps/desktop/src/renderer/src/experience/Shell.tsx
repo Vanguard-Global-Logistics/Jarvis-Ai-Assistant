@@ -73,7 +73,10 @@ export function Shell({ devStateSwitcher = import.meta.env.DEV }: ShellProps): J
   // (wordmark/footer move into the dev diagnostics drawer). Unreachable in
   // production builds — it lives behind the dev switcher flag.
   const [rendererV2, setRendererV2] = useState(false);
-  const [dormantScene, setDormantScene] = useState(false);
+  const [studyPhase, setStudyPhase] = useState<'dormant' | 'gathering' | 'ignition' | null>(null);
+  // The renderer ACTUALLY live, reported by the V2 component itself — the
+  // inspector must never show "V2" while the honest fallback is rendering.
+  const [activeRenderer, setActiveRenderer] = useState<string>('legacy');
   const cinematic = devStateSwitcher && rendererV2;
 
   useEffect(() => {
@@ -165,7 +168,12 @@ export function Shell({ devStateSwitcher = import.meta.env.DEV }: ShellProps): J
         }}
       >
         {cinematic ? (
-          <OrbStudyV2 state={orbState} dormant={dormantScene} sizePx={460} />
+          <OrbStudyV2
+            state={orbState}
+            studyPhase={studyPhase}
+            sizePx={460}
+            onRendererResolved={setActiveRenderer}
+          />
         ) : (
           <Orb state={orbState} sizePx={420} />
         )}
@@ -244,30 +252,44 @@ export function Shell({ devStateSwitcher = import.meta.env.DEV }: ShellProps): J
               >
                 renderer V2 study {rendererV2 ? 'ON' : 'off'}
               </button>
-              {rendererV2 && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDormantScene((on) => !on);
-                  }}
-                  aria-pressed={dormantScene}
-                  style={{
-                    minHeight: 30,
-                    padding: '5px 10px',
-                    textAlign: 'right',
-                    fontFamily: fontFamily.mono,
-                    fontSize: 11,
-                    letterSpacing: letterSpacing.label,
-                    color: dormantScene ? background.fieldTop : text.secondaryDim,
-                    background: dormantScene ? accent.jarvisBlue : 'transparent',
-                    border: '1px solid transparent',
-                    borderRadius: 6,
-                    cursor: 'pointer',
-                  }}
-                >
-                  dormant scene
-                </button>
-              )}
+              <span
+                style={{
+                  fontFamily: fontFamily.mono,
+                  fontSize: 9,
+                  letterSpacing: letterSpacing.label,
+                  color: accent.claudePurple,
+                  padding: '2px 6px',
+                  textAlign: 'right',
+                }}
+              >
+                ACTIVE RENDERER: {rendererV2 ? activeRenderer : 'legacy'}
+              </span>
+              {rendererV2 &&
+                (['dormant', 'gathering', 'ignition'] as const).map((phase) => (
+                  <button
+                    key={phase}
+                    type="button"
+                    onClick={() => {
+                      setStudyPhase((current) => (current === phase ? null : phase));
+                    }}
+                    aria-pressed={studyPhase === phase}
+                    style={{
+                      minHeight: 30,
+                      padding: '5px 10px',
+                      textAlign: 'right',
+                      fontFamily: fontFamily.mono,
+                      fontSize: 11,
+                      letterSpacing: letterSpacing.label,
+                      color: studyPhase === phase ? background.fieldTop : text.secondaryDim,
+                      background: studyPhase === phase ? accent.jarvisBlue : 'transparent',
+                      border: '1px solid transparent',
+                      borderRadius: 6,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    study: {phase}
+                  </button>
+                ))}
               {cinematic && (
                 <span
                   style={{
@@ -297,7 +319,7 @@ export function Shell({ devStateSwitcher = import.meta.env.DEV }: ShellProps): J
                   type="button"
                   onClick={() => {
                     setOrbState(state);
-                    setDormantScene(false);
+                    setStudyPhase(null);
                   }}
                   aria-pressed={state === orbState}
                   style={{

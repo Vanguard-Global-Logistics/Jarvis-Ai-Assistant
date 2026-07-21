@@ -19,6 +19,15 @@ const env = parseEnv();
 
 const RENDERER_DEV_URL = process.env.ELECTRON_RENDERER_URL ?? null;
 
+// DEV-ONLY: allow Chromium's software WebGL (SwiftShader) so the V2 renderer
+// study can run in headless/GPU-less environments (Codespaces, CI probes).
+// Chromium 139+ disables software WebGL unless this switch is present. Never
+// applied to packaged builds — real hardware GL is expected there, and a
+// packaged app must not carry an "unsafe" rendering flag.
+if (!app.isPackaged) {
+  app.commandLine.appendSwitch('enable-unsafe-swiftshader');
+}
+
 /**
  * The CSP nonce Vite used to tag its injected dev scripts, or `null` when the
  * renderer is built HTML and no nonce should exist.
