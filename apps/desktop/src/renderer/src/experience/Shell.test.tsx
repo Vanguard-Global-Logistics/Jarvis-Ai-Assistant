@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AppInfo } from '@jarvis/contracts';
 import { ORB_STATES } from '@jarvis/contracts';
+import { orbTiming } from '@jarvis/ui';
 import { Shell } from './Shell.js';
 
 /** Real-shaped fixture for the one channel; labeled values, no mock ambiguity. */
@@ -73,12 +74,25 @@ describe('Shell', () => {
     expect(await screen.findByText(/electron 43\.0\.0-test/)).toBeTruthy();
   });
 
-  it('surfaces a missing preload bridge instead of rendering a plausible blank', async () => {
+  it('handles a missing preload bridge gracefully: neutral text, no alert, no fake bridge', async () => {
     stubMatchMedia();
-    // No jarvis stub: window.jarvis is undefined.
+    // No jarvis stub: window.jarvis is undefined — the browser-preview case.
+    render(<Shell devStateSwitcher={false} />);
+    expect(await screen.findByText(/PRELOAD BRIDGE UNAVAILABLE/)).toBeTruthy();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('surfaces a present-but-failing bridge visibly and compactly', async () => {
+    stubMatchMedia();
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.stubGlobal('jarvis', {
+      getAppInfo: vi.fn().mockRejectedValue(new Error('ipc validation failed')),
+    });
     render(<Shell devStateSwitcher={false} />);
     expect(await screen.findByRole('alert')).toBeTruthy();
-    expect(screen.getByRole('alert').textContent).toContain('window.jarvis is undefined');
+    expect(screen.getByRole('alert').textContent).toContain('HOST FACTS UNAVAILABLE');
+    expect(consoleError).toHaveBeenCalled();
+    consoleError.mockRestore();
   });
 
   describe('dev-only state switcher', () => {
@@ -90,12 +104,23 @@ describe('Shell', () => {
       expect(screen.queryAllByRole('button')).toHaveLength(0);
     });
 
-    it('offers all eleven states, labeled MOCK, with aegisLockdown marked demo-only', () => {
+    it('is docked and collapsed by default: only the toggle shows', () => {
       stubMatchMedia();
       stubBridge();
       render(<Shell devStateSwitcher={true} />);
-      expect(screen.getByText(/DEV · STATE SWITCHER · MOCK/)).toBeTruthy();
-      expect(screen.getAllByRole('button')).toHaveLength(ORB_STATES.length);
+      const toggle = screen.getByRole('button', { name: /DEV · STATES/ });
+      expect(toggle.getAttribute('aria-expanded')).toBe('false');
+      expect(screen.queryAllByRole('button')).toHaveLength(1);
+    });
+
+    it('expands to all eleven states, labeled MOCK, aegisLockdown marked demo-only', () => {
+      stubMatchMedia();
+      stubBridge();
+      render(<Shell devStateSwitcher={true} />);
+      fireEvent.click(screen.getByRole('button', { name: /DEV · STATES/ }));
+      expect(screen.getByText(/MOCK — drives the Orb visual only/)).toBeTruthy();
+      // The eleven state buttons plus the toggle itself.
+      expect(screen.getAllByRole('button')).toHaveLength(ORB_STATES.length + 1);
       expect(screen.getByRole('button', { name: 'aegisLockdown (demo-only)' })).toBeTruthy();
     });
 
@@ -103,11 +128,30 @@ describe('Shell', () => {
       stubMatchMedia();
       stubBridge();
       render(<Shell devStateSwitcher={true} />);
+      fireEvent.click(screen.getByRole('button', { name: /DEV · STATES/ }));
       fireEvent.click(screen.getByRole('button', { name: 'listening' }));
       expect(screen.getByRole('img').getAttribute('data-orb-state')).toBe('listening');
       expect(screen.getByRole('button', { name: 'listening' }).getAttribute('aria-pressed')).toBe(
         'true',
       );
+    });
+
+    it('wake settles into idle after the choreography completes', () => {
+      vi.useFakeTimers();
+      try {
+        stubMatchMedia();
+        stubBridge();
+        render(<Shell devStateSwitcher={true} />);
+        fireEvent.click(screen.getByRole('button', { name: /DEV · STATES/ }));
+        fireEvent.click(screen.getByRole('button', { name: 'wake' }));
+        expect(screen.getByRole('img').getAttribute('data-orb-state')).toBe('wake');
+        act(() => {
+          vi.advanceTimersByTime(orbTiming.wakeSequenceMs + 500);
+        });
+        expect(screen.getByRole('img').getAttribute('data-orb-state')).toBe('idle');
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 });

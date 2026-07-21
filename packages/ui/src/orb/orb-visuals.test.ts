@@ -64,10 +64,12 @@ describe('orbVisualConfig', () => {
     expect(config.pulse).toBe('reactive');
   });
 
-  it('wake: one-shot bloom, 18000ms spin', () => {
+  it('wake: one-shot bloom, 18000ms spin, converge particles (energy gathering)', () => {
     const config = orbVisualConfig('wake', false);
     expect(config.bloom).toBe('wake');
     expect(config.ringSpinPeriodMs).toBe(18000);
+    expect(config.particleMode).toBe('converge');
+    expect(config.nucleusIntensity).toBe(1);
   });
 
   it('success: one-shot success bloom', () => {
@@ -83,12 +85,40 @@ describe('orbVisualConfig', () => {
     expect(config.coreOpacity).toBe(0.55);
   });
 
-  it('aegisLockdown: coreScale 0.5, coreOpacity 0.35, particles off', () => {
+  it('aegisLockdown: coreScale 0.5, coreOpacity 0.35, particles off, containment collapsed', () => {
     const config = orbVisualConfig('aegisLockdown', false);
     expect(config.coreScale).toBe(0.5);
     expect(config.coreOpacity).toBe(0.35);
     expect(config.particleMode).toBe('off');
     expect(config.ringSpinPeriodMs).toBe(Infinity);
+    expect(config.containmentScale).toBe(0.8);
+    expect(config.ringOpacity).toBe(0.18);
+    expect(config.nucleusIntensity).toBe(0.08);
+  });
+
+  it('containment compresses in stages: steady 1 → warning 0.985 → critical 0.955', () => {
+    expect(orbVisualConfig('idle', false).containmentScale).toBe(1);
+    expect(orbVisualConfig('warning', false).containmentScale).toBe(0.985);
+    expect(orbVisualConfig('critical', false).containmentScale).toBe(0.955);
+  });
+
+  it('vibration is critical-only, and never survives reduced motion', () => {
+    for (const state of ORB_STATES) {
+      expect(orbVisualConfig(state, false).vibration).toBe(state === 'critical');
+      expect(orbVisualConfig(state, true).vibration).toBe(false);
+    }
+  });
+
+  it('nucleus intensity and ring opacity carry state structure statically (reduced-safe)', () => {
+    expect(orbVisualConfig('offline', false).nucleusIntensity).toBe(0.15);
+    expect(orbVisualConfig('offline', false).ringOpacity).toBe(0.3);
+    for (const state of ORB_STATES) {
+      const moving = orbVisualConfig(state, false);
+      const still = orbVisualConfig(state, true);
+      expect(still.nucleusIntensity).toBe(moving.nucleusIntensity);
+      expect(still.containmentScale).toBe(moving.containmentScale);
+      expect(still.ringOpacity).toBe(moving.ringOpacity);
+    }
   });
 
   it('mirrors orbStateMotion[state].loops for every state, motion and reduced alike', () => {
@@ -130,6 +160,8 @@ describe('orbTiming', () => {
     expect(orbTiming.rhythmicPulseMs).toBe(1200);
     expect(orbTiming.alarmPulseMs).toBe(900);
     expect(orbTiming.reactiveCycleMs).toBe(2400);
+    expect(orbTiming.wakeSequenceMs).toBe(2800);
+    expect(orbTiming.nucleusSwirlMs).toBe(21000);
   });
 });
 

@@ -43,6 +43,14 @@ export const orbTiming = {
   alarmPulseMs: 900,
   /** speaking reactive-pulse keyframe cycle (deterministic multi-sine sampling window). */
   reactiveCycleMs: 2400,
+  /**
+   * Total wake choreography length (benchmark §2 moments 1–3 compressed to app
+   * scale): dormant spark → energy gathering → containment alignment → core
+   * ignition → dimensional expansion → settle. Four `duration.sceneMs` beats.
+   */
+  wakeSequenceMs: 2800,
+  /** Nucleus internal-swirl rotation period — slow, ambient-class motion. */
+  nucleusSwirlMs: 21000,
   /** idle breathing amplitude (max scale of the breathing loop). */
   idleBreathScale: 1.02,
   /** warning breathing amplitude — slightly tighter than idle. */
@@ -168,6 +176,22 @@ export interface OrbVisualConfig {
   desaturate: boolean;
   /** From `orbStateMotion[state].loops`. */
   loops: boolean;
+  /**
+   * Brightness of the internal energy nucleus, 0..1 — the "stored
+   * intelligence" glow inside the dark mechanical heart (benchmark §4: the
+   * brightness lives around and within the core's shells, never a flat fill).
+   */
+  nucleusIntensity: number;
+  /**
+   * Scale multiplier for the containment structure (gimbal shells + arcs),
+   * separate from `coreScale`: shells compress under threat states and
+   * collapse for aegisLockdown ("rings tighten" — token grammar for critical).
+   */
+  containmentScale: number;
+  /** Overall luminous-containment-ring opacity — its dominance is state-driven. */
+  ringOpacity: number;
+  /** Controlled micro-vibration of the containment (critical instability only). */
+  vibration: boolean;
 }
 
 /** The motion-language half of the per-state table (accent/loops come from `orbStateMotion`). */
@@ -182,10 +206,16 @@ interface StateVisualBase {
   coreOpacity: number;
   coreScale: number;
   desaturate: boolean;
+  nucleusIntensity: number;
+  containmentScale: number;
+  ringOpacity: number;
+  vibration: boolean;
 }
 
 const NO_BREATH = { breathScale: 1, breathPeriodMs: 0 } as const;
 const NORMAL_CORE = { coreOpacity: 1, coreScale: 1 } as const;
+/** Steady containment: no compression, no vibration, standard ring presence. */
+const STEADY_CONTAINMENT = { containmentScale: 1, ringOpacity: 0.75, vibration: false } as const;
 
 /** Task brief table, verbatim: state → { breath, spin, counterRotate, pulse, bloom, particles, core }. */
 const STATE_VISUALS: Record<OrbState, StateVisualBase> = {
@@ -198,6 +228,8 @@ const STATE_VISUALS: Record<OrbState, StateVisualBase> = {
     bloom: 'none',
     particleMode: 'halo',
     ...NORMAL_CORE,
+    ...STEADY_CONTAINMENT,
+    nucleusIntensity: 0.55,
     desaturate: false,
   },
   wake: {
@@ -206,8 +238,13 @@ const STATE_VISUALS: Record<OrbState, StateVisualBase> = {
     counterRotate: false,
     pulse: 'none',
     bloom: 'wake',
-    particleMode: 'halo',
+    // Energy gathering: the field is drawn INTO the intelligence during wake.
+    particleMode: 'converge',
     ...NORMAL_CORE,
+    containmentScale: 1,
+    ringOpacity: 0.9,
+    vibration: false,
+    nucleusIntensity: 1,
     desaturate: false,
   },
   listening: {
@@ -218,6 +255,10 @@ const STATE_VISUALS: Record<OrbState, StateVisualBase> = {
     bloom: 'none',
     particleMode: 'halo',
     ...NORMAL_CORE,
+    containmentScale: 1,
+    ringOpacity: 0.85,
+    vibration: false,
+    nucleusIntensity: 0.7,
     desaturate: false,
   },
   thinking: {
@@ -228,6 +269,10 @@ const STATE_VISUALS: Record<OrbState, StateVisualBase> = {
     bloom: 'none',
     particleMode: 'halo',
     ...NORMAL_CORE,
+    containmentScale: 1,
+    ringOpacity: 0.8,
+    vibration: false,
+    nucleusIntensity: 0.75,
     desaturate: false,
   },
   reasoning: {
@@ -238,6 +283,10 @@ const STATE_VISUALS: Record<OrbState, StateVisualBase> = {
     bloom: 'none',
     particleMode: 'converge',
     ...NORMAL_CORE,
+    containmentScale: 1,
+    ringOpacity: 0.8,
+    vibration: false,
+    nucleusIntensity: 0.85,
     desaturate: false,
   },
   speaking: {
@@ -248,6 +297,10 @@ const STATE_VISUALS: Record<OrbState, StateVisualBase> = {
     bloom: 'none',
     particleMode: 'halo',
     ...NORMAL_CORE,
+    containmentScale: 1,
+    ringOpacity: 0.85,
+    vibration: false,
+    nucleusIntensity: 0.8,
     desaturate: false,
   },
   success: {
@@ -258,6 +311,10 @@ const STATE_VISUALS: Record<OrbState, StateVisualBase> = {
     bloom: 'success',
     particleMode: 'halo',
     ...NORMAL_CORE,
+    containmentScale: 1,
+    ringOpacity: 0.9,
+    vibration: false,
+    nucleusIntensity: 0.9,
     desaturate: false,
   },
   warning: {
@@ -269,6 +326,11 @@ const STATE_VISUALS: Record<OrbState, StateVisualBase> = {
     bloom: 'none',
     particleMode: 'halo',
     ...NORMAL_CORE,
+    // First stage of compression: the containment tightens perceptibly.
+    containmentScale: 0.985,
+    ringOpacity: 0.7,
+    vibration: false,
+    nucleusIntensity: 0.6,
     desaturate: false,
   },
   critical: {
@@ -280,6 +342,11 @@ const STATE_VISUALS: Record<OrbState, StateVisualBase> = {
     particleMode: 'halo',
     coreOpacity: 1,
     coreScale: orbTiming.criticalCoreScale,
+    // "Rings tighten" + controlled instability (token grammar for critical).
+    containmentScale: 0.955,
+    ringOpacity: 0.9,
+    vibration: true,
+    nucleusIntensity: 0.9,
     desaturate: false,
   },
   offline: {
@@ -291,6 +358,10 @@ const STATE_VISUALS: Record<OrbState, StateVisualBase> = {
     particleMode: 'still',
     coreOpacity: orbTiming.offlineCoreOpacity,
     coreScale: 1,
+    containmentScale: 1,
+    ringOpacity: 0.3,
+    vibration: false,
+    nucleusIntensity: 0.15,
     desaturate: true,
   },
   aegisLockdown: {
@@ -302,6 +373,11 @@ const STATE_VISUALS: Record<OrbState, StateVisualBase> = {
     particleMode: 'off',
     coreOpacity: orbTiming.aegisLockdownCoreOpacity,
     coreScale: orbTiming.aegisLockdownCoreScale,
+    // The containment collapses toward the locked core (demo-only state).
+    containmentScale: 0.8,
+    ringOpacity: 0.18,
+    vibration: false,
+    nucleusIntensity: 0.08,
     desaturate: false,
   },
 };
@@ -334,9 +410,15 @@ export function orbVisualConfig(state: OrbState, reducedMotion: boolean): OrbVis
       particleMode: base.particleMode,
       desaturate: base.desaturate,
       loops: motion.loops,
+      nucleusIntensity: base.nucleusIntensity,
+      containmentScale: base.containmentScale,
+      ringOpacity: base.ringOpacity,
+      vibration: base.vibration,
     };
   }
 
+  // Static identity survives: intensity, compression, and ring presence are
+  // static properties, so they carry the state's structure without motion.
   return {
     accentColor: motion.reducedMotion.accentColor,
     coreOpacity: base.coreOpacity,
@@ -350,5 +432,9 @@ export function orbVisualConfig(state: OrbState, reducedMotion: boolean): OrbVis
     particleMode: base.particleMode === 'off' ? 'off' : 'still',
     desaturate: base.desaturate,
     loops: motion.loops,
+    nucleusIntensity: base.nucleusIntensity,
+    containmentScale: base.containmentScale,
+    ringOpacity: base.ringOpacity,
+    vibration: false,
   };
 }

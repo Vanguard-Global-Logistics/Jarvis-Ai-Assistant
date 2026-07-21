@@ -11,6 +11,15 @@ import { withAlpha } from './orb-visuals.js';
 
 export type ParticleMode = 'halo' | 'converge' | 'still' | 'off';
 
+/**
+ * Depth layer selection: the Orb renders TWO fields from the same seed — a
+ * `rear` field behind the core (deeper particles: smaller, dimmer, slower)
+ * and a `front` field in front of it (nearer: larger, brighter, faster) —
+ * so the dust occludes and is occluded, and parallax reads as volume
+ * (benchmark §6/§8). `all` renders every particle on one canvas.
+ */
+export type ParticleLayer = 'rear' | 'front' | 'all';
+
 export interface ParticleFieldOptions {
   canvas: HTMLCanvasElement;
   /** Canvas is square `sizePx × sizePx`. */
@@ -19,6 +28,8 @@ export interface ParticleFieldOptions {
   mode: ParticleMode;
   /** Defaults to a fixed date-derived constant so the field is reproducible without a caller-supplied seed. */
   seed?: number;
+  /** Which depth slice of the (deterministic) population to draw. Default 'all'. */
+  layer?: ParticleLayer;
 }
 
 export interface ParticleField {
@@ -66,6 +77,9 @@ export function mulberry32(seed: number): () => number {
   };
 }
 
+/** Particles nearer than this depth belong to the `front` layer. */
+export const FRONT_DEPTH_THRESHOLD = 0.62;
+
 interface Particle {
   angle: number;
   /** Base (halo) radius, normalized 0..1 of the canvas half-size. */
@@ -74,22 +88,40 @@ interface Particle {
   alpha: number;
   /** Signed radians/ms — orbital drift speed and direction. */
   driftSpeed: number;
+  /** 0 (deepest, rear) .. 1 (nearest, front) — scales size/brightness/speed. */
+  depth: number;
 }
 
-function createParticles(seed: number): readonly Particle[] {
+function createParticles(seed: number, layer: ParticleLayer): readonly Particle[] {
   const rand = mulberry32(seed);
   const particles: Particle[] = [];
   for (let i = 0; i < PARTICLE_COUNT; i += 1) {
     const direction = rand() < 0.5 ? -1 : 1;
+    const depth = rand();
+    // Depth shapes everything: near motes are larger, brighter, faster —
+    // "controlled variation", never uniform decorative dots.
+    const depthSize = 0.55 + 0.85 * depth;
+    const depthAlpha = 0.45 + 0.55 * depth;
+    const depthSpeed = 0.5 + depth;
     particles.push({
       angle: rand() * Math.PI * 2,
       radius: RADIUS_MIN + rand() * (RADIUS_MAX - RADIUS_MIN),
-      sizePx: SIZE_MIN_PX + rand() * (SIZE_MAX_PX - SIZE_MIN_PX),
-      alpha: ALPHA_MIN + rand() * (ALPHA_MAX - ALPHA_MIN),
-      driftSpeed: direction * (HALO_DRIFT_MIN + rand() * (HALO_DRIFT_MAX - HALO_DRIFT_MIN)),
+      sizePx: (SIZE_MIN_PX + rand() * (SIZE_MAX_PX - SIZE_MIN_PX)) * depthSize,
+      alpha: (ALPHA_MIN + rand() * (ALPHA_MAX - ALPHA_MIN)) * depthAlpha,
+      driftSpeed:
+        direction * (HALO_DRIFT_MIN + rand() * (HALO_DRIFT_MAX - HALO_DRIFT_MIN)) * depthSpeed,
+      depth,
     });
   }
-  return particles;
+  // The full population is always generated (fixed PRNG consumption order, so
+  // rear+front from the same seed are complementary, never overlapping);
+  // the layer filter selects the slice afterwards.
+  if (layer === 'all') {
+    return particles;
+  }
+  return particles.filter((p) =>
+    layer === 'front' ? p.depth >= FRONT_DEPTH_THRESHOLD : p.depth < FRONT_DEPTH_THRESHOLD,
+  );
 }
 
 /**
@@ -101,7 +133,7 @@ function createParticles(seed: number): readonly Particle[] {
  */
 export function createParticleField(opts: ParticleFieldOptions): ParticleField {
   const { canvas, sizePx } = opts;
-  const particles = createParticles(opts.seed ?? DEFAULT_PARTICLE_SEED);
+  const particles = createParticles(opts.seed ?? DEFAULT_PARTICLE_SEED, opts.layer ?? 'all');
   const ctx = canvas.getContext('2d');
 
   let mode = opts.mode;
@@ -125,9 +157,13 @@ export function createParticleField(opts: ParticleFieldOptions): ParticleField {
     for (const particle of particles) {
       const angle =
         mode === 'still' ? particle.angle : particle.angle + elapsedMs * particle.driftSpeed;
+      // Nearer motes answer the pull sooner — attraction with depth stagger,
+      // not a uniform collapse.
       const radius =
         mode === 'converge'
-          ? particle.radius + (CONVERGE_RADIUS - particle.radius) * convergeT
+          ? particle.radius +
+            (CONVERGE_RADIUS - particle.radius) *
+              Math.min(1, convergeT * (0.6 + 0.55 * particle.depth))
           : particle.radius;
       const x = center + Math.cos(angle) * radius * half;
       const y = center + Math.sin(angle) * radius * half;
