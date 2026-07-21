@@ -153,45 +153,45 @@ historical claim not re-verified now · **[GAP]** referenced but absent.
   `2026-07-17-experience-prototype-plan.md` (E1–E4; E1 complete).
 - Task briefs (`.superpowers/sdd/`, git-ignored): task-1..6, e1a, e1b, e2a all have
   reports; **`task-e2b-brief.md` has no report — E2b is the incomplete brief.**
-- **E2 status:** the git-ignored ledger records *"E2 (approved 2026-07-17,
-  William's scope + boundaries; screenshot gate at the end)"*, controller-installed
+- **E2 status:** the git-ignored ledger records _"E2 (approved 2026-07-17,
+  William's scope + boundaries; screenshot gate at the end)"_, controller-installed
   deps (matching the unstaged diff), E2a complete/reviewed/committed. The
   **committed** handoff (`docs/status/AUTONOMOUS-SESSION-HANDOFF.md`) still says
-  *"E2 implementation awaits William's approval"* — **stale**, and it also still
+  _"E2 implementation awaits William's approval"_ — **stale**, and it also still
   contains a resolved-contradiction artifact (§Blockers says the benchmark video is
   both preserved with SHA-256 and "not yet uploaded"). Flagged Medium in §10.
 - **DAEDALUS status: does not exist.** No agent manifests, mission templates,
   autonomy contracts, trust/ranking contracts, APEX documents, business-separation
   policies, incident-response documents, or deployment/release policy files exist
-  anywhere in the repo [FACT — full-tree grep]. The *functional analog* of what the
+  anywhere in the repo [FACT — full-tree grep]. The _functional analog_ of what the
   instruction calls DAEDALUS is the session-scoped superpowers SDD controller
   process (briefs → subagent → review → ledger), which is a workflow, not an agent,
   and has no persistent runner.
 
 ### Foundational document inventory (item 3)
 
-| Document | Location | Status recorded in the file |
-|---|---|---|
-| Jarvis Constitution | `docs/foundation/01-CONSTITUTION.md` | **v1.0, APPROVED** (amendments approved by William 2026-07-17); NOT IMPLEMENTED as runtime |
-| Original Constitution draft | `docs/superpowers/specs/2026-07-17-core-constitution-v1.0-original.md` | preserved verbatim, do not edit |
-| OWNER-OBJECTIVES | `docs/vision/OWNER-OBJECTIVES.md` | Layer 1, **DRAFT — pending William's approval**; only William authors/amends |
-| NORTH-STAR | `docs/vision/NORTH-STAR.md` | **[GAP] — pending, referenced, unwritten** |
-| Master Blueprint | `docs/MASTER-BLUEPRINT.md` | reconciled 2026-07-17; "never authorization to build" |
-| Completion Doctrine | `docs/foundation/09-COMPLETION-DOCTRINE.md` | DRAFT (adopted by ADR 0005) |
-| Philosophy Engine | `docs/foundation/02-PHILOSOPHY-ENGINE.md` | DRAFT |
-| Security Reference | `docs/foundation/07-SECURITY-REFERENCE.md` | DRAFT, permanently a pointer |
-| Foundation docs 03/04/05/06/08 | — | **[GAP] — named by ADR 0005, unwritten** |
-| `docs/architecture/` (Layer 3) | — | **[GAP] — directory does not exist yet** |
-| Documentation architecture | `docs/superpowers/specs/2026-07-17-foundation-docs-design.md` (v3) + ADR 0005 | APPROVED |
-| ADRs | `docs/DECISIONS/0001–0006` | all Accepted |
-| Security contract | `reference/design-handoff/SECURITY-BOUNDARIES.md` + `JARVIS-MASTER-SPEC.md` | archived, immutable, outranks every layer |
-| Ledger rules | `FINANCIAL-SURVIVAL-RULES.md`, `Ledger-Claude-Code-Handoff.md` | archived, immutable |
-| Forge rules | `Forge-Claude-Code-Handoff.md` (five-fact model) | archived, immutable |
-| AEGIS docs | `Jarvis-Aegis-Claude-Code-Handoff.md` + SECURITY-BOUNDARIES | archived, immutable; `services/aegis` empty by choice |
-| Memory policy | `PROJECT-MEMORY-SPEC.md` (repo-as-memory); `06-MEMORY-CONSTITUTION.md` **[GAP]**; `docs/MEMORY-MODEL.md` referenced by the audit but **[GAP] never created** |
-| State/gap docs | `docs/CURRENT-STATE-AUDIT.md`, `docs/KNOWN-LIMITATIONS.md`, `docs/IPC-SURFACE.md`, `docs/WINDOWS-ACCEPTANCE-TEST.md`, `docs/BACKLOG.md` | current as of 2026-07-16/17 |
-| Handoff | `docs/status/AUTONOMOUS-SESSION-HANDOFF.md` | committed, **stale re E2** |
-| Agent manifests / mission templates / autonomy contracts / trust-ranking contracts / APEX / incident-response / deployment-release / testing-evaluation policies | — | **[GAP] — none exist as standalone documents** (testing/eval and release rules exist only inside CLAUDE.md §3/§8, the Completion Doctrine, and ADR 0006's DoD) |
+| Document                                                                                                                                                         | Location                                                                                                                                                     | Status recorded in the file                                                                                                                                    |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Jarvis Constitution                                                                                                                                              | `docs/foundation/01-CONSTITUTION.md`                                                                                                                         | **v1.0, APPROVED** (amendments approved by William 2026-07-17); NOT IMPLEMENTED as runtime                                                                     |
+| Original Constitution draft                                                                                                                                      | `docs/superpowers/specs/2026-07-17-core-constitution-v1.0-original.md`                                                                                       | preserved verbatim, do not edit                                                                                                                                |
+| OWNER-OBJECTIVES                                                                                                                                                 | `docs/vision/OWNER-OBJECTIVES.md`                                                                                                                            | Layer 1, **DRAFT — pending William's approval**; only William authors/amends                                                                                   |
+| NORTH-STAR                                                                                                                                                       | `docs/vision/NORTH-STAR.md`                                                                                                                                  | **[GAP] — pending, referenced, unwritten**                                                                                                                     |
+| Master Blueprint                                                                                                                                                 | `docs/MASTER-BLUEPRINT.md`                                                                                                                                   | reconciled 2026-07-17; "never authorization to build"                                                                                                          |
+| Completion Doctrine                                                                                                                                              | `docs/foundation/09-COMPLETION-DOCTRINE.md`                                                                                                                  | DRAFT (adopted by ADR 0005)                                                                                                                                    |
+| Philosophy Engine                                                                                                                                                | `docs/foundation/02-PHILOSOPHY-ENGINE.md`                                                                                                                    | DRAFT                                                                                                                                                          |
+| Security Reference                                                                                                                                               | `docs/foundation/07-SECURITY-REFERENCE.md`                                                                                                                   | DRAFT, permanently a pointer                                                                                                                                   |
+| Foundation docs 03/04/05/06/08                                                                                                                                   | —                                                                                                                                                            | **[GAP] — named by ADR 0005, unwritten**                                                                                                                       |
+| `docs/architecture/` (Layer 3)                                                                                                                                   | —                                                                                                                                                            | **[GAP] — directory does not exist yet**                                                                                                                       |
+| Documentation architecture                                                                                                                                       | `docs/superpowers/specs/2026-07-17-foundation-docs-design.md` (v3) + ADR 0005                                                                                | APPROVED                                                                                                                                                       |
+| ADRs                                                                                                                                                             | `docs/DECISIONS/0001–0006`                                                                                                                                   | all Accepted                                                                                                                                                   |
+| Security contract                                                                                                                                                | `reference/design-handoff/SECURITY-BOUNDARIES.md` + `JARVIS-MASTER-SPEC.md`                                                                                  | archived, immutable, outranks every layer                                                                                                                      |
+| Ledger rules                                                                                                                                                     | `FINANCIAL-SURVIVAL-RULES.md`, `Ledger-Claude-Code-Handoff.md`                                                                                               | archived, immutable                                                                                                                                            |
+| Forge rules                                                                                                                                                      | `Forge-Claude-Code-Handoff.md` (five-fact model)                                                                                                             | archived, immutable                                                                                                                                            |
+| AEGIS docs                                                                                                                                                       | `Jarvis-Aegis-Claude-Code-Handoff.md` + SECURITY-BOUNDARIES                                                                                                  | archived, immutable; `services/aegis` empty by choice                                                                                                          |
+| Memory policy                                                                                                                                                    | `PROJECT-MEMORY-SPEC.md` (repo-as-memory); `06-MEMORY-CONSTITUTION.md` **[GAP]**; `docs/MEMORY-MODEL.md` referenced by the audit but **[GAP] never created** |
+| State/gap docs                                                                                                                                                   | `docs/CURRENT-STATE-AUDIT.md`, `docs/KNOWN-LIMITATIONS.md`, `docs/IPC-SURFACE.md`, `docs/WINDOWS-ACCEPTANCE-TEST.md`, `docs/BACKLOG.md`                      | current as of 2026-07-16/17                                                                                                                                    |
+| Handoff                                                                                                                                                          | `docs/status/AUTONOMOUS-SESSION-HANDOFF.md`                                                                                                                  | committed, **stale re E2**                                                                                                                                     |
+| Agent manifests / mission templates / autonomy contracts / trust-ranking contracts / APEX / incident-response / deployment-release / testing-evaluation policies | —                                                                                                                                                            | **[GAP] — none exist as standalone documents** (testing/eval and release rules exist only inside CLAUDE.md §3/§8, the Completion Doctrine, and ADR 0006's DoD) |
 
 ### Existing authority hierarchy as recorded (item 5)
 
@@ -212,9 +212,9 @@ docs — consistent across all sources:
 6. CLAUDE.md (operating manual; corrected when it disagrees with code).
 7. William overrides all of it, at any time, in both roles: he is the sole
    amender of Layer 1/Foundation docs, and his "explicit framing always wins"
-   in-session (02-PHILOSOPHY-ENGINE) — with one recorded exception: *"No objective
-   here overrides a security boundary"* and *"Security boundaries themselves are
-   never negotiable"* — i.e., the docs already treat security as constraining even
+   in-session (02-PHILOSOPHY-ENGINE) — with one recorded exception: _"No objective
+   here overrides a security boundary"_ and _"Security boundaries themselves are
+   never negotiable"_ — i.e., the docs already treat security as constraining even
    William's casual instruction (a deliberate two-key design: he can amend the
    boundary documents, but a conversational instruction does not waive them).
 
@@ -226,31 +226,31 @@ Mapping the instruction's Parts II–XLV against the existing corpus.
 
 ### Fully or substantially covered already (item 6)
 
-| Instruction part | Where it already lives |
-|---|---|
-| II.3 Human sovereignty | 01-CONSTITUTION (Collaboration Principle), 02 (strategic decisions are William's), OWNER-OBJECTIVES governance |
-| II.4 Honesty registers | Truth Principle (4 registers), 02 epistemic discipline, CLAUDE.md §8 |
-| IV lower-never-overrides (partial) | ADR 0005 four rules; security outranks all layers |
-| V amendment control (core) | 01: "Jarvis may propose amendments; Jarvis never applies one"; OWNER-OBJECTIVES: only William amends, prior version preserved; ADR 0005 status vocabulary |
-| VI AEGIS/Ledger authority | SECURITY-BOUNDARIES, FINANCIAL-SURVIVAL-RULES, Ledger/Forge handoffs, CLAUDE.md §2 — incl. "no title overrides AEGIS" in spirit (nothing may lower a restriction) |
-| VII non-escalation (core) | "Jarvis never grants itself new permissions / never holds unlimited permissions" (CLAUDE.md §2 table); raise-only levels |
-| XII reversibility (partial) | 02 stakes/reversibility test; Completion Doctrine rule 9; escalation of irreversibility to William undecided |
-| XIII/XIV audit (principle) | "Every significant decision is auditable"; append-only audit logs (audit §13); ADR/experiments append-only conventions |
-| XV epistemic integrity | Truth Principle, 02, Knowledge category rules (evidence-grade only) |
-| XXIII model independence | CLAUDE.md §5 provider-neutral abstraction; mock-default; closed provider set; adapters-not-call-sites |
-| XXIV safe self-improvement | Evolution Engine charter ("no uncontrolled self-modification"), Jarvis Academy ("learning proposes; William approves") |
-| XXVI/XXVIII financial basics | FINANCIAL-SURVIVAL-RULES 1–11 (STS, Cost Governor, credit-is-not-cash, purchase review, CPA disclaimer); Ledger may-never list |
-| XXXV change/release governance | Forge five-fact model; Completion Doctrine six-stage ladder; "a local commit is not a release" is literally the ladder |
-| XXXVI accessibility (partial) | reduced-motion + ≥44px targets + safe-area (CLAUDE.md §6); E2a a11y utilities; typed BLACKOUT + Console recovery = non-voice override path |
-| XXIX/XXX claims honesty (partial) | Ledger CPA/attorney disclaimer; "never a licensed professional" anti-goal seed; CLAUDE.md §7 regulated-domain warnings for Peptastic/VPL |
-| XLVI review discipline | Chief Architect 9 questions; never-sole-approver; independent (ChatGPT) review precedent |
+| Instruction part                   | Where it already lives                                                                                                                                            |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| II.3 Human sovereignty             | 01-CONSTITUTION (Collaboration Principle), 02 (strategic decisions are William's), OWNER-OBJECTIVES governance                                                    |
+| II.4 Honesty registers             | Truth Principle (4 registers), 02 epistemic discipline, CLAUDE.md §8                                                                                              |
+| IV lower-never-overrides (partial) | ADR 0005 four rules; security outranks all layers                                                                                                                 |
+| V amendment control (core)         | 01: "Jarvis may propose amendments; Jarvis never applies one"; OWNER-OBJECTIVES: only William amends, prior version preserved; ADR 0005 status vocabulary         |
+| VI AEGIS/Ledger authority          | SECURITY-BOUNDARIES, FINANCIAL-SURVIVAL-RULES, Ledger/Forge handoffs, CLAUDE.md §2 — incl. "no title overrides AEGIS" in spirit (nothing may lower a restriction) |
+| VII non-escalation (core)          | "Jarvis never grants itself new permissions / never holds unlimited permissions" (CLAUDE.md §2 table); raise-only levels                                          |
+| XII reversibility (partial)        | 02 stakes/reversibility test; Completion Doctrine rule 9; escalation of irreversibility to William undecided                                                      |
+| XIII/XIV audit (principle)         | "Every significant decision is auditable"; append-only audit logs (audit §13); ADR/experiments append-only conventions                                            |
+| XV epistemic integrity             | Truth Principle, 02, Knowledge category rules (evidence-grade only)                                                                                               |
+| XXIII model independence           | CLAUDE.md §5 provider-neutral abstraction; mock-default; closed provider set; adapters-not-call-sites                                                             |
+| XXIV safe self-improvement         | Evolution Engine charter ("no uncontrolled self-modification"), Jarvis Academy ("learning proposes; William approves")                                            |
+| XXVI/XXVIII financial basics       | FINANCIAL-SURVIVAL-RULES 1–11 (STS, Cost Governor, credit-is-not-cash, purchase review, CPA disclaimer); Ledger may-never list                                    |
+| XXXV change/release governance     | Forge five-fact model; Completion Doctrine six-stage ladder; "a local commit is not a release" is literally the ladder                                            |
+| XXXVI accessibility (partial)      | reduced-motion + ≥44px targets + safe-area (CLAUDE.md §6); E2a a11y utilities; typed BLACKOUT + Console recovery = non-voice override path                        |
+| XXIX/XXX claims honesty (partial)  | Ledger CPA/attorney disclaimer; "never a licensed professional" anti-goal seed; CLAUDE.md §7 regulated-domain warnings for Peptastic/VPL                          |
+| XLVI review discipline             | Chief Architect 9 questions; never-sole-approver; independent (ChatGPT) review precedent                                                                          |
 
 ### Partially covered / ambiguous (item 8)
 
 - **IV hierarchy** — layering exists but there is no single ordered list ranking
   William's live instruction vs Constitution vs AEGIS vs Ledger vs Mission
   Charters vs task instructions. (High)
-- **V amendment** — the *who* is defined (only William), the *how* is not: no
+- **V amendment** — the _who_ is defined (only William), the _how_ is not: no
   required record format (wording/reason/risks/version/rollback). (Medium)
 - **XI autonomy** — a two-notch ladder exists (reversible-low-stakes: proceed;
   irreversible/high-stakes: ask), not a graduated 0–8 ladder with evidence gates.
@@ -259,12 +259,12 @@ Mapping the instruction's Parts II–XLV against the existing corpus.
   Phase 1 design decision" is recorded, but 06-MEMORY-CONSTITUTION is unwritten
   and `docs/MEMORY-MODEL.md` (named by the audit) was never created. (High)
 - **XXI injection defense** — contract reject-lists and "no prompt passthrough"
-  cover the process boundary; nothing covers hostile *content* (web, email, docs,
+  cover the process boundary; nothing covers hostile _content_ (web, email, docs,
   retrieved memories) because no ingestion exists yet. (High at the moment any
   connector/browse capability lands; Medium today)
 - **XXXII resilience** — probe/CI/fail-visibly culture exists; no RTO/RPO/backup
   /degraded-mode doctrine. (Medium)
-- **XXXVI human override** — typed BLACKOUT + dev-recovery exist in *design*;
+- **XXXVI human override** — typed BLACKOUT + dev-recovery exist in _design_;
   nothing is implemented. (tracks AEGIS v1)
 - **XLI owner objectives** — six abstract objectives exist and are load-bearing
   (Decision Engine dimension 1). The instruction's concrete targets (protect BCI
@@ -274,25 +274,25 @@ Mapping the instruction's Parts II–XLV against the existing corpus.
 
 ### Missing entirely (item 7)
 
-| Part | Principle | Severity |
-|---|---|---|
-| III | Financial Freedom Mode / mission-qualification process | Medium (no autonomy exists to misuse yet) |
-| VIII | Capability leases | High (needed before any agent autonomy) |
-| IX | Separation of duties beyond builder≠approver | Medium |
-| X | Mastery/Trust/Crown certification | Low (no agents exist) |
-| XVII–XVIII | Privacy/data stewardship + multi-person consent | High |
-| XIX | **BCI employer firewall** | **High** |
-| XX | Cross-business compartments | High (blocked-on-William status exists; rules don't) |
-| XXII | **Identity & anti-impersonation** | **Critical** |
-| XXV | Anti-Goodhart/metric-gaming | Low today, High when agents are scored |
-| XXVII | Portfolio governance | Low |
-| XXIX | Jurisdictional awareness | Medium |
-| XXXI | IP/licensing tracking | Medium (open decision 4 in the doc-design spec is the only trace) |
-| XXXIII–XXXIV | Incident response + emergency powers scope | Medium (AEGIS design intent exists; doctrine doesn't) |
-| XXXVII | Wellbeing/attention | Low-Medium (objectives 1/4 gesture at it) |
-| XXXVIII–XL | DAEDALUS / VIGIL / POSEIDON | Not concepts in the repo at all — chartering decision required |
-| XLII | Decommissioning | Medium |
-| XLIII–XLV | Machine-testable invariants / governance-as-code / constitutional test suite | High (the natural spine of AEGIS v1) |
+| Part         | Principle                                                                    | Severity                                                          |
+| ------------ | ---------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| III          | Financial Freedom Mode / mission-qualification process                       | Medium (no autonomy exists to misuse yet)                         |
+| VIII         | Capability leases                                                            | High (needed before any agent autonomy)                           |
+| IX           | Separation of duties beyond builder≠approver                                 | Medium                                                            |
+| X            | Mastery/Trust/Crown certification                                            | Low (no agents exist)                                             |
+| XVII–XVIII   | Privacy/data stewardship + multi-person consent                              | High                                                              |
+| XIX          | **BCI employer firewall**                                                    | **High**                                                          |
+| XX           | Cross-business compartments                                                  | High (blocked-on-William status exists; rules don't)              |
+| XXII         | **Identity & anti-impersonation**                                            | **Critical**                                                      |
+| XXV          | Anti-Goodhart/metric-gaming                                                  | Low today, High when agents are scored                            |
+| XXVII        | Portfolio governance                                                         | Low                                                               |
+| XXIX         | Jurisdictional awareness                                                     | Medium                                                            |
+| XXXI         | IP/licensing tracking                                                        | Medium (open decision 4 in the doc-design spec is the only trace) |
+| XXXIII–XXXIV | Incident response + emergency powers scope                                   | Medium (AEGIS design intent exists; doctrine doesn't)             |
+| XXXVII       | Wellbeing/attention                                                          | Low-Medium (objectives 1/4 gesture at it)                         |
+| XXXVIII–XL   | DAEDALUS / VIGIL / POSEIDON                                                  | Not concepts in the repo at all — chartering decision required    |
+| XLII         | Decommissioning                                                              | Medium                                                            |
+| XLIII–XLV    | Machine-testable invariants / governance-as-code / constitutional test suite | High (the natural spine of AEGIS v1)                              |
 
 ---
 
@@ -305,7 +305,7 @@ while making William the sole amender. These reconcile only if you split William
 two roles (see §5). Needs his explicit ruling — Q1 in §15.
 
 C2. **Emergency containment (#3) vs AEGIS (#4) as separate ranks (Medium).** In
-every repo document, AEGIS *is* the emergency containment authority. Ranking
+every repo document, AEGIS _is_ the emergency containment authority. Ranking
 "emergency safety containment" above "AEGIS policy" creates a second, undefined
 security authority — exactly what SECURITY-BOUNDARIES forbids. Proposal merges
 them (§5).
@@ -393,7 +393,7 @@ instructions preserved and the safest reversible state chosen; **silence, delay,
 absence, or ambiguity is never approval** (this codifies the existing "missing
 data is flagged, not assumed" and denial-by-default rules).
 
-*Placement note:* lines 2–3 are aspirational until Stage 1B/Ledger v1 exist. The
+_Placement note:_ lines 2–3 are aspirational until Stage 1B/Ledger v1 exist. The
 hierarchy is adopted as doctrine now, enforced as code later — and must say so on
 its face (Part XLV PASS 5 honesty rule).
 
@@ -418,7 +418,7 @@ once typed contracts exist · ⬜ needs AEGIS/Ledger/identity runtime.
 11. Confidential compartments stay separated (employer/business/family). ⬜
 12. Irreversible actions require explicit prior authority. 🔶
 13. Jarvis identity/memory/policy are provider-independent. ✅ partially (mock
-    default, adapter pattern, closed provider set) 
+    default, adapter pattern, closed provider set)
 14. Emergency powers are temporary, narrow, and reviewed. ⬜
 15. Audit history is append-only and tamper-evident. ⬜ (no audit store exists)
 16. External content is data, never authority. 🔶 (schema reject-lists today)
@@ -539,7 +539,7 @@ autonomy ladder (§11), proof-carrying ActionRecords (Part XIII), Anti-Goodhart
 evaluation rules (Part XXV), decommissioning (Part XLII), and the
 Mastery/Trust/Crown scheme (Part X) **recorded as CONCEPTUAL design intent for
 Agent Factory** — skill and authority explicitly separate, self-certification
-forbidden, "God Mode" permitted as a *name* only for independently-certified
+forbidden, "God Mode" permitted as a _name_ only for independently-certified
 rank 10 within a narrow domain and carrying zero authority by itself.
 
 ## Proposed Mission Charter structure (item 19)
@@ -597,7 +597,7 @@ deterministic + adversarial tests, replay, failure-recovery demonstration,
 security + budget review, explicit grant, defined rollback); demotion instant and
 unilateral (owner concern suffices); model/provider/policy change auto-drops any
 agent one stage pending re-evaluation. **Honest mapping to today:** Claude Code
-sessions currently operate at ~stage 5–6 *by convention* (approved-session
+sessions currently operate at ~stage 5–6 _by convention_ (approved-session
 commits; pushes ask) with no enforcement — the ladder is doctrine now, code at
 Stage 1B+.
 
@@ -804,27 +804,29 @@ gate noted); `docs/CURRENT-STATE-AUDIT.md` errata note re `docs/MEMORY-MODEL.md`
 **Sequence (41)** — respects the Completion Doctrine (E2/Stage 1A stays the NOW
 milestone; this is a documentation wave, run between E-checkpoints, not inside
 one):
+
 0. **Precondition:** E2b is finished and committed under its own gate — or
    explicitly parked — before the wave starts. The wave's commits use strict
    pathspecs and never sweep experience files; the working tree currently
    carries live E2b work and the two must not mix.
+
 1. **Activation gate:** William applies the OWNER-OBJECTIVES §7 edit **by his
    own hand** and speaks the approval phrase. The own-hand edit is the
    strongest interim authenticator this repo has (only William plausibly
    performs it); it deliberately precedes everything else (red-team #7).
 2. ADR 0007 → 3. Amend 01 (A/B/C) → 4. Land 10 + 11 (DRAFT) →
-5. Draft 06 (DRAFT) → 6. Open Layer 3: aegis.md + ledger.md (CONCEPTUAL) →
-7. Truth passes (CLAUDE.md, handoff — incl. the stale push note, README, audit
-erratum) → 8. BACKLOG update → 9. Commit wave on the feature branch (each step
-its own reviewable commit; push only with separate approval, per §4 rules).
+3. Draft 06 (DRAFT) → 6. Open Layer 3: aegis.md + ledger.md (CONCEPTUAL) →
+4. Truth passes (CLAUDE.md, handoff — incl. the stale push note, README, audit
+   erratum) → 8. BACKLOG update → 9. Commit wave on the feature branch (each step
+   its own reviewable commit; push only with separate approval, per §4 rules).
 
 **Dependencies & prerequisites (42):** typed contracts + tests ⇒ Stage 1B
 scoping (after Stage 1A acceptance); identity/authentication ⇒ AEGIS v1 +
-hardware factors (Stage 1B+); compartment *enforcement* ⇒ AEGIS v1 + real data
+hardware factors (Stage 1B+); compartment _enforcement_ ⇒ AEGIS v1 + real data
 integrations; incident drills ⇒ persistent runtime; provider-governance
 enforcement ⇒ first real connector; Amy/multi-user consent ⇒ William's model for
 Sophisticated Sips; Financial Freedom Mode execution ⇒ Ledger v1 + Mission
-Charter contract (the *doctrine* needs none of these).
+Charter contract (the _doctrine_ needs none of these).
 
 ---
 
@@ -838,7 +840,7 @@ amendments + new lower docs, as proposed.
 **Under-specifying enforcement (44 — High):** the opposite failure — writing
 beautiful doctrine and calling it protection. Mitigation is structural: every
 principle in the traceability matrix carries an implementation status; anything
-🔶/⬜ is prose-only *and says so*; KNOWN-LIMITATIONS gains one line per adopted-
+🔶/⬜ is prose-only _and says so_; KNOWN-LIMITATIONS gains one line per adopted-
 but-unenforced doctrine at each truth pass; and the review's own rule — "do not
 imply a policy is technically enforced when it exists only in prose" — is written
 into 10-AUTHORITY-AND-AUTONOMY as a permanent honesty requirement.
@@ -960,7 +962,7 @@ draft; disposition in brackets):**
   carrying live E2b files. [Fixed: §14 step 0 precondition + pathspec rule.]
 - **I7 (Medium, authority):** the approval phrase is printed in a readable file
   and unauthenticatable at first use; the strongest interim authenticator in
-  the package (William's own-hand OWNER-OBJECTIVES edit) was sequenced *after*
+  the package (William's own-hand OWNER-OBJECTIVES edit) was sequenced _after_
   the phrase. [Fixed: §14 step 1 makes the own-hand edit part of the activation
   gate. Residual impersonation risk remains and is stated — R1 stands.]
 
@@ -968,6 +970,7 @@ draft; disposition in brackets):**
 
 Honestly open — the loop did not clear these and cannot from a documentation
 wave alone:
+
 1. **Identity/authentication — Critical.** Unsolvable in prose; Stage 1B+.
 2. **Runtime enforcement of every boundary — Critical class.** AEGIS v1/Ledger
    v1 are the fix; until then, every rule in this package is doctrine + the
@@ -1006,49 +1009,49 @@ Status: ✅ enforced today · 📄 doctrine only (proposed or existing prose) ·
 🔶 typed-contract stage (Stage 1B) · ⬜ needs runtime (AEGIS/Ledger/identity+).
 Owner = accountable party once adopted.
 
-| Principle | Governing document | Typed contract | Enforcement point | Test | Owner | Status |
-|---|---|---|---|---|---|---|
-| Human sovereignty | 01 Amend. A | ApprovalRecord | AEGIS identity | suite #4 | William | 📄→⬜ |
-| Deterministic hierarchy | 10 (new) | AuthorityLevel | policy engine | suite #6 | AEGIS | 📄→🔶 |
-| Amendment control | 01 Amend. B + ADR 0007 | — | ADR process + CI trailer | R6 check | William | 📄 |
-| Jarvis never controls AEGIS | SECURITY-BOUNDARIES (immutable) | contracts reject-list | ESLint + IPC allowlist + (later) process sep. | bridge test ✅ | AEGIS | ✅ partial→⬜ |
-| Non-escalation | 10 | CapabilityLease | lease validator | suite #1,#2 | AEGIS | 📄→🔶 |
-| Capability leases expire | 10 | CapabilityLease.expiry | lease validator | suite #3 | AEGIS | 🔶 |
-| Silence ≠ approval | 10 | ApprovalRecord required | fail-closed default | suite #4 | AEGIS | 📄→🔶 |
-| Separation of duties | 10 §SoD table | ApprovalRecord roles | review workflow | suite #10 | William | 📄 |
-| Skill ≠ authority | 10 (Crown CONCEPTUAL) | MasteryRank/TrustTier vs Lease | lease validator | suite #1 | Agent Factory | 📄 |
-| Graduated autonomy | 10 ladder | AgentIdentity.stage | promotion gate | replay/shadow evidence | William | 📄 |
-| Reversibility first | 10 + 02 (existing) | ActionRecord.rollback | irreversible-action gate | suite #14 | Jarvis | 📄→🔶 |
-| Proof-carrying actions | 10 | ActionRecord | action gate | suite #14,#15 | AEGIS | 🔶 |
-| Audit tamper-evidence | AEGIS policy (16) | hash-chained log | AEGIS store | suite #19 | AEGIS | ⬜ |
-| Epistemic integrity | Truth Principle + 02 (existing) | EvidenceRecord | review discipline | spot checks | Jarvis | 📄 ✅culture |
-| Memory integrity | 06 (to draft) | DataClassification/RetentionRule | memory service | Memory v1 tests | Jarvis+AEGIS | 📄→⬜ |
-| Privacy/data stewardship | 06 + 11 | Compartment | AEGIS data access | suite #7 | AEGIS | 📄→⬜ |
-| Multi-person consent | 11 | Compartment(family) | AEGIS + William | design review | William | 📄 |
-| BCI firewall | 11 (new) | Compartment(BCI) | AEGIS data access | suite #8 | AEGIS | 📄→⬜ |
-| Cross-business compartments | 11 | Compartment | AEGIS data access | suite #7 | AEGIS | 📄→⬜ |
-| Injection defense | 9 §doctrine + SECURITY-BOUNDARIES reject-list | data-only content schema | connector gate | suite #13 | AEGIS | 📄 + ✅IPC |
-| Anti-impersonation | AEGIS policy (16) | authenticated instruction | AEGIS identity | suite (auth) | AEGIS | ⬜ **Critical gap** |
-| Provider independence | CLAUDE.md §5 (existing) + 9 §26 | provider config | adapter factory | provider tests ✅ | Jarvis | ✅ partial |
-| Safe self-improvement | Evolution Engine charter + 10 | ApprovalRecord | review gate | suite #11 | William | 📄 |
-| Anti-Goodhart | 10 §XXV rules | EvidenceRecord multi-metric | evaluation process | suite #20 | William | 📄 |
-| Mission stop-loss | Ledger policy (17) | MissionCharter+StopLossRule | Ledger engine | suite #15,#16 | Ledger | 📄→⬜ |
-| Portfolio governance | Ledger policy (17) | MissionCharter set | Ledger review | analysis review | Ledger | 📄 |
-| Financial integrity | FINANCIAL-SURVIVAL-RULES (immutable) + 17 | BudgetLimit | Ledger engine | suite #15 | Ledger | 📄→⬜ |
-| Legal/jurisdiction | 17 + charter fields | MissionCharter.jurisdiction | qualification step 4 | charter validation | William | 📄 |
-| Truthful claims / customer protection | 11 + existing disclaimers | — | mission compliance screen | review | William | 📄 |
-| IP/licensing | 11 §34 | asset provenance record | Forge gate | dependency review | Forge | 📄 |
-| Operational resilience | AEGIS policy + VIGIL-shaped duties (Q2) | Incident | watchdog runtime | drills | VIGIL/AEGIS | ⬜ |
-| Incident response | AEGIS policy (16) | Incident | AEGIS doctrine | drills | AEGIS | 📄→⬜ |
-| Emergency powers bounded | AEGIS policy (16) | emergency ActionRecord | AEGIS runtime | suite #12 | AEGIS | 📄→⬜ |
-| Change/release governance | Completion Doctrine + five-fact (existing) | evidence ladder record | Forge + CI ✅probe | suite #20 + probe ✅ | Forge | ✅ partial |
-| Accessibility/override | §11-35 + CLAUDE.md §6 | — | UI standards + E2a utils ✅ | a11y tests ✅partial | Jarvis | ✅ partial |
-| Wellbeing | OWNER-OBJECTIVES op. + §11 | owner-time in Ledger | notification policy | owner-time report | Jarvis | 📄 |
-| Decommissioning | 10 §XLII | lease/credential teardown record | retirement checklist | teardown test | AEGIS | 📄 |
-| Owner objectives | OWNER-OBJECTIVES + §7 additions | Ledger mission seeds | Decision Engine dim. 1 | traceability in briefs | William | 📄 (pending his hand) |
+| Principle                             | Governing document                            | Typed contract                   | Enforcement point                             | Test                   | Owner         | Status                |
+| ------------------------------------- | --------------------------------------------- | -------------------------------- | --------------------------------------------- | ---------------------- | ------------- | --------------------- |
+| Human sovereignty                     | 01 Amend. A                                   | ApprovalRecord                   | AEGIS identity                                | suite #4               | William       | 📄→⬜                 |
+| Deterministic hierarchy               | 10 (new)                                      | AuthorityLevel                   | policy engine                                 | suite #6               | AEGIS         | 📄→🔶                 |
+| Amendment control                     | 01 Amend. B + ADR 0007                        | —                                | ADR process + CI trailer                      | R6 check               | William       | 📄                    |
+| Jarvis never controls AEGIS           | SECURITY-BOUNDARIES (immutable)               | contracts reject-list            | ESLint + IPC allowlist + (later) process sep. | bridge test ✅         | AEGIS         | ✅ partial→⬜         |
+| Non-escalation                        | 10                                            | CapabilityLease                  | lease validator                               | suite #1,#2            | AEGIS         | 📄→🔶                 |
+| Capability leases expire              | 10                                            | CapabilityLease.expiry           | lease validator                               | suite #3               | AEGIS         | 🔶                    |
+| Silence ≠ approval                    | 10                                            | ApprovalRecord required          | fail-closed default                           | suite #4               | AEGIS         | 📄→🔶                 |
+| Separation of duties                  | 10 §SoD table                                 | ApprovalRecord roles             | review workflow                               | suite #10              | William       | 📄                    |
+| Skill ≠ authority                     | 10 (Crown CONCEPTUAL)                         | MasteryRank/TrustTier vs Lease   | lease validator                               | suite #1               | Agent Factory | 📄                    |
+| Graduated autonomy                    | 10 ladder                                     | AgentIdentity.stage              | promotion gate                                | replay/shadow evidence | William       | 📄                    |
+| Reversibility first                   | 10 + 02 (existing)                            | ActionRecord.rollback            | irreversible-action gate                      | suite #14              | Jarvis        | 📄→🔶                 |
+| Proof-carrying actions                | 10                                            | ActionRecord                     | action gate                                   | suite #14,#15          | AEGIS         | 🔶                    |
+| Audit tamper-evidence                 | AEGIS policy (16)                             | hash-chained log                 | AEGIS store                                   | suite #19              | AEGIS         | ⬜                    |
+| Epistemic integrity                   | Truth Principle + 02 (existing)               | EvidenceRecord                   | review discipline                             | spot checks            | Jarvis        | 📄 ✅culture          |
+| Memory integrity                      | 06 (to draft)                                 | DataClassification/RetentionRule | memory service                                | Memory v1 tests        | Jarvis+AEGIS  | 📄→⬜                 |
+| Privacy/data stewardship              | 06 + 11                                       | Compartment                      | AEGIS data access                             | suite #7               | AEGIS         | 📄→⬜                 |
+| Multi-person consent                  | 11                                            | Compartment(family)              | AEGIS + William                               | design review          | William       | 📄                    |
+| BCI firewall                          | 11 (new)                                      | Compartment(BCI)                 | AEGIS data access                             | suite #8               | AEGIS         | 📄→⬜                 |
+| Cross-business compartments           | 11                                            | Compartment                      | AEGIS data access                             | suite #7               | AEGIS         | 📄→⬜                 |
+| Injection defense                     | 9 §doctrine + SECURITY-BOUNDARIES reject-list | data-only content schema         | connector gate                                | suite #13              | AEGIS         | 📄 + ✅IPC            |
+| Anti-impersonation                    | AEGIS policy (16)                             | authenticated instruction        | AEGIS identity                                | suite (auth)           | AEGIS         | ⬜ **Critical gap**   |
+| Provider independence                 | CLAUDE.md §5 (existing) + 9 §26               | provider config                  | adapter factory                               | provider tests ✅      | Jarvis        | ✅ partial            |
+| Safe self-improvement                 | Evolution Engine charter + 10                 | ApprovalRecord                   | review gate                                   | suite #11              | William       | 📄                    |
+| Anti-Goodhart                         | 10 §XXV rules                                 | EvidenceRecord multi-metric      | evaluation process                            | suite #20              | William       | 📄                    |
+| Mission stop-loss                     | Ledger policy (17)                            | MissionCharter+StopLossRule      | Ledger engine                                 | suite #15,#16          | Ledger        | 📄→⬜                 |
+| Portfolio governance                  | Ledger policy (17)                            | MissionCharter set               | Ledger review                                 | analysis review        | Ledger        | 📄                    |
+| Financial integrity                   | FINANCIAL-SURVIVAL-RULES (immutable) + 17     | BudgetLimit                      | Ledger engine                                 | suite #15              | Ledger        | 📄→⬜                 |
+| Legal/jurisdiction                    | 17 + charter fields                           | MissionCharter.jurisdiction      | qualification step 4                          | charter validation     | William       | 📄                    |
+| Truthful claims / customer protection | 11 + existing disclaimers                     | —                                | mission compliance screen                     | review                 | William       | 📄                    |
+| IP/licensing                          | 11 §34                                        | asset provenance record          | Forge gate                                    | dependency review      | Forge         | 📄                    |
+| Operational resilience                | AEGIS policy + VIGIL-shaped duties (Q2)       | Incident                         | watchdog runtime                              | drills                 | VIGIL/AEGIS   | ⬜                    |
+| Incident response                     | AEGIS policy (16)                             | Incident                         | AEGIS doctrine                                | drills                 | AEGIS         | 📄→⬜                 |
+| Emergency powers bounded              | AEGIS policy (16)                             | emergency ActionRecord           | AEGIS runtime                                 | suite #12              | AEGIS         | 📄→⬜                 |
+| Change/release governance             | Completion Doctrine + five-fact (existing)    | evidence ladder record           | Forge + CI ✅probe                            | suite #20 + probe ✅   | Forge         | ✅ partial            |
+| Accessibility/override                | §11-35 + CLAUDE.md §6                         | —                                | UI standards + E2a utils ✅                   | a11y tests ✅partial   | Jarvis        | ✅ partial            |
+| Wellbeing                             | OWNER-OBJECTIVES op. + §11                    | owner-time in Ledger             | notification policy                           | owner-time report      | Jarvis        | 📄                    |
+| Decommissioning                       | 10 §XLII                                      | lease/credential teardown record | retirement checklist                          | teardown test          | AEGIS         | 📄                    |
+| Owner objectives                      | OWNER-OBJECTIVES + §7 additions               | Ledger mission seeds             | Decision Engine dim. 1                        | traceability in briefs | William       | 📄 (pending his hand) |
 
 ---
 
-*End of review. Per the instruction's Part XLIX: STOP. No governing document has
+_End of review. Per the instruction's Part XLIX: STOP. No governing document has
 been modified; nothing has been committed, pushed, merged, deployed, or
-installed. Awaiting: `APPROVE SOVEREIGN GOVERNANCE PACKAGE`.*
+installed. Awaiting: `APPROVE SOVEREIGN GOVERNANCE PACKAGE`._
