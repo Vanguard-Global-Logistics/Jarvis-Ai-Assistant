@@ -14,7 +14,8 @@
   },
   "dependencies": {
     "@jarvis/contracts": "*",
-    "motion": "^12.42.2"
+    "motion": "^12.42.2",
+    "three": "^0.185.1"
   },
   "peerDependencies": {
     "react": "^19.0.0",

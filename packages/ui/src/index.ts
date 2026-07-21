@@ -37,5 +37,11 @@ export type { HexBadgeProps } from './primitives/HexBadge.js';
 
 export { Orb } from './orb/Orb.js';
 export type { OrbProps } from './orb/Orb.js';
+
+// DEV-FLAGGED CONCEPT STUDY (E2 renderer reset): NOT the production renderer.
+// The legacy Orb above remains the live E2 renderer until William's visual
+// decision at the rapid concept gate.
+export { OrbStudyV2 } from './orb-v2/OrbStudyV2.js';
+export type { OrbStudyV2Props } from './orb-v2/OrbStudyV2.js';
 export { LUMINOUS_WHITE, orbTiming, orbVisualConfig, toBezier } from './orb/orb-visuals.js';
 export type { OrbVisualConfig } from './orb/orb-visuals.js';

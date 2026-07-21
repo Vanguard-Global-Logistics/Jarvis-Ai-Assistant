@@ -4,6 +4,7 @@ import type { AppInfo, OrbState } from '@jarvis/contracts';
 import { ORB_STATES } from '@jarvis/contracts';
 import {
   Orb,
+  OrbStudyV2,
   accent,
   background,
   fontFamily,
@@ -67,6 +68,13 @@ export function Shell({ devStateSwitcher = import.meta.env.DEV }: ShellProps): J
   const [orbState, setOrbState] = useState<OrbState>('idle');
   const [host, setHost] = useState<HostFacts>({ kind: 'loading' });
   const [switcherOpen, setSwitcherOpen] = useState(false);
+  // DEV-ONLY renderer study (E2 renderer reset): when on, the V2 three.js
+  // study renders instead of the legacy Orb, and the frame goes cinematic
+  // (wordmark/footer move into the dev diagnostics drawer). Unreachable in
+  // production builds — it lives behind the dev switcher flag.
+  const [rendererV2, setRendererV2] = useState(false);
+  const [dormantScene, setDormantScene] = useState(false);
+  const cinematic = devStateSwitcher && rendererV2;
 
   useEffect(() => {
     let cancelled = false;
@@ -129,21 +137,23 @@ export function Shell({ devStateSwitcher = import.meta.env.DEV }: ShellProps): J
         overflow: 'hidden',
       }}
     >
-      <h1
-        style={{
-          marginTop: 44,
-          marginBottom: 0,
-          fontFamily: fontFamily.display,
-          fontSize: 26,
-          fontWeight: 700,
-          letterSpacing: letterSpacing.wordmark,
-          textTransform: 'uppercase',
-          color: text.heading,
-          zIndex: 1,
-        }}
-      >
-        Jarvis
-      </h1>
+      {!cinematic && (
+        <h1
+          style={{
+            marginTop: 44,
+            marginBottom: 0,
+            fontFamily: fontFamily.display,
+            fontSize: 26,
+            fontWeight: 700,
+            letterSpacing: letterSpacing.wordmark,
+            textTransform: 'uppercase',
+            color: text.heading,
+            zIndex: 1,
+          }}
+        >
+          Jarvis
+        </h1>
+      )}
 
       <div
         style={{
@@ -154,7 +164,11 @@ export function Shell({ devStateSwitcher = import.meta.env.DEV }: ShellProps): J
           zIndex: 1,
         }}
       >
-        <Orb state={orbState} sizePx={420} />
+        {cinematic ? (
+          <OrbStudyV2 state={orbState} dormant={dormantScene} sizePx={460} />
+        ) : (
+          <Orb state={orbState} sizePx={420} />
+        )}
       </div>
 
       {/* static depth cues over the stage, under nothing interactive */}
@@ -207,12 +221,83 @@ export function Shell({ devStateSwitcher = import.meta.env.DEV }: ShellProps): J
               >
                 MOCK — drives the Orb visual only; no real state engine exists
               </span>
+              <button
+                type="button"
+                data-dev-v2="true"
+                onClick={() => {
+                  setRendererV2((on) => !on);
+                }}
+                aria-pressed={rendererV2}
+                style={{
+                  minHeight: 30,
+                  padding: '5px 10px',
+                  textAlign: 'right',
+                  fontFamily: fontFamily.mono,
+                  fontSize: 11,
+                  letterSpacing: letterSpacing.label,
+                  color: rendererV2 ? background.fieldTop : accent.claudePurple,
+                  background: rendererV2 ? accent.claudePurple : 'transparent',
+                  border: `1px solid ${accent.claudePurple}`,
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                }}
+              >
+                renderer V2 study {rendererV2 ? 'ON' : 'off'}
+              </button>
+              {rendererV2 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDormantScene((on) => !on);
+                  }}
+                  aria-pressed={dormantScene}
+                  style={{
+                    minHeight: 30,
+                    padding: '5px 10px',
+                    textAlign: 'right',
+                    fontFamily: fontFamily.mono,
+                    fontSize: 11,
+                    letterSpacing: letterSpacing.label,
+                    color: dormantScene ? background.fieldTop : text.secondaryDim,
+                    background: dormantScene ? accent.jarvisBlue : 'transparent',
+                    border: '1px solid transparent',
+                    borderRadius: 6,
+                    cursor: 'pointer',
+                  }}
+                >
+                  dormant scene
+                </button>
+              )}
+              {cinematic && (
+                <span
+                  style={{
+                    fontFamily: fontFamily.mono,
+                    fontSize: 9,
+                    letterSpacing: letterSpacing.label,
+                    color: text.faint,
+                    padding: '4px 6px',
+                    maxWidth: 220,
+                    borderTop: `1px solid ${surface.hairline}`,
+                  }}
+                >
+                  DIAGNOSTICS · PHASE 1 FOUNDATION · NO APPLICATION FEATURES · AEGIS NOT IMPLEMENTED
+                  ·{' '}
+                  {host.kind === 'real'
+                    ? `HOST: electron ${host.info.electronVersion} · ${host.info.platform}`
+                    : host.kind === 'noBridge'
+                      ? 'BROWSER PREVIEW — NO PRELOAD BRIDGE'
+                      : host.kind === 'bridgeError'
+                        ? 'BRIDGE FAILED — SEE CONSOLE'
+                        : 'READING HOST…'}
+                </span>
+              )}
               {ORB_STATES.map((state) => (
                 <button
                   key={state}
                   type="button"
                   onClick={() => {
                     setOrbState(state);
+                    setDormantScene(false);
                   }}
                   aria-pressed={state === orbState}
                   style={{
@@ -259,48 +344,50 @@ export function Shell({ devStateSwitcher = import.meta.env.DEV }: ShellProps): J
         </section>
       )}
 
-      <footer
-        style={{
-          width: '100%',
-          boxSizing: 'border-box',
-          padding: '12px 24px 14px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 3,
-          alignItems: 'center',
-          fontFamily: fontFamily.mono,
-          fontSize: 10,
-          letterSpacing: letterSpacing.label,
-          color: text.faint,
-          textAlign: 'center',
-          zIndex: 1,
-        }}
-      >
-        <span>
-          PHASE 1 FOUNDATION · NO APPLICATION FEATURES · AEGIS NOT IMPLEMENTED — NOTHING HERE IS
-          PROTECTED BY IT
-        </span>
-        {host.kind === 'loading' && <span>Reading host info…</span>}
-        {host.kind === 'real' && (
+      {!cinematic && (
+        <footer
+          style={{
+            width: '100%',
+            boxSizing: 'border-box',
+            padding: '12px 24px 14px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 3,
+            alignItems: 'center',
+            fontFamily: fontFamily.mono,
+            fontSize: 10,
+            letterSpacing: letterSpacing.label,
+            color: text.faint,
+            textAlign: 'center',
+            zIndex: 1,
+          }}
+        >
           <span>
-            HOST (REAL, via app:get-info): app {host.info.appVersion} · electron{' '}
-            {host.info.electronVersion} · chrome {host.info.chromeVersion} · node{' '}
-            {host.info.nodeVersion} · {host.info.platform} ({host.info.arch}) · packaged{' '}
-            {String(host.info.isPackaged)}
+            PHASE 1 FOUNDATION · NO APPLICATION FEATURES · AEGIS NOT IMPLEMENTED — NOTHING HERE IS
+            PROTECTED BY IT
           </span>
-        )}
-        {host.kind === 'noBridge' && (
-          <span>
-            BROWSER PREVIEW · PRELOAD BRIDGE UNAVAILABLE — HOST FACTS REQUIRE THE ELECTRON RUNTIME
-            (SEE CONSOLE)
-          </span>
-        )}
-        {host.kind === 'bridgeError' && (
-          <span role="alert" style={{ color: accent.warning }}>
-            HOST FACTS UNAVAILABLE — THE PRELOAD BRIDGE FAILED; SEE CONSOLE DIAGNOSTICS
-          </span>
-        )}
-      </footer>
+          {host.kind === 'loading' && <span>Reading host info…</span>}
+          {host.kind === 'real' && (
+            <span>
+              HOST (REAL, via app:get-info): app {host.info.appVersion} · electron{' '}
+              {host.info.electronVersion} · chrome {host.info.chromeVersion} · node{' '}
+              {host.info.nodeVersion} · {host.info.platform} ({host.info.arch}) · packaged{' '}
+              {String(host.info.isPackaged)}
+            </span>
+          )}
+          {host.kind === 'noBridge' && (
+            <span>
+              BROWSER PREVIEW · PRELOAD BRIDGE UNAVAILABLE — HOST FACTS REQUIRE THE ELECTRON RUNTIME
+              (SEE CONSOLE)
+            </span>
+          )}
+          {host.kind === 'bridgeError' && (
+            <span role="alert" style={{ color: accent.warning }}>
+              HOST FACTS UNAVAILABLE — THE PRELOAD BRIDGE FAILED; SEE CONSOLE DIAGNOSTICS
+            </span>
+          )}
+        </footer>
+      )}
     </main>
   );
 }

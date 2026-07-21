@@ -119,9 +119,10 @@ describe('Shell', () => {
       render(<Shell devStateSwitcher={true} />);
       fireEvent.click(screen.getByRole('button', { name: /DEV · STATES/ }));
       expect(screen.getByText(/MOCK — drives the Orb visual only/)).toBeTruthy();
-      // The eleven state buttons plus the toggle itself.
-      expect(screen.getAllByRole('button')).toHaveLength(ORB_STATES.length + 1);
+      // Eleven state buttons + the drawer toggle + the V2-study toggle.
+      expect(screen.getAllByRole('button')).toHaveLength(ORB_STATES.length + 2);
       expect(screen.getByRole('button', { name: 'aegisLockdown (demo-only)' })).toBeTruthy();
+      expect(screen.getByRole('button', { name: /renderer V2 study/ })).toBeTruthy();
     });
 
     it('drives the Orb state locally', () => {
