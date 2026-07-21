@@ -364,6 +364,43 @@ async function runChecks(page, mode) {
     info.error ? `THREW: ${String(info.error).split('\n')[0]}` : JSON.stringify(i),
   );
 
+  // E2: the Experience Shell mounts the Orb. Assert the real component is
+  // live — state, ARIA meaning, and its canvas — not merely that React
+  // produced markup.
+  const orbState = await page.evaluate(
+    'document.querySelector("[data-orb-state]")?.getAttribute("data-orb-state") ?? null',
+  );
+  add(
+    'Orb mounted in idle state',
+    orbState.value === 'idle',
+    `data-orb-state = ${JSON.stringify(orbState.value)}`,
+  );
+
+  const orbAria = await page.evaluate(
+    'document.querySelector("[data-orb-state]")?.getAttribute("aria-label") ?? null',
+  );
+  add(
+    'Orb carries its ARIA label',
+    typeof orbAria.value === 'string' && orbAria.value.startsWith('Jarvis orb:'),
+    JSON.stringify(orbAria.value),
+  );
+
+  const orbCanvas = await page.evaluate(
+    'document.querySelector("[data-orb-state] canvas") !== null',
+  );
+  add('Orb particle canvas present', orbCanvas.value === true, String(orbCanvas.value));
+
+  // The state switcher is a dev-only tool: present in dev, stripped in prod.
+  const switcher = await page.evaluate(
+    'document.querySelector(\'[aria-label^="Dev-only orb state switcher"]\') !== null',
+  );
+  const switcherOk = mode === 'dev' ? switcher.value === true : switcher.value === false;
+  add(
+    mode === 'dev' ? 'Dev state switcher present (dev)' : 'Dev state switcher absent (prod)',
+    switcherOk,
+    `present = ${String(switcher.value)}`,
+  );
+
   // The bridge must stay narrow. A generic passthrough here would hand the
   // renderer the whole main process (ADR 0002).
   const invoke = await page.evaluate('window.jarvis ? typeof window.jarvis.invoke : "no-bridge"');
