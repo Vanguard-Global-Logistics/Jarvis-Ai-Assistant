@@ -11,27 +11,27 @@ import { createParticleField } from './particles.js';
 import type { ParticleField, ParticleLayer } from './particles.js';
 
 /**
- * The Orb — the centerpiece (task E2, visual correction pass). Layered
- * pseudo-3D per the approved benchmark `docs/design/JARVIS-MOTION-BENCHMARK.md`
- * §4 (layer stack), §5 (materials: the brightness lives around and within the
- * dark mechanical heart, never as a flat fill), §6 (depth-varied particles),
- * §18 (reduced motion), §19 (performance budget): CSS perspective transforms +
- * SVG + Canvas 2D only — no WebGL, no three.js, no backdrop blur.
+ * The Orb — the centerpiece (task E2, visual correction pass 2). One coherent
+ * field of contained intelligence, not adjacent circular UI layers: the
+ * nucleus drives shell luminosity and orbital tempo, breathing propagates
+ * outward with a phase lag, and the particle field converges into / emits
+ * from the same center the light does. Benchmark authority:
+ * `docs/design/JARVIS-MOTION-BENCHMARK.md` §4–§6, §18, §19. CSS perspective
+ * transforms + SVG + Canvas 2D only — no WebGL, no three.js, no backdrop
+ * blur.
+ *
+ * Anti-readings deliberately engineered away: no complete uniform ellipses
+ * (energy paths are partial, asymmetric, dash-broken — not an atom diagram);
+ * no concentric iris/pupil geometry (the nucleus is two off-center light
+ * volumes with filaments and an occluding crescent — not an eye); no single
+ * dominant bright arc (the containment is depth-separated segments of unequal
+ * length and luminosity — not a progress ring).
  *
  * The component is state-agnostic: every visual decision comes from
  * `orbVisualConfig(state, reducedMotion)`; nothing here re-derives timing or
  * the reduced-motion rule. `aegisLockdown` therefore renders like any other
  * state, but it is a **demo-only visual state** — AEGIS is NOT IMPLEMENTED
  * (`docs/KNOWN-LIMITATIONS.md` §1) and only a labeled demo may drive it.
- *
- * Layer stack, back to front (benchmark §4, adapted): ambient glow → rear
- * particle canvas (deep motes) → outer thin orbital rings → rear containment
- * arc → gimbal shell pair → mechanical segmented ring → CORE GROUP (occlusion
- * shadow, dark mechanical body with asymmetric lighting, two translucent
- * shells, internal energy nucleus with slow swirl, specular highlight) →
- * front containment arc (double-edged, state-driven luminosity) → front
- * particle canvas (near motes, occluding) → wake choreography and one-shot
- * blooms → StateAnnouncer.
  */
 export interface OrbProps {
   state: OrbState;
@@ -48,14 +48,16 @@ const ENTER_BEZIER = toBezier(easing.enter);
 const MECHANICAL_SEGMENTS = 48;
 const MECHANICAL_RADIUS = 0.46;
 /**
- * Containment ring: refined structure, not the subject. Thin double-edged
- * stroke (~2.2% + 0.7% inner edge), radius between mechanicals and core.
+ * Containment field: several depth-separated arc segments of unequal radius,
+ * width, length, and luminosity, drifting at offset periods so they never
+ * align into a single readable ring. `phaseDeg` is each segment's initial
+ * rotation — deterministic, chosen for asymmetry.
  */
-const CONTAINMENT_RADIUS = 0.34;
-const CONTAINMENT_STROKE = 0.022;
-const CONTAINMENT_EDGE_STROKE = 0.007;
-/** Front arc covers ~62% of the circumference; the gap reads as occlusion. */
-const FRONT_ARC_FRACTION = 0.62;
+const CONTAINMENT_SEGMENTS = [
+  { radius: 0.34, width: 0.018, arc: 0.3, opacity: 1, periodFactor: 2, phaseDeg: -118 },
+  { radius: 0.326, width: 0.009, arc: 0.16, opacity: 0.55, periodFactor: 2.3, phaseDeg: -6 },
+  { radius: 0.352, width: 0.006, arc: 0.09, opacity: 0.4, periodFactor: 1.7, phaseDeg: 96 },
+] as const;
 /** Core group diameter as a fraction of the square. */
 const CORE_FRACTION = 0.3;
 /** CSS percentage strings for the centered core box, derived once. */
@@ -83,7 +85,8 @@ const REACTIVE_KEYFRAMES: number[] = Array.from({ length: REACTIVE_SAMPLE_COUNT 
  * Wake choreography (benchmark §2 moments 1–3, compressed): phase fractions
  * of `orbTiming.wakeSequenceMs`. dormant spark 0–0.18 → energy gathering
  * 0.18–0.45 → containment alignment 0.45–0.62 → core ignition 0.62–0.75 →
- * dimensional expansion 0.75–1 → (caller settles to idle breathing).
+ * dimensional expansion 0.75–1 → (caller settles to idle breathing). The
+ * core dips just before ignition — anticipation, then release.
  */
 const WAKE_TIMES = [0, 0.18, 0.45, 0.62, 0.75, 1];
 const WAKE_S = orbTiming.wakeSequenceMs / 1000;
@@ -94,7 +97,6 @@ const WAKE_S = orbTiming.wakeSequenceMs / 1000;
  * motion drives those. Radial/conic gradients are not CSS-animatable and
  * change instantly — a known, disclosed limit of the pseudo-3D approach.
  */
-const accentTransition = `border-color ${String(duration.quickMs)}ms ${easing.standard}`;
 const strokeTransition = `stroke ${String(duration.quickMs)}ms ${easing.standard}`;
 
 // Inferred literal type (not CSSProperties): under exactOptionalPropertyTypes
@@ -116,13 +118,16 @@ function spinProps(
   };
 }
 
-/** Pulse animation props for the containment ring; static for 'none'. */
-function pulseProps(config: OrbVisualConfig): {
-  animate: { opacity: number | number[] };
-  transition?: object;
-} {
-  const base = config.ringOpacity;
-  switch (config.pulse) {
+/**
+ * Pulse animation for a luminous layer, scaled to a base opacity. Applied to
+ * BOTH the containment segments and the nucleus so the whole Orb shares one
+ * energy signal (unification rule).
+ */
+function pulseProps(
+  pulse: OrbVisualConfig['pulse'],
+  base: number,
+): { animate: { opacity: number | number[] }; transition?: object } {
+  switch (pulse) {
     case 'rhythmic':
       return {
         animate: { opacity: [base, base * 0.72, base] },
@@ -202,7 +207,11 @@ function ParticleCanvas({
     }
     field.setMode(config.particleMode, config.accentColor);
     field.stop();
-    if (config.particleMode === 'halo' || config.particleMode === 'converge') {
+    if (
+      config.particleMode === 'halo' ||
+      config.particleMode === 'converge' ||
+      config.particleMode === 'emit'
+    ) {
       field.start();
     } else {
       field.renderStatic();
@@ -222,6 +231,76 @@ function ParticleCanvas({
   );
 }
 
+/**
+ * A tilted spatial energy path: a dash-broken partial ellipse (two unequal
+ * arc segments, unequal opacity) inside a 3D-tilted plane — reads as a trace
+ * of orbital energy, not a complete technical ellipse (anti-atom rule).
+ */
+function EnergyPath({
+  accentColor,
+  inset,
+  tilt,
+  spinPeriodMs,
+  direction,
+  arcFractions,
+  phaseDeg,
+  baseOpacity,
+}: {
+  accentColor: string;
+  inset: string;
+  tilt: { rotateX?: number; rotateY?: number; rotateZ?: number };
+  spinPeriodMs: number;
+  direction: 1 | -1;
+  /** [long arc, short bright arc] as fractions of the circumference. */
+  arcFractions: [number, number];
+  phaseDeg: number;
+  baseOpacity: number;
+}): JSX.Element {
+  // The path is drawn in a unit viewBox and scaled; radius 48 of 100.
+  const r = 48;
+  const c = 2 * Math.PI * r;
+  const [longArc, shortArc] = arcFractions;
+  return (
+    <div aria-hidden="true" style={{ position: 'absolute', inset, perspective: 800 }}>
+      <motion.div
+        style={{ position: 'absolute', inset: 0, ...tilt }}
+        {...spinProps(spinPeriodMs, direction)}
+      >
+        <svg width="100%" height="100%" viewBox="0 0 100 100" style={{ display: 'block' }}>
+          {/* long faint trace */}
+          <circle
+            cx={50}
+            cy={50}
+            r={r}
+            fill="none"
+            stroke={accentColor}
+            strokeWidth={0.6}
+            strokeLinecap="round"
+            strokeDasharray={`${(c * longArc).toFixed(2)} ${(c * (1 - longArc)).toFixed(2)}`}
+            opacity={baseOpacity * 0.5}
+            transform={`rotate(${String(phaseDeg)} 50 50)`}
+            style={{ transition: strokeTransition }}
+          />
+          {/* short brighter energy trace, elsewhere on the path */}
+          <circle
+            cx={50}
+            cy={50}
+            r={r}
+            fill="none"
+            stroke={accentColor}
+            strokeWidth={0.9}
+            strokeLinecap="round"
+            strokeDasharray={`${(c * shortArc).toFixed(2)} ${(c * (1 - shortArc)).toFixed(2)}`}
+            opacity={baseOpacity}
+            transform={`rotate(${String(phaseDeg + 150)} 50 50)`}
+            style={{ transition: strokeTransition }}
+          />
+        </svg>
+      </motion.div>
+    </div>
+  );
+}
+
 export function Orb({ state, sizePx = 360, announce = true }: OrbProps): JSX.Element {
   const reducedMotion = useReducedMotion();
   const config = orbVisualConfig(state, reducedMotion);
@@ -229,16 +308,19 @@ export function Orb({ state, sizePx = 360, announce = true }: OrbProps): JSX.Ele
   const glowFilterId = useId();
 
   const isWaking = config.bloom === 'wake';
-  const hairline = withAlpha(config.accentColor, 0.22);
+  const nucleus = config.nucleusIntensity;
+  // Unification: orbital tempo responds to core intensity — a brighter
+  // nucleus drives faster containment drift (deterministic, config-derived).
+  const effectiveSpinMs = config.ringSpinPeriodMs / (0.7 + 0.6 * nucleus);
   const mechanicalCircumference = 2 * Math.PI * MECHANICAL_RADIUS * sizePx;
   const mechanicalSegment = mechanicalCircumference / MECHANICAL_SEGMENTS;
-  const containmentCircumference = 2 * Math.PI * CONTAINMENT_RADIUS * sizePx;
-  // The counter-rotation pair: the outer shell flips direction under
+  // The counter-rotation pair: the outer path flips direction under
   // counterRotate; the inner always spins +1, so the two oppose each other.
   const outerDirection: 1 | -1 = config.counterRotate ? -1 : 1;
   const innerDirection: 1 | -1 = 1;
-  const pulse = pulseProps(config);
-  const nucleus = config.nucleusIntensity;
+  const ringPulse = pulseProps(config.pulse, 1);
+  const nucleusPulse = pulseProps(config.pulse, 0.35 + 0.65 * nucleus);
+  const breathing = config.breathScale > 1;
 
   const ariaLabel = `Jarvis orb: ${
     reducedMotion ? motionEntry.reducedMotion.description : motionEntry.description
@@ -246,15 +328,16 @@ export function Orb({ state, sizePx = 360, announce = true }: OrbProps): JSX.Ele
 
   /**
    * Wake choreography vs steady state: during wake the core group and the
-   * containment run keyframe timelines (spark → gathering → alignment →
-   * ignition → expansion); every other state animates to its resting values.
-   * Reduced motion never enters this branch (config.bloom is 'none').
+   * containment run keyframe timelines; every other state animates to its
+   * resting values. Reduced motion never enters the wake branch.
    */
   const coreGroupMotion = isWaking
     ? {
         animate: {
           opacity: [0, 0.55, 0.85, 1, 1, 1],
-          scale: [0.3, 0.4, 0.58, 0.66, 1.06, 1],
+          // Anticipation: the gathered mass tightens (0.58 → 0.54) just
+          // before ignition, then releases through the expansion overshoot.
+          scale: [0.3, 0.4, 0.58, 0.54, 1.07, 1],
         },
         transition: { duration: WAKE_S, times: WAKE_TIMES, ease: STANDARD_BEZIER },
       }
@@ -271,7 +354,7 @@ export function Orb({ state, sizePx = 360, announce = true }: OrbProps): JSX.Ele
     ? {
         animate: {
           opacity: [0, 0.08, 0.3, 0.85, 1, 1],
-          rotateZ: [-38, -38, -22, -6, 0, 0],
+          rotateZ: [-38, -38, -22, 2, -1, 0],
           scale: [0.85, 0.85, 0.92, 0.99, 1.03, 1],
         },
         transition: { duration: WAKE_S, times: WAKE_TIMES, ease: STANDARD_BEZIER },
@@ -294,6 +377,33 @@ export function Orb({ state, sizePx = 360, announce = true }: OrbProps): JSX.Ele
       }
     : { animate: { x: 0, y: 0 }, transition: { duration: duration.quickMs / 1000 } };
 
+  // Breathing propagates outward: the nucleus respires first, the ambient
+  // glow follows a beat later (unification: light moves center → field).
+  const nucleusRespiration = breathing
+    ? {
+        animate: { scale: [1, 1.03, 1] },
+        transition: {
+          duration: config.breathPeriodMs / 1000,
+          ease: STANDARD_BEZIER,
+          repeat: Infinity,
+        },
+      }
+    : { animate: { scale: 1 }, transition: { duration: duration.surfaceMs / 1000 } };
+  const glowBreath = breathing
+    ? {
+        animate: { scale: [1, config.breathScale, 1] },
+        transition: {
+          duration: config.breathPeriodMs / 1000,
+          ease: STANDARD_BEZIER,
+          repeat: Infinity,
+          delay: 0.15,
+        },
+      }
+    : {
+        animate: { scale: 1 },
+        transition: { duration: duration.surfaceMs / 1000, ease: STANDARD_BEZIER },
+      };
+
   return (
     <div
       role="img"
@@ -308,48 +418,38 @@ export function Orb({ state, sizePx = 360, announce = true }: OrbProps): JSX.Ele
         filter: config.desaturate ? 'saturate(0.25)' : undefined,
       }}
     >
-      {/* 1 — ambient glow, breathing when the state breathes */}
+      {/* 1 — ambient glow: the field the intelligence lights, breathing a
+          beat behind the nucleus */}
       <motion.div
         aria-hidden="true"
         style={{
           ...fullSquare,
           borderRadius: '50%',
-          background: `radial-gradient(circle, ${withAlpha(config.accentColor, 0.12)} 0%, transparent 62%)`,
+          background: `radial-gradient(circle, ${withAlpha(config.accentColor, 0.1 + 0.06 * nucleus)} 0%, transparent 62%)`,
         }}
-        animate={config.breathScale > 1 ? { scale: [1, config.breathScale, 1] } : { scale: 1 }}
-        transition={
-          config.breathScale > 1
-            ? {
-                duration: config.breathPeriodMs / 1000,
-                ease: STANDARD_BEZIER,
-                repeat: Infinity,
-              }
-            : { duration: duration.surfaceMs / 1000, ease: STANDARD_BEZIER }
-        }
+        {...glowBreath}
       />
 
       {/* 2 — rear particle canvas: deep motes behind the machine */}
       <ParticleCanvas layer="rear" sizePx={sizePx} config={config} opacity={0.7} />
 
-      {/* 3 — outer thin orbital rings: faint silhouette extenders (benchmark §4.5) */}
-      <div aria-hidden="true" style={{ ...fullSquare, inset: '2%', perspective: 900 }}>
-        <motion.div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            borderRadius: '50%',
-            border: `1px solid ${withAlpha(config.accentColor, 0.1)}`,
-            transition: accentTransition,
-            rotateX: 76,
-          }}
-          {...spinProps(config.ringSpinPeriodMs * 1.6, outerDirection)}
-        />
-      </div>
+      {/* 3 — spatial energy paths: partial, asymmetric, dash-broken — the
+          orbital structure without the atom diagram */}
+      <EnergyPath
+        accentColor={config.accentColor}
+        inset="2%"
+        tilt={{ rotateX: 76, rotateZ: 14 }}
+        spinPeriodMs={effectiveSpinMs * 1.6}
+        direction={outerDirection}
+        arcFractions={[0.38, 0.1]}
+        phaseDeg={-30}
+        baseOpacity={0.35}
+      />
 
       {/* containment group: everything that "contains" scales/vibrates together */}
       <motion.div aria-hidden="true" style={fullSquare} {...vibrationMotion}>
         <motion.div style={fullSquare} {...containmentMotion}>
-          {/* 4 — rear containment arc: the ring passes BEHIND the core */}
+          {/* 4 — rear containment pass: the field's far side, dim, behind the core */}
           <svg
             width={sizePx}
             height={sizePx}
@@ -359,55 +459,45 @@ export function Orb({ state, sizePx = 360, announce = true }: OrbProps): JSX.Ele
             <circle
               cx={sizePx / 2}
               cy={sizePx / 2}
-              r={CONTAINMENT_RADIUS * sizePx}
+              r={CONTAINMENT_SEGMENTS[0].radius * sizePx}
               fill="none"
               stroke={LUMINOUS_WHITE}
-              strokeWidth={CONTAINMENT_STROKE * sizePx}
-              opacity={0.28 * config.ringOpacity}
+              strokeWidth={CONTAINMENT_SEGMENTS[0].width * sizePx}
+              opacity={0.22 * config.ringOpacity}
             />
           </svg>
 
-          {/* 5 — gimbal shell pair: tilted orbital hairlines */}
-          <div style={{ position: 'absolute', inset: '8%', perspective: 800 }}>
-            <motion.div
-              style={{
-                position: 'absolute',
-                inset: 0,
-                borderRadius: '50%',
-                border: `1px solid ${hairline}`,
-                transition: accentTransition,
-                rotateX: 72,
-              }}
-              {...spinProps(config.ringSpinPeriodMs, outerDirection)}
-            />
-          </div>
-          {/* Inner gimbal inset 16.4%: outer spans 84%, 0.8 × 84% = 67.2% span. */}
-          <div style={{ position: 'absolute', inset: '16.4%', perspective: 800 }}>
-            <motion.div
-              style={{
-                position: 'absolute',
-                inset: 0,
-                borderRadius: '50%',
-                border: `1px solid ${hairline}`,
-                transition: accentTransition,
-                rotateY: 66,
-              }}
-              {...spinProps(config.ringSpinPeriodMs, innerDirection)}
-            />
-          </div>
+          {/* 5 — gimbal energy paths: the tilted pair, partial and unequal */}
+          <EnergyPath
+            accentColor={config.accentColor}
+            inset="8%"
+            tilt={{ rotateX: 72, rotateZ: -8 }}
+            spinPeriodMs={effectiveSpinMs}
+            direction={outerDirection}
+            arcFractions={[0.44, 0.14]}
+            phaseDeg={-118}
+            baseOpacity={0.5}
+          />
+          <EnergyPath
+            accentColor={config.accentColor}
+            inset="16.4%"
+            tilt={{ rotateY: 66, rotateZ: 22 }}
+            spinPeriodMs={effectiveSpinMs}
+            direction={innerDirection}
+            arcFractions={[0.36, 0.12]}
+            phaseDeg={64}
+            baseOpacity={0.5}
+          />
 
-          {/* 6 — mechanical segmented ring at half the shell period */}
-          <motion.div
-            style={fullSquare}
-            {...spinProps(config.ringSpinPeriodMs / 2, outerDirection)}
-          >
+          {/* 6 — mechanical segmented ring at half the drift period */}
+          <motion.div style={fullSquare} {...spinProps(effectiveSpinMs / 2, outerDirection)}>
             <svg width={sizePx} height={sizePx} viewBox={squareViewBox(sizePx)}>
               <circle
                 cx={sizePx / 2}
                 cy={sizePx / 2}
                 r={MECHANICAL_RADIUS * sizePx}
                 fill="none"
-                stroke={withAlpha(config.accentColor, 0.3)}
+                stroke={withAlpha(config.accentColor, 0.28)}
                 strokeWidth={1}
                 strokeDasharray={`${(mechanicalSegment * 0.35).toFixed(3)} ${(mechanicalSegment * 0.65).toFixed(3)}`}
                 style={{ transition: strokeTransition }}
@@ -442,23 +532,24 @@ export function Orb({ state, sizePx = 360, announce = true }: OrbProps): JSX.Ele
             background: 'radial-gradient(circle, rgba(0,0,0,0.55) 30%, transparent 70%)',
           }}
         />
-        {/* 7b — dark mechanical body, lit asymmetrically from the upper left */}
+        {/* 7b — dark mechanical body, lit asymmetrically from the upper left;
+            its rim luminosity follows the nucleus (shared energy) */}
         <div
           style={{
             position: 'absolute',
             inset: 0,
             borderRadius: '50%',
             background: 'radial-gradient(circle at 36% 30%, #1b2634 0%, #0c121b 42%, #05070a 78%)',
-            boxShadow: `inset -6px -8px 18px rgba(0,0,0,0.6), 0 0 ${String(sizePx * 0.05)}px ${withAlpha(config.accentColor, 0.18)}`,
+            boxShadow: `inset -6px -8px 18px rgba(0,0,0,0.6), 0 0 ${String(sizePx * 0.05)}px ${withAlpha(config.accentColor, 0.1 + 0.14 * nucleus)}`,
           }}
         />
-        {/* 7c — translucent outer shell: rim of contained energy */}
+        {/* 7c — translucent outer shell: rim lit by the nucleus */}
         <div
           style={{
             position: 'absolute',
             inset: '-9%',
             borderRadius: '50%',
-            background: `radial-gradient(circle, transparent 52%, ${withAlpha(config.accentColor, 0.1)} 68%, transparent 76%)`,
+            background: `radial-gradient(circle, transparent 52%, ${withAlpha(config.accentColor, 0.06 + 0.08 * nucleus)} 68%, transparent 76%)`,
           }}
         />
         {/* 7d — translucent inner shell, offset: front/rear separation */}
@@ -468,26 +559,59 @@ export function Orb({ state, sizePx = 360, announce = true }: OrbProps): JSX.Ele
             inset: '4%',
             borderRadius: '50%',
             transform: 'translate(-2%, -3%)',
-            background: `radial-gradient(circle at 42% 38%, transparent 40%, ${withAlpha(config.accentColor, 0.14)} 58%, transparent 70%)`,
+            background: `radial-gradient(circle at 42% 38%, transparent 40%, ${withAlpha(config.accentColor, 0.08 + 0.1 * nucleus)} 58%, transparent 70%)`,
           }}
         />
-        {/* 7e — internal energy nucleus: stored intelligence, state-driven */}
-        <motion.div
-          style={{
-            position: 'absolute',
-            inset: '26%',
-            borderRadius: '50%',
-            background: `radial-gradient(circle at 44% 40%, ${withAlpha(LUMINOUS_WHITE, Math.min(1, nucleus))} 0%, ${withAlpha(config.accentColor, 0.75 * nucleus)} 38%, transparent 72%)`,
-          }}
-          animate={{ opacity: 0.35 + 0.65 * nucleus }}
-          transition={{ duration: duration.quickMs / 1000, ease: STANDARD_BEZIER }}
-        />
-        {/* 7f — internal swirl: subtle motion inside the nucleus (loops only) */}
+        {/* 7e — nucleus: two overlapping off-center light volumes — energy,
+            not an eye. Pulse modes drive it directly (one energy system). */}
+        <motion.div style={{ position: 'absolute', inset: '22%' }} {...nucleusPulse}>
+          <motion.div style={{ position: 'absolute', inset: 0 }} {...nucleusRespiration}>
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                borderRadius: '50%',
+                background: `radial-gradient(circle at 38% 46%, ${withAlpha(config.accentColor, 0.8)} 0%, ${withAlpha(config.accentColor, 0.25)} 42%, transparent 68%)`,
+              }}
+            />
+            <div
+              style={{
+                position: 'absolute',
+                inset: '8%',
+                borderRadius: '50%',
+                transform: 'translate(14%, -6%)',
+                background: `radial-gradient(circle at 60% 42%, ${withAlpha(LUMINOUS_WHITE, 0.85)} 0%, ${withAlpha(LUMINOUS_WHITE, 0.2)} 34%, transparent 62%)`,
+              }}
+            />
+            {/* faint internal filaments (masked conic slivers) */}
+            <div
+              style={{
+                position: 'absolute',
+                inset: '-6%',
+                borderRadius: '50%',
+                background: `conic-gradient(from 40deg, transparent 0%, ${withAlpha(config.accentColor, 0.2)} 6%, transparent 14%, transparent 52%, ${withAlpha(LUMINOUS_WHITE, 0.12)} 60%, transparent 70%)`,
+                maskImage: 'radial-gradient(circle, black 0%, black 55%, transparent 72%)',
+              }}
+            />
+            {/* occluding crescent: depth inside the light */}
+            <div
+              style={{
+                position: 'absolute',
+                inset: '6%',
+                borderRadius: '50%',
+                transform: 'translate(16%, -10%)',
+                background:
+                  'radial-gradient(circle at 70% 30%, rgba(5,7,10,0.5) 0%, transparent 55%)',
+              }}
+            />
+          </motion.div>
+        </motion.div>
+        {/* 7f — internal swirl: slow drift inside the volume (loops only) */}
         {config.loops && Number.isFinite(config.ringSpinPeriodMs) && (
           <motion.div
             style={{
               position: 'absolute',
-              inset: '20%',
+              inset: '18%',
               borderRadius: '50%',
               background: `conic-gradient(from 0deg, transparent 0%, ${withAlpha(config.accentColor, 0.12 * nucleus)} 12%, transparent 30%, transparent 55%, ${withAlpha(config.accentColor, 0.08 * nucleus)} 68%, transparent 82%)`,
               maskImage: 'radial-gradient(circle, black 0%, black 60%, transparent 75%)',
@@ -499,71 +623,69 @@ export function Orb({ state, sizePx = 360, announce = true }: OrbProps): JSX.Ele
         <div
           style={{
             position: 'absolute',
-            left: '24%',
-            top: '18%',
-            width: '22%',
-            height: '16%',
+            left: '22%',
+            top: '16%',
+            width: '20%',
+            height: '14%',
             borderRadius: '50%',
-            background: `radial-gradient(circle, ${withAlpha(LUMINOUS_WHITE, 0.3 * Math.max(0.4, nucleus))} 0%, transparent 70%)`,
+            transform: 'rotate(-18deg)',
+            background: `radial-gradient(circle, ${withAlpha(LUMINOUS_WHITE, 0.28 * Math.max(0.4, nucleus))} 0%, transparent 70%)`,
           }}
         />
       </motion.div>
 
-      {/* 8 — front containment arc: double-edged, partial (occlusion gap), state-lit */}
-      <motion.div aria-hidden="true" style={fullSquare} {...pulse}>
-        <motion.div style={fullSquare} {...spinProps(config.ringSpinPeriodMs * 2, outerDirection)}>
-          <svg width={sizePx} height={sizePx} viewBox={squareViewBox(sizePx)}>
-            <defs>
-              <filter id={glowFilterId} x="-40%" y="-40%" width="180%" height="180%">
-                <feGaussianBlur stdDeviation={sizePx * 0.012} />
-              </filter>
-            </defs>
-            {/* soft bloom duplicate — controlled, narrow */}
-            <circle
-              cx={sizePx / 2}
-              cy={sizePx / 2}
-              r={CONTAINMENT_RADIUS * sizePx}
-              fill="none"
-              stroke={LUMINOUS_WHITE}
-              strokeWidth={CONTAINMENT_STROKE * sizePx * 1.8}
-              strokeDasharray={`${(containmentCircumference * FRONT_ARC_FRACTION).toFixed(2)} ${(containmentCircumference * (1 - FRONT_ARC_FRACTION)).toFixed(2)}`}
-              strokeLinecap="round"
-              opacity={0.4}
-              filter={`url(#${glowFilterId})`}
-              transform={`rotate(-118 ${String(sizePx / 2)} ${String(sizePx / 2)})`}
-            />
-            {/* main edge */}
-            <circle
-              cx={sizePx / 2}
-              cy={sizePx / 2}
-              r={CONTAINMENT_RADIUS * sizePx}
-              fill="none"
-              stroke={LUMINOUS_WHITE}
-              strokeWidth={CONTAINMENT_STROKE * sizePx}
-              strokeDasharray={`${(containmentCircumference * FRONT_ARC_FRACTION).toFixed(2)} ${(containmentCircumference * (1 - FRONT_ARC_FRACTION)).toFixed(2)}`}
-              strokeLinecap="round"
-              transform={`rotate(-118 ${String(sizePx / 2)} ${String(sizePx / 2)})`}
-            />
-            {/* inner second edge — the benchmark's "subtle double edge" */}
-            <circle
-              cx={sizePx / 2}
-              cy={sizePx / 2}
-              r={CONTAINMENT_RADIUS * sizePx * 0.955}
-              fill="none"
-              stroke={LUMINOUS_WHITE}
-              strokeWidth={CONTAINMENT_EDGE_STROKE * sizePx}
-              strokeDasharray={`${(containmentCircumference * 0.52).toFixed(2)} ${(containmentCircumference * 0.48).toFixed(2)}`}
-              strokeLinecap="round"
-              opacity={0.5}
-              transform={`rotate(-98 ${String(sizePx / 2)} ${String(sizePx / 2)})`}
-            />
-          </svg>
-        </motion.div>
+      {/* 8 — front containment segments: depth-separated arcs, unequal in
+          every dimension, drifting at offset tempos — a field, not a ring */}
+      <motion.div aria-hidden="true" style={fullSquare} {...ringPulse}>
+        {CONTAINMENT_SEGMENTS.map((seg, i) => (
+          <motion.div
+            key={seg.phaseDeg}
+            style={fullSquare}
+            {...spinProps(effectiveSpinMs * seg.periodFactor, outerDirection)}
+          >
+            <svg width={sizePx} height={sizePx} viewBox={squareViewBox(sizePx)}>
+              {i === 0 && (
+                <defs>
+                  <filter id={glowFilterId} x="-40%" y="-40%" width="180%" height="180%">
+                    <feGaussianBlur stdDeviation={sizePx * 0.01} />
+                  </filter>
+                </defs>
+              )}
+              {i === 0 && (
+                <circle
+                  cx={sizePx / 2}
+                  cy={sizePx / 2}
+                  r={seg.radius * sizePx}
+                  fill="none"
+                  stroke={LUMINOUS_WHITE}
+                  strokeWidth={seg.width * sizePx * 1.8}
+                  strokeLinecap="round"
+                  strokeDasharray={`${(2 * Math.PI * seg.radius * sizePx * seg.arc).toFixed(2)} ${(2 * Math.PI * seg.radius * sizePx * (1 - seg.arc)).toFixed(2)}`}
+                  opacity={0.35 * seg.opacity * config.ringOpacity}
+                  filter={`url(#${glowFilterId})`}
+                  transform={`rotate(${String(seg.phaseDeg)} ${String(sizePx / 2)} ${String(sizePx / 2)})`}
+                />
+              )}
+              <circle
+                cx={sizePx / 2}
+                cy={sizePx / 2}
+                r={seg.radius * sizePx}
+                fill="none"
+                stroke={LUMINOUS_WHITE}
+                strokeWidth={seg.width * sizePx}
+                strokeLinecap="round"
+                strokeDasharray={`${(2 * Math.PI * seg.radius * sizePx * seg.arc).toFixed(2)} ${(2 * Math.PI * seg.radius * sizePx * (1 - seg.arc)).toFixed(2)}`}
+                opacity={seg.opacity * config.ringOpacity}
+                transform={`rotate(${String(seg.phaseDeg)} ${String(sizePx / 2)} ${String(sizePx / 2)})`}
+              />
+            </svg>
+          </motion.div>
+        ))}
       </motion.div>
 
       {/* 8b — alarm accent flash rides over the containment (two-whites rule:
-          the ring itself stays warm white; red arrives as a synchronized
-          accent duplicate) */}
+          the segments stay warm white; red arrives as a synchronized accent
+          duplicate) */}
       {config.pulse === 'alarm' && (
         <motion.div
           aria-hidden="true"
@@ -579,10 +701,13 @@ export function Orb({ state, sizePx = 360, announce = true }: OrbProps): JSX.Ele
             <circle
               cx={sizePx / 2}
               cy={sizePx / 2}
-              r={CONTAINMENT_RADIUS * sizePx}
+              r={CONTAINMENT_SEGMENTS[0].radius * sizePx}
               fill="none"
               stroke={config.accentColor}
-              strokeWidth={CONTAINMENT_STROKE * sizePx}
+              strokeWidth={CONTAINMENT_SEGMENTS[0].width * sizePx}
+              strokeDasharray={`${(2 * Math.PI * CONTAINMENT_SEGMENTS[0].radius * sizePx * 0.3).toFixed(2)} ${(2 * Math.PI * CONTAINMENT_SEGMENTS[0].radius * sizePx * 0.7).toFixed(2)}`}
+              strokeLinecap="round"
+              transform={`rotate(-118 ${String(sizePx / 2)} ${String(sizePx / 2)})`}
             />
           </svg>
         </motion.div>
@@ -591,7 +716,7 @@ export function Orb({ state, sizePx = 360, announce = true }: OrbProps): JSX.Ele
       {/* 9 — front particle canvas: near motes pass in front of the machine */}
       <ParticleCanvas layer="front" sizePx={sizePx} config={config} opacity={1} />
 
-      {/* 10 — wake ignition flash + one-shot blooms; never loop */}
+      {/* 10 — wake ignition flash + expansion; success bloom; never loop */}
       <AnimatePresence>
         {isWaking && (
           <motion.div

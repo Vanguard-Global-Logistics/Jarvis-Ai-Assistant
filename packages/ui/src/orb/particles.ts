@@ -9,7 +9,7 @@ import { withAlpha } from './orb-visuals.js';
  * no DOM reads/writes beyond the given `<canvas>` element.
  */
 
-export type ParticleMode = 'halo' | 'converge' | 'still' | 'off';
+export type ParticleMode = 'halo' | 'converge' | 'emit' | 'still' | 'off';
 
 /**
  * Depth layer selection: the Orb renders TWO fields from the same seed — a
@@ -52,6 +52,8 @@ const RADIUS_MIN = 0.62;
 const RADIUS_MAX = 0.95;
 const CONVERGE_RADIUS = 0.3;
 const CONVERGE_SETTLE_MS = 4000;
+/** One outward emission cycle (speaking): nucleus → halo radius, then reborn. */
+const EMIT_CYCLE_MS = 5200;
 const SIZE_MIN_PX = 0.5;
 const SIZE_MAX_PX = 1.6;
 const ALPHA_MIN = 0.15;
@@ -158,18 +160,29 @@ export function createParticleField(opts: ParticleFieldOptions): ParticleField {
       const angle =
         mode === 'still' ? particle.angle : particle.angle + elapsedMs * particle.driftSpeed;
       // Nearer motes answer the pull sooner — attraction with depth stagger,
-      // not a uniform collapse.
-      const radius =
-        mode === 'converge'
-          ? particle.radius +
-            (CONVERGE_RADIUS - particle.radius) *
-              Math.min(1, convergeT * (0.6 + 0.55 * particle.depth))
-          : particle.radius;
+      // not a uniform collapse. Emission runs the opposite way: each mote is
+      // born at the nucleus and travels out to its halo radius on its own
+      // deterministic cycle (phase = its angle; period scaled by depth),
+      // fading as it travels — the intelligence exhales.
+      let radius = particle.radius;
+      let alpha = particle.alpha;
+      if (mode === 'converge') {
+        radius =
+          particle.radius +
+          (CONVERGE_RADIUS - particle.radius) *
+            Math.min(1, convergeT * (0.6 + 0.55 * particle.depth));
+      } else if (mode === 'emit') {
+        const period = EMIT_CYCLE_MS * (0.7 + 0.6 * particle.depth);
+        const phase = particle.angle / (Math.PI * 2);
+        const cycleT = (elapsedMs / period + phase) % 1;
+        radius = CONVERGE_RADIUS + (particle.radius - CONVERGE_RADIUS) * cycleT;
+        alpha = particle.alpha * (1 - 0.7 * cycleT);
+      }
       const x = center + Math.cos(angle) * radius * half;
       const y = center + Math.sin(angle) * radius * half;
 
       ctx.beginPath();
-      ctx.fillStyle = withAlpha(accentColor, particle.alpha);
+      ctx.fillStyle = withAlpha(accentColor, alpha);
       ctx.arc(x, y, particle.sizePx, 0, Math.PI * 2);
       ctx.fill();
     }

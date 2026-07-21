@@ -171,7 +171,7 @@ export interface OrbVisualConfig {
   pulse: 'none' | 'rhythmic' | 'reactive' | 'alarm';
   /** One-shot entrance effects; never loops. */
   bloom: 'none' | 'wake' | 'success';
-  particleMode: 'halo' | 'converge' | 'still' | 'off';
+  particleMode: 'halo' | 'converge' | 'emit' | 'still' | 'off';
   /** offline only. */
   desaturate: boolean;
   /** From `orbStateMotion[state].loops`. */
@@ -295,7 +295,8 @@ const STATE_VISUALS: Record<OrbState, StateVisualBase> = {
     counterRotate: false,
     pulse: 'reactive',
     bloom: 'none',
-    particleMode: 'halo',
+    // Measured outward energy propagation: the nucleus emits while speaking.
+    particleMode: 'emit',
     ...NORMAL_CORE,
     containmentScale: 1,
     ringOpacity: 0.85,
