@@ -34,8 +34,12 @@ vi.mock('electron', () => ({
 /**
  * Every function the renderer is allowed to see. This list is the security
  * claim; the tests below only enforce it.
+ *
+ * Widened in Checkpoint 2 (ADR 0002) to `sendChat` and `amplify` — each a
+ * narrow, purpose-named model call, each documented in docs/IPC-SURFACE.md.
+ * This edit is the deliberate act; the failure it resolves was the checkpoint.
  */
-const ALLOWED_API = ['getAppInfo'] as const;
+const ALLOWED_API = ['getAppInfo', 'sendChat', 'amplify'] as const;
 
 /** Load the bridge fresh and return what it handed to `exposeInMainWorld`. */
 async function loadBridge(): Promise<{ namespace: string; api: Record<string, unknown> }> {
@@ -127,5 +131,42 @@ describe('jarvis.getAppInfo', () => {
     const call = mocks.invoke.mock.calls[0];
     if (call === undefined) throw new Error('invoke was not called');
     expect(call).toEqual([CHANNELS.appGetInfo]);
+  });
+});
+
+describe('jarvis.sendChat', () => {
+  it('invokes jarvis:chat with the transcript unchanged', async () => {
+    const { api } = await loadBridge();
+    const sendChat = api.sendChat;
+    if (typeof sendChat !== 'function') throw new Error('sendChat is missing');
+
+    mocks.invoke.mockResolvedValue({ text: 'hi', provider: 'mock' });
+    const request = { messages: [{ role: 'user', content: 'Hello, Jarvis.' }] };
+    await (sendChat as (r: unknown) => Promise<unknown>)(request);
+
+    expect(mocks.invoke).toHaveBeenCalledTimes(1);
+    expect(mocks.invoke).toHaveBeenCalledWith(CHANNELS.jarvisChat, request);
+  });
+});
+
+describe('jarvis.amplify', () => {
+  it('wraps the idea into the { idea } request the contract expects', async () => {
+    const { api } = await loadBridge();
+    const amplify = api.amplify;
+    if (typeof amplify !== 'function') throw new Error('amplify is missing');
+
+    mocks.invoke.mockResolvedValue({
+      clarifiedIntent: 'x',
+      missingQuestions: ['y'],
+      improvedConcept: 'z',
+      recommendedNextStep: 'w',
+      buildReadyPrompt: 'p',
+    });
+    await (amplify as (idea: string) => Promise<unknown>)('a faster permit tracker');
+
+    expect(mocks.invoke).toHaveBeenCalledTimes(1);
+    expect(mocks.invoke).toHaveBeenCalledWith(CHANNELS.jarvisAmplify, {
+      idea: 'a faster permit tracker',
+    });
   });
 });

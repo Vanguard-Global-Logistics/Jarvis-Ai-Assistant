@@ -1,5 +1,11 @@
 import { z } from 'zod';
 import { CHANNELS } from './channels.js';
+import {
+  AmplifierResultSchema,
+  AmplifyRequestSchema,
+  ChatReplySchema,
+  ChatRequestSchema,
+} from '../model/contracts.js';
 
 /**
  * IPC contracts — the single definition of every message that crosses the
@@ -60,6 +66,45 @@ export const appGetInfoContract = defineContract({
   response: AppInfoSchema,
 });
 
+// --- jarvis:chat ------------------------------------------------------------
+
+/**
+ * One conversation turn. The request is the transcript the renderer holds; the
+ * response is one model reply that names its own provider.
+ *
+ * The request and response schemas are the *same* `ChatRequestSchema` /
+ * `ChatReplySchema` the jarvis-core provider consumes and produces
+ * (`packages/contracts/src/model/contracts.ts`) — defined once, so the shape the
+ * UI sends, the shape the IPC boundary validates, and the shape the provider
+ * receives cannot drift (CLAUDE.md §3). Both are `.strict()`, so an extra field
+ * in either direction fails at the boundary rather than flowing on.
+ *
+ * The transcript, not just the latest message, crosses the boundary because the
+ * provider is stateless by design: the renderer owns the conversation, main owns
+ * the key and the model call. No history is retained in main — Stage 1A persists
+ * only on an explicit save, which is a separate channel set (ADR 0006), not this
+ * one.
+ */
+export const jarvisChatContract = defineContract({
+  channel: CHANNELS.jarvisChat,
+  request: ChatRequestSchema,
+  response: ChatReplySchema,
+});
+
+// --- jarvis:amplify ---------------------------------------------------------
+
+/**
+ * Thought Amplifier v1: one rough idea in, the five validated fields out
+ * (ADR 0006). `AmplifierResultSchema` is `.strict()`, so a provider that returns
+ * a sixth field — or omits one — fails at the boundary instead of reaching the
+ * amplifier card as malformed data.
+ */
+export const jarvisAmplifyContract = defineContract({
+  channel: CHANNELS.jarvisAmplify,
+  request: AmplifyRequestSchema,
+  response: AmplifierResultSchema,
+});
+
 // --- registry ---------------------------------------------------------------
 
 /**
@@ -69,4 +114,6 @@ export const appGetInfoContract = defineContract({
  */
 export const IPC_CONTRACTS = {
   [CHANNELS.appGetInfo]: appGetInfoContract,
+  [CHANNELS.jarvisChat]: jarvisChatContract,
+  [CHANNELS.jarvisAmplify]: jarvisAmplifyContract,
 } as const;

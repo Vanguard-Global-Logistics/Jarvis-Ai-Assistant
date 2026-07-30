@@ -21,7 +21,11 @@
 - **Recurring cost:** $0/month infra; optional usage-billed API key.
 - **Why now:** the first usable improvement for William; everything before it was
   documentation. Fully local on a trusted machine, so it safely precedes AEGIS v1.
-- **Status: Checkpoint 1 of 4 complete (model contracts + jarvis-core providers; not wired to the app).**
+- **Status: conversation slice complete (ADR 0007) — `jarvis:chat` + `jarvis:amplify`
+  wired end to end, mock-default, with `verify` + `build` + `probe:runtime` green on Linux.
+  REMAINING for the milestone: persistence (`history:*` channels + SQLite migrations +
+  `better-sqlite3` ABI rebuild), the Windows packaged-installer gate, and William's
+  acceptance (using it for one real task).**
 
 ---
 

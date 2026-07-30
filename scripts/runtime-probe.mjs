@@ -374,8 +374,16 @@ async function runChecks(page, mode) {
   );
 
   const keys = await page.evaluate('window.jarvis ? Object.keys(window.jarvis) : null');
-  const keysOk = JSON.stringify(keys.value) === JSON.stringify(['getAppInfo']);
-  add('Object.keys is exactly ["getAppInfo"]', keysOk, JSON.stringify(keys.value));
+  // Checkpoint 2 (ADR 0007) widened the bridge to the two model calls. This stays an
+  // EXACT match, in insertion order: it is the runtime half of the preload surface test,
+  // and its whole value is that an unlisted function fails it.
+  const keysOk =
+    JSON.stringify(keys.value) === JSON.stringify(['getAppInfo', 'sendChat', 'amplify']);
+  add(
+    'Object.keys is exactly ["getAppInfo","sendChat","amplify"]',
+    keysOk,
+    JSON.stringify(keys.value),
+  );
 
   const info = await page.evaluate('window.jarvis ? await window.jarvis.getAppInfo() : null');
   const i = info.value;
@@ -395,6 +403,49 @@ async function runChecks(page, mode) {
     'getAppInfo() returns real platform info',
     infoOk,
     info.error ? `THREW: ${String(info.error).split('\n')[0]}` : JSON.stringify(i),
+  );
+
+  // Checkpoint 2: drive a real conversation turn across the boundary. The probe
+  // runs with no API key, so this exercises the deterministic mock provider —
+  // and asserts the reply names its provider, which is what lets the UI label
+  // mock output as mock (CLAUDE.md §8).
+  const chat = await page.evaluate(
+    'window.jarvis ? await window.jarvis.sendChat({ messages: [{ role: "user", content: "probe: say hello" }] }) : null',
+  );
+  const c = chat.value;
+  const chatOk =
+    c !== null &&
+    typeof c === 'object' &&
+    typeof c.text === 'string' &&
+    c.text.length > 0 &&
+    (c.provider === 'mock' || c.provider === 'anthropic');
+  add(
+    'jarvis:chat round-trips with a provider-labeled reply',
+    chatOk,
+    chat.error ? `THREW: ${String(chat.error).split('\n')[0]}` : JSON.stringify(c).slice(0, 160),
+  );
+
+  // Thought Amplifier v1: one idea in, the five validated fields out. The
+  // response schema is re-validated in main, so a malformed card would have
+  // thrown at the boundary before reaching here.
+  const amp = await page.evaluate(
+    'window.jarvis ? await window.jarvis.amplify("probe idea: a faster permit tracker") : null',
+  );
+  const a = amp.value;
+  const ampOk =
+    a !== null &&
+    typeof a === 'object' &&
+    typeof a.clarifiedIntent === 'string' &&
+    a.clarifiedIntent.length > 0 &&
+    Array.isArray(a.missingQuestions) &&
+    a.missingQuestions.length > 0 &&
+    typeof a.improvedConcept === 'string' &&
+    typeof a.recommendedNextStep === 'string' &&
+    typeof a.buildReadyPrompt === 'string';
+  add(
+    'jarvis:amplify returns the five validated fields',
+    ampOk,
+    amp.error ? `THREW: ${String(amp.error).split('\n')[0]}` : JSON.stringify(a).slice(0, 160),
   );
 
   // E2: the Experience Shell mounts the Orb. Assert the real component is

@@ -1,14 +1,19 @@
 import { join } from 'node:path';
 import { BrowserWindow, app } from 'electron';
 import { createLogger, describeEnv, parseEnv } from '@jarvis/config';
+import { createProvider } from '@jarvis/jarvis-core';
+import { registerAmplifyHandler } from './handlers/amplify.js';
 import { registerAppInfoHandler } from './handlers/app-info.js';
+import { registerChatHandler } from './handlers/chat.js';
 import { applyContentSecurityPolicy, denyAllPermissions, lockNavigation } from './security.js';
 
 /**
  * Electron main process — the trusted side of the boundary.
  *
- * STATUS: PARTIAL. The shell launches, is hardened, and renders. It has NO
- * features: no IPC channels, no database, no AEGIS, no orchestrator.
+ * STATUS: PARTIAL. The shell launches, is hardened, renders, and now serves the
+ * Stage 1A conversation surface: `app:get-info`, `jarvis:chat`, and
+ * `jarvis:amplify`. It still has NO persistence, no database, no AEGIS, and no
+ * orchestrator beyond a single stateless model call per turn.
  */
 
 const log = createLogger({ scope: 'desktop:main' });
@@ -16,6 +21,13 @@ const log = createLogger({ scope: 'desktop:main' });
 // Fail fast on invalid configuration rather than surfacing it later as an
 // unexplained fault. Throws naming offending keys only, never values.
 const env = parseEnv();
+
+// The one model provider, created once in the trusted process. It owns the
+// Anthropic client — and the API key inside it — for the whole app lifetime;
+// no request rebuilds it, and the key never leaves this process. With no key
+// configured this is the deterministic MockProvider (ADR 0006: $0, offline,
+// self-labeling), which is exactly what ships by default.
+const modelProvider = createProvider(env);
 
 const RENDERER_DEV_URL = process.env.ELECTRON_RENDERER_URL ?? null;
 
@@ -107,8 +119,13 @@ void app.whenReady().then(() => {
   log.info('starting', { env: describeEnv(env) });
 
   // Handlers are registered before the first window exists, so no renderer can
-  // invoke a channel that is not yet listening.
+  // invoke a channel that is not yet listening. Each one is a deliberate hole in
+  // the trust boundary (ADR 0002): a read-only host-facts call, and two calls
+  // that reach only the model provider — never the filesystem, shell, env, or
+  // AEGIS.
   registerAppInfoHandler();
+  registerChatHandler(modelProvider);
+  registerAmplifyHandler(modelProvider);
 
   createWindow();
 

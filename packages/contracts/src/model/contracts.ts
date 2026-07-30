@@ -42,6 +42,22 @@ export const ChatReplySchema = z
 
 export type ChatReply = z.infer<typeof ChatReplySchema>;
 
+/**
+ * Thought Amplifier v1 input — a single rough idea.
+ *
+ * A one-field object rather than a bare string on purpose: it is `.strict()`,
+ * so a caller that tries to smuggle extra fields across the boundary is
+ * rejected, and a later addition (e.g. a mode flag) extends the object without
+ * changing the channel's shape from "string" to "object".
+ */
+export const AmplifyRequestSchema = z
+  .object({
+    idea: z.string().min(1),
+  })
+  .strict();
+
+export type AmplifyRequest = z.infer<typeof AmplifyRequestSchema>;
+
 /** Thought Amplifier v1 — the five outputs, exactly (ADR 0006). */
 export const AmplifierResultSchema = z
   .object({

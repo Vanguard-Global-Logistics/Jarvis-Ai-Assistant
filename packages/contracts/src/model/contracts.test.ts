@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { AmplifierResultSchema, ChatReplySchema, ChatRequestSchema } from './contracts.js';
+import {
+  AmplifierResultSchema,
+  AmplifyRequestSchema,
+  ChatReplySchema,
+  ChatRequestSchema,
+} from './contracts.js';
 
 describe('ChatRequestSchema', () => {
   it('accepts a minimal valid request', () => {
@@ -31,6 +36,18 @@ describe('ChatReplySchema', () => {
   it('requires a provider id from the closed set', () => {
     expect(ChatReplySchema.safeParse({ text: 'hi', provider: 'mock' }).success).toBe(true);
     expect(ChatReplySchema.safeParse({ text: 'hi', provider: 'openai' }).success).toBe(false);
+  });
+});
+
+describe('AmplifyRequestSchema', () => {
+  it('accepts a single non-empty idea', () => {
+    expect(AmplifyRequestSchema.safeParse({ idea: 'a faster permit tracker' }).success).toBe(true);
+  });
+
+  it('rejects an empty idea, a missing idea, and extra fields', () => {
+    expect(AmplifyRequestSchema.safeParse({ idea: '' }).success).toBe(false);
+    expect(AmplifyRequestSchema.safeParse({}).success).toBe(false);
+    expect(AmplifyRequestSchema.safeParse({ idea: 'x', tone: 'blunt' }).success).toBe(false);
   });
 });
 

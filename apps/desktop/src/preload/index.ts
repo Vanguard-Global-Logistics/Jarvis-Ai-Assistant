@@ -1,6 +1,12 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { CHANNELS } from '@jarvis/contracts/ipc/channels';
-import type { AppInfo } from '@jarvis/contracts';
+import type {
+  AmplifierResult,
+  AmplifyRequest,
+  AppInfo,
+  ChatReply,
+  ChatRequest,
+} from '@jarvis/contracts';
 
 /**
  * Preload — the only bridge between the untrusted renderer and the trusted main
@@ -37,6 +43,25 @@ import type { AppInfo } from '@jarvis/contracts';
 const api = {
   /** Static host facts: versions, platform, packaged state. */
   getAppInfo: (): Promise<AppInfo> => ipcRenderer.invoke(CHANNELS.appGetInfo) as Promise<AppInfo>,
+
+  /**
+   * One conversation turn. The renderer owns the transcript and passes the whole
+   * of it; main owns the key and the model call and returns one reply. This is a
+   * named operation for exactly this purpose — not a generic message pipe.
+   */
+  sendChat: (request: ChatRequest): Promise<ChatReply> =>
+    ipcRenderer.invoke(CHANNELS.jarvisChat, request) as Promise<ChatReply>,
+
+  /**
+   * Thought Amplifier v1: one idea in, five fields out. The bridge shapes the
+   * argument into the `{ idea }` request the contract expects, so a caller
+   * cannot smuggle extra request fields through — and main re-validates it
+   * anyway (`.strict()`).
+   */
+  amplify: (idea: string): Promise<AmplifierResult> =>
+    ipcRenderer.invoke(CHANNELS.jarvisAmplify, {
+      idea,
+    } satisfies AmplifyRequest) as Promise<AmplifierResult>,
 } as const;
 
 export type JarvisApi = typeof api;

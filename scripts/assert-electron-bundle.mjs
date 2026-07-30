@@ -40,7 +40,13 @@ const TARGETS = [
     // Main has full Node: real npm packages resolve from node_modules. Native modules
     // (better-sqlite3) MUST stay external — bundling one would break the ABI rebuild
     // that Electron requires.
-    allowed: new Set(['electron', 'zod', 'better-sqlite3']),
+    //
+    // `@anthropic-ai/sdk` is here deliberately (Checkpoint 2, ADR 0007): jarvis-core's
+    // Anthropic adapter is now reachable from main, so the SDK is a real runtime
+    // dependency of the trusted process. It stays external — it ships compiled JS — and
+    // is main-process only: the renderer/preload assertions below still forbid it (and
+    // every other secret-bearing dep) from crossing to the client.
+    allowed: new Set(['electron', 'zod', 'better-sqlite3', '@anthropic-ai/sdk']),
   },
   {
     name: 'preload',
@@ -88,6 +94,28 @@ function isNodeBuiltin(spec) {
   return ['path', 'fs', 'url', 'module', 'events', 'timers', 'os', 'crypto'].includes(spec);
 }
 
+/**
+ * A specifier is allowed if it is a permitted package root OR a subpath of one.
+ *
+ * The subpath rule is deliberate: a permitted dependency legitimately exposes
+ * subpath entry points — `zod/v4`, `@anthropic-ai/sdk/helpers/zod` — and each
+ * resolves to the same package the root allows. It does NOT widen the surface to
+ * a new package: `spec.startsWith(entry + '/')` matches subpaths of `entry`, not
+ * a different top-level name. A wholly new external dependency still fails, which
+ * is the point.
+ *
+ * @param {string} spec
+ * @param {Set<string>} allowed
+ * @returns {boolean}
+ */
+function isAllowedExternal(spec, allowed) {
+  if (allowed.has(spec)) return true;
+  for (const entry of allowed) {
+    if (spec.startsWith(`${entry}/`)) return true;
+  }
+  return false;
+}
+
 /** @type {string[]} */
 const failures = [];
 
@@ -114,7 +142,7 @@ for (const { name, file, allowed } of TARGETS) {
       continue;
     }
 
-    if (!allowed.has(spec)) {
+    if (!isAllowedExternal(spec, allowed)) {
       failures.push(
         `${name}: imports unexpected external "${spec}".\n` +
           `      Allowed: ${[...allowed].join(', ')} (plus Node builtins).\n` +

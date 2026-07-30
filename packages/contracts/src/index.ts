@@ -18,11 +18,18 @@
 export { ALL_CHANNELS, CHANNELS } from './ipc/channels.js';
 export type { ChannelName } from './ipc/channels.js';
 
-export { AppInfoSchema, IPC_CONTRACTS, appGetInfoContract } from './ipc/contracts.js';
+export {
+  AppInfoSchema,
+  IPC_CONTRACTS,
+  appGetInfoContract,
+  jarvisAmplifyContract,
+  jarvisChatContract,
+} from './ipc/contracts.js';
 export type { AppInfo, IpcContract } from './ipc/contracts.js';
 
 export {
   AmplifierResultSchema,
+  AmplifyRequestSchema,
   ChatMessageSchema,
   ChatReplySchema,
   ChatRequestSchema,
@@ -30,6 +37,7 @@ export {
 } from './model/contracts.js';
 export type {
   AmplifierResult,
+  AmplifyRequest,
   ChatMessage,
   ChatReply,
   ChatRequest,

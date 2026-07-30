@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AppInfo } from '@jarvis/contracts';
 import { ORB_STATES } from '@jarvis/contracts';
@@ -18,7 +18,20 @@ const APP_INFO: AppInfo = {
 };
 
 function stubBridge(): void {
-  vi.stubGlobal('jarvis', { getAppInfo: vi.fn().mockResolvedValue(APP_INFO) });
+  // The full bridge: host facts plus the two Stage 1A model calls. The
+  // conversation surface reads sendChat/amplify from here; these Shell tests do
+  // not invoke them (Conversation.test.tsx covers that), but the bridge should
+  // be shaped realistically.
+  vi.stubGlobal('jarvis', {
+    getAppInfo: vi.fn().mockResolvedValue(APP_INFO),
+    sendChat: vi.fn().mockResolvedValue({ text: 'hi', provider: 'mock' }),
+    amplify: vi.fn(),
+  });
+}
+
+/** The dev-only switcher region, or throw — scopes button counts to the switcher. */
+function switcherRegion(): HTMLElement {
+  return screen.getByRole('region', { name: /state switcher/i });
 }
 
 /** motion/react probes matchMedia; jsdom has none. */
@@ -101,7 +114,9 @@ describe('Shell', () => {
       stubBridge();
       render(<Shell devStateSwitcher={false} />);
       expect(screen.queryByRole('region', { name: /state switcher/i })).toBeNull();
-      expect(screen.queryAllByRole('button')).toHaveLength(0);
+      // No switcher toggle at all — the conversation composer's own buttons
+      // (Send/Amplify) are a separate surface and are asserted elsewhere.
+      expect(screen.queryByRole('button', { name: /DEV · STATES/ })).toBeNull();
     });
 
     it('is docked and collapsed by default: only the toggle shows', () => {
@@ -110,7 +125,9 @@ describe('Shell', () => {
       render(<Shell devStateSwitcher={true} />);
       const toggle = screen.getByRole('button', { name: /DEV · STATES/ });
       expect(toggle.getAttribute('aria-expanded')).toBe('false');
-      expect(screen.queryAllByRole('button')).toHaveLength(1);
+      // Scoped to the switcher region so the conversation composer's buttons do
+      // not count: collapsed means only the toggle lives inside it.
+      expect(within(switcherRegion()).getAllByRole('button')).toHaveLength(1);
     });
 
     it('expands to all eleven states, labeled MOCK, aegisLockdown marked demo-only', () => {
@@ -119,8 +136,9 @@ describe('Shell', () => {
       render(<Shell devStateSwitcher={true} />);
       fireEvent.click(screen.getByRole('button', { name: /DEV · STATES/ }));
       expect(screen.getByText(/MOCK — drives the Orb visual only/)).toBeTruthy();
-      // Eleven state buttons + the drawer toggle + the V2-study toggle.
-      expect(screen.getAllByRole('button')).toHaveLength(ORB_STATES.length + 2);
+      // Eleven state buttons + the drawer toggle + the V2-study toggle, scoped to
+      // the switcher region (the composer's Send/Amplify are outside it).
+      expect(within(switcherRegion()).getAllByRole('button')).toHaveLength(ORB_STATES.length + 2);
       expect(screen.getByRole('button', { name: 'aegisLockdown (demo-only)' })).toBeTruthy();
       expect(screen.getByRole('button', { name: /renderer V2 study/ })).toBeTruthy();
     });

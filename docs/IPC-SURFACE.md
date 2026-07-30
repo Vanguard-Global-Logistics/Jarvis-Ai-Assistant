@@ -1,7 +1,11 @@
 # The IPC Surface
 
-Date: 2026-07-16
-Status: **IMPLEMENTED AND VERIFIED** — one channel implemented and observed live on Windows development runtime.
+Date: 2026-07-30
+Status: **THREE channels.** `app:get-info` is IMPLEMENTED AND VERIFIED (observed live on
+Windows development runtime, 2026-07-16). `jarvis:chat` and `jarvis:amplify` are
+IMPLEMENTED AND VERIFIED on the Linux runtime probe (prod + dev, real Electron, a mock
+round-trip driven end to end, 2026-07-30) — the Windows packaged-installer gate is still
+open (ADR 0004), and neither is _accepted_ (ADR 0006) until William uses it for a real task.
 
 `CLAUDE.md` §9 requires every API to be documented, "including the internal typed IPC
 surface, which is the highest-risk boundary in the Electron shell." This file is that
@@ -85,6 +89,43 @@ Response fields:
 These are static, non-sensitive host facts for the status bar and bug reports. This
 channel was chosen as the first one precisely because it grants no authority: it proves
 the boundary machinery end to end without widening the attack surface.
+
+### `jarvis:chat`
+
+|                       |                                                                                                                                               |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Status**            | IMPLEMENTED AND VERIFIED on the Linux runtime probe (prod + dev, mock round-trip). Windows packaged gate open; not yet _accepted_ (ADR 0006). |
+| **Renderer call**     | `window.jarvis.sendChat(request: ChatRequest): Promise<ChatReply>`                                                                            |
+| **Request**           | `ChatRequestSchema` — `{ messages: { role: 'user' \| 'assistant', content: string }[] }`, min one message, `.strict()`                        |
+| **Response**          | `ChatReplySchema` — `{ text: string, provider: 'mock' \| 'anthropic' }`, `.strict()`                                                          |
+| **Handler**           | `registerChatHandler(provider)` in `apps/desktop/src/main/handlers/chat.ts`                                                                   |
+| **Contract**          | `jarvisChatContract` in `packages/contracts/src/ipc/contracts.ts`                                                                             |
+| **Side effects**      | One model call against the shared main-process provider. No filesystem, no persistence, no state retained in main.                            |
+| **Authority granted** | None beyond calling the model provider. No filesystem, shell, env, user data, or AEGIS. The API key stays in main.                            |
+
+The transcript, not just the newest message, crosses the boundary: the provider is
+stateless, the renderer owns the conversation, and main owns the key and the call. A
+`system` role is rejected by the schema — a system prompt is a main-process concern and
+must never be injectable from the renderer. The reply names its `provider` so the UI can
+label mock output as mock (CLAUDE.md §8). Provider/SDK failures are sanitised to a fixed
+category in main (`toSafeModelError`) before any logging, and collapse to
+`"jarvis:chat failed"` across IPC — no provider internals reach a log or the renderer.
+
+### `jarvis:amplify`
+
+|                       |                                                                                                                                                                |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Status**            | IMPLEMENTED AND VERIFIED on the Linux runtime probe (prod + dev, mock round-trip). Windows packaged gate open; not yet _accepted_ (ADR 0006).                  |
+| **Renderer call**     | `window.jarvis.amplify(idea: string): Promise<AmplifierResult>`                                                                                                |
+| **Request**           | `AmplifyRequestSchema` — `{ idea: string }`, non-empty, `.strict()` (the bridge shapes the string into this object)                                            |
+| **Response**          | `AmplifierResultSchema` — the five fields (`clarifiedIntent`, `missingQuestions[]`, `improvedConcept`, `recommendedNextStep`, `buildReadyPrompt`), `.strict()` |
+| **Handler**           | `registerAmplifyHandler(provider)` in `apps/desktop/src/main/handlers/amplify.ts`                                                                              |
+| **Contract**          | `jarvisAmplifyContract` in `packages/contracts/src/ipc/contracts.ts`                                                                                           |
+| **Side effects**      | One model call against the shared main-process provider.                                                                                                       |
+| **Authority granted** | None beyond calling the model provider. Same envelope as `jarvis:chat`.                                                                                        |
+
+The response schema is `.strict()` and re-validated in main, so a provider that returns a
+malformed card fails at the boundary rather than reaching the amplifier UI.
 
 ---
 

@@ -1,13 +1,29 @@
 # Known Limitations
 
-Date: 2026-07-16
-Scope: the Stage 6 production foundation (adds the typed IPC boundary).
+Date: 2026-07-30
+Scope: the Stage 6 foundation plus the Stage 1A conversation slice (ADR 0007).
 
 Per `CLAUDE.md` §8, gaps are stated plainly here rather than implied to be solved.
 This file is the honest counterweight to the scaffold: it records what the foundation
 does **not** do.
 
 ---
+
+## 0. The conversation is in-memory only — nothing is saved
+
+**Status: persistence NOT IMPLEMENTED.**
+
+ADR 0007 added a working conversation (`jarvis:chat`) and Thought Amplifier
+(`jarvis:amplify`), but no part of Stage 1A's persistence exists yet: there are no
+`history:*` channels, `packages/database` has zero migrations, and `better-sqlite3` has
+not been rebuilt against Electron's ABI. Closing the app discards the conversation, and
+the UI says so on every screen. Do not describe Jarvis as remembering, saving, or
+recalling anything. The persistence slice is a separate, separately-approved widening
+(ADR 0006 defines it).
+
+With no `ANTHROPIC_API_KEY` set, replies come from the deterministic **mock** provider,
+labeled MOCK PROVIDER in the UI. A real key is opt-in and usage-billed; the mock default
+is why the app costs $0 to run.
 
 ## 1. Nothing in this repository is protected by AEGIS
 

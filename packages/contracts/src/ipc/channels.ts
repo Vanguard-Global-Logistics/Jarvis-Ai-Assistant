@@ -13,6 +13,21 @@
 export const CHANNELS = {
   /** Static host facts: versions, platform, packaged state. Read-only. */
   appGetInfo: 'app:get-info',
+
+  /**
+   * One conversation turn: a transcript in, one model reply out. The reply
+   * names its own provider so the UI can label mock output as mock
+   * (SECURITY-BOUNDARIES.md; CLAUDE.md §8). Grants no authority beyond calling
+   * the main-process model provider — no filesystem, shell, env, or AEGIS.
+   */
+  jarvisChat: 'jarvis:chat',
+
+  /**
+   * Thought Amplifier v1 (ADR 0006): a rough idea in, the five validated
+   * fields out. Same authority envelope as `jarvis:chat` — a model call and
+   * nothing more.
+   */
+  jarvisAmplify: 'jarvis:amplify',
 } as const;
 
 export type ChannelName = (typeof CHANNELS)[keyof typeof CHANNELS];

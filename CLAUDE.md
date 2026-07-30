@@ -15,17 +15,23 @@ Repository: `github.com/Vanguard-Global-Logistics/Jarvis-Ai-Assistant`.
 - **GitHub is the source of truth.** Not this conversation, not chat history, not a
   previous session's memory. If this file and the code disagree, the code wins — and
   this file must then be corrected.
-- **The repository is a foundation with zero application features.** As of Stage 6 it
-  has a monorepo, toolchain, CI, an env layer, a SQLite migration runner, a hardened
-  Electron shell, and the typed IPC boundary. It has **no** AEGIS, no orchestrator, no
-  Forge, no Ledger, no memory, no voice, no vision, and no feature schema. Do not describe
-  any part of Jarvis as built, working, or protected. **`docs/KNOWN-LIMITATIONS.md` is
-  the authoritative list of what does not exist — read it before claiming anything works.**
-- **One IPC channel exists: `app:get-info`.** It returns static host facts (versions,
-  platform, packaged state) and grants no authority — no filesystem, shell, env, user
-  data, or AEGIS. It exists to prove the renderer↔main boundary end to end, and it is the
-  only thing `window.jarvis` exposes. `docs/IPC-SURFACE.md` is the authoritative
-  inventory; adding a channel is a boundary change (ADR 0002), not a routine edit.
+- **The repository is a foundation plus the Stage 1A conversation slice.** As of ADR 0007
+  it has a monorepo, toolchain, CI, an env layer, a SQLite migration runner (zero
+  migrations), a hardened Electron shell, the typed IPC boundary, and a working
+  conversation surface (chat + Thought Amplifier v1, mock-default). It still has **no**
+  AEGIS, no orchestrator beyond a single stateless model call, no Forge, no Ledger, no
+  **persistence** (the conversation is in-memory; closing discards it), no memory, no
+  voice, no vision, and no feature schema. Do not describe any part of Jarvis as protected,
+  or as saving anything. **`docs/KNOWN-LIMITATIONS.md` is the authoritative list of what
+  does not exist — read it before claiming anything works.**
+- **Three IPC channels exist: `app:get-info`, `jarvis:chat`, `jarvis:amplify`.**
+  `app:get-info` returns static host facts. `jarvis:chat` and `jarvis:amplify` (ADR 0007)
+  are narrow model calls: a transcript or an idea in, a reply or the five amplifier fields
+  out. None grants authority beyond calling the main-process model provider — no
+  filesystem, shell, env, user data, or AEGIS, and the API key never leaves main. These
+  three are the whole of what `window.jarvis` exposes. `docs/IPC-SURFACE.md` is the
+  authoritative inventory; adding a channel is a boundary change (ADR 0002), not a routine
+  edit.
 - **Authoritative documents**, in precedence order:
   1. `reference/design-handoff/*.md` — the behavioral contract (11 spec files).
      **Archived and immutable. Never edit these.**
@@ -176,15 +182,15 @@ The directories exist and the toolchain runs. **Most of them are empty**, and th
 column is the part that matters:
 
 ```
-apps/desktop           Electron shell (main / preload / renderer)  PARTIAL — hardened, one IPC channel
+apps/desktop           Electron shell (main / preload / renderer)  PARTIAL — hardened, 3 IPC channels, live conversation UI
 apps/pwa               PWA shell                                   NOT IMPLEMENTED — empty, out of scope
-services/jarvis-core   Orchestration, isolated from renderer       PARTIAL — model provider + amplifier logic, not wired to the app
+services/jarvis-core   Orchestration, isolated from renderer       PARTIAL — model provider + amplifier, wired to the app via chat/amplify (ADR 0007)
 services/aegis         AEGIS engine — independent, no GenAI        NOT IMPLEMENTED — empty
-packages/contracts     Zod schemas + shared types                  PARTIAL — IPC, model, and experience contracts; no feature schema
-packages/ui            Design-system components                    PARTIAL — design tokens + motion language; no components yet
+packages/contracts     Zod schemas + shared types                  PARTIAL — IPC (3 channels), model, and experience contracts; no feature schema
+packages/ui            Design-system components                    PARTIAL — tokens, motion, Orb + glass primitives
 packages/config        Env validation + structured logging         IMPLEMENTED, unit-tested
-packages/database      SQLite connection + migration runner        PARTIAL — runner works, zero migrations
-docs/DECISIONS/        ADRs                                        0001–0006
+packages/database      SQLite connection + migration runner        PARTIAL — runner works, zero migrations (persistence not built — ADR 0007)
+docs/DECISIONS/        ADRs                                        0001–0007
 docs/foundation/       Layer 2 foundation documents (ADR 0005)     PARTIAL — 01 APPROVED; 02, 07, 09 DRAFT; rest CONCEPTUAL
 ```
 

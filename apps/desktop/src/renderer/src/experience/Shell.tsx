@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { JSX } from 'react';
 import type { AppInfo, OrbState } from '@jarvis/contracts';
 import { ORB_STATES } from '@jarvis/contracts';
@@ -13,6 +13,8 @@ import {
   surface,
   text,
 } from '@jarvis/ui';
+import { Conversation } from './Conversation.js';
+import type { ConversationBridge } from './Conversation.js';
 
 /**
  * The Experience Shell (task E2, visual correction pass): cinematic ambient
@@ -68,6 +70,13 @@ export function Shell({ devStateSwitcher = import.meta.env.DEV }: ShellProps): J
   const [orbState, setOrbState] = useState<OrbState>('idle');
   const [host, setHost] = useState<HostFacts>({ kind: 'loading' });
   const [switcherOpen, setSwitcherOpen] = useState(false);
+
+  // The preload bridge, read once. `window.jarvis` is stable after the preload
+  // runs; it is `undefined` only in a plain-browser preview of the Vite page,
+  // where the conversation composer disables itself and says so. Passing the
+  // whole api is safe — it structurally satisfies the narrow ConversationBridge
+  // (sendChat + amplify), and the extra getAppInfo is simply unused here.
+  const bridge = useMemo<ConversationBridge | null>(() => window.jarvis ?? null, []);
   // DEV-ONLY renderer study (E2 renderer reset): when on, the V2 three.js
   // study renders instead of the legacy Orb, and the frame goes cinematic
   // (wordmark/footer move into the dev diagnostics drawer). Unreachable in
@@ -130,7 +139,7 @@ export function Shell({ devStateSwitcher = import.meta.env.DEV }: ShellProps): J
     <main
       style={{
         position: 'relative',
-        minHeight: '100vh',
+        height: '100vh',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -143,10 +152,10 @@ export function Shell({ devStateSwitcher = import.meta.env.DEV }: ShellProps): J
       {!cinematic && (
         <h1
           style={{
-            marginTop: 44,
+            marginTop: 22,
             marginBottom: 0,
             fontFamily: fontFamily.display,
-            fontSize: 26,
+            fontSize: 22,
             fontWeight: 700,
             letterSpacing: letterSpacing.wordmark,
             textTransform: 'uppercase',
@@ -158,26 +167,36 @@ export function Shell({ devStateSwitcher = import.meta.env.DEV }: ShellProps): J
         </h1>
       )}
 
-      <div
-        style={{
-          flex: 1,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1,
-        }}
-      >
-        {cinematic ? (
+      {cinematic ? (
+        // The dev-only V2 renderer study keeps the full-bleed cinematic stage.
+        <div
+          style={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1,
+          }}
+        >
           <OrbStudyV2
             state={orbState}
             studyPhase={studyPhase}
             sizePx={460}
             onRendererResolved={setActiveRenderer}
           />
-        ) : (
-          <Orb state={orbState} sizePx={420} />
-        )}
-      </div>
+        </div>
+      ) : (
+        // Stage 1A live surface: the Orb is a compact ambient presence that now
+        // reflects REAL conversation state (thinking/speaking/reasoning), driven
+        // by the Conversation below — not the dev switcher. The switcher remains
+        // a dev-only manual override.
+        <>
+          <div style={{ marginTop: 6, marginBottom: 2, zIndex: 1 }}>
+            <Orb state={orbState} sizePx={132} />
+          </div>
+          <Conversation bridge={bridge} onOrbStateChange={setOrbState} />
+        </>
+      )}
 
       {/* static depth cues over the stage, under nothing interactive */}
       <div
