@@ -1,0 +1,51 @@
+# Line endings are LF everywhere, in the repository AND in the working tree.
+#
+# Without this file, Git for Windows' default `core.autocrlf=true` checks every
+# file out as CRLF while the index stays LF. Prettier is configured
+# `endOfLine: "lf"` (.prettierrc.json), so `npm run format:check` then fails on
+# every file in the repository and `npm run verify` exits before it reaches lint
+# — on a clean clone, with nothing wrong with the code. Linux CI never sees it.
+#
+# `eol=lf` is the part that matters: `text=auto` alone normalizes only what is
+# stored, and would leave the working tree CRLF and Prettier still failing.
+* text=auto eol=lf
+
+# reference/ is the archived, immutable record — the behavioural contract and the
+# approved motion benchmark. It is authority for visual truth
+# (docs/design/JARVIS-V2-DIRECTION.md) and CI fails the build if design-handoff
+# changes at all. Nothing in it may be normalized, ever: it is preserved verbatim,
+# byte for byte, including whatever line endings the original artifact arrived with.
+#
+# This is not hypothetical. reference/design/approved-motion/
+# jarvis-approved-generation-prompt-v1.md is stored with MIXED endings — it is the
+# complete original generation prompt, kept exactly as issued. Without this rule the
+# global `eol=lf` above would rewrite it on the next checkout and silently edit an
+# artifact the project treats as evidence.
+reference/** -text
+
+# Binaries must never be line-ending converted.
+*.mp4  binary
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.webp binary
+*.pdf  binary
+*.mp3  binary
+*.woff  binary
+*.woff2 binary
+*.ttf  binary
+*.otf  binary
+*.zip  binary
+*.exe  binary
+*.dll  binary
+*.node binary
+*.asar binary
+
+# Windows-only scripts are meaningless with LF endings — cmd.exe requires CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Shell scripts must stay LF even on Windows, or the shebang line breaks.
+*.sh text eol=lf
