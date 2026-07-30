@@ -1,5 +1,5 @@
 // @ts-check
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
@@ -38,8 +38,17 @@ const args = process.argv.slice(2);
 const wantProd = args.includes('--prod') || !args.includes('--dev');
 const wantDev = args.includes('--dev') || !args.includes('--prod');
 
-/** Electron needs a display. Codespaces has none, so borrow one. */
-const NEEDS_XVFB = !process.env.DISPLAY;
+/**
+ * Electron needs a display. Codespaces has none, so borrow one.
+ *
+ * Xvfb is an X11 tool and only makes sense on Linux. Windows and macOS have a native
+ * window manager and never set `DISPLAY`, so testing that variable alone concluded
+ * "no display" on the one platform this project actually targets, and demanded a
+ * Linux-only binary that will never be there. That made the probe — the check that
+ * exists to be run before Windows — the one check Windows could not run.
+ */
+const IS_WINDOWS = process.platform === 'win32';
+const NEEDS_XVFB = process.platform === 'linux' && !process.env.DISPLAY;
 
 /**
  * @typedef {{ name: string, ok: boolean, detail: string }} Check
@@ -112,9 +121,19 @@ if (NEEDS_XVFB) {
  * @param {Record<string, string>} env
  */
 function launch(command, cmdArgs, env) {
+  // On Windows `npm` is a batch script, not an executable. Node 22+ refuses to
+  // spawn a `.cmd` without a shell (the BatBadBut mitigation, CVE-2024-27980), so
+  // this one launch needs `shell: true` and there is no argv-preserving
+  // alternative. It emits DEP0190 because a shell concatenates arguments
+  // unescaped; that is safe only because every argument here is a fixed literal
+  // in this file. Never widen this to interpolated or caller-supplied values.
+  // The Electron binary is a real executable and is spawned directly, without a shell.
+  const useShell = IS_WINDOWS && command === 'npm';
+  const resolved = useShell ? 'npm.cmd' : command;
+
   const [bin, binArgs] = NEEDS_XVFB
-    ? ['xvfb-run', ['-a', command, ...cmdArgs]]
-    : [command, cmdArgs];
+    ? ['xvfb-run', ['-a', resolved, ...cmdArgs]]
+    : [resolved, cmdArgs];
 
   return spawn(bin, binArgs, {
     cwd: root,
@@ -122,7 +141,11 @@ function launch(command, cmdArgs, env) {
     // Own process group, so the whole tree dies on teardown. `dev:desktop` is
     // npm -> electron-vite -> electron; killing only the parent orphans Electron
     // and the next run collides on the debugging port.
-    detached: true,
+    //
+    // Windows has no process groups to detach into, and `detached` there instead
+    // opens a new console window; the tree is killed via taskkill below.
+    detached: !IS_WINDOWS,
+    shell: useShell,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
 }
@@ -130,7 +153,15 @@ function launch(command, cmdArgs, env) {
 /** @param {import('node:child_process').ChildProcess} child */
 function kill(child) {
   try {
-    if (child.pid !== undefined) process.kill(-child.pid, 'SIGKILL');
+    if (child.pid === undefined) return;
+    if (IS_WINDOWS) {
+      // No process groups: `process.kill(-pid)` is not supported. taskkill /T walks
+      // the child tree (npm -> electron-vite -> electron) so nothing survives to
+      // hold the debugging port into the next mode.
+      spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+      return;
+    }
+    process.kill(-child.pid, 'SIGKILL');
   } catch {
     // Already gone.
   }
@@ -159,8 +190,10 @@ async function assertPortFree(port, mode) {
         `[${mode}] port ${port} is already serving a DevTools endpoint.\n` +
           '  A stale Electron is running, and probing it would measure the WRONG BUILD.\n' +
           '  Kill it first:\n' +
-          '    pkill -9 -f "node_modules/electron/dist/electron"\n' +
-          '    pkill -9 -f "node_modules/.bin/vite"',
+          (IS_WINDOWS
+            ? '    taskkill /IM electron.exe /T /F'
+            : '    pkill -9 -f "node_modules/electron/dist/electron"\n' +
+              '    pkill -9 -f "node_modules/.bin/vite"'),
       );
     }
   } catch {
@@ -509,5 +542,9 @@ if (failed > 0) {
 
 console.log(
   '✓ runtime probe passed — the app launches, React mounts, and the bridge works.\n' +
-    '  This is Linux. It is NOT the Windows acceptance test; see docs/WINDOWS-ACCEPTANCE-TEST.md.\n',
+    `  Platform: ${process.platform}.\n` +
+    (IS_WINDOWS
+      ? '  This covers the automatable parts of docs/WINDOWS-ACCEPTANCE-TEST.md (Steps 1.2, 2, 3, 4.4).\n' +
+        '  Steps 1.1 (visual), 5 (permissions) and 6 (navigation) are still manual.\n'
+      : '  This is NOT the Windows acceptance test; see docs/WINDOWS-ACCEPTANCE-TEST.md.\n'),
 );
