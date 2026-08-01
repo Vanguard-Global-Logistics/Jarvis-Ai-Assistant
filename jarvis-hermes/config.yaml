@@ -1,0 +1,8 @@
+# Jarvis engine configuration (Hermes Agent)
+# Install location: ~/.hermes/config.yaml
+model:
+  default: anthropic/claude-sonnet-5
+  provider: anthropic
+memory:
+  memory_enabled: true
+  user_profile_enabled: true

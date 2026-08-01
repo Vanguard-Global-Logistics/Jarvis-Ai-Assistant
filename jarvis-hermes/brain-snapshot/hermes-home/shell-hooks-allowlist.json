@@ -1,0 +1,10 @@
+{
+  "approvals": [
+    {
+      "approved_at": "2026-08-01T04:53:40.998298Z",
+      "command": "/tmp/hermes/.venv/bin/python /root/.hermes/agent-hooks/spend_guard.py",
+      "event": "pre_tool_call",
+      "script_mtime_at_approval": "2026-08-01T04:52:45.728696Z"
+    }
+  ]
+}
