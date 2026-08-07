@@ -63,10 +63,14 @@ class FetchHiveLocalHttpClient implements HiveLocalHttpClient {
   }
 
   public async post(path: string, body: unknown): Promise<unknown> {
-    return this.request('POST', path, body);
+    return this.request('POST', path, JSON.stringify(body));
   }
 
-  private async request(method: 'GET' | 'POST', path: string, body?: unknown): Promise<unknown> {
+  private async request(
+    method: 'GET' | 'POST',
+    path: string,
+    serializedBody?: string,
+  ): Promise<unknown> {
     const controller = new AbortController();
     const timer = setTimeout(() => {
       controller.abort();
@@ -74,13 +78,9 @@ class FetchHiveLocalHttpClient implements HiveLocalHttpClient {
 
     try {
       const init: RequestInit = { method, signal: controller.signal };
-      if (method === 'POST') {
-        const serialized = JSON.stringify(body);
-        if (serialized === undefined) {
-          throw new Error('Hive local AI POST request could not be serialized.');
-        }
+      if (serializedBody !== undefined) {
         init.headers = { 'content-type': 'application/json' };
-        init.body = serialized;
+        init.body = serializedBody;
       }
 
       const response = await fetch(`${this.baseUrl}${path}`, init);
