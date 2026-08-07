@@ -1,0 +1,34 @@
+name: Hive Format Export
+
+on:
+  push:
+    branches: [agent/jarvis-hive-local-core-2026-08-07]
+
+permissions:
+  contents: read
+
+jobs:
+  format-export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Canonically format Hive slice
+        run: >-
+          npx prettier --write
+          services/jarvis-core/src/index.ts
+          services/jarvis-core/src/model/hive-local-provider.ts
+          services/jarvis-core/src/model/hive-local-provider.test.ts
+      - name: Archive formatted files
+        uses: actions/upload-artifact@v4
+        with:
+          name: hive-prettier-output
+          path: |
+            services/jarvis-core/src/index.ts
+            services/jarvis-core/src/model/hive-local-provider.ts
+            services/jarvis-core/src/model/hive-local-provider.test.ts
