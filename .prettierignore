@@ -9,6 +9,12 @@ CLAUDE.md
 docs/CURRENT-STATE-AUDIT.md
 docs/VISUAL-DESIGN-TARGET.md
 
+# Imported/preserved runtime snapshots and the legacy web companion are not part
+# of the TypeScript workspace formatter. Reformatting them would rewrite evidence
+# and unrelated historical code instead of validating the active monorepo.
+jarvis-hermes/
+jarvis-web/
+
 # Git-ignored subagent scratch space (briefs, reports, review packages) —
 # working files, not source; they must never gate `npm run verify`.
 .superpowers/
