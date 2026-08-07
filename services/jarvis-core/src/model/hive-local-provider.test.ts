@@ -4,7 +4,7 @@ import { HiveLocalProvider, validateHiveLocalBaseUrl } from './hive-local-provid
 
 class FakeClient implements HiveLocalHttpClient {
   public readonly gets: string[] = [];
-  public readonly posts: Array<{ path: string; body: unknown }> = [];
+  public readonly posts: { path: string; body: unknown }[] = [];
 
   public constructor(
     private readonly chatResponse: unknown = {
@@ -12,14 +12,14 @@ class FakeClient implements HiveLocalHttpClient {
     },
   ) {}
 
-  public async get(path: string): Promise<unknown> {
+  public get(path: string): Promise<unknown> {
     this.gets.push(path);
-    return { data: [{ id: 'qwen3:4b' }] };
+    return Promise.resolve({ data: [{ id: 'qwen3:4b' }] });
   }
 
-  public async post(path: string, body: unknown): Promise<unknown> {
+  public post(path: string, body: unknown): Promise<unknown> {
     this.posts.push({ path, body });
-    return this.chatResponse;
+    return Promise.resolve(this.chatResponse);
   }
 }
 
