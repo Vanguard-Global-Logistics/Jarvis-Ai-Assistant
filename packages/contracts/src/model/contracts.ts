@@ -9,7 +9,7 @@ import { z } from 'zod';
  */
 
 /** The providers that exist. A closed set — adding one is a deliberate act. */
-export const PROVIDER_IDS = ['mock', 'anthropic'] as const;
+export const PROVIDER_IDS = ['mock', 'anthropic', 'hive-local'] as const;
 export type ProviderId = (typeof PROVIDER_IDS)[number];
 
 export const ChatMessageSchema = z
