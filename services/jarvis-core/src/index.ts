@@ -20,16 +20,9 @@
  */
 
 export { AMPLIFIER_SYSTEM_PROMPT, buildAmplifierUserMessage } from './amplifier/prompt.js';
-export {
-  AnthropicProvider,
-  DEFAULT_MODEL,
-  ModelRefusalError,
-} from './model/anthropic-provider.js';
+export { AnthropicProvider, DEFAULT_MODEL, ModelRefusalError } from './model/anthropic-provider.js';
 export { createProvider } from './model/create-provider.js';
-export {
-  HiveLocalProvider,
-  validateHiveLocalBaseUrl,
-} from './model/hive-local-provider.js';
+export { HiveLocalProvider, validateHiveLocalBaseUrl } from './model/hive-local-provider.js';
 export type { HiveLocalHttpClient } from './model/hive-local-provider.js';
 export { MockProvider } from './model/mock-provider.js';
 export type { JarvisModelProvider } from './model/provider.js';
