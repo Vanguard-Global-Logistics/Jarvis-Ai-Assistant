@@ -46,7 +46,9 @@ export function validateHiveLocalBaseUrl(raw: string): string {
   }
 
   if (url.username !== '' || url.password !== '' || url.search !== '' || url.hash !== '') {
-    throw new Error('Hive local AI endpoint must not contain credentials, query parameters, or fragments.');
+    throw new Error(
+      'Hive local AI endpoint must not contain credentials, query parameters, or fragments.',
+    );
   }
 
   return url.toString().replace(/\/$/, '');
@@ -102,11 +104,7 @@ export class HiveLocalProvider implements JarvisModelProvider {
   private readonly configuredModel?: string;
   private resolvedModel?: string;
 
-  public constructor(options?: {
-    baseUrl?: string;
-    model?: string;
-    client?: HiveLocalHttpClient;
-  }) {
+  public constructor(options?: { baseUrl?: string; model?: string; client?: HiveLocalHttpClient }) {
     const baseUrl = options?.baseUrl ?? DEFAULT_BASE_URL;
     this.client = options?.client ?? new FetchHiveLocalHttpClient(baseUrl);
     this.configuredModel = options?.model;
