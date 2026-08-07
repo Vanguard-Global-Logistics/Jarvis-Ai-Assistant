@@ -8,29 +8,21 @@ const DEFAULT_BASE_URL = 'http://127.0.0.1:8000';
 const DEFAULT_MAX_TOKENS = 2048;
 const REQUEST_TIMEOUT_MS = 90_000;
 
-const ModelsResponseSchema = z
-  .object({
-    data: z.array(z.object({ id: z.string().min(1) }).strict()).min(1),
-  })
-  .passthrough();
+const ModelsResponseSchema = z.looseObject({
+  data: z.array(z.object({ id: z.string().min(1) }).strict()).min(1),
+});
 
-const ChatCompletionResponseSchema = z
-  .object({
-    choices: z
-      .array(
-        z
-          .object({
-            message: z
-              .object({
-                content: z.string(),
-              })
-              .passthrough(),
-          })
-          .passthrough(),
-      )
-      .min(1),
-  })
-  .passthrough();
+const ChatCompletionResponseSchema = z.looseObject({
+  choices: z
+    .array(
+      z.looseObject({
+        message: z.looseObject({
+          content: z.string(),
+        }),
+      }),
+    )
+    .min(1),
+});
 
 /**
  * Only loopback is allowed in the first Hive local-core slice. OpenJarvis's
@@ -76,7 +68,9 @@ class FetchHiveLocalHttpClient implements HiveLocalHttpClient {
 
   private async request(method: 'GET' | 'POST', path: string, body?: unknown): Promise<unknown> {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    const timer = setTimeout(() => {
+      controller.abort();
+    }, REQUEST_TIMEOUT_MS);
 
     try {
       const response = await fetch(`${this.baseUrl}${path}`, {
@@ -87,10 +81,10 @@ class FetchHiveLocalHttpClient implements HiveLocalHttpClient {
       });
 
       if (!response.ok) {
-        throw new Error(`Hive local AI request failed with HTTP ${response.status}.`);
+        throw new Error(`Hive local AI request failed with HTTP ${String(response.status)}.`);
       }
 
-      return (await response.json()) as unknown;
+      return await response.json();
     } finally {
       clearTimeout(timer);
     }
@@ -203,7 +197,7 @@ export class HiveLocalProvider implements JarvisModelProvider {
 }
 
 function extractJsonObject(text: string): string {
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const fenced = /```(?:json)?\s*([\s\S]*?)```/i.exec(text);
   if (fenced?.[1] !== undefined) {
     return fenced[1].trim();
   }
