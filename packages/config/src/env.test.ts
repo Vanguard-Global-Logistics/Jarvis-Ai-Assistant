@@ -8,6 +8,8 @@ describe('parseEnv', () => {
     expect(env.NODE_ENV).toBe('development');
     expect(env.PORT).toBe(3000);
     expect(env.PLAID_ENV).toBe('sandbox');
+    expect(env.HIVE_LOCAL_AI_MODE).toBe('off');
+    expect(env.HIVE_LOCAL_AI_URL).toBe('http://127.0.0.1:8000');
   });
 
   it('parses a valid environment without requiring any secret', () => {
@@ -17,6 +19,22 @@ describe('parseEnv', () => {
     expect(env.NODE_ENV).toBe('production');
     expect(env.PORT).toBe(8080);
     expect(env.ANTHROPIC_API_KEY).toBeUndefined();
+  });
+
+  it('accepts explicit Hive local-only mode without a cloud key', () => {
+    const env = parseEnv({
+      HIVE_LOCAL_AI_MODE: 'local-only',
+      HIVE_LOCAL_AI_URL: 'http://127.0.0.1:8000',
+      HIVE_LOCAL_AI_MODEL: 'qwen3:4b',
+    });
+
+    expect(env.HIVE_LOCAL_AI_MODE).toBe('local-only');
+    expect(env.HIVE_LOCAL_AI_MODEL).toBe('qwen3:4b');
+    expect(env.ANTHROPIC_API_KEY).toBeUndefined();
+  });
+
+  it('rejects an unknown Hive local AI mode', () => {
+    expect(() => parseEnv({ HIVE_LOCAL_AI_MODE: 'prefer-local' })).toThrow(EnvValidationError);
   });
 
   it('coerces PORT from string to number', () => {
