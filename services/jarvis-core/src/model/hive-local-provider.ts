@@ -73,12 +73,17 @@ class FetchHiveLocalHttpClient implements HiveLocalHttpClient {
     }, REQUEST_TIMEOUT_MS);
 
     try {
-      const response = await fetch(`${this.baseUrl}${path}`, {
-        method,
-        headers: method === 'POST' ? { 'content-type': 'application/json' } : undefined,
-        body: body === undefined ? undefined : JSON.stringify(body),
-        signal: controller.signal,
-      });
+      const init: RequestInit = { method, signal: controller.signal };
+      if (method === 'POST') {
+        const serialized = JSON.stringify(body);
+        if (serialized === undefined) {
+          throw new Error('Hive local AI POST request could not be serialized.');
+        }
+        init.headers = { 'content-type': 'application/json' };
+        init.body = serialized;
+      }
+
+      const response = await fetch(`${this.baseUrl}${path}`, init);
 
       if (!response.ok) {
         throw new Error(`Hive local AI request failed with HTTP ${String(response.status)}.`);
@@ -95,10 +100,14 @@ export class HiveLocalProvider implements JarvisModelProvider {
   public readonly id = 'hive-local' as const;
 
   private readonly client: HiveLocalHttpClient;
-  private readonly configuredModel?: string;
+  private readonly configuredModel: string | undefined;
   private resolvedModel?: string;
 
-  public constructor(options?: { baseUrl?: string; model?: string; client?: HiveLocalHttpClient }) {
+  public constructor(options?: {
+    baseUrl?: string;
+    model?: string | undefined;
+    client?: HiveLocalHttpClient;
+  }) {
     const baseUrl = options?.baseUrl ?? DEFAULT_BASE_URL;
     this.client = options?.client ?? new FetchHiveLocalHttpClient(baseUrl);
     this.configuredModel = options?.model;
