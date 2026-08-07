@@ -76,9 +76,9 @@ describe('HiveLocalProvider', () => {
       model: 'qwen3:4b',
     });
 
-    await expect(
-      provider.chat({ messages: [{ role: 'user', content: 'Hello' }] }),
-    ).rejects.toThrow('invalid chat response');
+    await expect(provider.chat({ messages: [{ role: 'user', content: 'Hello' }] })).rejects.toThrow(
+      'invalid chat response',
+    );
   });
 
   it('validates amplifier JSON against the shared contract', async () => {
