@@ -35,3 +35,17 @@ export type {
   MemoryWriteContext,
   RankedMemory,
 } from './policy.js';
+
+export type {
+  MemoryDeletionReason,
+  MemoryDeletionReceipt,
+  MemoryPersistenceResult,
+  MemoryRepositoryPort,
+} from './repository.js';
+
+export { MemoryService } from './service.js';
+export type {
+  MemoryDeleteResult,
+  MemoryRecallResult,
+  MemoryRememberResult,
+} from './service.js';
