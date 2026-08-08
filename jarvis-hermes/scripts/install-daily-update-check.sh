@@ -28,7 +28,7 @@ cp "$ROOT/hermes-release.env" "$INSTALL_ROOT/hermes-release.env"
 chmod 700 "$INSTALL_ROOT/stage-hermes-update.mjs"
 chmod 600 "$INSTALL_ROOT/hermes-release.env"
 
-python3 - "$PLIST" "$NODE_BIN" +  "$INSTALL_ROOT/stage-hermes-update.mjs" +  "$INSTALL_ROOT/hermes-release.env" "$STAGING_ROOT" +  "$LOG_ROOT" "$HOUR" "$MINUTE" <<'PY'
+python3 - "$PLIST" "$NODE_BIN" "$INSTALL_ROOT/stage-hermes-update.mjs" "$INSTALL_ROOT/hermes-release.env" "$STAGING_ROOT" "$LOG_ROOT" "$HOUR" "$MINUTE" <<'PY'
 import plistlib
 import sys
 from pathlib import Path
@@ -67,6 +67,6 @@ launchctl bootstrap "$DOMAIN" "$PLIST"
 launchctl enable "$DOMAIN/$LABEL"
 launchctl kickstart -k "$DOMAIN/$LABEL"
 
-printf 'Daily Hermes release staging is active at %02d:%02d local time.\n' +  "$HOUR" "$MINUTE"
+printf 'Daily Hermes release staging is active at %02d:%02d local time.\n' "$HOUR" "$MINUTE"
 printf 'Reports: %s\n' "$STAGING_ROOT/last-check.json"
 printf 'New code is quarantined and never auto-promoted.\n'
