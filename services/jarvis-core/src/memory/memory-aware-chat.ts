@@ -31,6 +31,13 @@ function latestUserMessageIndex(request: ChatRequest): number {
   return -1;
 }
 
+function serializeUntrustedMemory(value: object): string {
+  return JSON.stringify(value)
+    .replaceAll('<', '\\u003c')
+    .replaceAll('>', '\\u003e')
+    .replaceAll('&', '\\u0026');
+}
+
 /**
  * Application-layer bridge between governed Memory v1 and local model chat.
  *
@@ -78,7 +85,7 @@ export class MemoryAwareChatService {
     }
 
     const memoryLines = recalled.localModelProjection.map((item) =>
-      JSON.stringify({
+      serializeUntrustedMemory({
         canonicalKey: item.canonicalKey,
         kind: item.kind,
         sensitivity: item.sensitivity,
