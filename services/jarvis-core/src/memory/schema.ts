@@ -48,7 +48,7 @@ export const MemoryRecordSchema = z.object({
     .regex(/^[a-z0-9][a-z0-9._:-]*$/, 'must be a normalized canonical key'),
   value: z.string().trim().min(1).max(4_000),
   sensitivity: z.enum(MEMORY_SENSITIVITIES),
-  confidence: z.number().finite().min(0).max(1),
+  confidence: z.number().min(0).max(1),
   source: MemorySourceSchema,
   reviewState: z.enum(MEMORY_REVIEW_STATES),
   status: z.enum(MEMORY_STATUSES),
