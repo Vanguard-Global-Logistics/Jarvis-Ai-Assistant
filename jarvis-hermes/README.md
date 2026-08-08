@@ -19,6 +19,10 @@ signed-release check with launchd. New releases are downloaded to quarantine
 but cannot replace live code until review and AEGIS-or-owner admission are
 recorded against the exact artifact.
 
+The installer also migrates the retired `stt` agent-toolset entry left by
+older Hermes configs. This only removes an invalid tool-list item; local
+Whisper transcription remains enabled under the top-level `stt` settings.
+
 The physically tested R13.3 local voice remains the production baseline.
 Hermes uses its Kokoro/MLX bm_george worker through a narrow local adapter and
 falls back to the macOS system voice, not a paid TTS service.

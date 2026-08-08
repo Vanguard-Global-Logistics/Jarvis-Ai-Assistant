@@ -45,4 +45,17 @@ describe('Hermes shell entry points', () => {
       expect(readFileSync(resolve(root, script), 'utf8')).toContain('hermes-release.env');
     }
   });
+
+  it('prunes the retired STT toolset without disabling local transcription', () => {
+    const installer = readFileSync(
+      resolve(root, 'jarvis-hermes/scripts/install-hermes-v020.sh'),
+      'utf8',
+    );
+    const config = readFileSync(resolve(root, 'jarvis-hermes/config.yaml'), 'utf8');
+
+    expect(installer).toContain('retired_toolsets = {"stt"}');
+    expect(installer).toContain('current.get("platform_toolsets")');
+    expect(config).toMatch(/^stt:\n/m);
+    expect(config).toContain('provider: local');
+  });
 });

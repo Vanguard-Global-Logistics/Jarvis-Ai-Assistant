@@ -71,6 +71,27 @@ else
   fail "Hey Jarvis wake configuration is missing"
 fi
 
+if [[ -x "$PYTHON" ]] && "$PYTHON" - "$HERMES_HOME/config.yaml" <<'PY' >/dev/null 2>&1
+import sys
+from pathlib import Path
+import yaml
+
+config = yaml.safe_load(Path(sys.argv[1]).read_text(encoding="utf-8")) or {}
+platforms = config.get("platform_toolsets") or {}
+raise SystemExit(
+    any(
+        "stt" in configured
+        for configured in platforms.values()
+        if isinstance(configured, list)
+    )
+)
+PY
+then
+  pass "retired STT toolset entry is absent"
+else
+  fail "retired STT toolset entry remains in platform_toolsets"
+fi
+
 if "$HERMES_HOME/bin/jarvis-kokoro-tts.py" --self-test >/dev/null 2>&1; then
   pass "local Jarvis voice provider is ready"
 else

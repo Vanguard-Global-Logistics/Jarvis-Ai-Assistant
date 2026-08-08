@@ -96,6 +96,19 @@ def merge_missing(destination, source):
             merge_missing(destination[key], value)
 
 merge_missing(current, defaults)
+# Hermes voice transcription remains configured under the top-level `stt`
+# section.  In v0.20, however, `stt` is no longer an agent-callable toolset.
+# Older Hermes configs can retain it in per-platform toolset lists and emit
+# `Unknown toolsets: stt` at every launch.  Remove only that obsolete list
+# entry; do not remove or alter the local Whisper configuration above.
+retired_toolsets = {"stt"}
+platform_toolsets = current.get("platform_toolsets")
+if isinstance(platform_toolsets, dict):
+    for platform, configured in platform_toolsets.items():
+        if isinstance(configured, list):
+            platform_toolsets[platform] = [
+                name for name in configured if name not in retired_toolsets
+            ]
 temporary = target.with_suffix(".yaml.tmp")
 temporary.write_text(
     yaml.safe_dump(current, sort_keys=False, allow_unicode=True), encoding="utf-8"
