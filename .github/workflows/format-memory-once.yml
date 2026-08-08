@@ -1,0 +1,48 @@
+name: Format Memory Once
+
+on:
+  push:
+    branches:
+      - agent/jarvis-hive-local-core-2026-08-07
+    paths:
+      - .github/workflows/format-memory-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  format-memory:
+    name: Format Memory v1
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: agent/jarvis-hive-local-core-2026-08-07
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Apply repository Prettier
+        run: |
+          npx prettier --write "services/jarvis-core/src/memory/**/*.ts" "services/jarvis-core/src/index.ts"
+
+      - name: Commit formatting if needed
+        run: |
+          if git diff --quiet; then
+            echo "Memory TypeScript already matches repository Prettier."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add services/jarvis-core/src/memory services/jarvis-core/src/index.ts
+          git commit -m "style(memory): apply repository Prettier"
+          git push origin HEAD:agent/jarvis-hive-local-core-2026-08-07
