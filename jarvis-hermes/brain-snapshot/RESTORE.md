@@ -1,4 +1,5 @@
 # Jarvis brain snapshot — how to bring him back
+n> RETIRED: this recovery guide targets the preserved 0.19.1 snapshot. Use ../install.sh for audited Hermes 0.20.0; the old snapshot installer now fails closed.
 
 Refreshed **2026-08-01, late** from the cloud sandbox. This is everything that
 makes Jarvis *Jarvis* rather than a stock Hermes install. It deliberately

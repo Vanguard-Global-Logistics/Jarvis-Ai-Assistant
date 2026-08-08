@@ -1,0 +1,31 @@
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: daily
+      time: '08:15'
+      timezone: America/New_York
+    open-pull-requests-limit: 5
+    rebase-strategy: auto
+    versioning-strategy: increase-if-necessary
+    labels:
+      - dependencies
+      - needs-jarvis-review
+    groups:
+      safe-npm-updates:
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: daily
+      time: '08:30'
+      timezone: America/New_York
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+      - needs-jarvis-review

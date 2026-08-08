@@ -88,7 +88,7 @@ the correct answer if the point is to start tonight rather than to buy something
    cd jarvis-brain-snapshot && ./scripts/install.sh
    ```
 
-   That handles packages, uv, Hermes pinned at v0.19.1, the venv, `~/.hermes`,
+   That handles packages, uv, the retired Hermes 0.19.1 snapshot, the venv, `~/.hermes`,
    the three `/tmp` paths that have to be rewritten, the new key, hook
    re-registration, and the verification pass. It is safe to re-run and it
    backs up any existing brain first.
