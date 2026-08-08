@@ -1,7 +1,13 @@
 import { z } from 'zod';
 
 export const MEMORY_SCOPES = ['private', 'shared'] as const;
-export const MEMORY_KINDS = ['fact', 'preference', 'relationship', 'project', 'decision'] as const;
+export const MEMORY_KINDS = [
+  'fact',
+  'preference',
+  'relationship',
+  'project',
+  'decision',
+] as const;
 export const MEMORY_SENSITIVITIES = ['public', 'personal', 'sensitive', 'restricted'] as const;
 export const MEMORY_SOURCE_TYPES = [
   'user-explicit',
