@@ -78,9 +78,9 @@ describe('SqliteMemoryRepositoryAdapter', () => {
       expect(
         service.recall('family household count', readContext).ranked.map((item) => item.record.id),
       ).toEqual(['mem-2']);
-      expect(service.recall('family household count', readContext).localModelProjection[0]?.value).toBe(
-        'The household has five people.',
-      );
+      expect(
+        service.recall('family household count', readContext).localModelProjection[0]?.value,
+      ).toBe('The household has five people.');
 
       expect(service.delete('mem-2', writeContext, LATER, 'privacy-delete')).toMatchObject({
         deleted: true,
