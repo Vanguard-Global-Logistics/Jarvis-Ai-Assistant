@@ -6,7 +6,7 @@ import {
   type MemoryRecord,
   type MemoryRepositoryPort,
 } from '@jarvis/jarvis-core';
-import { SqliteMemoryStore, type StoredMemoryRecord } from '@jarvis/database';
+import type { SqliteMemoryStore, StoredMemoryRecord } from '@jarvis/database';
 
 function toStoredMemory(record: MemoryRecord): StoredMemoryRecord {
   return {
