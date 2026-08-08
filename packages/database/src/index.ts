@@ -19,11 +19,7 @@ export { openDatabase } from './connection.js';
 export type { OpenDatabaseOptions, SqliteDatabase } from './connection.js';
 
 export { memoryV1Migration } from './memory-migration.js';
-export {
-  MemoryStoreError,
-  MemoryStoreOwnershipError,
-  SqliteMemoryStore,
-} from './memory-store.js';
+export { MemoryStoreError, MemoryStoreOwnershipError, SqliteMemoryStore } from './memory-store.js';
 export type {
   MemoryAuditEvent,
   MemoryTombstone,

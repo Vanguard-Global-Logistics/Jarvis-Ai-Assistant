@@ -49,11 +49,13 @@ describe('Memory v1 SQLite migration', () => {
     const { db } = inMemoryStore();
     try {
       const names = db
-        .prepare(`
+        .prepare(
+          `
           SELECT name FROM sqlite_master
           WHERE type IN ('table', 'trigger') AND name LIKE 'memory_%'
           ORDER BY name ASC
-        `)
+        `,
+        )
         .all()
         .map((row) => (row as { name: string }).name);
 
@@ -145,9 +147,9 @@ describe('SqliteMemoryStore', () => {
       expect(() => db.prepare('DELETE FROM memory_records WHERE id = ?').run('mem-1')).toThrow(
         /cannot be hard-deleted/,
       );
-      expect(() => db.prepare('UPDATE memory_tombstones SET reason_code = ?').run('privacy-delete')).toThrow(
-        /append-only/,
-      );
+      expect(() =>
+        db.prepare('UPDATE memory_tombstones SET reason_code = ?').run('privacy-delete'),
+      ).toThrow(/append-only/);
       expect(() => db.prepare('DELETE FROM memory_audit').run()).toThrow(/append-only/);
     } finally {
       db.close();

@@ -172,11 +172,8 @@ export class SqliteMemoryStore {
     `);
 
     const transaction = this.db.transaction((): ReplaceActiveResult => {
-      const current = findCurrent.get(
-        record.profileId,
-        record.scope,
-        record.canonicalKey,
-      ) as MemoryRow | undefined;
+      const current = findCurrent.get(record.profileId, record.scope, record.canonicalKey) as
+        MemoryRow | undefined;
 
       if (current?.id === record.id) {
         throw new MemoryStoreError(`Memory record ${record.id} is already active`);
@@ -216,8 +213,7 @@ export class SqliteMemoryStore {
 
   public getById(id: string): StoredMemoryRecord | null {
     const row = this.db.prepare('SELECT * FROM memory_records WHERE id = ? LIMIT 1').get(id) as
-      | MemoryRow
-      | undefined;
+      MemoryRow | undefined;
     return row ? toStoredMemory(row) : null;
   }
 
@@ -227,33 +223,39 @@ export class SqliteMemoryStore {
     canonicalKey: string,
   ): StoredMemoryRecord | null {
     const row = this.db
-      .prepare(`
+      .prepare(
+        `
         SELECT * FROM memory_records
         WHERE profile_id = ? AND scope = ? AND canonical_key = ? AND status = 'active'
         LIMIT 1
-      `)
+      `,
+      )
       .get(profileId, scope, canonicalKey) as MemoryRow | undefined;
     return row ? toStoredMemory(row) : null;
   }
 
   public listActiveOwnedBy(profileId: string): StoredMemoryRecord[] {
     const rows = this.db
-      .prepare(`
+      .prepare(
+        `
         SELECT * FROM memory_records
         WHERE profile_id = ? AND status = 'active'
         ORDER BY updated_at DESC, id ASC
-      `)
+      `,
+      )
       .all(profileId) as MemoryRow[];
     return rows.map(toStoredMemory);
   }
 
   public listActiveShared(): StoredMemoryRecord[] {
     const rows = this.db
-      .prepare(`
+      .prepare(
+        `
         SELECT * FROM memory_records
         WHERE scope = 'shared' AND status = 'active'
         ORDER BY updated_at DESC, id ASC
-      `)
+      `,
+      )
       .all() as MemoryRow[];
     return rows.map(toStoredMemory);
   }
@@ -314,12 +316,14 @@ export class SqliteMemoryStore {
 
   public tombstonesForProfile(profileId: string): MemoryTombstone[] {
     const rows = this.db
-      .prepare(`
+      .prepare(
+        `
         SELECT sequence, record_digest, profile_id, deleted_at, reason_code
         FROM memory_tombstones
         WHERE profile_id = ?
         ORDER BY sequence ASC
-      `)
+      `,
+      )
       .all(profileId) as TombstoneRow[];
 
     return rows.map((row) => ({
@@ -333,12 +337,14 @@ export class SqliteMemoryStore {
 
   public auditTrailForProfile(profileId: string): MemoryAuditEvent[] {
     const rows = this.db
-      .prepare(`
+      .prepare(
+        `
         SELECT sequence, memory_id, profile_id, event_type, occurred_at
         FROM memory_audit
         WHERE profile_id = ?
         ORDER BY sequence ASC
-      `)
+      `,
+      )
       .all(profileId) as AuditRow[];
 
     return rows.map((row) => ({
