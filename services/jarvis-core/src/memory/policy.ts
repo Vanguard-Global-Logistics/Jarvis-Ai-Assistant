@@ -52,8 +52,10 @@ function decision(reasons: MemoryPolicyReason[]): MemoryPolicyDecision {
 }
 
 function sensitivityAtMost(value: MemorySensitivity, maximum: MemorySensitivity): boolean {
-  return (SENSITIVITY_RANK.get(value) ?? Number.POSITIVE_INFINITY) <=
-    (SENSITIVITY_RANK.get(maximum) ?? Number.NEGATIVE_INFINITY);
+  return (
+    (SENSITIVITY_RANK.get(value) ?? Number.POSITIVE_INFINITY) <=
+    (SENSITIVITY_RANK.get(maximum) ?? Number.NEGATIVE_INFINITY)
+  );
 }
 
 /**
@@ -81,7 +83,10 @@ export function evaluateMemoryWrite(
   if (record.scope === 'shared' && context.sharedWriteApproved !== true) {
     reasons.push('shared-write-not-approved');
   }
-  if (record.sensitivity === 'restricted' && context.restrictedWriteApproved !== true) {
+  if (
+    record.sensitivity === 'restricted' &&
+    context.restrictedWriteApproved !== true
+  ) {
     reasons.push('restricted-write-not-approved');
   }
 
@@ -120,7 +125,10 @@ export function evaluateMemoryRead(
   if (!sensitivityAtMost(record.sensitivity, context.maxSensitivity)) {
     reasons.push('sensitivity-exceeds-context');
   }
-  if (record.sensitivity === 'restricted' && context.restrictedReadApproved !== true) {
+  if (
+    record.sensitivity === 'restricted' &&
+    context.restrictedReadApproved !== true
+  ) {
     reasons.push('restricted-read-not-approved');
   }
   if (context.destination === 'cloud-model') reasons.push('cloud-memory-disabled');
@@ -186,7 +194,10 @@ export function rankMemoriesForQuery(
     const valueOverlap = overlapScore(queryTokens, valueTokens);
 
     const score =
-      exactKey * 10_000 + keyOverlap * 100 + valueOverlap * 10 + Math.round(record.confidence * 9);
+      exactKey * 10_000 +
+      keyOverlap * 100 +
+      valueOverlap * 10 +
+      Math.round(record.confidence * 9);
 
     // A natural-language query with no lexical/exact relationship should not
     // retrieve arbitrary memories merely because they passed access policy.
@@ -214,7 +225,10 @@ export interface MemoryPromptProjection {
 }
 
 function boundedValue(value: string, maxChars: number): string {
-  const clean = value.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
+  const clean = value
+    .replace(/[\u0000-\u001f\u007f]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
   if (clean.length <= maxChars) return clean;
   return `${clean.slice(0, Math.max(0, maxChars - 1)).trimEnd()}…`;
 }
@@ -231,7 +245,10 @@ export function projectMemoriesForLocalModel(
   options: { maxRecords?: number; maxValueChars?: number } = {},
 ): MemoryPromptProjection[] {
   const maxRecords = Math.max(0, Math.min(12, Math.trunc(options.maxRecords ?? 6)));
-  const maxValueChars = Math.max(40, Math.min(1_000, Math.trunc(options.maxValueChars ?? 320)));
+  const maxValueChars = Math.max(
+    40,
+    Math.min(1_000, Math.trunc(options.maxValueChars ?? 320)),
+  );
 
   return ranked.slice(0, maxRecords).map(({ record }) => ({
     canonicalKey: record.canonicalKey,
