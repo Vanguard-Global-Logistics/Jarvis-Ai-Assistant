@@ -1,13 +1,7 @@
 import { z } from 'zod';
 
 export const MEMORY_SCOPES = ['private', 'shared'] as const;
-export const MEMORY_KINDS = [
-  'fact',
-  'preference',
-  'relationship',
-  'project',
-  'decision',
-] as const;
+export const MEMORY_KINDS = ['fact', 'preference', 'relationship', 'project', 'decision'] as const;
 export const MEMORY_SENSITIVITIES = ['public', 'personal', 'sensitive', 'restricted'] as const;
 export const MEMORY_SOURCE_TYPES = [
   'user-explicit',
@@ -25,10 +19,9 @@ export type MemorySourceType = (typeof MEMORY_SOURCE_TYPES)[number];
 export type MemoryReviewState = (typeof MEMORY_REVIEW_STATES)[number];
 export type MemoryStatus = (typeof MEMORY_STATUSES)[number];
 
-const IsoTimestampSchema = z.string().refine(
-  (value) => Number.isFinite(Date.parse(value)),
-  'must be a parseable timestamp',
-);
+const IsoTimestampSchema = z
+  .string()
+  .refine((value) => Number.isFinite(Date.parse(value)), 'must be a parseable timestamp');
 
 export const MemorySourceSchema = z.object({
   type: z.enum(MEMORY_SOURCE_TYPES),
