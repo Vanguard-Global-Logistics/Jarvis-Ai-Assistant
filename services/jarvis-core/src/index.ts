@@ -2,8 +2,9 @@
  * @jarvis/jarvis-core — the Jarvis orchestration runtime.
  *
  * STATUS: PARTIAL — provider-neutral model abstraction, Hive local provider,
- * Anthropic adapter, mock provider, and Thought Amplifier v1 logic implemented;
- * broader orchestration, persistence, and sub-agent coordination remain separate
+ * Anthropic adapter, mock provider, Thought Amplifier v1, and the pure Memory v1
+ * policy/domain foundation are implemented. Durable persistence, runtime memory
+ * injection, broader orchestration, and sub-agent coordination remain separate
  * milestones.
  *
  * Why it exists as its own workspace rather than living in apps/desktop: the
@@ -20,6 +21,7 @@
  */
 
 export { AMPLIFIER_SYSTEM_PROMPT, buildAmplifierUserMessage } from './amplifier/prompt.js';
+export * from './memory/index.js';
 export { AnthropicProvider, DEFAULT_MODEL, ModelRefusalError } from './model/anthropic-provider.js';
 export { createProvider } from './model/create-provider.js';
 export { HiveLocalProvider, validateHiveLocalBaseUrl } from './model/hive-local-provider.js';
