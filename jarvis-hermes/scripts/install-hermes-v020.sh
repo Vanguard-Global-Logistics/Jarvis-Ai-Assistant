@@ -49,7 +49,7 @@ git -C "$HERMES_DIR" checkout --quiet --detach "$HERMES_RELEASE_COMMIT"
 ok "exact signed release objects match"
 
 step "Installing voice, wake, messaging, cron, and tool support"
-uv venv --python 3.11 "$HERMES_DIR/.venv"
+uv venv --clear --python 3.11 "$HERMES_DIR/.venv"
 PYTHON="$HERMES_DIR/.venv/bin/python"
 uv pip install --python "$PYTHON" -e "$HERMES_DIR[$HERMES_RELEASE_EXTRAS]"
 VERSION="$("$PYTHON" -c 'from importlib.metadata import version; print(version("hermes-agent"))')"

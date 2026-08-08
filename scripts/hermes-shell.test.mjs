@@ -29,6 +29,14 @@ describe('Hermes shell entry points', () => {
     expect(source).not.toMatch(/ \+ {2,}/);
   });
 
+  it('rebuilds the managed Hermes environment without prompting', () => {
+    const installer = readFileSync(
+      resolve(root, 'jarvis-hermes/scripts/install-hermes-v020.sh'),
+      'utf8',
+    );
+    expect(installer).toContain('uv venv --clear --python 3.11');
+  });
+
   it('keeps the signed release manifest wired to the installer and doctor', () => {
     for (const script of [
       'jarvis-hermes/scripts/install-hermes-v020.sh',
