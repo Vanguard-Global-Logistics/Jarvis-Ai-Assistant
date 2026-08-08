@@ -44,8 +44,4 @@ export type {
 } from './repository.js';
 
 export { MemoryService } from './service.js';
-export type {
-  MemoryDeleteResult,
-  MemoryRecallResult,
-  MemoryRememberResult,
-} from './service.js';
+export type { MemoryDeleteResult, MemoryRecallResult, MemoryRememberResult } from './service.js';

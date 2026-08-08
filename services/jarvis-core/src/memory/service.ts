@@ -75,11 +75,7 @@ export class MemoryService {
     return this.remember(candidate, context);
   }
 
-  public recall(
-    query: string,
-    context: MemoryReadContext,
-    limit = 8,
-  ): MemoryRecallResult {
+  public recall(query: string, context: MemoryReadContext, limit = 8): MemoryRecallResult {
     // Deny before storage access when the entire request is categorically blocked.
     // Per-record sensitivity/scope checks still happen inside rankMemoriesForQuery.
     if (!context.memoryReadAllowed || context.destination === 'cloud-model') {

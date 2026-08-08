@@ -132,10 +132,7 @@ describe('MemoryService remember/correct', () => {
     expect(accepted.stored).toBe(true);
     expect(repository.writeCount).toBe(1);
 
-    const denied = service.remember(
-      memory({ profileId: 'amy', id: 'amy-1' }),
-      writeContext,
-    );
+    const denied = service.remember(memory({ profileId: 'amy', id: 'amy-1' }), writeContext);
     expect(denied.stored).toBe(false);
     expect(denied.stored ? [] : denied.decision.reasons).toContain('profile-mismatch');
     expect(repository.writeCount).toBe(1);
@@ -194,9 +191,9 @@ describe('MemoryService recall', () => {
     const service = new MemoryService(repository);
 
     expect(
-      service.recall('family household count', localReadContext).ranked.map(
-        (result) => result.record.id,
-      ),
+      service
+        .recall('family household count', localReadContext)
+        .ranked.map((result) => result.record.id),
     ).toEqual(['mine']);
 
     expect(
