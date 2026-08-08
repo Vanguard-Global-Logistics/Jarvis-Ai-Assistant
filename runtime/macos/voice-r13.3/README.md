@@ -12,7 +12,7 @@ This directory is the repository reconciliation of the physically tested macOS l
 - Owner Voice Lock: local WeSpeaker CAM++ ONNX speaker verification before Whisper.
 - AEGIS is read-only from this voice runtime and remains independently authoritative.
 
-Physical R13/R13.3 evidence included a strong owner score of 0.906-0.976 and multiple non-owner/background samples rejected in the 0.073-0.400 range. A noisy genuine-owner utterance at 0.664 exposed an overly strict wake-assist threshold; R13.3 keeps the 0.760 strong-owner threshold and adds a narrow rescue only when all three are true: speaker score >= 0.62, an explicit Jarvis wake phrase is present, and the segment is strongly near-field >= 4.0x.
+Physical R13/R13.3 evidence included a strong owner score of 0.906-0.976 and multiple non-owner/background samples rejected in the 0.073-0.400 range. A later genuine-owner wake scored 0.587 at 9.97x near-field and exposed an overly strict rescue threshold; R13.3 keeps the 0.760 strong-owner threshold and adds a narrow rescue only when all three are true: speaker score >= 0.56, an explicit Jarvis wake phrase is present, and the segment is strongly near-field >= 4.0x.
 
 ## Security and privacy exclusions
 
