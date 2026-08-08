@@ -209,7 +209,7 @@ def edit_distance(a: str, b: str) -> int:
     return prev[-1]
 
 
-WAKE_VARIANTS = ("jarvis", "jervis", "jaros", "jarvus", "jarves")
+WAKE_VARIANTS = ("jarvis", "jervis", "dervis", "jaros", "jarvus", "jarves")
 
 
 def _first_spoken_sentence(text: str) -> str:

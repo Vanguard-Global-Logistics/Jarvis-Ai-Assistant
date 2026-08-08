@@ -107,7 +107,7 @@ class DuplexInterruptProbe:
         self.baseline_provider = baseline_provider
         self.owner_verify_pcm = owner_verify_pcm
         self.owner_wake_rescue_threshold = float(
-            os.environ.get("JARVIS_OWNER_WAKE_RESCUE_THRESHOLD", "0.62")
+            os.environ.get("JARVIS_OWNER_WAKE_RESCUE_THRESHOLD", "0.56")
         )
         self.vad = webrtcvad.Vad(3) if webrtcvad else None
         self.votes = deque(maxlen=7)

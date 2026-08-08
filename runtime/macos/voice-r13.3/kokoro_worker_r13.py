@@ -130,8 +130,9 @@ try:
                                 "mlx_cache_mb": round(mx.get_cache_memory() / 1048576, 1),
                                 "mlx_peak_mb": round(mx.get_peak_memory() / 1048576, 1),
                             }
-                            # Return unused working buffers to the unified-memory allocator.
-                            mx.clear_cache()
+                            # set_cache_limit() already bounds reusable buffers. Keep that
+                            # bounded cache warm between phrases; clearing it after every
+                            # request made short replies pay the allocation/setup cost again.
                         except Exception:
                             memory = {}
 
