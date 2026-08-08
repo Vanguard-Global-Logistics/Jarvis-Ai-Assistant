@@ -1,7 +1,7 @@
 # Known Limitations
 
-Date: 2026-07-30
-Scope: the Stage 6 foundation plus the Stage 1A conversation slice (ADR 0007).
+Date: 2026-08-07
+Scope: the Stage 6 foundation, Stage 1A conversation slice, Hive local-core branch, and Memory v1 policy foundation.
 
 Per `CLAUDE.md` §8, gaps are stated plainly here rather than implied to be solved.
 This file is the honest counterweight to the scaffold: it records what the foundation
@@ -12,6 +12,8 @@ does **not** do.
 ## 0. The conversation is in-memory only — nothing is saved
 
 **Status: persistence NOT IMPLEMENTED.**
+
+Memory v1 now has an approved constitution, ADR 0009, and a tested pure domain/policy layer in `services/jarvis-core/src/memory`. It still has **no durable storage or runtime recall**: no SQLite memory migration/repository, no memory IPC surface, and no orchestration injection. Do not describe Jarvis as persistently remembering until those later gates are implemented and physically accepted.
 
 ADR 0007 added a working conversation (`jarvis:chat`) and Thought Amplifier
 (`jarvis:amplify`), but no part of Stage 1A's persistence exists yet: there are no
@@ -85,10 +87,9 @@ and no feature schema.
 
 ## 5. There are zero migrations
 
-**Status: NOT IMPLEMENTED, by instruction.**
+**Status: PARTIAL — Memory v1 policy/schema approved; persistence NOT IMPLEMENTED.**
 
-`migrations` in `@jarvis/database` is an empty array. No tables exist for memory,
-projects, tasks, or the audit log. Those are feature design work and are not approved.
+`migrations` in `@jarvis/database` is an empty array. No tables exist for memory, projects, tasks, or the audit log. Memory v1 now has an approved constitution, ADR, schema, and pure policy/tests, but its SQLite migration/repository, audit/tombstone persistence, runtime retrieval, and any IPC widening are not implemented yet.
 
 ## 6. The model provider abstraction exists, but is not wired to the app
 
