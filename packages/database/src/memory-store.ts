@@ -40,11 +40,11 @@ export interface ReplaceActiveResult {
 }
 
 export class MemoryStoreError extends Error {
-  public override readonly name = 'MemoryStoreError';
+  public override readonly name: string = 'MemoryStoreError';
 }
 
 export class MemoryStoreOwnershipError extends MemoryStoreError {
-  public override readonly name = 'MemoryStoreOwnershipError';
+  public override readonly name: string = 'MemoryStoreOwnershipError';
 }
 
 interface MemoryRow {
