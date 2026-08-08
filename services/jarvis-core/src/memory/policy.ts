@@ -147,6 +147,14 @@ function overlapScore(left: ReadonlySet<string>, right: ReadonlySet<string>): nu
   return matches;
 }
 
+function normalizeQuery(value: string): string {
+  try {
+    return normalizeCanonicalKey(value);
+  } catch {
+    return '';
+  }
+}
+
 export interface RankedMemory {
   record: MemoryRecord;
   score: number;
@@ -166,13 +174,7 @@ export function rankMemoriesForQuery(
   if (safeLimit === 0) return [];
 
   const queryTokens = searchTokens(query);
-  let normalizedQuery = '';
-  try {
-    normalizedQuery = normalizeCanonicalKey(query);
-  } catch {
-    normalizedQuery = '';
-  }
-
+  const normalizedQuery = normalizeQuery(query);
   const ranked: RankedMemory[] = [];
 
   for (const candidate of candidates) {
@@ -215,11 +217,16 @@ export interface MemoryPromptProjection {
   sourceType: MemoryRecord['source']['type'];
 }
 
+function stripControlCharacters(value: string): string {
+  return Array.from(value, (character) => {
+    const codePoint = character.codePointAt(0) ?? 0;
+    const isControl = codePoint <= 31 || codePoint === 127;
+    return isControl ? ' ' : character;
+  }).join('');
+}
+
 function boundedValue(value: string, maxChars: number): string {
-  const clean = value
-    .replace(/[\u0000-\u001f\u007f]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  const clean = stripControlCharacters(value).replace(/\s+/g, ' ').trim();
   if (clean.length <= maxChars) return clean;
   return `${clean.slice(0, Math.max(0, maxChars - 1)).trimEnd()}…`;
 }
