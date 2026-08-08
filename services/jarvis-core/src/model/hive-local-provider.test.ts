@@ -70,6 +70,52 @@ describe('HiveLocalProvider', () => {
     expect(client.posts[0]?.body).toMatchObject({ model: 'qwen3:4b', stream: false });
   });
 
+  it('uses a fast local model for short ordinary chat requests', async () => {
+    const client = new FakeClient();
+    const provider = new HiveLocalProvider({
+      client,
+      model: 'balanced:8b',
+      fastModel: 'fast:2b',
+      reasoningModel: 'reasoning:14b',
+    });
+
+    await provider.chat({ messages: [{ role: 'user', content: 'Hello Jarvis' }] });
+
+    expect(client.posts[0]?.body).toMatchObject({ model: 'fast:2b' });
+  });
+
+  it('uses a reasoning local model for complex chat and amplification', async () => {
+    const client = new FakeClient({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              clarifiedIntent: 'Clarified.',
+              missingQuestions: ['What is the deadline?'],
+              improvedConcept: 'Improved.',
+              recommendedNextStep: 'Build the smallest test.',
+              buildReadyPrompt: 'Build it.',
+            }),
+          },
+        },
+      ],
+    });
+    const provider = new HiveLocalProvider({
+      client,
+      model: 'balanced:8b',
+      fastModel: 'fast:2b',
+      reasoningModel: 'reasoning:14b',
+    });
+
+    await provider.chat({
+      messages: [{ role: 'user', content: 'Analyze this architecture for security risks' }],
+    });
+    await provider.amplify('rough idea');
+
+    expect(client.posts[0]?.body).toMatchObject({ model: 'reasoning:14b' });
+    expect(client.posts[1]?.body).toMatchObject({ model: 'reasoning:14b' });
+  });
+
   it('rejects malformed local chat responses', async () => {
     const provider = new HiveLocalProvider({
       client: new FakeClient({ choices: [] }),

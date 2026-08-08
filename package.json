@@ -24,6 +24,7 @@
     "build": "npm run build --workspaces --if-present && npm run assert:bundle",
     "assert:bundle": "node scripts/assert-electron-bundle.mjs",
     "dev:desktop": "npm run dev --workspace @jarvis/desktop",
+    "doctor": "node scripts/doctor.mjs",
     "verify": "npm run format:check && npm run lint && npm run typecheck && npm run test",
     "probe:runtime": "node scripts/runtime-probe.mjs"
   },
