@@ -8,6 +8,8 @@ reference/
 CLAUDE.md
 docs/CURRENT-STATE-AUDIT.md
 docs/VISUAL-DESIGN-TARGET.md
+docs/foundation/06-MEMORY-CONSTITUTION.md
+docs/DECISIONS/0009-memory-v1-local-governed-foundation.md
 
 # Imported/preserved runtime snapshots and the legacy web companion are not part
 # of the TypeScript workspace formatter. Reformatting them would rewrite evidence
