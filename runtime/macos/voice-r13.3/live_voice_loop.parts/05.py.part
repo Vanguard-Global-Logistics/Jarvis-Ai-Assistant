@@ -1,0 +1,154 @@
+
+        if not heard_wake and (field_locked or room_guard.is_noisy(now)):
+            FIELD_LOCK_UNTIL = max(FIELD_LOCK_UNTIL, now + FIELD_HOLD_SECONDS)
+            field_locked = True
+
+        if heard_wake:
+            room_guard.observe_wake(now)
+        else:
+            # Other speakers have already been removed by Owner Voice Lock.
+            # Only verified-owner nonwake speech can influence conversational state.
+            foreground_ratio = (
+                float(acoustic.get("peak_to_floor", 0.0)) if acoustic else 0.0
+            )
+            if owner_decision == "owner" and foreground_ratio >= 1.35:
+                room_guard.observe_nonwake(now)
+        room_guard.report_if_changed(now)
+
+        noisy_room = room_guard.is_noisy(now)
+        in_conversation = conversation_until > now
+
+        owner_slot = OWNER_COMMAND_SLOT_UNTIL > now
+
+        if field_locked and not heard_wake and not owner_slot:
+            # At a game or similarly loud environment, a temporary dip back to
+            # NORMAL must not let sideline speech become a Jarvis follow-up.
+            continue
+
+        if heard_wake and not inline:
+            print("Wake word accepted.")
+            if field_locked or noisy_room:
+                print(
+                    f"Owner command slot: ARMED for {WAKE_COMMAND_SLOT_SECONDS:.1f}s",
+                    flush=True,
+                )
+            mic_state = speak_without_mic_backlog(mic_reader, "Yes?", "Acknowledgement")
+            if mic_state is None:
+                break
+            # Start the protected owner slot AFTER the acknowledgement finishes.
+            # R12.3 consumed much of the slot while George was saying "Yes?".
+            OWNER_COMMAND_SLOT_UNTIL = time.time() + WAKE_COMMAND_SLOT_SECONDS
+            print(
+                f"Owner command slot: STARTED now for {WAKE_COMMAND_SLOT_SECONDS:.1f}s",
+                flush=True,
+            )
+            armed_until = time.time() + WAKE_ARM_SECONDS
+            conversation_until = time.time() + CONVERSATION_SECONDS
+            continue
+
+        if heard_wake and inline:
+            command = inline
+            armed_until = 0.0
+            OWNER_COMMAND_SLOT_UNTIL = 0.0
+        elif owner_slot:
+            command = text.strip()
+            OWNER_COMMAND_SLOT_UNTIL = 0.0
+            armed_until = 0.0
+            print("Owner command slot: CONSUMED", flush=True)
+        elif (armed_until > now or in_conversation) and not noisy_room and not field_locked:
+            command = text.strip()
+            armed_until = 0.0
+        else:
+            continue
+
+        if not command:
+            continue
+
+        print(f"Request: {command}")
+        turn_started = time.perf_counter()
+        set_voice_state("thinking")
+
+        # Route deterministic work first. Only general reasoning enters the model.
+        answer = local_math(command)
+        if answer is None:
+            answer = brain.deterministic_answer(command)
+
+        if answer is not None:
+            brain.remember_exchange(command, answer)
+            print(f"Jarvis: {answer}  [brain=local-code 0.00s]")
+            speech_result = get_live_speaker().speak_text(
+                mic_reader,
+                speech_friendly(answer),
+                "Speech output",
+            )
+            if speech_result is None:
+                break
+            service = time.perf_counter() - turn_started
+            log_latency({
+                "route": "local-code",
+                "stt_seconds": round(stt, 3),
+                "first_audio_seconds": round(float(speech_result["first_audio_seconds"]), 3),
+                "speech_total_seconds": round(float(speech_result["total_seconds"]), 3),
+                "turn_service_seconds": round(service, 3),
+            })
+        else:
+            # Critical latency change: read the OpenJarvis SSE stream and feed
+            # speech-sized phrases to George before the model finishes the reply.
+            try:
+                phrase_stream = brain.stream_phrases(command)
+                speech_result = get_live_speaker().speak_stream(
+                    mic_reader,
+                    phrase_stream,
+                    "Speech output",
+                )
+                if speech_result is None:
+                    raise RuntimeError("streaming speech did not complete")
+                answer = brain.last_answer or str(speech_result.get("text", "")).strip()
+                metrics = brain.last_stream_metrics
+                service = time.perf_counter() - turn_started
+                print(
+                    f"Jarvis: {answer}  "
+                    f"[brain=ollama-reflex ttft={float(metrics.get('ttft_seconds', 0.0)):.2f}s "
+                    f"model={float(metrics.get('model_total_seconds', 0.0)):.2f}s]",
+                    flush=True,
+                )
+                log_latency({
+                    "route": "hive-local-stream",
+                    "stt_seconds": round(stt, 3),
+                    "brain_ttft_seconds": float(metrics.get("ttft_seconds", 0.0)),
+                    "brain_total_seconds": float(metrics.get("model_total_seconds", 0.0)),
+                    "first_audio_seconds": round(float(speech_result["first_audio_seconds"]), 3),
+                    "speech_synth_seconds": round(float(speech_result["synth_total_seconds"]), 3),
+                    "speech_audio_seconds": round(float(speech_result["audio_seconds"]), 3),
+                    "speech_total_seconds": round(float(speech_result["total_seconds"]), 3),
+                    "turn_service_seconds": round(service, 3),
+                })
+            except Exception as exc:
+                print("Local streaming brain error:", repr(exc), flush=True)
+                answer = "My local brain is unavailable. I will not use the cloud without permission."
+                speech_result = get_live_speaker().speak_text(
+                    mic_reader,
+                    answer,
+                    "Speech output",
+                )
+                if speech_result is None:
+                    break
+                service = time.perf_counter() - turn_started
+                log_latency({
+                    "route": "local-error",
+                    "stt_seconds": round(stt, 3),
+                    "turn_service_seconds": round(service, 3),
+                })
+
+        print(
+            f"Turn service time (after end-of-speech detection): "
+            f"{time.perf_counter() - turn_started:.2f}s",
+            flush=True,
+        )
+        conversation_until = time.time() + CONVERSATION_SECONDS
+
+finally:
+    mic_reader.close()
+    set_voice_state("idle")
+    stop_owned_kokoro_worker()
+    print("\nJarvis / Hive R13.3 Live Calibration engine stopped.", flush=True)
