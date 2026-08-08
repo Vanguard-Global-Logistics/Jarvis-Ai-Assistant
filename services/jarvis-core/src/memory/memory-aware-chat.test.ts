@@ -74,19 +74,19 @@ class CapturingProvider implements JarvisModelProvider {
 
   public constructor(public readonly id: ProviderId) {}
 
-  public async chat(request: ChatRequest): Promise<ChatReply> {
+  public chat(request: ChatRequest): Promise<ChatReply> {
     this.lastRequest = request;
-    return { text: 'ok', provider: this.id };
+    return Promise.resolve({ text: 'ok', provider: this.id });
   }
 
-  public async amplify(_idea: string): Promise<AmplifierResult> {
-    return {
+  public amplify(_idea: string): Promise<AmplifierResult> {
+    return Promise.resolve({
       clarifiedIntent: 'intent',
       missingQuestions: ['question'],
       improvedConcept: 'concept',
       recommendedNextStep: 'next',
       buildReadyPrompt: 'prompt',
-    };
+    });
   }
 }
 

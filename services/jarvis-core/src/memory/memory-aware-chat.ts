@@ -2,7 +2,7 @@ import type { ChatReply, ChatRequest } from '@jarvis/contracts';
 import type { JarvisModelProvider } from '../model/provider.js';
 import type { MemoryReadContext } from './policy.js';
 import type { MemorySensitivity } from './schema.js';
-import { MemoryService } from './service.js';
+import type { MemoryService } from './service.js';
 
 export interface MemoryAwareChatContext {
   readonly requesterProfileId: string;
