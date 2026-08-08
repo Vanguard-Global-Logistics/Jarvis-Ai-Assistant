@@ -90,7 +90,7 @@ class FakeMemoryRepository implements MemoryRepositoryPort {
   ): MemoryDeletionReceipt | null {
     this.deleteCount += 1;
     const existing = this.records.get(id);
-    if (!existing || existing.profileId !== profileId || existing.status !== 'active') {
+    if (existing?.profileId !== profileId || existing?.status !== 'active') {
       return null;
     }
 
