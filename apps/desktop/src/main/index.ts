@@ -1,10 +1,12 @@
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { BrowserWindow, app } from 'electron';
 import { createLogger, describeEnv, parseEnv } from '@jarvis/config';
 import { createProvider } from '@jarvis/jarvis-core';
 import { registerAmplifyHandler } from './handlers/amplify.js';
 import { registerAppInfoHandler } from './handlers/app-info.js';
 import { registerChatHandler } from './handlers/chat.js';
+import { createIpcSenderValidator } from './ipc-sender.js';
 import { applyContentSecurityPolicy, denyAllPermissions, lockNavigation } from './security.js';
 
 /**
@@ -30,6 +32,10 @@ const env = parseEnv();
 const modelProvider = createProvider(env);
 
 const RENDERER_DEV_URL = process.env.ELECTRON_RENDERER_URL ?? null;
+const validateIpcSender = createIpcSenderValidator({
+  packagedEntryUrl: pathToFileURL(join(__dirname, '../renderer/index.html')).href,
+  developmentUrl: RENDERER_DEV_URL,
+});
 
 // DEV-ONLY: allow Chromium's software WebGL (SwiftShader) so the V2 renderer
 // study can run in headless/GPU-less environments (Codespaces, CI probes).
@@ -123,9 +129,9 @@ void app.whenReady().then(() => {
   // the trust boundary (ADR 0002): a read-only host-facts call, and two calls
   // that reach only the model provider — never the filesystem, shell, env, or
   // AEGIS.
-  registerAppInfoHandler();
-  registerChatHandler(modelProvider);
-  registerAmplifyHandler(modelProvider);
+  registerAppInfoHandler(validateIpcSender);
+  registerChatHandler(modelProvider, validateIpcSender);
+  registerAmplifyHandler(modelProvider, validateIpcSender);
 
   createWindow();
 

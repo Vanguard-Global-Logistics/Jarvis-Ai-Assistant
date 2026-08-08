@@ -1,6 +1,6 @@
 # The IPC Surface
 
-Date: 2026-07-30
+Date: 2026-08-08
 Status: **THREE channels.** `app:get-info` is IMPLEMENTED AND VERIFIED (observed live on
 Windows development runtime, 2026-07-16). `jarvis:chat` and `jarvis:amplify` are
 IMPLEMENTED AND VERIFIED on the Linux runtime probe (prod + dev, real Electron, a mock
@@ -26,15 +26,16 @@ If this file and the code disagree, **the code wins and this file is wrong** —
         │
         └──► ipcRenderer.invoke('app:get-info')
                     │
-                    └──► handleContract(appGetInfoContract, impl)
-                              │  1. parse request  ─── reject on failure
-                              │  2. run impl
-                              │  3. parse response ─── reject on failure
+                    └──► handleContract(contract, impl, validateSender)
+                              │  1. validate sender ─── reject on failure
+                              │  2. parse request   ─── reject on failure
+                              │  3. run impl
+                              │  4. parse response  ─── reject on failure
                               ▼
-                         registerAppInfoHandler()
+                         registerAppInfoHandler(validateSender)
 ```
 
-Four properties hold, and each is load-bearing:
+Five properties hold, and each is load-bearing:
 
 1. **The allowlist is the whole surface.** A channel not in `CHANNELS`
    (`packages/contracts/src/ipc/channels.ts`) does not exist. There is no dynamic
@@ -43,10 +44,15 @@ Four properties hold, and each is load-bearing:
    operation. There is no `invoke(channel, ...args)` and there must never be one — a
    generic passthrough hands the renderer the whole main process and makes the allowlist
    decoration. This is enforced by test, not by review (see below).
-3. **Main validates, in both directions.** `handleContract`
+3. **Main authenticates the sending frame first.** Packaged IPC is accepted only from the
+   exact renderer entry URL. Development IPC is accepted only from the configured HTTP(S)
+   loopback origin. Missing, malformed, credential-bearing, remote, lookalike, and sibling
+   packaged URLs fail closed before request parsing or implementation code.
+4. **Main validates, in both directions.** `handleContract`
    (`apps/desktop/src/main/ipc.ts`) is the only path to `ipcMain.handle`. Nothing calls
-   `ipcMain.handle` directly, so validation cannot be forgotten — it is structural.
-4. **The preload does not validate.** It imports `CHANNELS` only, never the Zod schemas.
+   `ipcMain.handle` directly, so sender, request, and response validation cannot be
+   forgotten — it is structural.
+5. **The preload does not validate.** It imports `CHANNELS` only, never the Zod schemas.
    Main is the side that must not trust the caller. Validating in the preload too would
    imply the renderer-side copy is trustworthy, which it is not.
 
@@ -69,7 +75,7 @@ of arriving in the UI. Every response schema is `.strict()` for the same reason.
 | **Renderer call**     | `window.jarvis.getAppInfo(): Promise<AppInfo>`                                                                                          |
 | **Request**           | `z.undefined()` — no payload. A renderer that sends one is rejected.                                                                    |
 | **Response**          | `AppInfoSchema`, `.strict()`                                                                                                            |
-| **Handler**           | `registerAppInfoHandler()` in `apps/desktop/src/main/handlers/app-info.ts`                                                              |
+| **Handler**           | `registerAppInfoHandler(validateSender)` in `apps/desktop/src/main/handlers/app-info.ts`                                                |
 | **Contract**          | `appGetInfoContract` in `packages/contracts/src/ipc/contracts.ts`                                                                       |
 | **Side effects**      | None. Reads Electron metadata only.                                                                                                     |
 | **Authority granted** | None. No filesystem, no shell, no env, no user data, no AEGIS.                                                                          |
@@ -98,7 +104,7 @@ the boundary machinery end to end without widening the attack surface.
 | **Renderer call**     | `window.jarvis.sendChat(request: ChatRequest): Promise<ChatReply>`                                                                            |
 | **Request**           | `ChatRequestSchema` — `{ messages: { role: 'user' \| 'assistant', content: string }[] }`, min one message, `.strict()`                        |
 | **Response**          | `ChatReplySchema` — `{ text: string, provider: 'mock' \| 'anthropic' }`, `.strict()`                                                          |
-| **Handler**           | `registerChatHandler(provider)` in `apps/desktop/src/main/handlers/chat.ts`                                                                   |
+| **Handler**           | `registerChatHandler(provider, validateSender)` in `apps/desktop/src/main/handlers/chat.ts`                                                   |
 | **Contract**          | `jarvisChatContract` in `packages/contracts/src/ipc/contracts.ts`                                                                             |
 | **Side effects**      | One model call against the shared main-process provider. No filesystem, no persistence, no state retained in main.                            |
 | **Authority granted** | None beyond calling the model provider. No filesystem, shell, env, user data, or AEGIS. The API key stays in main.                            |
@@ -119,7 +125,7 @@ category in main (`toSafeModelError`) before any logging, and collapse to
 | **Renderer call**     | `window.jarvis.amplify(idea: string): Promise<AmplifierResult>`                                                                                                |
 | **Request**           | `AmplifyRequestSchema` — `{ idea: string }`, non-empty, `.strict()` (the bridge shapes the string into this object)                                            |
 | **Response**          | `AmplifierResultSchema` — the five fields (`clarifiedIntent`, `missingQuestions[]`, `improvedConcept`, `recommendedNextStep`, `buildReadyPrompt`), `.strict()` |
-| **Handler**           | `registerAmplifyHandler(provider)` in `apps/desktop/src/main/handlers/amplify.ts`                                                                              |
+| **Handler**           | `registerAmplifyHandler(provider, validateSender)` in `apps/desktop/src/main/handlers/amplify.ts`                                                              |
 | **Contract**          | `jarvisAmplifyContract` in `packages/contracts/src/ipc/contracts.ts`                                                                                           |
 | **Side effects**      | One model call against the shared main-process provider.                                                                                                       |
 | **Authority granted** | None beyond calling the model provider. Same envelope as `jarvis:chat`.                                                                                        |

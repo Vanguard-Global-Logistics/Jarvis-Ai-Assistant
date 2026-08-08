@@ -2,6 +2,7 @@ import type { ChatReply } from '@jarvis/contracts';
 import { jarvisChatContract } from '@jarvis/contracts';
 import type { JarvisModelProvider } from '@jarvis/jarvis-core';
 import { handleContract } from '../ipc.js';
+import type { IpcSenderValidator } from '../ipc-sender.js';
 import { toSafeModelError } from './model-error.js';
 
 /**
@@ -21,12 +22,19 @@ import { toSafeModelError } from './model-error.js';
  * Provider failures are sanitised into a safe category before they propagate,
  * so nothing an SDK error carries can reach a log line or the renderer.
  */
-export function registerChatHandler(provider: JarvisModelProvider): void {
-  handleContract(jarvisChatContract, async (request): Promise<ChatReply> => {
-    try {
-      return await provider.chat(request);
-    } catch (cause) {
-      throw toSafeModelError(cause);
-    }
-  });
+export function registerChatHandler(
+  provider: JarvisModelProvider,
+  validateSender: IpcSenderValidator,
+): void {
+  handleContract(
+    jarvisChatContract,
+    async (request): Promise<ChatReply> => {
+      try {
+        return await provider.chat(request);
+      } catch (cause) {
+        throw toSafeModelError(cause);
+      }
+    },
+    validateSender,
+  );
 }
