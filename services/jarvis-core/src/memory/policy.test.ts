@@ -6,7 +6,11 @@ import {
   rankMemoriesForQuery,
   type MemoryReadContext,
 } from './policy.js';
-import { MemoryRecordSchema, normalizeCanonicalKey, type MemoryRecord } from './schema.js';
+import {
+  MemoryRecordSchema,
+  normalizeCanonicalKey,
+  type MemoryRecord,
+} from './schema.js';
 
 const NOW = '2026-08-07T22:00:00-04:00';
 
@@ -38,7 +42,7 @@ const localRead: MemoryReadContext = {
 
 describe('Memory v1 schema and write admission', () => {
   it('normalizes canonical keys deterministically', () => {
-    expect(normalizeCanonicalKey(" Project / Sophisticated Sips : Domain ")).toBe(
+    expect(normalizeCanonicalKey(' Project / Sophisticated Sips : Domain ')).toBe(
       'project.sophisticated.sips.:.domain',
     );
   });
@@ -100,14 +104,23 @@ describe('Memory v1 retrieval policy', () => {
   it('isolates private memory by profile', () => {
     expect(evaluateMemoryRead(memory(), localRead).allowed).toBe(true);
     expect(
-      evaluateMemoryRead(memory(), { ...localRead, requesterProfileId: 'amy' }).reasons,
+      evaluateMemoryRead(memory(), {
+        ...localRead,
+        requesterProfileId: 'amy',
+      }).reasons,
     ).toContain('profile-mismatch');
   });
 
   it('excludes pending, superseded, and deleted records', () => {
-    expect(evaluateMemoryRead(memory({ reviewState: 'pending' }), localRead).allowed).toBe(false);
-    expect(evaluateMemoryRead(memory({ status: 'superseded' }), localRead).allowed).toBe(false);
-    expect(evaluateMemoryRead(memory({ status: 'deleted' }), localRead).allowed).toBe(false);
+    expect(
+      evaluateMemoryRead(memory({ reviewState: 'pending' }), localRead).allowed,
+    ).toBe(false);
+    expect(
+      evaluateMemoryRead(memory({ status: 'superseded' }), localRead).allowed,
+    ).toBe(false);
+    expect(evaluateMemoryRead(memory({ status: 'deleted' }), localRead).allowed).toBe(
+      false,
+    );
   });
 
   it('never discloses Memory v1 to a cloud-model destination', () => {
@@ -122,8 +135,12 @@ describe('Memory v1 retrieval policy', () => {
 
   it('requires explicit shared and restricted read approval', () => {
     const shared = memory({ scope: 'shared' });
-    expect(evaluateMemoryRead(shared, localRead).reasons).toContain('shared-read-not-approved');
-    expect(evaluateMemoryRead(shared, { ...localRead, allowShared: true }).allowed).toBe(true);
+    expect(evaluateMemoryRead(shared, localRead).reasons).toContain(
+      'shared-read-not-approved',
+    );
+    expect(evaluateMemoryRead(shared, { ...localRead, allowShared: true }).allowed).toBe(
+      true,
+    );
 
     const restricted = memory({ sensitivity: 'restricted' });
     expect(
