@@ -1,0 +1,37 @@
+export {
+  MEMORY_KINDS,
+  MEMORY_REVIEW_STATES,
+  MEMORY_SCOPES,
+  MEMORY_SENSITIVITIES,
+  MEMORY_SOURCE_TYPES,
+  MEMORY_STATUSES,
+  MemoryRecordSchema,
+  MemorySourceSchema,
+  normalizeCanonicalKey,
+} from './schema.js';
+export type {
+  MemoryKind,
+  MemoryRecord,
+  MemoryReviewState,
+  MemoryScope,
+  MemorySensitivity,
+  MemorySource,
+  MemorySourceType,
+  MemoryStatus,
+} from './schema.js';
+
+export {
+  evaluateMemoryRead,
+  evaluateMemoryWrite,
+  projectMemoriesForLocalModel,
+  rankMemoriesForQuery,
+} from './policy.js';
+export type {
+  MemoryDestination,
+  MemoryPolicyDecision,
+  MemoryPolicyReason,
+  MemoryPromptProjection,
+  MemoryReadContext,
+  MemoryWriteContext,
+  RankedMemory,
+} from './policy.js';
