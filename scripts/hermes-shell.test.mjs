@@ -112,7 +112,9 @@ describe('Hermes shell entry points', () => {
       resolve(root, 'runtime/macos/voice-r13.3/live_voice_loop.parts/04.py.part'),
       'utf8',
     );
-    const uncertain = source.indexOf('if owner_decision == "uncertain":');
+    const uncertain = source.indexOf(
+      'if owner_decision == "uncertain" and not development_accept:',
+    );
     const observe = source.indexOf('room_guard.observe_nonwake(now)', uncertain);
     const rejection = source.indexOf(
       'if not (live_rescue or terminal_rescue or profile_accept):',
