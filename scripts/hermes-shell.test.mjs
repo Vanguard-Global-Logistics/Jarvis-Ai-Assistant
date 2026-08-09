@@ -160,6 +160,14 @@ describe('Hermes shell entry points', () => {
     expect(installer).toContain(`$HERE/${memoryPath}`);
     expect(doctor).toContain(`$HERMES_HOME/${memoryPath}`);
   });
+  it('ignores the deterministic R13.3 reconstruction artifact', () => {
+    const gitignore = readFileSync(resolve(root, '.gitignore'), 'utf8');
+
+    expect(gitignore).toMatch(
+      /^runtime\/macos\/voice-r13\.3\/live_voice_loop_r13_3\.py$/m,
+    );
+  });
+
   it('runs R13.3 reconstruction as a standalone command before copying', () => {
     const installer = readFileSync(
       resolve(root, 'runtime/macos/voice-r13.3/INSTALL-AND-START-R13-3.command'),
