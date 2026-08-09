@@ -26,10 +26,10 @@ GitHub and tested runtime evidence are the source of truth. This file contains n
 - PR URL: `https://github.com/Vanguard-Global-Logistics/Jarvis-Ai-Assistant/pull/2`
 - PR target: `main`
 - Verified implementation head immediately before the latest documentation update:
-  `2adf5a99c1590efa63be13617cfce16e183f75d9`
+  `cac2b7be96e8f53c633483ca83fdeb969fc48ce7`
 - Base at the verified PR inspection: `c5ec68f04ecb8049287d4990073c390f25ba0ecc`
 - PR state at handoff creation: open, draft, mergeable.
-- CI evidence for `2adf5a9`: workflow **CI**, run **263**, completed successfully: format,
+- CI evidence for `cac2b7b`: workflow **CI**, run **265**, completed successfully: format,
   lint, typecheck, tests, build, real Electron runtime probe, and archived-handoff integrity.
 - Never modify `main` directly, force-push shared history, reset away user work, or treat a dirty worktree as disposable.
 - Read `CLAUDE.md`, `docs/CURRENT-STATE-AUDIT.md`, `docs/KNOWN-LIMITATIONS.md`, `docs/IPC-SURFACE.md`, `docs/BACKLOG.md`, relevant ADRs, and this handoff before changing code.
