@@ -62,6 +62,23 @@ describe('Hermes shell entry points', () => {
     expect(config).toContain('provider: local');
   });
 
+  it('installs and verifies the owner-approved Octagon commercial memory', () => {
+    const installer = readFileSync(
+      resolve(root, 'jarvis-hermes/scripts/install-hermes-v020.sh'),
+      'utf8',
+    );
+    const doctor = readFileSync(
+      resolve(root, 'jarvis-hermes/scripts/hermes-v020-doctor.sh'),
+      'utf8',
+    );
+    const memoryPath = 'memories/OCTAGON-COMMERCIAL-STRATEGY.md';
+
+    expect(readFileSync(resolve(root, 'jarvis-hermes', memoryPath), 'utf8')).toContain(
+      'The Octagon is the commercial, shared-workspace add-on for Jarvis.',
+    );
+    expect(installer).toContain(`$HERE/${memoryPath}`);
+    expect(doctor).toContain(`$HERMES_HOME/${memoryPath}`);
+  });
   it('runs R13.3 reconstruction as a standalone command before copying', () => {
     const installer = readFileSync(
       resolve(root, 'runtime/macos/voice-r13.3/INSTALL-AND-START-R13-3.command'),
