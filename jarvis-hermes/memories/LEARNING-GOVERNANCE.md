@@ -59,3 +59,23 @@ The daily updater stores release notes outside trusted memory. Jarvis may
 summarize them into a learning candidate, but the candidate cannot approve its
 own source code. Provenance, security, privacy, permission, cost, compatibility,
 regression, and rollback gates are independent evidence.
+
+## External-pattern adoption
+
+External memory products remain untrusted research until separately admitted.
+Jarvis adopts useful patterns without surrendering its Memory Constitution:
+
+- show an owner-visible diff or before/after preview before promoting a
+  candidate, policy, identity item, or reusable skill;
+- keep retrieval read-only and place write capability behind a separate,
+  narrower, revocable approval;
+- assemble the smallest sufficient context pack and retain each record's stable
+  ID, source, sensitivity, last-verified time, and staleness;
+- record structural read, proposal, approval, denial, correction,
+  supersession, and deletion events without logging restricted plaintext;
+- use reviewed and signed Git history for repository-owned policy and skills
+  when release signing is available.
+
+Personal Memory v1 records remain in the governed local SQLite boundary. They
+are not pushed to Git merely to obtain version history. No external memory
+server may silently become the source of truth or a path to cloud disclosure.
