@@ -74,6 +74,22 @@ Minimum field workflow:
 
 Daily email autonomy begins at A1 draft and moves to A2 approve-to-send. Scheduled A3 sending is allowed only after a written owner policy, correct-recipient controls, opt-out/escalation rules and repeated successful pilot evidence.
 
+#### Nightly Simpro job briefing sync
+
+With employer and Simpro authorization, Job Site Progress will use a least-privilege, read-only OAuth integration to refresh each approved job at midnight local time. Browser scraping is a separately approved fallback only when an official endpoint is unavailable; it must never reuse a person's interactive credentials or bypass access controls.
+
+The sync reads only the fields required from approved jobs, cost centers, schedules, timesheets/job cards, vendor orders and inventory records. Each job briefing records:
+
+- last successful sync, source record and stale-data warning;
+- ordered product, supplier acknowledgement, backorder, in-transit, estimated arrival, received/delivered and changed-ETA states;
+- ETA source, last verification time and confidence; an estimate is never presented as a guaranteed arrival;
+- products due within 24, 48 and 72 hours and materials blocking scheduled work;
+- assigned technicians and scheduled crew-hours for today and upcoming workdays;
+- budget/forecast labor, verified actual labor, remaining labor and projected crew-days by cost center;
+- readiness, blockers, decisions and technician notifications queued, approved or sent.
+
+A manual `Refresh Now` remains available. Later change-triggered or webhook refresh may supplement—not replace—the nightly reconciliation after authorization and acceptance testing. Technicians receive only job-relevant ETA changes for work assigned to them, with correct-recipient mapping, duplicate suppression and delivery evidence.
+
 ### Phase 6 — Add transparent labor forecasting
 
 Labor tracking begins with technician self-reported actual time and remaining-work estimates by project, phase, area/system and punch item. It supports planning, billing review and future labor forecasting.
@@ -83,6 +99,12 @@ Labor tracking begins with technician self-reported actual time and remaining-wo
 - The system does not automatically discipline, rank, terminate or make employment decisions.
 - Reported labor is not payroll source-of-truth unless an authorized payroll integration and reconciliation policy are separately approved.
 - Forecasts show source data, assumptions, confidence and changes over time.
+- Calculate each cost center independently before rolling up the job; never blend unrelated cost-center budgets or actuals.
+- `remaining labor hours = approved forecast/budget labor hours - verified actual labor hours`.
+- `scheduled crew capacity = sum of each assigned technician's scheduled hours for that cost center and workday`.
+- `estimated workdays remaining = remaining labor hours / scheduled crew capacity`, with no divide-by-zero and no negative-hours display.
+- Do not estimate from technician headcount alone. Part-day schedules, access limits, skill mix, productivity, material availability, dependencies and rework must remain visible assumptions.
+- Reconcile schedule records with timesheets/job cards by stable job and cost-center identifiers so hours are not double-counted.
 - Planned-versus-actual categories may include project management, rough-in material/labor, trim-out material/labor, programming, training and closeout.
 
 ## Initial skill registry
@@ -96,11 +118,14 @@ Labor tracking begins with technician self-reported actual time and remaining-wo
 | Create daily field punch list | A1 | Correct assignments and acceptance evidence | Proposed |
 | Send technician daily punch list | A2 | Correct recipients, no duplicates, delivery evidence | Proposed |
 | Record field progress/problem | A2 | Timely, attributable, source-preserving update | Proposed |
-| Forecast remaining labor | A1 | Forecast error improves against verified actuals | Proposed |
+| Refresh approved Simpro job data | A2 pilot → A3 policy | Complete midnight reconciliation with stale-data alarm | Proposed |
+| Track product ETA and delivery state | A1 | Source-linked ETA changes with no false guarantees | Proposed |
+| Notify assigned technicians of ETA change | A2 | Correct recipients, no duplicates, delivery evidence | Proposed |
+| Forecast remaining labor by cost center | A1 | Forecast error improves against verified actuals | Proposed |
 
 ## AEGIS stop conditions
 
-Stop and escalate on missing authorization, wrong project or recipient, stale or conflicting source documents, cross-compartment data, absent required evidence, untrusted attachment, credential failure, duplicate send, destructive request, unexplained labor anomaly, tool failure, or any attempt to bypass approval.
+Stop and escalate on missing authorization, wrong project or recipient, stale or conflicting source documents, cross-compartment data, absent required evidence, untrusted attachment, credential failure, duplicate send, destructive request, unexplained labor anomaly, stale sync, missing ETA source, unmapped job or cost center, schedule/timesheet double counting, negative remaining hours, tool failure, or any attempt to bypass approval.
 
 ## Required pilot evidence
 
@@ -113,8 +138,11 @@ Before wider use, simulate and physically test:
 - one tool/email failure with safe retry or stop;
 - one technician correction and reviewer rejection/reopen;
 - one customer/GC feedback item through verified closure;
-- one planned-versus-actual labor forecast without payroll or employee-decision claims.
+- one planned-versus-actual labor forecast without payroll or employee-decision claims;
+- one midnight Simpro reconciliation plus a stale-sync alert;
+- one ETA change delivered only to correctly assigned technicians;
+- one multi-cost-center labor forecast with part-day schedules and no double counting.
 
 ## Honest current state
 
-This roadmap does not mean Jarvis control adapters, full BCI Agent workflows, technician accounts, daily emails, job-site reporting or labor forecasting are implemented. They remain gated behind the reliable Jarvis foundation, automation inventory, employer authorization, multi-user identity, AEGIS enforcement and physical acceptance.
+This roadmap does not mean Jarvis control adapters, full BCI Agent workflows, technician accounts, daily emails, authorized Simpro sync, product ETA alerts, job-site reporting or labor forecasting are implemented. They remain gated behind the reliable Jarvis foundation, automation inventory, employer authorization, multi-user identity, AEGIS enforcement and physical acceptance.
