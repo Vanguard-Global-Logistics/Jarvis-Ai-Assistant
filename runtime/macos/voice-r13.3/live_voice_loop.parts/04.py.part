@@ -127,11 +127,16 @@ try:
             print("Field lock: OFF — sustained quiet verified; natural follow-up restored.", flush=True)
             field_lock_announced = False
 
+        owner_slot_waiting = OWNER_COMMAND_SLOT_UNTIL > now_before_listen
         preexisting_conversation = (
             conversation_until > now_before_listen or armed_until > now_before_listen
         )
 
-        if field_locked_before_listen:
+        # A standalone wake is an explicit request to capture the owner's whole
+        # next command. Do not truncate it to the short noisy-room scan window.
+        if owner_slot_waiting:
+            listen_limit = MAX_UTTERANCE_SECONDS
+        elif field_locked_before_listen:
             listen_limit = LOUD_WAKE_SCAN_SECONDS
         elif preexisting_conversation and not detector.is_loud_environment():
             listen_limit = MAX_UTTERANCE_SECONDS
@@ -144,6 +149,9 @@ try:
             mic_reader,
             detector,
             max_seconds=listen_limit,
+            end_silence_ms=(
+                COMMAND_END_SILENCE_MS if owner_slot_waiting else None
+            ),
         )
         if STOP:
             break
