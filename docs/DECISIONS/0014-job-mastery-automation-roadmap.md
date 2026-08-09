@@ -42,11 +42,25 @@ Site readiness is checked before dispatch. Customer or GC feedback becomes a tra
 
 Daily punch-list emails start as A1 drafts and A2 owner-approved sends. A3 scheduled sending requires a written policy, verified recipient mapping, duplicate prevention, delivery evidence, escalation rules, opt-out/correction handling and repeated pilot success. External messages always remain revocable through AEGIS.
 
-### 5. Labor tracking is transparent and planning-focused
+### 5. Simpro is reconciled through an authorized read-only integration
 
-Technicians self-report actual time and remaining-work estimates. The program may compare plan versus actual and support forecasting or billing review. It performs no covert surveillance, automatic discipline, performance ranking, termination decision or payroll write. Any payroll use requires a separate authorized integration and reconciliation decision.
+With employer and Simpro approval, Job Site Progress refreshes approved job, cost-center, schedule, timesheet/job-card, vendor-order and inventory fields at midnight local time through least-privilege OAuth. Interactive browser scraping is not the default and requires a separate decision when an official endpoint cannot provide a required field.
 
-### 6. Outcomes govern promotion
+Every product ETA retains its source, source record, last verification time, state and confidence. Supplier estimates are labeled as estimates. Assigned technicians receive only relevant arrival or delay changes after recipient verification and duplicate suppression. A failed or stale sync raises an exception rather than silently reusing old information.
+
+### 6. Labor tracking is transparent and planning-focused
+
+Technicians self-report actual time and remaining-work estimates. Verified actuals may also be reconciled from authorized Simpro timesheets or job cards. The program may compare plan versus actual and support forecasting or billing review. It performs no covert surveillance, automatic discipline, performance ranking, termination decision or payroll write. Any payroll use requires a separate authorized integration and reconciliation decision.
+
+Forecasting is performed by cost center:
+
+- remaining labor hours = approved forecast/budget labor hours minus verified actual labor hours;
+- daily crew capacity = the sum of scheduled hours for each assigned technician on that cost center;
+- estimated workdays remaining = remaining labor hours divided by scheduled crew capacity.
+
+Headcount alone is insufficient. The forecast exposes part-day schedules, access, material, dependency, productivity, skill-mix and rework assumptions; prevents division by zero, negative displays and schedule/timesheet double counting; then rolls cost centers into a job-level briefing.
+
+### 7. Outcomes govern promotion
 
 The system is promoted only when it demonstrates time returned to William, fewer missed commitments, fewer wasted dispatches, faster blocker resolution, accurate source-cited reporting, reliable punch closure and improving labor-forecast accuracy without increasing review burden or safety/privacy risk.
 
@@ -55,8 +69,9 @@ The system is promoted only when it demonstrates time returned to William, fewer
 - Existing automation code must be inventoried before Jarvis controls it.
 - BCI Agent remains a separate specialist under Jarvis supervision.
 - Job Site Progress is a separate future multi-user program, not a hidden feature claim.
-- Multi-user identity, recipient verification, employer authorization and AEGIS enforcement are prerequisites.
+- Multi-user identity, recipient verification, employer authorization, Simpro-approved OAuth access and AEGIS enforcement are prerequisites.
 - William can eventually manage by exception and spend more time at sites, but only after field evidence is trustworthy.
+- Nightly refresh, manual refresh, stale-data alarms, product ETA history and cost-center labor forecasts become explicit Job Site Progress requirements.
 - The proven R13.3 voice baseline is unchanged.
 
 ## Acceptance evidence
@@ -64,4 +79,5 @@ The system is promoted only when it demonstrates time returned to William, fewer
 - The roadmap is installed in Jarvis/Hermes project memory.
 - The backlog preserves Automation Control and Job Site Progress after their dependencies.
 - Installer, doctor and regression tests include the roadmap memory.
-- No job-site, email or labor capability is labeled implemented without physical evidence.
+- No job-site, Simpro sync, product ETA, email or labor capability is labeled implemented without physical evidence.
+- Tests preserve read-only integration, source-linked ETA and cost-center forecast requirements.
