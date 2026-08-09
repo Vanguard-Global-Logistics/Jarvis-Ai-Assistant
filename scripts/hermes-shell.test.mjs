@@ -204,6 +204,10 @@ describe('Hermes shell entry points', () => {
     expect(routing).toContain('listen_limit = MAX_UTTERANCE_SECONDS');
     expect(routing).toContain('COMMAND_END_SILENCE_MS if owner_slot_waiting else None');
     expect(routing).toContain('OWNER_COMMAND_SLOT_UNTIL if owner_slot_waiting else None');
+    expect(routing).toContain('short_text, short_stt = transcribe_pcm(pcm)');
+    expect(routing).toContain('OWNER_DEVELOPMENT_MODE');
+    expect(routing).toContain('short_ratio >= OWNER_WAKE_RESCUE_NEARFIELD');
+    expect(routing).toContain('OWNER DEVELOPMENT short-wake acceptance');
     expect(routing).toContain('heard_wake or owner_slot_for_capture');
     expect(commandGate).toContain('owner_slot = owner_slot_for_capture');
     expect(wakeBlock).toContain('OWNER_COMMAND_SLOT_UNTIL = time.time()');
