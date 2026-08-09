@@ -182,6 +182,45 @@ try:
         except ValueError as exc:
             message = str(exc).lower()
             if "too short" in message or "not enough" in message:
+                # CAM++ needs a longer biometric sample than a naturally spoken
+                # "Jarvis". In owner-development mode only, let Whisper inspect
+                # the short near-field clip and accept it solely as a wake—not
+                # as a command—when the explicit wake parser agrees.
+                short_ratio = (
+                    float(acoustic.get("peak_to_floor", 0.0)) if acoustic else 0.0
+                )
+                try:
+                    short_text, short_stt = transcribe_pcm(pcm)
+                except Exception:
+                    short_text, short_stt = "", 0.0
+                short_wake, short_inline = parse_wake(short_text)
+                if (
+                    OWNER_DEVELOPMENT_MODE
+                    and short_wake
+                    and not short_inline
+                    and short_ratio >= OWNER_WAKE_RESCUE_NEARFIELD
+                ):
+                    print(
+                        f"Heard: {short_text}  "
+                        f"[STT {short_stt:.2f}s owner=short-wake "
+                        f"peak/floor={short_ratio:.2f}x]"
+                    )
+                    print(
+                        "Owner Voice Lock: OWNER DEVELOPMENT short-wake acceptance",
+                        flush=True,
+                    )
+                    OWNER_COMMAND_SLOT_UNTIL = (
+                        time.time() + WAKE_COMMAND_SLOT_SECONDS
+                    )
+                    armed_until = OWNER_COMMAND_SLOT_UNTIL
+                    conversation_until = time.time() + CONVERSATION_SECONDS
+                    print("Wake word accepted.", flush=True)
+                    print(
+                        f"Owner command capture: LISTENING now for "
+                        f"{WAKE_COMMAND_SLOT_SECONDS:.1f}s",
+                        flush=True,
+                    )
+                    continue
                 print("Owner Voice Lock: SHORT/NON-SPEECH — ignored", flush=True)
                 continue
             print(f"Owner Voice Lock validation error: {exc!r}", flush=True)
