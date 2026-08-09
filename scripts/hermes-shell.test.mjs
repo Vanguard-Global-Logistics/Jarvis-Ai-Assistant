@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -75,6 +76,37 @@ describe('Hermes shell entry points', () => {
       'cp "$DIR/live_voice_loop_r13_3.py" "$VOICE_ROOT/live_voice_loop.py"',
     );
     expect(installer).not.toContain('reconstruct-live-voice-loop.sh"\\n');
+  });
+
+  it('pins reconstruction to the exact ordered R13.3 voice-loop parts', () => {
+    const script = readFileSync(
+      resolve(root, 'runtime/macos/voice-r13.3/reconstruct-live-voice-loop.sh'),
+      'utf8',
+    );
+    const expected = script.match(/^EXPECTED="([0-9a-f]{64})"$/m)?.[1];
+    const parts = [...script.matchAll(/live_voice_loop\.parts\/(\d+\.py\.part)/g)].map(
+      (match) => match[1],
+    );
+
+    expect(parts).toEqual([
+      '00.py.part',
+      '01.py.part',
+      '02.py.part',
+      '03.py.part',
+      '04.py.part',
+      '05.py.part',
+    ]);
+
+    const digest = createHash('sha256');
+    for (const part of parts) {
+      digest.update(
+        readFileSync(
+          resolve(root, 'runtime/macos/voice-r13.3/live_voice_loop.parts', part),
+        ),
+      );
+    }
+
+    expect(digest.digest('hex')).toBe(expected);
   });
 
   it('uses uncertain non-wake speech as noisy-room evidence before rejection', () => {
