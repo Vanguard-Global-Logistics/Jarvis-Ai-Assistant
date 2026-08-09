@@ -100,6 +100,7 @@ def listen_for_utterance(
     detector: SpeechDetector,
     *,
     max_seconds: float | None = None,
+    end_silence_ms: int | None = None,
 ) -> tuple[bytes | None, dict]:
     pre = deque(maxlen=PRE_ROLL_FRAMES)
     frames: list[bytes] = []
@@ -143,11 +144,14 @@ def listen_for_utterance(
             rms_values.append(rms)
             silence = 0 if voiced else silence + 1
 
-            dynamic_end_frames = (
-                END_SILENCE_FRAMES
-                if detector.is_loud_environment()
-                else max(1, int(360 / FRAME_MS))
-            )
+            if end_silence_ms is not None:
+                dynamic_end_frames = max(1, int(end_silence_ms / FRAME_MS))
+            else:
+                dynamic_end_frames = (
+                    END_SILENCE_FRAMES
+                    if detector.is_loud_environment()
+                    else max(1, int(360 / FRAME_MS))
+                )
             done = silence >= dynamic_end_frames or len(frames) >= limit_frames
             if done:
                 if silence >= dynamic_end_frames and silence < len(frames):
