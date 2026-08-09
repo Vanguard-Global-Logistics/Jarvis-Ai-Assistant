@@ -79,3 +79,17 @@ Jarvis adopts useful patterns without surrendering its Memory Constitution:
 Personal Memory v1 records remain in the governed local SQLite boundary. They
 are not pushed to Git merely to obtain version history. No external memory
 server may silently become the source of truth or a path to cloud disclosure.
+
+## Continual Harness adoption
+
+Jarvis adopts Prime Agent's evidence-backed continual-refinement pattern behind
+Jarvis governance. Daily use may create bounded structural observations and
+owner-visible improvement candidates. Repeated work reaches a skill candidate
+after three occurrences in seven days; two corrections, two failures, or three
+latency measurements may also create a review candidate.
+
+The daily loop is proposal-only. It never self-promotes and never modifies live
+code, executable skills, prompts, identity, policy, permissions, AEGIS,
+credentials, external actions, or production data. Promotion requires sandbox
+tests, rollback proof, owner approval, and independent review when the change is
+security-, architecture-, permission-, finance-, or release-relevant.

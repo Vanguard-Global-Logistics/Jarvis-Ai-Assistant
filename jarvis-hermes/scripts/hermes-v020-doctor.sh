@@ -61,7 +61,7 @@ else
   fail "Hermes CLI is missing"
 fi
 
-for required in "$HERMES_HOME/SOUL.md" "$HERMES_HOME/memories/HERMES-V0.20-CAPABILITIES.md" "$HERMES_HOME/memories/LEARNING-GOVERNANCE.md" "$HERMES_HOME/memories/OCTAGON-COMMERCIAL-STRATEGY.md" "$HERMES_HOME/memories/JARVIS-PROFESSIONAL-MODE.md" "$HERMES_HOME/memories/JARVIS-JOB-MASTERY-ROADMAP.md" "$HERMES_HOME/memories/INFRASTRUCTURE-AND-MEMORY-ADOPTION.md" "$HERMES_HOME/bin/jarvis-kokoro-tts.py"; do
+for required in "$HERMES_HOME/SOUL.md" "$HERMES_HOME/memories/HERMES-V0.20-CAPABILITIES.md" "$HERMES_HOME/memories/LEARNING-GOVERNANCE.md" "$HERMES_HOME/memories/PRIME-AGENT-CONTINUAL-IMPROVEMENT.md" "$HERMES_HOME/memories/OCTAGON-COMMERCIAL-STRATEGY.md" "$HERMES_HOME/memories/JARVIS-PROFESSIONAL-MODE.md" "$HERMES_HOME/memories/JARVIS-JOB-MASTERY-ROADMAP.md" "$HERMES_HOME/memories/INFRASTRUCTURE-AND-MEMORY-ADOPTION.md" "$HERMES_HOME/bin/jarvis-kokoro-tts.py"; do
   [[ -s "$required" ]] && pass "$required installed" || fail "$required missing"
 done
 
@@ -105,6 +105,11 @@ fi
 
 PLIST="$HOME/Library/LaunchAgents/com.vanguard.jarvis.hermes-update-check.plist"
 [[ -s "$PLIST" ]] && pass "daily signed-release staging job is installed" || warn "daily update check is not installed yet"
+
+IMPROVEMENT_PLIST="$HOME/Library/LaunchAgents/com.vanguard.jarvis.daily-improvement.plist"
+IMPROVEMENT_RUNNER="$HOME/.jarvis/continual-learning/bin/daily-improvement-loop.mjs"
+[[ -s "$IMPROVEMENT_PLIST" ]] && pass "daily continual-improvement job is installed" || warn "daily continual-improvement job is not installed yet"
+[[ -x "$IMPROVEMENT_RUNNER" ]] && pass "continual-improvement proposal runner is installed" || warn "continual-improvement proposal runner is not installed yet"
 
 printf '\nHermes v0.20 doctor: %d pass, %d fail, %d warning.\n' "$PASS" "$FAIL" "$WARN"
 (( FAIL == 0 ))
