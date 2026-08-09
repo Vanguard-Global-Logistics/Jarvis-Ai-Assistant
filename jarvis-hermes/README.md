@@ -33,6 +33,7 @@ Detailed contracts:
 - memories/HERMES-V0.20-CAPABILITIES.md — on-demand tool index.
 - memories/LEARNING-GOVERNANCE.md — cumulative-learning rules.
 - memories/OCTAGON-COMMERCIAL-STRATEGY.md — owner-approved product and commercial boundaries.
+- memories/JARVIS-PROFESSIONAL-MODE.md — personal ownership and professional-use boundaries.
 - docs/DECISIONS/0011-hermes-v020-governed-updates.md — update gates.
 
 ## Historical notes
