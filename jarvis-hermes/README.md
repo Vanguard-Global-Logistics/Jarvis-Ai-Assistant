@@ -34,6 +34,7 @@ Detailed contracts:
 - memories/LEARNING-GOVERNANCE.md — cumulative-learning rules.
 - memories/OCTAGON-COMMERCIAL-STRATEGY.md — owner-approved product and commercial boundaries.
 - memories/JARVIS-PROFESSIONAL-MODE.md — personal ownership and professional-use boundaries.
+- memories/JARVIS-JOB-MASTERY-ROADMAP.md — locked automation and field-progress sequence.
 - docs/DECISIONS/0011-hermes-v020-governed-updates.md — update gates.
 
 ## Historical notes
