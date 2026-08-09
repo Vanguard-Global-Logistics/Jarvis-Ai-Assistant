@@ -11,6 +11,8 @@ const scripts = [
   'jarvis-hermes/scripts/hermes-v020-doctor.sh',
   'jarvis-hermes/scripts/install-daily-update-check.sh',
   'jarvis-hermes/scripts/install-hermes-v020.sh',
+  'runtime/macos/voice-r13.3/INSTALL-AND-START-R13-3.command',
+  'runtime/macos/voice-r13.3/reconstruct-live-voice-loop.sh',
 ];
 
 describe('Hermes shell entry points', () => {
@@ -57,5 +59,23 @@ describe('Hermes shell entry points', () => {
     expect(installer).toContain('current.get("platform_toolsets")');
     expect(config).toMatch(/^stt:\n/m);
     expect(config).toContain('provider: local');
+  });
+
+  it('runs R13.3 reconstruction as a standalone command before copying', () => {
+    const installer = readFileSync(
+      resolve(root, 'runtime/macos/voice-r13.3/INSTALL-AND-START-R13-3.command'),
+      'utf8',
+    );
+    const lines = installer.split('\n');
+    const reconstruction = lines.indexOf(
+      'bash "$DIR/reconstruct-live-voice-loop.sh"',
+    );
+
+    expect(reconstruction).toBeGreaterThan(-1);
+    expect(lines[reconstruction + 1]).toBe('');
+    expect(lines[reconstruction + 2]).toBe(
+      'cp "$DIR/live_voice_loop_r13_3.py" "$VOICE_ROOT/live_voice_loop.py"',
+    );
+    expect(installer).not.toContain('reconstruct-live-voice-loop.sh"\\n');
   });
 });

@@ -37,7 +37,9 @@ mkdir -p "$VOICE_ROOT/backups-r13-3" "$CORE/backups-r13-3"
 [ -f "$VOICE_ROOT/live_voice_loop.py" ] && cp "$VOICE_ROOT/live_voice_loop.py" "$VOICE_ROOT/backups-r13-3/live_voice_loop.py.before-r13-3"
 [ -f "$ACTIVE_START" ] && cp "$ACTIVE_START" "$CORE/backups-r13-3/START-JARVIS-HIVE.command.before-r13-3"
 
-bash "$DIR/reconstruct-live-voice-loop.sh"\n\ncp "$DIR/live_voice_loop_r13_3.py" "$VOICE_ROOT/live_voice_loop.py"
+bash "$DIR/reconstruct-live-voice-loop.sh"
+
+cp "$DIR/live_voice_loop_r13_3.py" "$VOICE_ROOT/live_voice_loop.py"
 cp "$DIR/live_local_speech_r13_3.py" "$VOICE_ROOT/live_local_speech_r13_3.py"
 cp "$DIR/hive_local_brain_r13.py" "$VOICE_ROOT/hive_local_brain_r11.py"
 cp "$DIR/kokoro_worker_r13.py" "$VOICE_ROOT/kokoro_worker_r7.py"
