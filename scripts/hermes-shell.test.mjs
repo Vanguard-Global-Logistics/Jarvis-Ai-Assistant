@@ -101,6 +101,24 @@ describe('Hermes shell entry points', () => {
     expect(installer).toContain(`$HERE/${memoryPath}`);
     expect(doctor).toContain(`$HERMES_HOME/${memoryPath}`);
   });
+  it('installs the owner-approved job-mastery and field-progress roadmap', () => {
+    const installer = readFileSync(
+      resolve(root, 'jarvis-hermes/scripts/install-hermes-v020.sh'),
+      'utf8',
+    );
+    const doctor = readFileSync(
+      resolve(root, 'jarvis-hermes/scripts/hermes-v020-doctor.sh'),
+      'utf8',
+    );
+    const memoryPath = 'memories/JARVIS-JOB-MASTERY-ROADMAP.md';
+    const roadmap = readFileSync(resolve(root, 'jarvis-hermes', memoryPath), 'utf8');
+
+    expect(roadmap).toContain('Phase 2 — Inventory and certify existing automations');
+    expect(roadmap).toContain('Phase 5 — Build Job Site Progress');
+    expect(roadmap).toContain('No covert audio, camera, GPS or background surveillance.');
+    expect(installer).toContain(`$HERE/${memoryPath}`);
+    expect(doctor).toContain(`$HERMES_HOME/${memoryPath}`);
+  });
   it('runs R13.3 reconstruction as a standalone command before copying', () => {
     const installer = readFileSync(
       resolve(root, 'runtime/macos/voice-r13.3/INSTALL-AND-START-R13-3.command'),
