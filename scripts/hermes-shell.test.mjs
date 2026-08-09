@@ -114,7 +114,10 @@ describe('Hermes shell entry points', () => {
     );
     const uncertain = source.indexOf('if owner_decision == "uncertain":');
     const observe = source.indexOf('room_guard.observe_nonwake(now)', uncertain);
-    const rejection = source.indexOf(\n      'if not (live_rescue or terminal_rescue or profile_accept):',\n      uncertain,\n    );
+    const rejection = source.indexOf(
+      'if not (live_rescue or terminal_rescue or profile_accept):',
+      uncertain,
+    );
 
     expect(uncertain).toBeGreaterThan(-1);
     expect(observe).toBeGreaterThan(uncertain);
