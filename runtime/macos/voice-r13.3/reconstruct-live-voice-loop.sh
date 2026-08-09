@@ -3,7 +3,7 @@ set -euo pipefail
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
 OUT="$DIR/live_voice_loop_r13_3.py"
-EXPECTED="0978fba02a4f4f3a828146d4a61d5d8623da49fc963b85086b3ac6170a69e61f"
+EXPECTED="e92ccaf546070aff935cdde1db8246ec7c16bb65e2cf0e512d63baded5dcfd5c"
 
 cat \
   "$DIR/live_voice_loop.parts/00.py.part" \
