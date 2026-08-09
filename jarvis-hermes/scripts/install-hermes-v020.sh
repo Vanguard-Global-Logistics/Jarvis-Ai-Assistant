@@ -66,6 +66,7 @@ cp "$HERE/SOUL.md" "$HERMES_HOME/SOUL.md"
 cp "$HERE/memories/HERMES-V0.20-CAPABILITIES.md" "$HERMES_HOME/memories/"
 cp "$HERE/memories/LEARNING-GOVERNANCE.md" "$HERMES_HOME/memories/"
 cp "$HERE/memories/OCTAGON-COMMERCIAL-STRATEGY.md" "$HERMES_HOME/memories/"
+cp "$HERE/memories/JARVIS-PROFESSIONAL-MODE.md" "$HERMES_HOME/memories/"
 cp "$HERE/scripts/jarvis-kokoro-tts.py" "$HERMES_HOME/bin/"
 chmod 700 "$HERMES_HOME/bin/jarvis-kokoro-tts.py"
 
