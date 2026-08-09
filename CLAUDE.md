@@ -70,6 +70,10 @@ Repository: `github.com/Vanguard-Global-Logistics/Jarvis-Ai-Assistant`.
 **Jarvis** is William Lavold's personal AI assistant and orchestrator — a private,
 single-user system, not a product for other users. There is no multi-user auth in scope.
 
+**Professional-use identity ruling (ADR 0013):** Jarvis may help William master his job
+through an isolated Professional Mode, but Jarvis is not an employer program, employer
+product, or employer-owned agent. Employer systems and records are authorized sources only.
+Any older `BCI Agent` or `BCI Work Edition` wording is superseded.
 It is a **modular architecture**: independent subsystems that communicate only through
 narrow, typed, schema-validated contracts. The modularity is a security requirement, not
 a code-organization preference — see §2. Subsystems must be separable at the process
@@ -361,7 +365,7 @@ Jarvis / Throne OS ecosystem with defined purpose and ownership. **All are NOT I
 | **Forge** | The **software engineering system** | Build/dev pipeline state and approval evidence | **NOT IMPLEMENTED** (Phase 1 ships a shell) |
 | **Ledger** | **Manages finances** — read-only, advisory | Financial advisory state | **NOT IMPLEMENTED** (Phase 1 ships a shell) |
 | **AEGIS** | **Manages security, independently** of Jarvis | Security level, capability grants, audit log | **NOT IMPLEMENTED** (Phase 1 builds the real state engine) |
-| **BCI Agent** | **Internal AV project management AI** | AV project management | **NOT IMPLEMENTED** |
+| **Jarvis Professional Mode** | **William's private job-mastery and productivity compartment; never employer-owned or employer-branded** | Isolated professional workflows, approved-source context, and owner-controlled skills | **NOT IMPLEMENTED** |
 | **Sophisticated Sips** | **Business operating system for Amy Lavold's coffee business**, including **Menu OS** | Coffee business operations; Menu OS | **NOT IMPLEMENTED** |
 | **Vanguard Performance Labs** | **Research peptide business platform** with an **AI concierge** | Research peptide business operations; concierge surface | **NOT IMPLEMENTED** |
 | **Peptastic** | **Clinical and business operating platform for clinics and med spas** | Clinical + business operations for clinics/med spas | **NOT IMPLEMENTED** |
