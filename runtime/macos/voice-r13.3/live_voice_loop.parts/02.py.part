@@ -101,6 +101,7 @@ def listen_for_utterance(
     *,
     max_seconds: float | None = None,
     end_silence_ms: int | None = None,
+    start_deadline: float | None = None,
 ) -> tuple[bytes | None, dict]:
     pre = deque(maxlen=PRE_ROLL_FRAMES)
     frames: list[bytes] = []
@@ -116,6 +117,12 @@ def listen_for_utterance(
     while not STOP:
         if not aegis_allows_voice():
             return None, {}
+        if (
+            not triggered
+            and start_deadline is not None
+            and time.time() >= start_deadline
+        ):
+            return None, {"slot_expired": True}
         frame = reader.get_frame(timeout=0.75)
         if frame is None:
             if reader.error:
