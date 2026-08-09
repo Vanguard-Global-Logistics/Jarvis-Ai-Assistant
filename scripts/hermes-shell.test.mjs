@@ -149,6 +149,31 @@ describe('Hermes shell entry points', () => {
     );
   });
 
+  it('enables owner-development wake and slot priority without TV follow-up', () => {
+    const start = readFileSync(
+      resolve(root, 'runtime/macos/voice-r13.3/START-JARVIS-R13-3.command'),
+      'utf8',
+    );
+    const routing = readFileSync(
+      resolve(root, 'runtime/macos/voice-r13.3/live_voice_loop.parts/04.py.part'),
+      'utf8',
+    );
+    const commandGate = readFileSync(
+      resolve(root, 'runtime/macos/voice-r13.3/live_voice_loop.parts/05.py.part'),
+      'utf8',
+    );
+
+    expect(start).toContain(
+      'JARVIS_OWNER_DEVELOPMENT_MODE="${JARVIS_OWNER_DEVELOPMENT_MODE:-1}"',
+    );
+    expect(routing).toContain(
+      'development_accept = OWNER_DEVELOPMENT_MODE and (',
+    );
+    expect(routing).toContain('heard_wake or owner_slot_active');
+    expect(routing).toContain('Owner Voice Lock: OWNER DEVELOPMENT acceptance');
+    expect(commandGate).toContain('not OWNER_DEVELOPMENT_MODE');
+  });
+
   it('prewarms a representative first response for George', () => {
     const source = readFileSync(
       resolve(root, 'runtime/macos/voice-r13.3/live_voice_loop.parts/01.py.part'),

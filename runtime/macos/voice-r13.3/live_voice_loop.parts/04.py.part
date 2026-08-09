@@ -176,7 +176,7 @@ try:
         owner_score = float(owner_check.get("score", 0.0))
         owner_seconds = float(owner_check.get("seconds", 0.0))
 
-        if owner_decision == "other":
+        if owner_decision == "other" and not OWNER_DEVELOPMENT_MODE:
             print(
                 f"Owner Voice Lock: OTHER — ignored "
                 f"(score={owner_score:.3f}, verify={owner_seconds:.2f}s)",
@@ -211,8 +211,28 @@ try:
         nearfield_ratio = (
             float(acoustic.get("peak_to_floor", 0.0)) if acoustic else 0.0
         )
+        owner_slot_active = OWNER_COMMAND_SLOT_UNTIL > now
+        development_accept = OWNER_DEVELOPMENT_MODE and (
+            heard_wake or owner_slot_active
+        )
 
-        if owner_decision == "uncertain":
+        if owner_decision == "other":
+            if not development_accept:
+                print(
+                    f"Owner Voice Lock: OTHER — ignored "
+                    f"(score={owner_score:.3f}, wake={heard_wake}, "
+                    f"slot={owner_slot_active})",
+                    flush=True,
+                )
+                continue
+            print(
+                f"Owner Voice Lock: OWNER DEVELOPMENT acceptance "
+                f"(score={owner_score:.3f}, wake={heard_wake}, "
+                f"slot={owner_slot_active})",
+                flush=True,
+            )
+
+        if owner_decision == "uncertain" and not development_accept:
             # Uncertain non-wake speech is not authorized as a command, but it
             # is still strong evidence that the room is conversational. Count
             # it before rejection so TV/family chatter closes natural follow-up
@@ -253,6 +273,13 @@ try:
                 f"Owner Voice Lock: OWNER via {route} "
                 f"(score={owner_score:.3f}, nearfield={nearfield_ratio:.2f}x, "
                 f"verify={owner_seconds:.2f}s)",
+                flush=True,
+            )
+        elif owner_decision == "uncertain":
+            print(
+                f"Owner Voice Lock: OWNER DEVELOPMENT acceptance "
+                f"(score={owner_score:.3f}, wake={heard_wake}, "
+                f"slot={owner_slot_active})",
                 flush=True,
             )
         else:

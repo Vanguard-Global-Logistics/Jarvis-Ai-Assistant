@@ -39,6 +39,10 @@ MAX_UTTERANCE_SECONDS = float(os.environ.get("JARVIS_MAX_UTTERANCE_SECONDS", "30
 END_SILENCE_MS = int(os.environ.get("JARVIS_END_SILENCE_MS", "650"))
 WORKER_SOCKET = HOME / "Jarvis-Live-Voice" / "kokoro-worker.sock"
 HIVE_MODEL = os.environ.get("JARVIS_HIVE_MODEL", "qwen3.5:4b")
+OWNER_DEVELOPMENT_MODE = (
+    os.environ.get("JARVIS_OWNER_DEVELOPMENT_MODE", "0").strip().lower()
+    not in {"", "0", "false", "off", "no"}
+)
 
 RATE = 16000
 SAMPLE_WIDTH = 2

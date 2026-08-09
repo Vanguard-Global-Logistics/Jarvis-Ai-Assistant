@@ -55,7 +55,12 @@
             OWNER_COMMAND_SLOT_UNTIL = 0.0
             armed_until = 0.0
             print("Owner command slot: CONSUMED", flush=True)
-        elif (armed_until > now or in_conversation) and not noisy_room and not field_locked:
+        elif (
+            not OWNER_DEVELOPMENT_MODE
+            and (armed_until > now or in_conversation)
+            and not noisy_room
+            and not field_locked
+        ):
             command = text.strip()
             armed_until = 0.0
         else:

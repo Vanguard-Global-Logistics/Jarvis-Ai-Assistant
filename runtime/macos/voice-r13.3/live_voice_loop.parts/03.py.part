@@ -232,8 +232,12 @@ print("Reasoning: direct warm Ollama Reflex Lane (think=false)")
 print(f"Model: {HIVE_MODEL}")
 print("Simple deterministic tasks: local Python")
 print(f"Turn detection: {detector.mode}")
-print("Speaker attention: local CAM++ Owner Voice Lock before Whisper")
-print(f"Live wake rescue: score >= {OWNER_WAKE_RESCUE_THRESHOLD:.2f} + Jarvis + {OWNER_WAKE_RESCUE_NEARFIELD:.1f}x near-field")
+if OWNER_DEVELOPMENT_MODE:
+    print("Speaker attention: OWNER DEVELOPMENT — wake/slot priority; biometrics diagnostic")
+    print("Owner development mode: explicit Jarvis wake or active slot is accepted")
+else:
+    print("Speaker attention: local CAM++ Owner Voice Lock before Whisper")
+    print(f"Live wake rescue: score >= {OWNER_WAKE_RESCUE_THRESHOLD:.2f} + Jarvis + {OWNER_WAKE_RESCUE_NEARFIELD:.1f}x near-field")
 print(f"End-of-turn silence: {END_SILENCE_MS} ms")
 print("Speech recognition: local Whisper base, greedy decode")
 print("Voice: local Kokoro George bm_george @ 1.30x, phrase-pipelined")
@@ -246,10 +250,16 @@ print("Wake isolation: strong Hey/Okay Jarvis accepted anywhere in noisy transcr
 print("Field gate: WebRTC speech + rolling near-field acoustic threshold")
 print("Crowd control: loud pre-wake audio is scanned in short windows")
 print("Field hysteresis: wake-only mode releases only after sustained quiet")
-print(f"Wake slot: verified owner gets one {WAKE_COMMAND_SLOT_SECONDS:.1f}s protected command")
+print(
+    f"Wake slot: {'wake-confirmed' if OWNER_DEVELOPMENT_MODE else 'verified owner'} "
+    f"gets one {WAKE_COMMAND_SLOT_SECONDS:.1f}s protected command"
+)
 print("Noisy-room guard: non-owner voices are rejected before STT")
 print("Echo control: strict near-field interrupt gate rejects most speaker/crowd audio")
-print("Say 'Jarvis' once, then continue naturally. You can interrupt George while he talks.")
+if OWNER_DEVELOPMENT_MODE:
+    print("Tonight mode: say 'Hey Jarvis' with the command, or say 'Jarvis' then the command.")
+else:
+    print("Say 'Jarvis' once, then continue naturally. You can interrupt George while he talks.")
 print("Say 'Goodbye Jarvis' to end the active conversation.")
 print("Press Control-C to stop.")
 print("============================================================")
