@@ -67,9 +67,7 @@ describe('Hermes shell entry points', () => {
       'utf8',
     );
     const lines = installer.split('\n');
-    const reconstruction = lines.indexOf(
-      'bash "$DIR/reconstruct-live-voice-loop.sh"',
-    );
+    const reconstruction = lines.indexOf('bash "$DIR/reconstruct-live-voice-loop.sh"');
 
     expect(reconstruction).toBeGreaterThan(-1);
     expect(lines[reconstruction + 1]).toBe('');
