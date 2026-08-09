@@ -42,13 +42,19 @@ def _wav_duration(path: Path) -> float:
         return 0.0
 
 
-def chunk_spoken_text(text: str, target_words: int = 12) -> list[str]:
+def chunk_spoken_text(
+    text: str,
+    first_words: int = 4,
+    later_words: int = 12,
+) -> list[str]:
+    """Split static answers aggressively once, then use natural later chunks."""
     body = re.sub(r"\s+", " ", str(text or "").strip())
     if not body:
         return []
     chunks: list[str] = []
     rest = body
     while rest:
+        target_words = first_words if not chunks else later_words
         sentence = re.search(r"^(.+?[.!?])(?:\s+|$)", rest)
         if sentence and len(sentence.group(1).split()) <= target_words + 4:
             chunks.append(sentence.group(1).strip())

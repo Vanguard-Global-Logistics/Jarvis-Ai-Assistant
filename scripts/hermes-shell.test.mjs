@@ -172,6 +172,22 @@ describe('Hermes shell entry points', () => {
     expect(commandGate).toContain('not OWNER_DEVELOPMENT_MODE');
   });
 
+  it('hands a short first answer chunk to George without changing recognition', () => {
+    const speech = readFileSync(
+      resolve(root, 'runtime/macos/voice-r13.3/live_local_speech_r13_3.py'),
+      'utf8',
+    );
+    const brain = readFileSync(
+      resolve(root, 'runtime/macos/voice-r13.3/hive_local_brain_r13.py'),
+      'utf8',
+    );
+
+    expect(speech).toContain('first_words: int = 4');
+    expect(speech).toContain('target_words = first_words if not chunks else later_words');
+    expect(brain).toContain('target = 3 if first else 11');
+    expect(brain).toContain('hard = 5 if first else 16');
+  });
+
   it('prewarms a representative first response for George', () => {
     const source = readFileSync(
       resolve(root, 'runtime/macos/voice-r13.3/live_voice_loop.parts/01.py.part'),
