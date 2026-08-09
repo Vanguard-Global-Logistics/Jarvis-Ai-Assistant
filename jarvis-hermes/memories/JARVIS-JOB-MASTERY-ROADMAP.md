@@ -90,6 +90,27 @@ The sync reads only the fields required from approved jobs, cost centers, schedu
 
 A manual `Refresh Now` remains available. Later change-triggered or webhook refresh may supplement—not replace—the nightly reconciliation after authorization and acceptance testing. Technicians receive only job-relevant ETA changes for work assigned to them, with correct-recipient mapping, duplicate suppression and delivery evidence.
 
+#### Daily Technician Report Loop
+
+On each scheduled workday, an authorized automation sends each assigned technician a structured daily-report request at 7:00 a.m. in that technician's approved local time zone. It asks for:
+
+- job and cost center worked;
+- punch-list items started, advanced, blocked or completed;
+- actual labor hours worked and the technician's estimate of labor hours remaining;
+- materials received, missing, delayed or needed;
+- access, dependency, safety and quality problems;
+- notes and approved photos/evidence required for verification.
+
+If no valid report has been received, Jarvis may send at most one reminder per hour. Reminders stop immediately after a valid report, skip technicians who are not scheduled or are marked absent/leave, and stop at the configured shift cutoff. The policy must define maximum reminders, holidays, escalation, correction and opt-out handling before scheduled A3 sending is enabled.
+
+A valid reply is acknowledged, stored with its original sender and timestamp, and parsed into proposed project updates. Reported completed work is added to the punch history and becomes `ready for verification`; it does not silently close a contractual item. Verified actual labor reduces remaining labor for the matching job and cost center. Punch progress and labor consumption remain separate so the same work is never subtracted twice. Self-reported hours are labeled pending until reconciled with the authorized Simpro timesheet/job-card source or accepted by the authorized reviewer.
+
+William's daily briefing groups results by job and cost center and shows each technician's report state, source-linked work summary, punch changes, blockers, material/ETA changes, verified actual hours, remaining hours, scheduled crew-hours, projected crew-days and missing reports.
+
+Before any address is enrolled, Jarvis must ask William for the exact email address, legal/display name, technician or manager role, assigned jobs/cost centers, time zone, normal shift and cutoff, why that person is included, who authorized the communication, escalation path and any delivery preference. Jarvis never guesses recipients or imports a broad contact list without approval.
+
+The report loop begins at A1 draft, advances to an A2 limited pilot, and reaches A3 scheduled sending only after employer/system authorization, written owner policy, recipient verification, repeated delivery tests and AEGIS acceptance.
+
 ### Phase 6 — Add transparent labor forecasting
 
 Labor tracking begins with technician self-reported actual time and remaining-work estimates by project, phase, area/system and punch item. It supports planning, billing review and future labor forecasting.
@@ -121,11 +142,15 @@ Labor tracking begins with technician self-reported actual time and remaining-wo
 | Refresh approved Simpro job data | A2 pilot → A3 policy | Complete midnight reconciliation with stale-data alarm | Proposed |
 | Track product ETA and delivery state | A1 | Source-linked ETA changes with no false guarantees | Proposed |
 | Notify assigned technicians of ETA change | A2 | Correct recipients, no duplicates, delivery evidence | Proposed |
+| Draft technician daily-report request | A1 | Correct assignment, fields and recipient preview | Proposed |
+| Send bounded report request/reminders | A2 pilot → A3 policy | 7:00 start, hourly maximum, immediate stop after valid reply | Proposed |
+| Ingest technician report | A2 | Source preserved; proposed punch/labor updates correctly mapped | Proposed |
+| Build William's per-job daily briefing | A1 | Complete report state, ETA, blockers and labor forecast | Proposed |
 | Forecast remaining labor by cost center | A1 | Forecast error improves against verified actuals | Proposed |
 
 ## AEGIS stop conditions
 
-Stop and escalate on missing authorization, wrong project or recipient, stale or conflicting source documents, cross-compartment data, absent required evidence, untrusted attachment, credential failure, duplicate send, destructive request, unexplained labor anomaly, stale sync, missing ETA source, unmapped job or cost center, schedule/timesheet double counting, negative remaining hours, tool failure, or any attempt to bypass approval.
+Stop and escalate on missing authorization, wrong project or recipient, stale or conflicting source documents, cross-compartment data, absent required evidence, untrusted attachment, credential failure, duplicate send, destructive request, unexplained labor anomaly, stale sync, missing ETA source, unmapped job or cost center, schedule/timesheet double counting, negative remaining hours, unknown sender, unenrolled recipient, unscheduled or absent technician, reminder after a valid report or shift cutoff, tool failure, or any attempt to bypass approval.
 
 ## Required pilot evidence
 
@@ -141,8 +166,11 @@ Before wider use, simulate and physically test:
 - one planned-versus-actual labor forecast without payroll or employee-decision claims;
 - one midnight Simpro reconciliation plus a stale-sync alert;
 - one ETA change delivered only to correctly assigned technicians;
-- one multi-cost-center labor forecast with part-day schedules and no double counting.
+- one multi-cost-center labor forecast with part-day schedules and no double counting;
+- one 7:00 report request followed by an hourly reminder that stops on a valid reply;
+- one invalid or duplicate reply that does not alter the punch list or labor balance;
+- one technician reply parsed into source-linked proposed updates and William's job briefing.
 
 ## Honest current state
 
-This roadmap does not mean Jarvis control adapters, full BCI Agent workflows, technician accounts, daily emails, authorized Simpro sync, product ETA alerts, job-site reporting or labor forecasting are implemented. They remain gated behind the reliable Jarvis foundation, automation inventory, employer authorization, multi-user identity, AEGIS enforcement and physical acceptance.
+This roadmap does not mean Jarvis control adapters, full BCI Agent workflows, technician accounts, daily emails, authorized Simpro sync, product ETA alerts, scheduled technician emails, reply ingestion, job-site reporting or labor forecasting are implemented. They remain gated behind the reliable Jarvis foundation, automation inventory, employer authorization, multi-user identity, AEGIS enforcement and physical acceptance.
