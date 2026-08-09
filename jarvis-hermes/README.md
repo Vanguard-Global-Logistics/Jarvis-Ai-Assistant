@@ -32,6 +32,7 @@ Detailed contracts:
 - hermes-release.env — pinned release identity.
 - memories/HERMES-V0.20-CAPABILITIES.md — on-demand tool index.
 - memories/LEARNING-GOVERNANCE.md — cumulative-learning rules.
+- memories/OCTAGON-COMMERCIAL-STRATEGY.md — owner-approved product and commercial boundaries.
 - docs/DECISIONS/0011-hermes-v020-governed-updates.md — update gates.
 
 ## Historical notes
