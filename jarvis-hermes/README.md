@@ -26,6 +26,12 @@ proposal or rewrites live code, policy, identity, permissions, AEGIS, voice,
 credentials, or external actions. An approved observation adapter remains the
 next gate before normal use can populate meaningful reports.
 
+The installed knowledge also preserves William's AEGIS Defensive Prime Swarm
+decision: fast deterministic containment, incident-scoped defensive Primes,
+isolated patch generation, independent verification, no hack-back, poisoned
+input separation, and layered copy/clone deterrence. This is an architecture
+and policy package; it does not claim the AEGIS runtime or swarm is live.
+
 The installer also migrates the retired `stt` agent-toolset entry left by
 older Hermes configs. This only removes an invalid tool-list item; local
 Whisper transcription remains enabled under the top-level `stt` settings.
@@ -46,12 +52,14 @@ Detailed contracts:
 - memories/HERMES-V0.20-CAPABILITIES.md — on-demand tool index.
 - memories/LEARNING-GOVERNANCE.md — cumulative-learning rules.
 - memories/PRIME-AGENT-CONTINUAL-IMPROVEMENT.md — daily proposal loop and no-self-promotion boundary.
+- memories/AEGIS-DEFENSIVE-PRIME-SWARM.md — rapid incident response, learning, and clone-resistance boundaries.
 - memories/OCTAGON-COMMERCIAL-STRATEGY.md — owner-approved product and commercial boundaries.
 - memories/JARVIS-PROFESSIONAL-MODE.md — personal ownership and professional-use boundaries.
 - memories/JARVIS-JOB-MASTERY-ROADMAP.md — locked automation and field-progress sequence.
 - memories/INFRASTRUCTURE-AND-MEMORY-ADOPTION.md — Coolify boundary and adopted memory safeguards.
 - docs/DECISIONS/0011-hermes-v020-governed-updates.md — update gates.
 - docs/DECISIONS/0016-prime-agent-governed-continual-improvement.md — adopted Prime Agent patterns and promotion gates.
+- docs/DECISIONS/0017-aegis-defensive-prime-swarm-and-ip-protection.md — defensive swarm and commercial IP boundary.
 
 ## Historical notes
 

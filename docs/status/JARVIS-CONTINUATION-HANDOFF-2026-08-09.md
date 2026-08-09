@@ -25,11 +25,12 @@ GitHub and tested runtime evidence are the source of truth. This file contains n
 - Draft pull request: **#2 — Pin Hermes v0.20 and add governed update intake**
 - PR URL: `https://github.com/Vanguard-Global-Logistics/Jarvis-Ai-Assistant/pull/2`
 - PR target: `main`
-- Verified implementation head immediately before this documentation-only handoff commit:
-  `78a794bcbe806fb0700184a2f1a579c2ad1120c6`
+- Verified implementation head immediately before the latest documentation update:
+  `2adf5a99c1590efa63be13617cfce16e183f75d9`
 - Base at the verified PR inspection: `c5ec68f04ecb8049287d4990073c390f25ba0ecc`
 - PR state at handoff creation: open, draft, mergeable.
-- CI evidence for `78a794b`: workflow **CI**, run **255**, completed successfully.
+- CI evidence for `2adf5a9`: workflow **CI**, run **263**, completed successfully: format,
+  lint, typecheck, tests, build, real Electron runtime probe, and archived-handoff integrity.
 - Never modify `main` directly, force-push shared history, reset away user work, or treat a dirty worktree as disposable.
 - Read `CLAUDE.md`, `docs/CURRENT-STATE-AUDIT.md`, `docs/KNOWN-LIMITATIONS.md`, `docs/IPC-SURFACE.md`, `docs/BACKLOG.md`, relevant ADRs, and this handoff before changing code.
 - The archived behavioral handoff under `reference/design-handoff/` is immutable.
@@ -87,6 +88,13 @@ The most recent physical Mac result is:
   - `JARVIS-JOB-MASTERY-ROADMAP.md`
   - `INFRASTRUCTURE-AND-MEMORY-ADOPTION.md`
 
+The branch now also contains `PRIME-AGENT-CONTINUAL-IMPROVEMENT.md`,
+`AEGIS-DEFENSIVE-PRIME-SWARM.md`, a tested proposal-only daily improvement runner, and a
+03:45 launchd installer. They are CI-verified but have not yet been pulled and physically
+accepted on the Mac. After installation, the doctor is expected to add checks for the two
+new memories, the daily proposal job, and its runner; record the observed result rather than
+assuming it.
+
 These Markdown memories are governed knowledge packages; they do not prove that durable conversational Memory v1 is connected to the live desktop or R13.3 runtime.
 
 ### R13.3 voice baseline
@@ -123,7 +131,7 @@ Latest field evidence showed voice capture working reliably. The remaining visib
 
 Do not use success in one runtime as proof that the other contains the same feature.
 
-## Immediate root blocker: Jarvis Tool Bridge
+## Immediate root blockers: AEGIS containment foundation and Jarvis Tool Bridge
 
 The latest physical R13.3 transcript proved that Jarvis hears and answers but cannot discover or execute tools. The log explicitly reported:
 
@@ -133,7 +141,9 @@ The latest physical R13.3 transcript proved that Jarvis hears and answers but ca
 
 Therefore the local Qwen voice lane can converse, but it cannot inspect the filesystem, list tools, research the internet, download a file, or execute an automation. It correctly answered that those capabilities were unavailable.
 
-The next programming milestone is a governed Tool Bridge, not another microphone rewrite.
+The next programming milestone is a deterministic AEGIS incident/containment foundation
+paired with a governed Tool Bridge, not another microphone rewrite. External actions must not
+arrive before enforceable isolation, denial, evidence, and rollback.
 
 Required design:
 
@@ -175,6 +185,27 @@ Do not connect broad email, downloads, shell execution, or business-system crede
 - Paying customers may rate completed business interactions; review integrity, dispute handling, identity and anti-retaliation controls remain required.
 - Political funding, election influence, political targeting, or use of the platform to manipulate elections is prohibited.
 - The marketplace/federation is a future business architecture, not implemented functionality.
+
+### Defensive Prime Swarm and copy/clone protection
+
+- ADR 0017 accepts an AEGIS-commanded defensive swarm architecture. Its runtime is not
+  implemented.
+- Vigil, Bastion, Forensics, Forge Defense, Sentinel, and Recovery Primes are
+  incident-scoped roles with bounded contracts; they are not permanent agents with broad
+  credentials.
+- Deterministic AEGIS containment may freeze outbound actions, revoke scoped leases,
+  isolate an affected Hive/company boundary, preserve evidence, and restore a signed
+  known-good artifact under an exact reversible allowlist.
+- Generative Primes may triage and build fix candidates only after containment and only in
+  quarantine. They never approve their own security-critical work.
+- Never hack back or act against an external system. Attribution requires evidence; an IP
+  address or model guess is not proof.
+- Attacker content is untrusted evidence and cannot directly teach memory, policy, or an
+  executable skill.
+- Copying cannot be made impossible after distributing a client. Use signed/notarized
+  artifacts, provenance/SBOM, unique per-Hive asymmetric identity, short-lived capability
+  leases, no shared master secrets, company/customer isolation, watermarking, honeytokens,
+  mutual AEGIS attestation, federation revocation, and qualified legal IP protection.
 
 ### Throne
 
@@ -260,6 +291,16 @@ Build a Jarvis-owned presentation capability producing editable PowerPoint files
 
 Useful as an on-demand, isolated media-rendering worker for project recaps, training, sales demonstrations, and Octagon walkthroughs. Never place it in the live voice process. Preview before publishing. Its current commercial license must be reviewed when team size or automated product use changes; keep the renderer behind a replaceable interface. The Remotion plugin/tool is not confirmed installed in this handoff.
 
+### Prime Agent
+
+Prime Agent itself is not installed or embedded. Jarvis selectively adopted its useful
+Continual Harness patterns in ADR 0016: bounded observations, seven-day pattern comparison,
+the owner-approved three-occurrences-per-week skill threshold, proposal generation, sandbox
+tests, independent review, owner-visible promotion, monitoring, and rollback. The first
+executable slice writes proposals only and never self-promotes. An approved structural
+observation adapter remains pending; do not alter the accepted R13.3 voice source merely to
+collect learning data.
+
 ### Base44
 
 Use only as an optional sandboxed prototype factory for non-core applications such as a BCI field report/punchlist prototype. Never connect Base44 directly to the canonical Jarvis repository; its GitHub synchronization and managed backend create lock-in and safety concerns. Use a separate repository, export code/data where the paid plan permits, audit it, replace Base44-only auth/database/hosting dependencies, and import only accepted code.
@@ -294,8 +335,11 @@ Never include actual secrets in this table. A connector being present in ChatGPT
 - Keep generated reconstruction ignored.
 - Keep personal memory and locked voice profile outside Git.
 
-### P1 — Build the Tool Bridge
+### P1 — Build the AEGIS containment foundation and Tool Bridge
 
+- Deterministic AEGIS incident state, capability leases, reversible containment allowlist,
+  stop control, and append-only evidence.
+- Signed security events with company/Hive/tenant isolation.
 - Capability registry and health checks.
 - Deterministic conversation/action router.
 - Narrow Hermes adapter.
@@ -303,6 +347,8 @@ Never include actual secrets in this table. A connector being present in ChatGPT
 - Tool-result return to George.
 - Audit, cancellation, timeouts, duplicate protection, restart recovery.
 - Physical Mac acceptance.
+- Approved structural observation adapter feeding the proposal-only daily improvement loop.
+- No external actions until denial, isolation, evidence, rollback, and independent review pass.
 
 ### P2 — Daily-use desktop foundation
 
@@ -354,7 +400,7 @@ A strategy document, installed memory file, UI tile, mock, shell, prototype, mod
 
 Use this exact starting instruction:
 
-> Continue Jarvis from `Vanguard-Global-Logistics/Jarvis-Ai-Assistant`, draft PR #2, branch `agent/jarvis-whole-macbook-2026-08-08`. Read `CLAUDE.md`, the current audit/known limitations/backlog, and `docs/status/JARVIS-CONTINUATION-HANDOFF-2026-08-09.md` completely. Verify the remote branch head, PR state, CI, and working tree before changes. Preserve the proven R13.3 SHA-256 baseline and locked owner profile. Do not claim AEGIS, durable memory, tools, connectors, BCI Agent, Job Site Progress, Octagon, Throne, or Hive federation are implemented without evidence. The immediate programming milestone is the governed Jarvis Tool Bridge from R13.3 to Hermes: capability registry, deterministic action routing, AEGIS/owner approval, narrow tool adapters, evidence, result-to-voice, failure containment, and physical Mac acceptance. Never put credentials in chat or GitHub and never enable silent paid-cloud fallback.
+> Continue Jarvis from `Vanguard-Global-Logistics/Jarvis-Ai-Assistant`, draft PR #2, branch `agent/jarvis-whole-macbook-2026-08-08`. Read `CLAUDE.md`, the current audit/known limitations/backlog, and `docs/status/JARVIS-CONTINUATION-HANDOFF-2026-08-09.md` completely. Verify the remote branch head, PR state, CI, and working tree before changes. Preserve the proven R13.3 SHA-256 baseline and locked owner profile. Do not claim AEGIS, the Defensive Prime Swarm, clone prevention, durable memory, tools, connectors, BCI Agent, Job Site Progress, Octagon, Throne, or Hive federation are implemented without evidence. The immediate programming milestone is the deterministic AEGIS incident/containment foundation paired with the governed Jarvis Tool Bridge: company/Hive isolation, capability leases, reversible allowlisted containment, append-only evidence, capability registry, deterministic action routing, owner approval, narrow tool adapters, result-to-voice, failure containment, independent review, and physical Mac acceptance. Preserve the proposal-only continual-improvement loop and add only a bounded structural observation adapter; attacker content and raw transcripts must never become trusted learning. Never hack back, put credentials in chat or GitHub, or enable silent paid-cloud fallback.
 
 ## Handoff verification checklist
 
@@ -365,8 +411,9 @@ A new session has successfully resumed only after it can state:
 - Hermes doctor result;
 - R13.3 accepted checksum;
 - difference between Electron monorepo and R13.3/Hermes runtime;
-- immediate Tool Bridge milestone;
+- immediate AEGIS containment and Tool Bridge milestone;
 - AEGIS and external-action limitation;
+- Defensive Prime Swarm, poisoned-learning, no-hack-back, and clone-resistance boundaries;
 - the job-mastery sequence;
 - which evaluated tools are adopted, rejected, or candidate-only;
 - which connectors are actually authenticated in that new session.

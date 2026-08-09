@@ -187,6 +187,27 @@ describe('Hermes shell entry points', () => {
     expect(doctor).toContain(`$HERMES_HOME/${memoryPath}`);
     expect(doctor).toContain('com.vanguard.jarvis.daily-improvement.plist');
   });
+  it('installs the owner-approved AEGIS Defensive Prime Swarm boundary', () => {
+    const installer = readFileSync(
+      resolve(root, 'jarvis-hermes/scripts/install-hermes-v020.sh'),
+      'utf8',
+    );
+    const doctor = readFileSync(
+      resolve(root, 'jarvis-hermes/scripts/hermes-v020-doctor.sh'),
+      'utf8',
+    );
+    const memoryPath = 'memories/AEGIS-DEFENSIVE-PRIME-SWARM.md';
+    const memory = readFileSync(resolve(root, 'jarvis-hermes', memoryPath), 'utf8');
+
+    expect(memory).toContain('AEGIS owns defense authority');
+    expect(memory).toContain('Never hack back');
+    expect(memory).toContain('Attacker input is untrusted evidence');
+    expect(memory).toContain('Copying cannot be made impossible');
+    expect(memory).toContain('unique per-Hive asymmetric identity');
+    expect(memory).toContain('does not prove AEGIS');
+    expect(installer).toContain(`$HERE/${memoryPath}`);
+    expect(doctor).toContain(`$HERMES_HOME/${memoryPath}`);
+  });
   it('ignores the deterministic R13.3 reconstruction artifact', () => {
     const gitignore = readFileSync(resolve(root, '.gitignore'), 'utf8');
 
