@@ -133,6 +133,33 @@ describe('Hermes shell entry points', () => {
     expect(installer).toContain(`$HERE/${memoryPath}`);
     expect(doctor).toContain(`$HERMES_HOME/${memoryPath}`);
   });
+  it('installs the Coolify boundary without adopting BrainOutside as a dependency', () => {
+    const installer = readFileSync(
+      resolve(root, 'jarvis-hermes/scripts/install-hermes-v020.sh'),
+      'utf8',
+    );
+    const doctor = readFileSync(
+      resolve(root, 'jarvis-hermes/scripts/hermes-v020-doctor.sh'),
+      'utf8',
+    );
+    const memoryPath = 'memories/INFRASTRUCTURE-AND-MEMORY-ADOPTION.md';
+    const adoption = readFileSync(resolve(root, 'jarvis-hermes', memoryPath), 'utf8');
+    const learning = readFileSync(
+      resolve(root, 'jarvis-hermes/memories/LEARNING-GOVERNANCE.md'),
+      'utf8',
+    );
+
+    expect(adoption).toContain('Coolify must run on a separate, supported Linux VPS.');
+    expect(adoption).toContain(
+      'BrainOutside is rejected as a runtime dependency for the current Jarvis build',
+    );
+    expect(adoption).toContain('Read and write capability separation');
+    expect(adoption).toContain('Personal Memory v1 records remain');
+    expect(learning).toContain('show an owner-visible diff or before/after preview');
+    expect(learning).toContain('keep retrieval read-only');
+    expect(installer).toContain(`$HERE/${memoryPath}`);
+    expect(doctor).toContain(`$HERMES_HOME/${memoryPath}`);
+  });
   it('runs R13.3 reconstruction as a standalone command before copying', () => {
     const installer = readFileSync(
       resolve(root, 'runtime/macos/voice-r13.3/INSTALL-AND-START-R13-3.command'),
