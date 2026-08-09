@@ -94,6 +94,9 @@ describe('Hermes shell entry points', () => {
     expect(professionalMemory).toContain(
       "Jarvis is not a BCI program, BCI product, BCI agent, or employer-owned system.",
     );
+    expect(professionalMemory).toContain(
+      "BCI Agent is a separate program William has been building",
+    );
     expect(professionalMemory).toContain("buy back time");
     expect(installer).toContain(`$HERE/${memoryPath}`);
     expect(doctor).toContain(`$HERMES_HOME/${memoryPath}`);
