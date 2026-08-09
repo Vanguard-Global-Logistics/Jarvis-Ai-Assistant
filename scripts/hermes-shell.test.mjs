@@ -163,9 +163,7 @@ describe('Hermes shell entry points', () => {
   it('ignores the deterministic R13.3 reconstruction artifact', () => {
     const gitignore = readFileSync(resolve(root, '.gitignore'), 'utf8');
 
-    expect(gitignore).toMatch(
-      /^runtime\/macos\/voice-r13\.3\/live_voice_loop_r13_3\.py$/m,
-    );
+    expect(gitignore).toMatch(/^runtime\/macos\/voice-r13\.3\/live_voice_loop_r13_3\.py$/m);
   });
 
   it('runs R13.3 reconstruction as a standalone command before copying', () => {
