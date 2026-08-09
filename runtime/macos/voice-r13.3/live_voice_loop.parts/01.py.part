@@ -67,7 +67,7 @@ raw_plane = RuntimeControlPlane(
 )
 hud_plane = NonBlockingControlPlane(raw_plane)
 fast_backend = WorkerKokoroBackend(os.environ.get("JARVIS_VOICE", ""))
-for _phrase in ("Yes?", "Standing by."):
+for _phrase in ("Yes?", "Standing by.", "Jarvis is ready to help."):
     fast_backend.precache(_phrase)
 print("George fast phrases: PRECACHED", flush=True)
 print("George active worker speed: 1.30x", flush=True)

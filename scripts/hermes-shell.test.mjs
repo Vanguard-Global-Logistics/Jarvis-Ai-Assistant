@@ -76,4 +76,27 @@ describe('Hermes shell entry points', () => {
     );
     expect(installer).not.toContain('reconstruct-live-voice-loop.sh"\\n');
   });
+
+  it('uses uncertain non-wake speech as noisy-room evidence before rejection', () => {
+    const source = readFileSync(
+      resolve(root, 'runtime/macos/voice-r13.3/live_voice_loop.parts/04.py.part'),
+      'utf8',
+    );
+    const uncertain = source.indexOf('if owner_decision == "uncertain":');
+    const observe = source.indexOf('room_guard.observe_nonwake(now)', uncertain);
+    const rejection = source.indexOf('if not (live_rescue or profile_accept):', uncertain);
+
+    expect(uncertain).toBeGreaterThan(-1);
+    expect(observe).toBeGreaterThan(uncertain);
+    expect(rejection).toBeGreaterThan(observe);
+  });
+
+  it('prewarms a representative first response for George', () => {
+    const source = readFileSync(
+      resolve(root, 'runtime/macos/voice-r13.3/live_voice_loop.parts/01.py.part'),
+      'utf8',
+    );
+
+    expect(source).toContain('("Yes?", "Standing by.", "Jarvis is ready to help.")');
+  });
 });

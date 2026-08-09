@@ -202,6 +202,14 @@ try:
         now = time.time()
 
         if owner_decision == "uncertain":
+            # Uncertain non-wake speech is not authorized as a command, but it
+            # is still strong evidence that the room is conversational. Count
+            # it before rejection so TV/family chatter closes natural follow-up
+            # mode before an owner utterance can be mistaken for a command.
+            if not heard_wake:
+                room_guard.observe_nonwake(now)
+                room_guard.report_if_changed(now)
+
             nearfield_ratio = (
                 float(acoustic.get("peak_to_floor", 0.0)) if acoustic else 0.0
             )
