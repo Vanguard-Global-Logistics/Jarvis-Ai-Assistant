@@ -128,6 +128,9 @@ try:
             field_lock_announced = False
 
         owner_slot_waiting = OWNER_COMMAND_SLOT_UNTIL > now_before_listen
+        # Freeze authorization for an utterance that starts before the slot
+        # deadline. Finishing STT or a long sentence must not revoke it mid-turn.
+        owner_slot_for_capture = owner_slot_waiting
         preexisting_conversation = (
             conversation_until > now_before_listen or armed_until > now_before_listen
         )
@@ -152,6 +155,9 @@ try:
             end_silence_ms=(
                 COMMAND_END_SILENCE_MS if owner_slot_waiting else None
             ),
+            start_deadline=(
+                OWNER_COMMAND_SLOT_UNTIL if owner_slot_waiting else None
+            ),
         )
         if STOP:
             break
@@ -159,6 +165,10 @@ try:
             print(f"AEGIS changed to {aegis_state()!r}; voice stopped without altering AEGIS.")
             break
         if not pcm:
+            if acoustic.get("slot_expired"):
+                OWNER_COMMAND_SLOT_UNTIL = 0.0
+                armed_until = 0.0
+                print("Owner command capture: EXPIRED — say Jarvis again.", flush=True)
             if mic_reader.error:
                 if not STOP:
                     print(f"Microphone stream stopped: {mic_reader.error}", flush=True)
@@ -219,9 +229,8 @@ try:
         nearfield_ratio = (
             float(acoustic.get("peak_to_floor", 0.0)) if acoustic else 0.0
         )
-        owner_slot_active = OWNER_COMMAND_SLOT_UNTIL > now
         development_accept = OWNER_DEVELOPMENT_MODE and (
-            heard_wake or owner_slot_active
+            heard_wake or owner_slot_for_capture
         )
 
         if owner_decision == "other":
@@ -229,14 +238,14 @@ try:
                 print(
                     f"Owner Voice Lock: OTHER — ignored "
                     f"(score={owner_score:.3f}, wake={heard_wake}, "
-                    f"slot={owner_slot_active})",
+                    f"slot={owner_slot_for_capture})",
                     flush=True,
                 )
                 continue
             print(
                 f"Owner Voice Lock: OWNER DEVELOPMENT acceptance "
                 f"(score={owner_score:.3f}, wake={heard_wake}, "
-                f"slot={owner_slot_active})",
+                f"slot={owner_slot_for_capture})",
                 flush=True,
             )
 
@@ -287,7 +296,7 @@ try:
             print(
                 f"Owner Voice Lock: OWNER DEVELOPMENT acceptance "
                 f"(score={owner_score:.3f}, wake={heard_wake}, "
-                f"slot={owner_slot_active})",
+                f"slot={owner_slot_for_capture})",
                 flush=True,
             )
         else:
