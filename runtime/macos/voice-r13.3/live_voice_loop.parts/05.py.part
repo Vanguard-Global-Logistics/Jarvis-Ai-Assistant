@@ -18,7 +18,7 @@
         noisy_room = room_guard.is_noisy(now)
         in_conversation = conversation_until > now
 
-        owner_slot = OWNER_COMMAND_SLOT_UNTIL > now
+        owner_slot = owner_slot_for_capture
 
         if field_locked and not heard_wake and not owner_slot:
             # At a game or similarly loud environment, a temporary dip back to
