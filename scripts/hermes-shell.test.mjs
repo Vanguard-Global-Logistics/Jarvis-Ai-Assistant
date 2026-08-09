@@ -118,6 +118,13 @@ describe('Hermes shell entry points', () => {
     expect(roadmap).toContain('Nightly Simpro job briefing sync');
     expect(roadmap).toContain('least-privilege, read-only OAuth integration');
     expect(roadmap).toContain('ETA source, last verification time and confidence');
+    expect(roadmap).toContain('Daily Technician Report Loop');
+    expect(roadmap).toContain('daily-report request at 7:00 a.m.');
+    expect(roadmap).toContain('Reminders stop immediately after a valid report');
+    expect(roadmap).toContain('why that person is included');
+    expect(roadmap).toContain(
+      'Verified actual labor reduces remaining labor for the matching job and cost center.',
+    );
     expect(roadmap).toContain(
       "scheduled crew capacity = sum of each assigned technician's scheduled hours",
     );
