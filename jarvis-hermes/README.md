@@ -23,6 +23,12 @@ The installer also migrates the retired `stt` agent-toolset entry left by
 older Hermes configs. This only removes an invalid tool-list item; local
 Whisper transcription remains enabled under the top-level `stt` settings.
 
+The installed governance memory also records the owner-approved infrastructure
+decision: Coolify is a future AEGIS-gated deployment plane on a separate Linux
+VPS, never a workload for the 8 GB MacBook. BrainOutside is not installed;
+Jarvis adopts only selected proposal-preview, capability-separation,
+source-linked context, ledger, and signed-history patterns.
+
 The physically tested R13.3 local voice remains the production baseline.
 Hermes uses its Kokoro/MLX bm_george worker through a narrow local adapter and
 falls back to the macOS system voice, not a paid TTS service.
@@ -35,6 +41,7 @@ Detailed contracts:
 - memories/OCTAGON-COMMERCIAL-STRATEGY.md — owner-approved product and commercial boundaries.
 - memories/JARVIS-PROFESSIONAL-MODE.md — personal ownership and professional-use boundaries.
 - memories/JARVIS-JOB-MASTERY-ROADMAP.md — locked automation and field-progress sequence.
+- memories/INFRASTRUCTURE-AND-MEMORY-ADOPTION.md — Coolify boundary and adopted memory safeguards.
 - docs/DECISIONS/0011-hermes-v020-governed-updates.md — update gates.
 
 ## Historical notes
@@ -44,17 +51,18 @@ Three layers, each swappable:
 - **Brain** — Claude (`claude-sonnet-4-6`) does the reasoning.
 - **Engine** — Hermes Agent gives Jarvis hands: terminal, files, web, persistent
   memory, cron, skills, subagents, and messaging gateways.
-- **Identity** — `SOUL.md`. This is the part that is actually *Jarvis*, and it is
+- **Identity** — `SOUL.md`. This is the part that is actually _Jarvis_, and it is
   ours. The brain and the engine can both be replaced without losing him.
 
 ## Files
 
-| File | Installs to | What it is |
-|---|---|---|
-| `SOUL.md` | `~/.hermes/SOUL.md` | Jarvis's identity, standards, and hard rules |
-| `USER.md` | `~/.hermes/memories/USER.md` | What Jarvis knows about William, permanently |
-| `config.yaml` | `~/.hermes/config.yaml` | Model choice + memory on |
-| `install.sh` | — | Sets all of the above up on a fresh machine |
+| File                                             | Installs to                  | What it is                                     |
+| ------------------------------------------------ | ---------------------------- | ---------------------------------------------- |
+| `SOUL.md`                                        | `~/.hermes/SOUL.md`          | Jarvis's identity, standards, and hard rules   |
+| `USER.md`                                        | `~/.hermes/memories/USER.md` | What Jarvis knows about William, permanently   |
+| `memories/INFRASTRUCTURE-AND-MEMORY-ADOPTION.md` | `~/.hermes/memories/`        | Coolify boundary and adopted memory safeguards |
+| `config.yaml`                                    | `~/.hermes/config.yaml`      | Model choice + memory on                       |
+| `install.sh`                                     | —                            | Sets all of the above up on a fresh machine    |
 
 Note the memory path: the profile Hermes actually reads is
 `~/.hermes/memories/USER.md`, not `~/.hermes/USER.md`. A file in the second
