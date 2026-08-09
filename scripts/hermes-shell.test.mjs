@@ -115,6 +115,13 @@ describe('Hermes shell entry points', () => {
 
     expect(roadmap).toContain('Phase 2 — Inventory and certify existing automations');
     expect(roadmap).toContain('Phase 5 — Build Job Site Progress');
+    expect(roadmap).toContain('Nightly Simpro job briefing sync');
+    expect(roadmap).toContain('least-privilege, read-only OAuth integration');
+    expect(roadmap).toContain('ETA source, last verification time and confidence');
+    expect(roadmap).toContain(
+      "scheduled crew capacity = sum of each assigned technician's scheduled hours",
+    );
+    expect(roadmap).toContain('Do not estimate from technician headcount alone.');
     expect(roadmap).toContain('No covert audio, camera, GPS or background surveillance.');
     expect(installer).toContain(`$HERE/${memoryPath}`);
     expect(doctor).toContain(`$HERMES_HOME/${memoryPath}`);
