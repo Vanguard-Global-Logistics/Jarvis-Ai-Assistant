@@ -270,17 +270,17 @@ Never place AEGIS, Cipher, biometrics, private Jarvis memory, credentials, R13.3
 
 Connector access cannot be transferred by prose. A future session must use the account's installed connector and may need the owner to sign in again.
 
-| System | Continuation state | Safe restart instruction |
-|---|---|---|
-| GitHub | Connected and verified while creating this handoff | Open the private repository and PR #2 through the GitHub connector; verify branch head and CI before work |
-| Gmail | Connector may be available, but no technician recipient enrollment exists | Search/read only when William asks; resolve every recipient before drafting/sending; never start scheduled mail |
-| Google Calendar | Connector may be available; not wired into Jarvis | Use only for explicit calendar tasks; do not imply Jarvis runtime access |
-| Base44 | Recommended connector was offered; installation not confirmed | If approved, create only a separate sandbox prototype/repository |
-| Remotion | Plugin not confirmed installed | Treat as evaluated future worker, not current Jarvis capability |
-| Simpro / Procore | No connector, OAuth grant, recipient map, or employer authorization recorded | Stop and obtain formal read-only scope before integration |
-| Coolify | No production server or account approved | Do not deploy |
-| Anthropic/cloud models | No Anthropic key supplied; paid fallback disabled | Preserve local-only behavior unless William explicitly approves provider, cost, and data scope |
-| Vercel / Supabase / GoDaddy / Square | Used in other Vanguard projects; not verified as active Jarvis connectors here | Reconnect and inspect the specific project before any action |
+| System                               | Continuation state                                                             | Safe restart instruction                                                                                        |
+| ------------------------------------ | ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
+| GitHub                               | Connected and verified while creating this handoff                             | Open the private repository and PR #2 through the GitHub connector; verify branch head and CI before work       |
+| Gmail                                | Connector may be available, but no technician recipient enrollment exists      | Search/read only when William asks; resolve every recipient before drafting/sending; never start scheduled mail |
+| Google Calendar                      | Connector may be available; not wired into Jarvis                              | Use only for explicit calendar tasks; do not imply Jarvis runtime access                                        |
+| Base44                               | Recommended connector was offered; installation not confirmed                  | If approved, create only a separate sandbox prototype/repository                                                |
+| Remotion                             | Plugin not confirmed installed                                                 | Treat as evaluated future worker, not current Jarvis capability                                                 |
+| Simpro / Procore                     | No connector, OAuth grant, recipient map, or employer authorization recorded   | Stop and obtain formal read-only scope before integration                                                       |
+| Coolify                              | No production server or account approved                                       | Do not deploy                                                                                                   |
+| Anthropic/cloud models               | No Anthropic key supplied; paid fallback disabled                              | Preserve local-only behavior unless William explicitly approves provider, cost, and data scope                  |
+| Vercel / Supabase / GoDaddy / Square | Used in other Vanguard projects; not verified as active Jarvis connectors here | Reconnect and inspect the specific project before any action                                                    |
 
 Never include actual secrets in this table. A connector being present in ChatGPT does not mean the standalone Mac Jarvis runtime can use it. The Tool Bridge must integrate each connector separately and safely.
 
