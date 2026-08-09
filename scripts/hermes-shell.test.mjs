@@ -163,12 +163,8 @@ describe('Hermes shell entry points', () => {
       'utf8',
     );
 
-    expect(start).toContain(
-      'JARVIS_OWNER_DEVELOPMENT_MODE="${JARVIS_OWNER_DEVELOPMENT_MODE:-1}"',
-    );
-    expect(routing).toContain(
-      'development_accept = OWNER_DEVELOPMENT_MODE and (',
-    );
+    expect(start).toContain('JARVIS_OWNER_DEVELOPMENT_MODE="${JARVIS_OWNER_DEVELOPMENT_MODE:-1}"');
+    expect(routing).toContain('development_accept = OWNER_DEVELOPMENT_MODE and (');
     expect(routing).toContain('heard_wake or owner_slot_active');
     expect(routing).toContain('Owner Voice Lock: OWNER DEVELOPMENT acceptance');
     expect(commandGate).toContain('not OWNER_DEVELOPMENT_MODE');
