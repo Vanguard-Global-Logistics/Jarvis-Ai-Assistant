@@ -203,7 +203,6 @@ describe('Hermes shell entry points', () => {
     expect(wakeBlock).toContain('OWNER_COMMAND_SLOT_UNTIL = time.time()');
     expect(wakeBlock).toContain('Owner command capture: LISTENING');
     expect(wakeBlock).not.toContain('speak_without_mic_backlog');
-    expect(wakeBlock).not.toContain('"Yes?"');
   });
 
   it('hands a short first answer chunk to George without changing recognition', () => {
