@@ -167,7 +167,7 @@ describe('Hermes shell entry points', () => {
 
     expect(start).toContain('JARVIS_OWNER_DEVELOPMENT_MODE="${JARVIS_OWNER_DEVELOPMENT_MODE:-1}"');
     expect(routing).toContain('development_accept = OWNER_DEVELOPMENT_MODE and (');
-    expect(routing).toContain('heard_wake or owner_slot_active');
+    expect(routing).toContain('heard_wake or owner_slot_for_capture');
     expect(routing).toContain('Owner Voice Lock: OWNER DEVELOPMENT acceptance');
     expect(commandGate).toContain('not OWNER_DEVELOPMENT_MODE');
   });
@@ -194,12 +194,18 @@ describe('Hermes shell entry points', () => {
       commandGate.indexOf('if heard_wake and inline:'),
     );
 
-    expect(config).toContain('JARVIS_WAKE_COMMAND_SLOT_SECONDS", "12.0"');
+    expect(config).toContain('JARVIS_WAKE_COMMAND_SLOT_SECONDS", "30.0"');
     expect(config).toContain('JARVIS_COMMAND_END_SILENCE_MS", "1200"');
     expect(capture).toContain('end_silence_ms: int | None = None');
+    expect(capture).toContain('start_deadline: float | None = None');
+    expect(capture).toContain('return None, {"slot_expired": True}');
+    expect(routing).toContain('owner_slot_for_capture = owner_slot_waiting');
     expect(routing).toContain('if owner_slot_waiting:');
     expect(routing).toContain('listen_limit = MAX_UTTERANCE_SECONDS');
     expect(routing).toContain('COMMAND_END_SILENCE_MS if owner_slot_waiting else None');
+    expect(routing).toContain('OWNER_COMMAND_SLOT_UNTIL if owner_slot_waiting else None');
+    expect(routing).toContain('heard_wake or owner_slot_for_capture');
+    expect(commandGate).toContain('owner_slot = owner_slot_for_capture');
     expect(wakeBlock).toContain('OWNER_COMMAND_SLOT_UNTIL = time.time()');
     expect(wakeBlock).toContain('Owner command capture: LISTENING');
     expect(wakeBlock).not.toContain('speak_without_mic_backlog');
