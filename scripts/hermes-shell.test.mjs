@@ -172,6 +172,40 @@ describe('Hermes shell entry points', () => {
     expect(commandGate).toContain('not OWNER_DEVELOPMENT_MODE');
   });
 
+  it('keeps listening and captures the whole command after standalone Jarvis', () => {
+    const config = readFileSync(
+      resolve(root, 'runtime/macos/voice-r13.3/live_voice_loop.parts/00.py.part'),
+      'utf8',
+    );
+    const capture = readFileSync(
+      resolve(root, 'runtime/macos/voice-r13.3/live_voice_loop.parts/02.py.part'),
+      'utf8',
+    );
+    const routing = readFileSync(
+      resolve(root, 'runtime/macos/voice-r13.3/live_voice_loop.parts/04.py.part'),
+      'utf8',
+    );
+    const commandGate = readFileSync(
+      resolve(root, 'runtime/macos/voice-r13.3/live_voice_loop.parts/05.py.part'),
+      'utf8',
+    );
+    const wakeBlock = commandGate.slice(
+      commandGate.indexOf('if heard_wake and not inline:'),
+      commandGate.indexOf('if heard_wake and inline:'),
+    );
+
+    expect(config).toContain('JARVIS_WAKE_COMMAND_SLOT_SECONDS", "12.0"');
+    expect(config).toContain('JARVIS_COMMAND_END_SILENCE_MS", "1200"');
+    expect(capture).toContain('end_silence_ms: int | None = None');
+    expect(routing).toContain('if owner_slot_waiting:');
+    expect(routing).toContain('listen_limit = MAX_UTTERANCE_SECONDS');
+    expect(routing).toContain('COMMAND_END_SILENCE_MS if owner_slot_waiting else None');
+    expect(wakeBlock).toContain('OWNER_COMMAND_SLOT_UNTIL = time.time()');
+    expect(wakeBlock).toContain('Owner command capture: LISTENING');
+    expect(wakeBlock).not.toContain('speak_without_mic_backlog');
+    expect(wakeBlock).not.toContain('"Yes?"');
+  });
+
   it('hands a short first answer chunk to George without changing recognition', () => {
     const speech = readFileSync(
       resolve(root, 'runtime/macos/voice-r13.3/live_local_speech_r13_3.py'),
