@@ -21,6 +21,17 @@
     return False, ""
 
 
+def is_terminal_wake_handshake(text: str) -> bool:
+    """Recognize a close, exact sentence-ending Jarvis as wake-only.
+
+    This deliberately does not return a command. It exists for natural direct
+    addresses such as "Do you hear me, Jarvis?" that the conservative opening
+    wake parser must not reinterpret as an inline request.
+    """
+    tokens = re.findall(r"[A-Za-z']+", text.strip())
+    return 2 <= len(tokens) <= 8 and tokens[-1].lower() == WAKE
+
+
 class NoisyRoomGuard:
     """Session-only guard against TV dialogue hijacking follow-up mode."""
 

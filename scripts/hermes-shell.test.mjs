@@ -121,6 +121,31 @@ describe('Hermes shell entry points', () => {
     expect(rejection).toBeGreaterThan(observe);
   });
 
+  it('keeps sentence-ending Jarvis wake-only and behind close-owner rescue', () => {
+    const parser = readFileSync(
+      resolve(root, 'runtime/macos/voice-r13.3/live_voice_loop.parts/03.py.part'),
+      'utf8',
+    );
+    const routing = readFileSync(
+      resolve(root, 'runtime/macos/voice-r13.3/live_voice_loop.parts/04.py.part'),
+      'utf8',
+    );
+    const commandGate = readFileSync(
+      resolve(root, 'runtime/macos/voice-r13.3/live_voice_loop.parts/05.py.part'),
+      'utf8',
+    );
+
+    expect(parser).toContain('2 <= len(tokens) <= 8 and tokens[-1].lower() == WAKE');
+    expect(routing).toContain('terminal_wake_handshake = True');
+    expect(routing).toContain('inline = ""');
+    expect(routing).toContain('owner_score >= OWNER_TERMINAL_HANDSHAKE_THRESHOLD');
+    expect(routing).toContain('nearfield_ratio >= OWNER_TERMINAL_HANDSHAKE_NEARFIELD');
+    expect(routing).toContain('if not terminal_wake_handshake and is_end_session(text):');
+    expect(commandGate.indexOf('if heard_wake and not inline:')).toBeLessThan(
+      commandGate.indexOf('if heard_wake and inline:'),
+    );
+  });
+
   it('prewarms a representative first response for George', () => {
     const source = readFileSync(
       resolve(root, 'runtime/macos/voice-r13.3/live_voice_loop.parts/01.py.part'),

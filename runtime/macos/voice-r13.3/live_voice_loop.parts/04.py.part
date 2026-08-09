@@ -199,7 +199,18 @@ try:
         )
 
         heard_wake, inline = parse_wake(text)
+        terminal_wake_handshake = False
+        if not heard_wake and is_terminal_wake_handshake(text):
+            # A sentence-ending Jarvis is only a wake handshake. Discard all
+            # preceding words so this path can never execute them as a command.
+            terminal_wake_handshake = True
+            heard_wake = True
+            inline = ""
+
         now = time.time()
+        nearfield_ratio = (
+            float(acoustic.get("peak_to_floor", 0.0)) if acoustic else 0.0
+        )
 
         if owner_decision == "uncertain":
             # Uncertain non-wake speech is not authorized as a command, but it
@@ -210,17 +221,20 @@ try:
                 room_guard.observe_nonwake(now)
                 room_guard.report_if_changed(now)
 
-            nearfield_ratio = (
-                float(acoustic.get("peak_to_floor", 0.0)) if acoustic else 0.0
-            )
             live_rescue = (
                 heard_wake
                 and owner_score >= OWNER_WAKE_RESCUE_THRESHOLD
                 and nearfield_ratio >= OWNER_WAKE_RESCUE_NEARFIELD
             )
+            terminal_rescue = (
+                terminal_wake_handshake
+                and not inline
+                and owner_score >= OWNER_TERMINAL_HANDSHAKE_THRESHOLD
+                and nearfield_ratio >= OWNER_TERMINAL_HANDSHAKE_NEARFIELD
+            )
             profile_accept = owner_voice_lock.wake_assisted_accept(owner_score, heard_wake)
 
-            if not (live_rescue or profile_accept):
+            if not (live_rescue or terminal_rescue or profile_accept):
                 print(
                     f"Owner Voice Lock: UNCERTAIN — ignored "
                     f"(score={owner_score:.3f}, wake={heard_wake}, "
@@ -229,7 +243,12 @@ try:
                 )
                 continue
 
-            route = "live-calibrated wake-rescue" if live_rescue else "profile wake-assist"
+            if terminal_rescue:
+                route = "terminal-address handshake"
+            elif live_rescue:
+                route = "live-calibrated wake-rescue"
+            else:
+                route = "profile wake-assist"
             print(
                 f"Owner Voice Lock: OWNER via {route} "
                 f"(score={owner_score:.3f}, nearfield={nearfield_ratio:.2f}x, "
@@ -244,7 +263,7 @@ try:
             )
 
         # Always honor explicit local shutdown, even in field/noisy mode.
-        if is_end_session(text):
+        if not terminal_wake_handshake and is_end_session(text):
             brain.reset()
             armed_until = 0.0
             conversation_until = 0.0

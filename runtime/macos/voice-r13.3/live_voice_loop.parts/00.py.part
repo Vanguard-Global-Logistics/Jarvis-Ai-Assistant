@@ -68,6 +68,12 @@ OWNER_WAKE_RESCUE_THRESHOLD = float(
 OWNER_WAKE_RESCUE_NEARFIELD = float(
     os.environ.get("JARVIS_OWNER_WAKE_RESCUE_NEARFIELD", "4.0")
 )
+OWNER_TERMINAL_HANDSHAKE_THRESHOLD = float(
+    os.environ.get("JARVIS_OWNER_TERMINAL_HANDSHAKE_THRESHOLD", "0.42")
+)
+OWNER_TERMINAL_HANDSHAKE_NEARFIELD = float(
+    os.environ.get("JARVIS_OWNER_TERMINAL_HANDSHAKE_NEARFIELD", "12.0")
+)
 
 sys.path.insert(0, str(HOME / "Jarvis-Live-Voice"))
 from hive_local_brain_r11 import HiveLocalBrain  # noqa: E402
