@@ -100,9 +100,7 @@ describe('Hermes shell entry points', () => {
     const digest = createHash('sha256');
     for (const part of parts) {
       digest.update(
-        readFileSync(
-          resolve(root, 'runtime/macos/voice-r13.3/live_voice_loop.parts', part),
-        ),
+        readFileSync(resolve(root, 'runtime/macos/voice-r13.3/live_voice_loop.parts', part)),
       );
     }
 
