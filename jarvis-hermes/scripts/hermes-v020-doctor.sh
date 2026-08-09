@@ -61,7 +61,7 @@ else
   fail "Hermes CLI is missing"
 fi
 
-for required in "$HERMES_HOME/SOUL.md" "$HERMES_HOME/memories/HERMES-V0.20-CAPABILITIES.md" "$HERMES_HOME/memories/LEARNING-GOVERNANCE.md" "$HERMES_HOME/memories/OCTAGON-COMMERCIAL-STRATEGY.md" "$HERMES_HOME/bin/jarvis-kokoro-tts.py"; do
+for required in "$HERMES_HOME/SOUL.md" "$HERMES_HOME/memories/HERMES-V0.20-CAPABILITIES.md" "$HERMES_HOME/memories/LEARNING-GOVERNANCE.md" "$HERMES_HOME/memories/OCTAGON-COMMERCIAL-STRATEGY.md" "$HERMES_HOME/memories/JARVIS-PROFESSIONAL-MODE.md" "$HERMES_HOME/bin/jarvis-kokoro-tts.py"; do
   [[ -s "$required" ]] && pass "$required installed" || fail "$required missing"
 done
 
