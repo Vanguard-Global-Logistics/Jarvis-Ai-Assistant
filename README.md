@@ -2,15 +2,14 @@
 
 Personal AI assistant and orchestrator for William Lavold. Private, single-user.
 
-> **Status: production foundation. Zero application features.**
+> **Status: Stage 1A desktop assistant implemented; physical acceptance pending.**
 >
-> This repository builds, lints, typechecks, and tests. It does **not** do anything yet.
-> There is no AEGIS, no orchestrator, no Forge, no Ledger, no memory, no voice, and no
-> vision. Nothing here is protected by AEGIS — AEGIS does not exist.
+> The Electron app supports conversation, Thought Amplifier, and explicit-save session
+> history. It does not have AEGIS, governed tools, job automation, voice integration, or
+> admitted self-learning. Nothing here is protected by AEGIS — AEGIS does not exist.
 >
-> One typed IPC channel exists (`app:get-info`, static host facts, no authority granted).
-> It proves the renderer↔main boundary end to end and is the only thing `window.jarvis`
-> exposes — see `docs/IPC-SURFACE.md`.
+> Seven typed IPC channels exist. The four `history:*` operations expose save/list/get/delete
+> only; Electron main owns the database and no generic IPC passthrough exists.
 >
 > `docs/KNOWN-LIMITATIONS.md` is the authoritative list of what is missing. Read it before
 > concluding anything works.
@@ -34,6 +33,7 @@ Requires Node 22+.
 
 ```bash
 npm install          # one install at the root links every workspace
+npm run rebuild:electron-native # rebuild better-sqlite3 for Electron's ABI
 npm run verify       # format + lint + typecheck + test
 npm run build        # build every workspace, and assert the Electron artifacts
 npm run dev:desktop  # launch the Electron shell
@@ -67,14 +67,14 @@ expressed in a monorepo — including a precise account of what is and is not en
 ## Layout
 
 ```
-apps/desktop           Electron shell (Windows target)     PARTIAL — hardened, one IPC channel
+apps/desktop           Electron desktop assistant          PARTIAL — Stage 1A, acceptance open
 apps/pwa               PWA shell                           NOT IMPLEMENTED — out of scope
-services/jarvis-core   Orchestration                       NOT IMPLEMENTED
+services/jarvis-core   Model + memory policy core           PARTIAL
 services/aegis         Security engine                     NOT IMPLEMENTED
-packages/contracts     Shared Zod schemas + types          PARTIAL — IPC only
-packages/ui            Design-system components            NOT IMPLEMENTED
+packages/contracts     Shared Zod schemas + types          PARTIAL — seven IPC operations
+packages/ui            Design-system components            PARTIAL
 packages/config        Env validation + logging            IMPLEMENTED, unit-tested
-packages/database      SQLite + migration runner           PARTIAL — zero migrations
+packages/database      SQLite + migrations + stores        PARTIAL — Stage 1A composed
 ```
 
 Most packages are empty. That is deliberate, not unfinished — see `CLAUDE.md` §8.

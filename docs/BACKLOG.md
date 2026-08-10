@@ -21,11 +21,15 @@
 - **Recurring cost:** $0/month infra; optional usage-billed API key.
 - **Why now:** the first usable improvement for William; everything before it was
   documentation. Fully local on a trusted machine, so it safely precedes AEGIS v1.
-- **Status: conversation slice complete (ADR 0007) — `jarvis:chat` + `jarvis:amplify`
-  wired end to end, mock-default, with `verify` + `build` + `probe:runtime` green on Linux.
-  REMAINING for the milestone: persistence (`history:*` channels + SQLite migrations +
-  `better-sqlite3` ABI rebuild), the Windows packaged-installer gate, and William's
-  acceptance (using it for one real task).**
+- **Status: approval-free implementation complete at `69b3e36` — conversation,
+  Thought Amplifier, exactly four bounded `history:*` channels, one Electron-main SQLite
+  owner, explicit Save Session/history/read-only-open/New Session/confirmed-delete UI,
+  zero auto-save, Electron ABI rebuild, and restart-aware runtime probes. CI run 301 passed
+  format, lint, strict typecheck, all tests, build, both real Electron runtime modes, and
+  archived-handoff integrity. REMAINING for milestone acceptance: target-platform
+  development and packaged-runtime acceptance, one real task, and William's explicit
+  acceptance. Those human/hardware gates are skipped until available; Stage 1B remains
+  blocked.**
 
 ---
 

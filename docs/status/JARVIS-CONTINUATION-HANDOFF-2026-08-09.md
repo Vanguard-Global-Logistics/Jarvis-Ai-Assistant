@@ -25,12 +25,12 @@ GitHub and tested runtime evidence are the source of truth. This file contains n
 - Draft pull request: **#2 — Pin Hermes v0.20 and add governed update intake**
 - PR URL: `https://github.com/Vanguard-Global-Logistics/Jarvis-Ai-Assistant/pull/2`
 - PR target: `main`
-- Verified implementation head immediately before the latest documentation update:
-  `82501984522959d89b222e0700069ad2a25cbf7d`
+- Stage 1A implementation head immediately before this documentation update:
+  `69b3e36949816a6bf8cca41aebed98f22ab8a213`
 - Verified physical Mac Hermes acceptance head: `53af8c060cb39e6217bc925868cefead78eae2d1`
 - Base at the verified PR inspection: `c5ec68f04ecb8049287d4990073c390f25ba0ecc`
 - PR state at handoff creation: open, draft, mergeable.
-- CI evidence for `8250198`: workflow **CI**, run **283**, completed successfully: format,
+- CI evidence for `69b3e36`: workflow **CI**, run **301**, completed successfully: format,
   lint, typecheck, tests, build, real Electron runtime probe, and archived-handoff integrity.
 - Never modify `main` directly, force-push shared history, reset away user work, or treat a dirty worktree as disposable.
 - Read `CLAUDE.md`, `docs/CURRENT-STATE-AUDIT.md`, `docs/KNOWN-LIMITATIONS.md`, `docs/IPC-SURFACE.md`, `docs/BACKLOG.md`, relevant ADRs, and this handoff before changing code.
@@ -146,7 +146,7 @@ Latest field evidence showed voice capture working reliably. The remaining visib
 
 ## Two runtimes that must not be conflated
 
-1. The TypeScript/Electron source-of-truth monorepo has a hardened desktop foundation, three narrow IPC channels, model-provider abstraction, local provider/routing work, tests, and CI. Its durable persistence, AEGIS, tool orchestration, voice integration, and full memory remain incomplete unless the current audit says otherwise.
+1. The TypeScript/Electron source-of-truth monorepo has a hardened desktop foundation, seven narrow IPC channels, explicit-save SQLite session history, model-provider abstraction, local provider/routing work, tests, and CI. Its AEGIS, tool orchestration, voice integration, and durable admitted Memory v1 remain incomplete unless the current audit says otherwise.
 2. R13.3 plus Hermes is a separately maintained, physically tested Mac voice path. It proves local voice interaction, but it is not yet wired to the monorepo's governed application architecture.
 
 Do not use success in one runtime as proof that the other contains the same feature.
@@ -166,30 +166,36 @@ must not begin until Stage 1A is implemented, runtime-verified, used for one rea
 by William. The continuation handoff previously contradicted this gate; repository commit `8250198`
 corrects the implementation direction without weakening the future AEGIS requirement.
 
-Implemented and CI-verified at `8250198`:
+The persistence foundation was implemented and CI-verified at `8250198`:
 
 - forward-only migration 2 creates strict `sessions` and ordered `messages` tables;
 - explicit-save-only `SqliteSessionHistoryStore` supports save, list, get, delete, cascade, bounded
   validation, atomic duplicate failure, and restart-safe recall;
 - client-neutral Zod history contracts define the one permitted saved-transcript shape;
 - 11 focused tests cover the storage and contract foundation;
-- no IPC, renderer, filesystem path, automatic save, Memory v1 admission, or new runtime authority
-  was added by this checkpoint.
+- that checkpoint added no IPC, renderer, filesystem path, automatic save, Memory v1 admission, or
+  new runtime authority.
 
-Remaining Stage 1A work:
+The complete approval-free Stage 1A code slice is implemented at `69b3e36`:
 
-1. Add exactly four schema-validated channels: `history:save`, `history:list`, `history:get`, and
-   `history:delete`.
-2. Compose one SQLite owner in Electron main, apply migrations once, close it cleanly, and add the
-   required Electron ABI rebuild for `better-sqlite3`.
-3. Expose four purpose-named preload functions—never a generic invoke bridge.
-4. Add Save Session naming, a history list, read-only open, and confirmed deletion to the renderer.
-5. Preserve the rule that closing without Save Session writes nothing.
-6. Extend exact IPC, preload, bundle, and runtime-probe assertions.
-7. Re-run the Windows development-runtime acceptance and have William use one real task and accept
-   the milestone.
+1. Exactly four schema-validated history channels exist: `history:save`, `history:list`,
+   `history:get`, and `history:delete`.
+2. Electron main owns one SQLite connection, applies migrations on startup, closes it on quit, and
+   rebuilds `better-sqlite3` for Electron's ABI.
+3. Preload exposes four purpose-named history functions and no generic invoke bridge.
+4. The renderer provides explicit Save Session naming, a history list, read-only open, New Session,
+   and confirmed deletion.
+5. Closing without Save Session writes nothing. Amplifier and error cards remain transient.
+6. Exact IPC, preload, bundle, restart persistence, deletion-after-restart, unsaved-session, and
+   real Electron runtime-probe assertions are automated.
 
-Only after that gate may AEGIS v1 be promoted. The future Tool Bridge still requires deterministic
+The remaining Stage 1A gates require William or target hardware and are intentionally skipped while
+approval-free programming continues:
+
+1. Re-run target-platform development and packaged-runtime acceptance.
+2. Have William use one real task and explicitly accept the milestone.
+
+Only after those gates may AEGIS v1 be promoted. The future Tool Bridge still requires deterministic
 AEGIS denial, isolation, evidence, rollback, capability leases, and owner approval before any
 external action.
 
@@ -413,15 +419,15 @@ Never include actual secrets in this table. A connector being present in ChatGPT
 - Keep generated reconstruction ignored.
 - Keep personal memory and locked voice profile outside Git.
 
-### P1 — Finish and accept Stage 1A explicit-save desktop persistence
+### P1 — Accept Stage 1A explicit-save desktop persistence
 
-- Wire the CI-verified session store and contracts through four narrow history IPC channels.
-- Keep one SQLite owner in Electron main and rebuild `better-sqlite3` for Electron's ABI.
-- Add explicit Save Session naming, list, read-only open, and confirmed deletion.
-- Extend preload exact-surface, IPC, bundle, and runtime-probe tests.
-- Prove unsaved sessions disappear and saved sessions survive restart.
+- Approval-free implementation is complete: four narrow history channels, one Electron-main SQLite
+  owner, Electron ABI rebuild, exact preload surface, explicit Save Session naming, list,
+  read-only open, New Session, confirmed deletion, and zero auto-save.
+- Automated restart probes prove unsaved sessions disappear, saved sessions survive restart, and
+  confirmed deletion survives another restart.
 - Re-run Windows development-runtime acceptance, use one real task, and obtain William's explicit
-  Stage 1A acceptance.
+  Stage 1A acceptance. **Skipped until William or target hardware is available.**
 - Preserve the accepted `53af8c0` Hermes baseline and its **32 pass, 0 fail, 1 warning** evidence.
 - Keep Relentless SEO proposal-only until a real tenant and its production accounts are explicitly
   enrolled; package acceptance did not authorize credentials or publishing.
@@ -482,7 +488,7 @@ A strategy document, installed memory file, UI tile, mock, shell, prototype, mod
 
 Use this exact starting instruction:
 
-> Continue Jarvis from `Vanguard-Global-Logistics/Jarvis-Ai-Assistant`, draft PR #2, branch `agent/jarvis-whole-macbook-2026-08-08`. Read `CLAUDE.md`, the current audit/known limitations/backlog, and `docs/status/JARVIS-CONTINUATION-HANDOFF-2026-08-09.md` completely. Verify the remote branch head, PR state, CI, and working tree before changes. Preserve the proven R13.3 SHA-256 baseline and locked owner profile. Do not claim AEGIS, the Defensive Prime Swarm, clone prevention, durable memory, tools, connectors, BCI Agent, Job Site Progress, Octagon, Throne, Hive federation, live SEO automation, Peptastic runtime integration, or search-ranking results are implemented without evidence. The single active milestone is Stage 1A explicit-save desktop persistence. Commit `8250198` implements and CI-verifies the forward-only session migration, single-writer save/list/get/delete store, restart-safe recall, and client-neutral history contracts, but adds no IPC or UI. Next add exactly four schema-validated history channels, one Electron-main SQLite owner with ABI rebuild, four purpose-named preload methods, Save Session/history/read-only-open/confirmed-delete UI, exact boundary and runtime-probe tests, Windows development-runtime acceptance, one real task, and William's explicit acceptance. Do not start AEGIS v1 or the Tool Bridge until Stage 1A is accepted; preserve their future deterministic containment, capability leases, isolation, append-only evidence, owner approval, failure containment, independent review, and no-external-action boundary. Preserve the proposal-only continual-improvement loop and bounded Research Prime: four enrolled primary release sources, structural facts only, no raw web prose, no automatic knowledge/code promotion, and no open-ended business search before its provider, cost ceiling, per-company source charter, prompt-injection isolation, and A1-only output are approved. Preserve the Jarvis-owned Relentless SEO standard as an A1-by-default public-product release gate using primary sources: no fake reviews, paid-link schemes, doorway pages, fabricated locations, unsupported regulated claims, ranking guarantees, automatic publishing, or cross-tenant Peptastic data. Attacker content and raw transcripts must never become trusted learning. Never hack back, put credentials in chat or GitHub, or enable silent paid-cloud fallback.
+> Continue Jarvis from `Vanguard-Global-Logistics/Jarvis-Ai-Assistant`, draft PR #2, branch `agent/jarvis-whole-macbook-2026-08-08`. Read `CLAUDE.md`, the current audit/known limitations/backlog, and `docs/status/JARVIS-CONTINUATION-HANDOFF-2026-08-09.md` completely. Verify the remote branch head, PR state, CI, and working tree before changes. Preserve the proven R13.3 SHA-256 baseline and locked owner profile. Do not claim AEGIS, the Defensive Prime Swarm, clone prevention, durable Memory v1, tools, connectors, BCI Agent, Job Site Progress, Octagon, Throne, Hive federation, live SEO automation, Peptastic runtime integration, or search-ranking results are implemented without evidence. Stage 1A's approval-free implementation is complete at `69b3e36`: strict session/message migration, single-writer SQLite store, exactly four bounded history channels, one Electron-main owner, native ABI rebuild, four purpose-named preload methods, explicit Save Session/history/read-only-open/New Session/confirmed-delete UI, zero auto-save, and restart-aware runtime probes. Target-platform acceptance, one real task, and William's explicit acceptance remain open and should be skipped until available. Do not start AEGIS v1 or the Tool Bridge until Stage 1A is accepted; continue only approval-free work that cannot widen runtime authority. Preserve their future deterministic containment, capability leases, isolation, append-only evidence, owner approval, failure containment, independent review, and no-external-action boundary. Preserve the proposal-only continual-improvement loop and bounded Research Prime: four enrolled primary release sources, structural facts only, no raw web prose, no automatic knowledge/code promotion, and no open-ended business search before its provider, cost ceiling, per-company source charter, prompt-injection isolation, and A1-only output are approved. Preserve the Jarvis-owned Relentless SEO standard as an A1-by-default public-product release gate using primary sources: no fake reviews, paid-link schemes, doorway pages, fabricated locations, unsupported regulated claims, ranking guarantees, automatic publishing, or cross-tenant Peptastic data. Attacker content and raw transcripts must never become trusted learning. Never hack back, put credentials in chat or GitHub, or enable silent paid-cloud fallback.
 
 ## Handoff verification checklist
 
@@ -493,7 +499,8 @@ A new session has successfully resumed only after it can state:
 - Hermes doctor result;
 - R13.3 accepted checksum;
 - difference between Electron monorepo and R13.3/Hermes runtime;
-- immediate Stage 1A explicit-save persistence milestone and the `8250198` backend boundary;
+- completed Stage 1A approval-free implementation, its evidence head, and its remaining physical and
+  owner-acceptance gates;
 - AEGIS and external-action limitation;
 - Defensive Prime Swarm, poisoned-learning, no-hack-back, and clone-resistance boundaries;
 - the job-mastery sequence;

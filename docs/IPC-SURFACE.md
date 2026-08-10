@@ -1,11 +1,10 @@
 # The IPC Surface
 
 Date: 2026-08-08
-Status: **THREE channels.** `app:get-info` is IMPLEMENTED AND VERIFIED (observed live on
-Windows development runtime, 2026-07-16). `jarvis:chat` and `jarvis:amplify` are
-IMPLEMENTED AND VERIFIED on the Linux runtime probe (prod + dev, real Electron, a mock
-round-trip driven end to end, 2026-07-30) — the Windows packaged-installer gate is still
-open (ADR 0004), and neither is _accepted_ (ADR 0006) until William uses it for a real task.
+Status: **SEVEN channels.** `app:get-info`, `jarvis:chat`, and `jarvis:amplify` are
+runtime-probed. Stage 1A adds four bounded explicit-save operations: `history:save`,
+`history:list`, `history:get`, and `history:delete`. Their automated and target-platform
+acceptance status is recorded separately; the Windows and William real-task gates remain open.
 
 `CLAUDE.md` §9 requires every API to be documented, "including the internal typed IPC
 surface, which is the highest-risk boundary in the Electron shell." This file is that
@@ -133,6 +132,26 @@ category in main (`toSafeModelError`) before any logging, and collapse to
 The response schema is `.strict()` and re-validated in main, so a provider that returns a
 malformed card fails at the boundary rather than reaching the amplifier UI.
 
+### `history:save`, `history:list`, `history:get`, `history:delete`
+
+| Channel          | Renderer call          | Request                    | Response                | Side effect                           |
+| ---------------- | ---------------------- | -------------------------- | ----------------------- | ------------------------------------- |
+| `history:save`   | `saveSession(request)` | `SaveSessionRequestSchema` | `SavedSessionSchema`    | Inserts one explicit named snapshot   |
+| `history:list`   | `listSessions()`       | `z.undefined()`            | bounded summary array   | None                                  |
+| `history:get`    | `getSession(id)`       | strict `{ id }`            | saved session or `null` | None                                  |
+| `history:delete` | `deleteSession(id)`    | strict `{ id }`            | strict `{ deleted }`    | Deletes one snapshot after UI confirm |
+
+All four handlers are registered by `registerHistoryHandlers` and receive an injected
+repository. Electron main creates one `SqliteSessionHistoryStore`, owns the only SQLite
+connection, applies forward-only migrations, and closes it on quit. The renderer never
+receives a database path, handle, SQL string, or generic operation.
+
+Saving is never automatic. Chat and Amplifier calls do not write history. Opening a saved
+session is read-only; continuing requires a new in-memory session. History v1 stores chat
+messages only. Amplifier and error cards are visibly labeled transient rather than silently
+dropped. Deletion is exposed as a narrow operation, but the renderer must obtain confirmation
+before invoking it.
+
 ---
 
 ## Adding a channel
@@ -221,8 +240,8 @@ and `better-sqlite3` is a native module that must not be bundled.
   (`packages/contracts/src/ipc/contracts.test.ts`).
 - The `AppInfo` schema rejects unknown platforms, missing fields, empty strings, and
   extra keys; the request schema rejects any payload.
-- The bridge exposes exactly one namespace (`jarvis`) and exactly one function
-  (`getAppInfo`), all values are functions, and no generic passthrough exists
+- The bridge exposes exactly one namespace (`jarvis`) and exactly seven purpose-named
+  functions, all values are functions, and no generic passthrough exists
   (`apps/desktop/src/preload/index.test.ts`). This test was verified red-green: it fails
   when a generic `invoke` is added to the bridge.
 
