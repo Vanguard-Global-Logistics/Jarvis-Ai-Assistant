@@ -19,7 +19,7 @@ const SAVED_META = {
   id: 'f4b1c1d2-3a4b-4c5d-8e6f-7a8b9c0d1e2f',
   title: 'What is the status?',
   savedAt: '2026-08-10T12:00:00.000Z',
-  messageCount: 2,
+  entryCount: 2,
 };
 
 function fakeBridge(overrides: Partial<ConversationBridge> = {}): ConversationBridge {
@@ -140,7 +140,7 @@ describe('Conversation', () => {
     expect(bridge.sendChat).toHaveBeenCalledTimes(1);
   });
 
-  it('disables Save Session until there is something to save, then saves exactly the transcript', async () => {
+  it('disables Save until there is something to save, then saves the transcript as entries', async () => {
     const bridge = fakeBridge();
     render(<Conversation bridge={bridge} />);
 
@@ -148,6 +148,8 @@ describe('Conversation', () => {
     expect(save).toHaveProperty('disabled', true);
     fireEvent.click(save);
     expect(bridge.saveConversation).not.toHaveBeenCalled();
+    // The disabled state explains itself instead of sitting there dead.
+    expect(screen.getByText(/Send a message or amplify an idea/i)).toBeTruthy();
 
     type('keep this one');
     fireEvent.click(screen.getByRole('button', { name: 'Send' }));
@@ -155,14 +157,30 @@ describe('Conversation', () => {
 
     expect(save).toHaveProperty('disabled', false);
     fireEvent.click(save);
-    // Exactly the visible transcript crosses the boundary — message items only.
+    // The visible transcript crosses the boundary as ordered entries.
     expect(bridge.saveConversation).toHaveBeenCalledWith({
-      messages: [
-        { role: 'user', content: 'keep this one' },
-        { role: 'assistant', content: 'Hello from the mock.' },
+      entries: [
+        { kind: 'message', role: 'user', content: 'keep this one' },
+        { kind: 'message', role: 'assistant', content: 'Hello from the mock.' },
       ],
     });
     expect(await screen.findByRole('status')).toBeTruthy();
+  });
+
+  it('saves an Amplifier-only session — the amplifier card is savable content (ADR 0009)', async () => {
+    const bridge = fakeBridge();
+    render(<Conversation bridge={bridge} />);
+
+    type('a faster permit tracker');
+    fireEvent.click(screen.getByRole('button', { name: 'Amplify' }));
+    await screen.findByText('Clarified intent');
+
+    const save = screen.getByRole('button', { name: /save session/i });
+    expect(save).toHaveProperty('disabled', false);
+    fireEvent.click(save);
+    expect(bridge.saveConversation).toHaveBeenCalledWith({
+      entries: [{ kind: 'amplification', idea: 'a faster permit tracker', result: AMP }],
+    });
   });
 
   it('lists saved sessions from the bridge when History is opened', async () => {
@@ -175,15 +193,17 @@ describe('Conversation', () => {
     const panel = await screen.findByRole('region', { name: /saved sessions/i });
     expect(bridge.listConversations).toHaveBeenCalledTimes(1);
     expect(within(panel).getByText('What is the status?')).toBeTruthy();
-    expect(within(panel).getByText(/2 messages/)).toBeTruthy();
+    expect(within(panel).getByText(/2 entries/)).toBeTruthy();
   });
 
-  it('opens a saved session read-only, with no composer, and returns to live', async () => {
+  it('opens a saved session read-only with both messages and amplifier cards, and returns to live', async () => {
     const saved = {
       ...SAVED_META,
-      messages: [
-        { role: 'user' as const, content: 'archived question' },
-        { role: 'assistant' as const, content: 'archived answer' },
+      entryCount: 3,
+      entries: [
+        { kind: 'message' as const, role: 'user' as const, content: 'archived question' },
+        { kind: 'message' as const, role: 'assistant' as const, content: 'archived answer' },
+        { kind: 'amplification' as const, idea: 'archived idea', result: AMP },
       ],
     };
     const bridge = fakeBridge({
@@ -199,6 +219,9 @@ describe('Conversation', () => {
     expect(bridge.getConversation).toHaveBeenCalledWith(SAVED_META.id);
     expect(within(view).getByText('archived question')).toBeTruthy();
     expect(within(view).getByText('archived answer')).toBeTruthy();
+    // The saved amplifier card renders in the read-only view too.
+    expect(within(view).getByText('Thought Amplifier v1')).toBeTruthy();
+    expect(within(view).getByText(AMP.clarifiedIntent)).toBeTruthy();
     // Read-only means READ-ONLY: no composer, no way to append to a record.
     expect(screen.queryByRole('textbox', { name: /message jarvis/i })).toBeNull();
 

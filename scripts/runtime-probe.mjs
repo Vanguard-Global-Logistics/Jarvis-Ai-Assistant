@@ -481,10 +481,16 @@ async function runChecks(page, mode) {
     list0.error ? `THREW: ${String(list0.error).split('\n')[0]}` : JSON.stringify(list0.value),
   );
 
+  // Save a mixed transcript: two messages AND an amplification (ADR 0009), so
+  // the amplifier-persistence path is exercised end to end at runtime, not just
+  // in unit tests.
   const saved = await page.evaluate(
-    'window.jarvis ? await window.jarvis.saveConversation({ messages: [' +
-      '{ role: "user", content: "probe: save this session" },' +
-      '{ role: "assistant", content: "probe reply" }] }) : null',
+    'window.jarvis ? await window.jarvis.saveConversation({ entries: [' +
+      '{ kind: "message", role: "user", content: "probe: save this session" },' +
+      '{ kind: "message", role: "assistant", content: "probe reply" },' +
+      '{ kind: "amplification", idea: "probe idea", result: {' +
+      ' clarifiedIntent: "ci", missingQuestions: ["q1", "q2"], improvedConcept: "ic",' +
+      ' recommendedNextStep: "ns", buildReadyPrompt: "bp" } }] }) : null',
   );
   const sv = saved.value;
   const savedOk =
@@ -494,9 +500,9 @@ async function runChecks(page, mode) {
     /^[0-9a-f-]{36}$/.test(sv.id) &&
     sv.title === 'probe: save this session' &&
     typeof sv.savedAt === 'string' &&
-    sv.messageCount === 2;
+    sv.entryCount === 3;
   add(
-    'history:save stores and returns metadata',
+    'history:save stores a mixed transcript and returns metadata',
     savedOk,
     saved.error ? `THREW: ${String(saved.error).split('\n')[0]}` : JSON.stringify(sv),
   );
@@ -516,17 +522,28 @@ async function runChecks(page, mode) {
   );
   const gotOk =
     got.value?.conversation != null &&
-    JSON.stringify(got.value.conversation.messages) ===
+    JSON.stringify(got.value.conversation.entries) ===
       JSON.stringify([
-        { role: 'user', content: 'probe: save this session' },
-        { role: 'assistant', content: 'probe reply' },
+        { kind: 'message', role: 'user', content: 'probe: save this session' },
+        { kind: 'message', role: 'assistant', content: 'probe reply' },
+        {
+          kind: 'amplification',
+          idea: 'probe idea',
+          result: {
+            clarifiedIntent: 'ci',
+            missingQuestions: ['q1', 'q2'],
+            improvedConcept: 'ic',
+            recommendedNextStep: 'ns',
+            buildReadyPrompt: 'bp',
+          },
+        },
       ]);
   add(
-    'history:get returns the exact saved transcript',
+    'history:get returns the exact saved transcript, amplification included',
     gotOk,
     got.error
       ? `THREW: ${String(got.error).split('\n')[0]}`
-      : JSON.stringify(got.value).slice(0, 160),
+      : JSON.stringify(got.value).slice(0, 200),
   );
 
   const del = await page.evaluate(

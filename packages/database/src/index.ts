@@ -4,9 +4,10 @@
  * STATUS: PARTIAL.
  *   - Connection ownership and the migration runner: IMPLEMENTED AND VERIFIED
  *     (unit tests, in-memory).
- *   - Feature schema: ONE migration — conversation history (Stage 1A
- *     persistence, ADR 0008). No memory, projects, tasks, or audit-log tables
- *     exist; those are feature design work that is not approved.
+ *   - Feature schema: two migrations — conversation history (Stage 1A
+ *     persistence, ADR 0008) and amplification entries (ADR 0009). No memory,
+ *     projects, tasks, or audit-log tables exist; those are feature design work
+ *     that is not approved.
  *
  * Wired to Electron by ADR 0008: the main process — and only the main process —
  * opens the database and applies `migrations` at startup. The driver is Node's
@@ -17,6 +18,7 @@
 
 import type { Migration } from './migrator.js';
 import { conversationHistoryMigration } from './migrations/0001-conversation-history.js';
+import { conversationAmplificationsMigration } from './migrations/0002-conversation-amplifications.js';
 
 export { openDatabase, withTransaction } from './connection.js';
 export type { OpenDatabaseOptions, SqliteDatabase } from './connection.js';
@@ -30,4 +32,7 @@ export type { AppliedMigration, Migration } from './migrator.js';
  * Each feature appends exactly one migration here and never edits an applied
  * one. Recovery is forward-only (see migrator.ts) — write a new migration.
  */
-export const migrations: readonly Migration[] = [conversationHistoryMigration];
+export const migrations: readonly Migration[] = [
+  conversationHistoryMigration,
+  conversationAmplificationsMigration,
+];

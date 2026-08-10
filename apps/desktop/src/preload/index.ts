@@ -7,6 +7,7 @@ import type {
   ChatReply,
   ChatRequest,
   HistoryIdRequest,
+  SaveConversationRequest,
   SavedConversation,
   SavedConversationMeta,
 } from '@jarvis/contracts';
@@ -72,7 +73,7 @@ const api = {
    * opaque id; it never names a path, a table, or a query. Saving is EXPLICIT:
    * this is the only function that writes, and it runs only when called.
    */
-  saveConversation: (request: ChatRequest): Promise<SavedConversationMeta> =>
+  saveConversation: (request: SaveConversationRequest): Promise<SavedConversationMeta> =>
     ipcRenderer.invoke(CHANNELS.historySave, request) as Promise<SavedConversationMeta>,
 
   /** Saved-conversation metadata, newest first. Never full transcripts. */

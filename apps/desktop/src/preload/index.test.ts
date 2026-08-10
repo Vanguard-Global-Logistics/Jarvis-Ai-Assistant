@@ -162,13 +162,13 @@ describe('jarvis.sendChat', () => {
 describe('history bridge functions (ADR 0008)', () => {
   const ID = 'f4b1c1d2-3a4b-4c5d-8e6f-7a8b9c0d1e2f';
 
-  it('saveConversation invokes history:save with the transcript unchanged', async () => {
+  it('saveConversation invokes history:save with the entries unchanged', async () => {
     const { api } = await loadBridge();
     const saveConversation = api.saveConversation;
     if (typeof saveConversation !== 'function') throw new Error('saveConversation is missing');
 
-    mocks.invoke.mockResolvedValue({ id: ID, title: 't', savedAt: 'x', messageCount: 1 });
-    const request = { messages: [{ role: 'user', content: 'keep this' }] };
+    mocks.invoke.mockResolvedValue({ id: ID, title: 't', savedAt: 'x', entryCount: 1 });
+    const request = { entries: [{ kind: 'message', role: 'user', content: 'keep this' }] };
     await (saveConversation as (r: unknown) => Promise<unknown>)(request);
 
     expect(mocks.invoke).toHaveBeenCalledWith(CHANNELS.historySave, request);

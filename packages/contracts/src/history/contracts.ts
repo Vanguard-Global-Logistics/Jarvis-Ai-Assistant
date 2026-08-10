@@ -1,11 +1,11 @@
 import { z } from 'zod';
-import { ChatMessageSchema } from '../model/contracts.js';
+import { AmplifierResultSchema } from '../model/contracts.js';
 
 /**
  * Conversation-history schemas — the shapes stored and served by the Stage 1A
- * persistence slice (ADR 0006, ADR 0008). The IPC contracts that carry them
- * across the boundary live with every other contract in `../ipc/contracts.ts`,
- * keyed by the channel allowlist.
+ * persistence slice (ADR 0006, ADR 0008; broadened to amplifications in
+ * ADR 0009). The IPC contracts that carry them across the boundary live with
+ * every other contract in `../ipc/contracts.ts`, keyed by the channel allowlist.
  *
  * The renderer never sees a filesystem path, a table name, or a row id it did
  * not receive from main. Identity is an opaque UUID minted in the main process;
@@ -15,27 +15,77 @@ import { ChatMessageSchema } from '../model/contracts.js';
  * client persists through these same schemas.
  */
 
+/**
+ * A saved transcript is an ordered list of ENTRIES, not just chat messages.
+ * Each entry is one of two kinds, discriminated on `kind`:
+ *
+ *   - a conversation message (`role` + `content`), or
+ *   - a Thought Amplifier result (`idea` + the five amplifier fields).
+ *
+ * This is why an Amplifier-only session is savable (ADR 0009): the amplifier
+ * card is first-class transcript content, not a throwaway view. Errors are not
+ * a kind — a failed turn is never persisted.
+ */
+export const SavedMessageEntrySchema = z
+  .object({
+    kind: z.literal('message'),
+    role: z.enum(['user', 'assistant']),
+    content: z.string().min(1),
+  })
+  .strict();
+
+export const SavedAmplificationEntrySchema = z
+  .object({
+    kind: z.literal('amplification'),
+    idea: z.string().min(1),
+    result: AmplifierResultSchema,
+  })
+  .strict();
+
+export const TranscriptEntrySchema = z.discriminatedUnion('kind', [
+  SavedMessageEntrySchema,
+  SavedAmplificationEntrySchema,
+]);
+
+export type SavedMessageEntry = z.infer<typeof SavedMessageEntrySchema>;
+export type SavedAmplificationEntry = z.infer<typeof SavedAmplificationEntrySchema>;
+export type TranscriptEntry = z.infer<typeof TranscriptEntrySchema>;
+
 /** Metadata for one saved conversation. Never contains the transcript. */
 export const SavedConversationMetaSchema = z
   .object({
     /** Minted by main (`crypto.randomUUID`). The renderer cannot choose ids. */
     id: z.uuid(),
-    /** Derived by main from the first user message — never renderer-supplied. */
+    /** Derived by main from the first message or amplified idea — never renderer-supplied. */
     title: z.string().min(1).max(120),
     /** ISO 8601, recorded by main at save time. */
     savedAt: z.iso.datetime(),
-    messageCount: z.number().int().min(1),
+    /** Total entries (messages + amplifications), always at least one. */
+    entryCount: z.number().int().min(1),
   })
   .strict();
 
 export type SavedConversationMeta = z.infer<typeof SavedConversationMetaSchema>;
 
-/** A full saved conversation: the metadata plus its transcript, in order. */
+/** A full saved conversation: the metadata plus its ordered entries. */
 export const SavedConversationSchema = SavedConversationMetaSchema.extend({
-  messages: z.array(ChatMessageSchema).min(1),
+  entries: z.array(TranscriptEntrySchema).min(1),
 }).strict();
 
 export type SavedConversation = z.infer<typeof SavedConversationSchema>;
+
+/**
+ * `history:save` request — the ordered entries in. Title, id, and timestamp are
+ * main's to assign, so the `.strict()` request has nowhere to smuggle them.
+ * At least one entry is required: an empty transcript is never savable.
+ */
+export const SaveConversationRequestSchema = z
+  .object({
+    entries: z.array(TranscriptEntrySchema).min(1),
+  })
+  .strict();
+
+export type SaveConversationRequest = z.infer<typeof SaveConversationRequestSchema>;
 
 /** The one-field id request shared by `history:get` and `history:delete`. */
 export const HistoryIdRequestSchema = z

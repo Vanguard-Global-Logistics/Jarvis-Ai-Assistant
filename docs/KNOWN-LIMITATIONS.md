@@ -16,7 +16,9 @@ does **not** do.
 gates open; not accepted until William saves and reopens a real session.**
 
 The four `history:*` channels store, list, reopen (read-only), and delete
-conversations in a main-process-owned SQLite database. What this is **not**:
+conversations in a main-process-owned SQLite database. A saved conversation is
+an ordered transcript of **entries** — chat messages and/or Thought Amplifier
+cards (ADR 0009), so an Amplifier-only session is savable. What this is **not**:
 
 - **No autosave.** Only an explicit Save Session persists anything. An unsaved
   conversation is discarded on close — the banner says so, and the runtime probe
@@ -89,9 +91,9 @@ exists as a step at all: there is no native module. The remaining honest caveats
 - `node:sqlite` is labeled **experimental on Node 22**, the runtime vitest uses. The
   app itself runs on Electron 43's embedded Node 24, where it is stable. If Node 22
   changes the API under the tests, the tests will say so loudly.
-- There is exactly **one** migration (`conversation-history`). No tables exist for
-  memory, projects, tasks, or the audit log — those are feature design work and are
-  not approved.
+- There are exactly **two** migrations (`conversation-history`,
+  `conversation-amplifications`, ADR 0009). No tables exist for memory, projects,
+  tasks, or the audit log — those are feature design work and are not approved.
 
 ## 5. (Retired) There are zero migrations
 

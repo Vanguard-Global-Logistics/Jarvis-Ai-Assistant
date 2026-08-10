@@ -8,6 +8,7 @@ import {
 } from '../model/contracts.js';
 import {
   HistoryIdRequestSchema,
+  SaveConversationRequestSchema,
   SavedConversationMetaSchema,
   SavedConversationSchema,
 } from '../history/contracts.js';
@@ -113,17 +114,16 @@ export const jarvisAmplifyContract = defineContract({
 // --- history:* (Stage 1A persistence, ADR 0008) -----------------------------
 
 /**
- * `history:save` — the transcript in, the stored metadata out.
+ * `history:save` — the ordered transcript entries in, the stored metadata out.
  *
- * The request is deliberately the SAME `ChatRequestSchema` the chat channel
- * uses (CLAUDE.md §3 — one definition, no drift): what you save is exactly the
- * shape you converse in. Title, id, and timestamp are main's to assign, so the
- * `.strict()` request has nowhere to smuggle them. Saving is the ONLY write
- * path: no other channel touches the database with a write.
+ * The request carries `entries` (messages and/or amplifications, ADR 0009), so
+ * an Amplifier-only session is savable. Title, id, and timestamp are main's to
+ * assign, so the `.strict()` request has nowhere to smuggle them. Saving is the
+ * ONLY write path: no other channel touches the database with a write.
  */
 export const historySaveContract = defineContract({
   channel: CHANNELS.historySave,
-  request: ChatRequestSchema,
+  request: SaveConversationRequestSchema,
   response: SavedConversationMetaSchema,
 });
 

@@ -6,9 +6,9 @@ Windows development runtime, 2026-07-16). `jarvis:chat` and `jarvis:amplify` are
 IMPLEMENTED AND VERIFIED on the Linux runtime probe (prod + dev, real Electron, a mock
 round-trip driven end to end, 2026-07-30). The four `history:*` channels (ADR 0008) are
 IMPLEMENTED AND VERIFIED on the Linux runtime probe (prod + dev, real Electron, a real
-SQLite save/list/get/delete round-trip driven end to end, 2026-08-10) — the Windows gates
-are still open (ADR 0004), and none is _accepted_ (ADR 0006) until William uses it for a
-real task.
+SQLite save/list/get/delete round-trip driven end to end, including a mixed transcript
+with an amplification per ADR 0009, 2026-08-10) — the Windows/macOS gates are still open
+(ADR 0004), and none is _accepted_ (ADR 0006) until it is used for a real task.
 
 `CLAUDE.md` §9 requires every API to be documented, "including the internal typed IPC
 surface, which is the highest-risk boundary in the Electron shell." This file is that
@@ -132,16 +132,16 @@ malformed card fails at the boundary rather than reaching the amplifier UI.
 
 ### `history:save`
 
-|                       |                                                                                                                                                       |
-| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Status**            | IMPLEMENTED AND VERIFIED on the Linux runtime probe (prod + dev, real SQLite round-trip, 2026-08-10). Windows gates open; not yet _accepted_.         |
-| **Renderer call**     | `window.jarvis.saveConversation(request: ChatRequest): Promise<SavedConversationMeta>`                                                                |
-| **Request**           | `ChatRequestSchema` — the SAME schema `jarvis:chat` uses (one definition, no drift), `.strict()`                                                      |
-| **Response**          | `SavedConversationMetaSchema` — `{ id (uuid), title, savedAt (ISO), messageCount }`, `.strict()`. Metadata only, never the transcript back.           |
-| **Handler**           | `registerHistoryHandlers(db)` in `apps/desktop/src/main/handlers/history.ts`                                                                          |
-| **Contract**          | `historySaveContract` in `packages/contracts/src/ipc/contracts.ts`                                                                                    |
-| **Side effects**      | One transactional insert into the main-owned SQLite database. **The ONLY write path for conversations in the application.**                           |
-| **Authority granted** | Persist the submitted transcript, nothing else. Id and title are minted in main — the `.strict()` request has no field to smuggle them. No SQL/paths. |
+|                       |                                                                                                                                                    |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Status**            | IMPLEMENTED AND VERIFIED on the Linux runtime probe (prod + dev, real SQLite round-trip, 2026-08-10). Windows gates open; not yet _accepted_.      |
+| **Renderer call**     | `window.jarvis.saveConversation(request: SaveConversationRequest): Promise<SavedConversationMeta>`                                                 |
+| **Request**           | `SaveConversationRequestSchema` — `{ entries }`, ordered transcript entries (messages and/or amplifications, ADR 0009), min 1, `.strict()`         |
+| **Response**          | `SavedConversationMetaSchema` — `{ id (uuid), title, savedAt (ISO), entryCount }`, `.strict()`. Metadata only, never the transcript back.          |
+| **Handler**           | `registerHistoryHandlers(db)` in `apps/desktop/src/main/handlers/history.ts`                                                                       |
+| **Contract**          | `historySaveContract` in `packages/contracts/src/ipc/contracts.ts`                                                                                 |
+| **Side effects**      | One transactional insert into the main-owned SQLite database. **The ONLY write path for conversations in the application.**                        |
+| **Authority granted** | Persist the submitted entries, nothing else. Id and title are minted in main — the `.strict()` request has no field to smuggle them. No SQL/paths. |
 
 Saving is explicit. A chat turn never writes; the runtime probe converses first and then
 asserts the history list is still empty, which is the runtime proof behind the UI's
@@ -161,15 +161,15 @@ asserts the history list is still empty, which is the runtime proof behind the U
 
 ### `history:get`
 
-|                       |                                                                                                                                             |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Status**            | IMPLEMENTED AND VERIFIED on the Linux runtime probe (2026-08-10). Windows gates open; not yet _accepted_.                                   |
-| **Renderer call**     | `window.jarvis.getConversation(id: string): Promise<{ conversation: SavedConversation \| null }>`                                           |
-| **Request**           | `HistoryIdRequestSchema` — `{ id }`, UUID only, `.strict()`. A path- or SQL-shaped string fails validation.                                 |
-| **Response**          | `{ conversation: SavedConversationSchema \| null }`, `.strict()`. `null` for a stale id — a normal outcome stated as a value, not an error. |
-| **Contract**          | `historyGetContract`                                                                                                                        |
-| **Side effects**      | Read-only query.                                                                                                                            |
-| **Authority granted** | Read one saved conversation by an id main previously issued. The UI renders it read-only.                                                   |
+|                       |                                                                                                                                                                          |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Status**            | IMPLEMENTED AND VERIFIED on the Linux runtime probe (2026-08-10). Windows gates open; not yet _accepted_.                                                                |
+| **Renderer call**     | `window.jarvis.getConversation(id: string): Promise<{ conversation: SavedConversation \| null }>`                                                                        |
+| **Request**           | `HistoryIdRequestSchema` — `{ id }`, UUID only, `.strict()`. A path- or SQL-shaped string fails validation.                                                              |
+| **Response**          | `{ conversation: SavedConversationSchema \| null }`, `.strict()` — the full ordered `entries`. `null` for a stale id — a normal outcome stated as a value, not an error. |
+| **Contract**          | `historyGetContract`                                                                                                                                                     |
+| **Side effects**      | Read-only query.                                                                                                                                                         |
+| **Authority granted** | Read one saved conversation by an id main previously issued. The UI renders it read-only.                                                                                |
 
 ### `history:delete`
 

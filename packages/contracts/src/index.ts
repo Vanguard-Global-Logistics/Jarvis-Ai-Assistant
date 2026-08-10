@@ -33,13 +33,21 @@ export type { AppInfo, IpcContract } from './ipc/contracts.js';
 
 export {
   HistoryIdRequestSchema,
+  SaveConversationRequestSchema,
+  SavedAmplificationEntrySchema,
   SavedConversationMetaSchema,
   SavedConversationSchema,
+  SavedMessageEntrySchema,
+  TranscriptEntrySchema,
 } from './history/contracts.js';
 export type {
   HistoryIdRequest,
+  SaveConversationRequest,
+  SavedAmplificationEntry,
   SavedConversation,
   SavedConversationMeta,
+  SavedMessageEntry,
+  TranscriptEntry,
 } from './history/contracts.js';
 
 export {

@@ -7,6 +7,7 @@ import type {
   ProviderId,
   SavedConversation,
   SavedConversationMeta,
+  TranscriptEntry,
 } from '@jarvis/contracts';
 import { GlassPanel, accent, fontFamily, letterSpacing, surface, text } from '@jarvis/ui';
 
@@ -54,7 +55,7 @@ export interface ConversationBridge {
     provider: ProviderId;
   }>;
   amplify: (idea: string) => Promise<AmplifierResult>;
-  saveConversation: (request: { messages: ChatMessage[] }) => Promise<SavedConversationMeta>;
+  saveConversation: (request: { entries: TranscriptEntry[] }) => Promise<SavedConversationMeta>;
   listConversations: () => Promise<{ conversations: SavedConversationMeta[] }>;
   getConversation: (id: string) => Promise<{ conversation: SavedConversation | null }>;
   deleteConversation: (id: string) => Promise<{ deleted: boolean }>;
@@ -225,12 +226,24 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
     if (opening) await refreshHistory();
   }, [historyOpen, refreshHistory]);
 
-  const messageCount = items.filter((it) => it.kind === 'message').length;
+  // Everything savable, in transcript order: messages AND amplifier cards
+  // (ADR 0009). Errors are never persisted. This is what makes an
+  // Amplifier-only session savable — the amplifier card is real content, not a
+  // throwaway view.
+  const toEntries = (list: TranscriptItem[]): TranscriptEntry[] =>
+    list.flatMap((it): TranscriptEntry[] => {
+      if (it.kind === 'message') return [{ kind: 'message', role: it.role, content: it.content }];
+      if (it.kind === 'amplify')
+        return [{ kind: 'amplification', idea: it.idea, result: it.result }];
+      return [];
+    });
+
+  const savableCount = items.filter((it) => it.kind === 'message' || it.kind === 'amplify').length;
 
   const saveSession = useCallback(async (): Promise<void> => {
-    if (bridge === null || busy || messageCount === 0) return;
+    if (bridge === null || busy || savableCount === 0) return;
     try {
-      const meta = await bridge.saveConversation({ messages: chatHistory(items) });
+      const meta = await bridge.saveConversation({ entries: toEntries(items) });
       setSaveNotice(`Saved “${meta.title}”`);
       window.setTimeout(() => {
         setSaveNotice(null);
@@ -248,7 +261,7 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
         },
       ]);
     }
-  }, [bridge, busy, messageCount, items, historyOpen, refreshHistory]);
+  }, [bridge, busy, savableCount, items, historyOpen, refreshHistory]);
 
   const openSaved = useCallback(
     async (id: string): Promise<void> => {
@@ -352,8 +365,16 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
         <ToolbarButton
           label="Save session"
           onClick={() => void saveSession()}
-          enabled={!disabled && !busy && messageCount > 0 && viewing === null}
-          title="Store this conversation on this PC (history:save)"
+          enabled={!disabled && !busy && savableCount > 0 && viewing === null}
+          // Explain the disabled state instead of sitting there dead: a button
+          // that refuses silently reads as broken (CLAUDE.md §8 — honest state).
+          title={
+            viewing !== null
+              ? 'Return to the live session to save'
+              : savableCount === 0
+                ? 'Send a message or amplify an idea first, then Save'
+                : 'Store this conversation on this PC (history:save)'
+          }
         />
         <ToolbarButton
           label={historyOpen ? 'History ▾' : 'History ▸'}
@@ -367,6 +388,22 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
           </span>
         )}
       </div>
+
+      {/* An always-visible one-liner when there is nothing to save yet, so the
+          greyed button is never a mystery. */}
+      {!disabled && viewing === null && savableCount === 0 && saveNotice === null && (
+        <p
+          style={{
+            margin: 0,
+            textAlign: 'center',
+            ...MONO_LABEL,
+            fontSize: 9,
+            color: text.faint,
+          }}
+        >
+          Send a message or amplify an idea, then Save Session stores it on this PC
+        </p>
+      )}
 
       {historyOpen && (
         <HistoryPanel
@@ -572,7 +609,8 @@ function HistoryPanel({
                 {meta.title}
               </span>
               <span style={{ ...MONO_LABEL, color: text.faint }}>
-                {formatSavedAt(meta.savedAt)} · {meta.messageCount} messages
+                {formatSavedAt(meta.savedAt)} · {meta.entryCount}{' '}
+                {meta.entryCount === 1 ? 'entry' : 'entries'}
               </span>
             </div>
             <button
@@ -668,9 +706,13 @@ function SavedConversationView({
           padding: '4px 2px',
         }}
       >
-        {conversation.messages.map((message, index) => (
-          <MessageBubble key={index} role={message.role} content={message.content} />
-        ))}
+        {conversation.entries.map((entry, index) =>
+          entry.kind === 'message' ? (
+            <MessageBubble key={index} role={entry.role} content={entry.content} />
+          ) : (
+            <AmplifierCard key={index} idea={entry.idea} result={entry.result} />
+          ),
+        )}
       </div>
     </div>
   );

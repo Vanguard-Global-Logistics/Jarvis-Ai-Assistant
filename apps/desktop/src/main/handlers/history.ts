@@ -28,7 +28,7 @@ import {
  * closing evidence — the probe chats first, then asserts the list is empty).
  */
 export function registerHistoryHandlers(db: SqliteDatabase): void {
-  handleContract(historySaveContract, (request) => saveConversation(db, request.messages));
+  handleContract(historySaveContract, (request) => saveConversation(db, request.entries));
 
   handleContract(historyListContract, () => ({ conversations: listConversations(db) }));
 

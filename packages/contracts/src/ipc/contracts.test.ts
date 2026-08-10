@@ -128,18 +128,36 @@ describe('jarvisChatContract', () => {
   });
 });
 
-describe('history contracts (Stage 1A persistence, ADR 0008)', () => {
+describe('history contracts (Stage 1A persistence, ADR 0008; amplifications ADR 0009)', () => {
   const id = 'f4b1c1d2-3a4b-4c5d-8e6f-7a8b9c0d1e2f';
   const meta = {
     id,
     title: 'What is the status?',
     savedAt: '2026-08-10T12:00:00.000Z',
-    messageCount: 2,
+    entryCount: 3,
   };
-  const messages = [
-    { role: 'user' as const, content: 'What is the status?' },
-    { role: 'assistant' as const, content: 'All green.' },
-  ];
+  const messageEntry = {
+    kind: 'message' as const,
+    role: 'user' as const,
+    content: 'What is the status?',
+  };
+  const assistantEntry = {
+    kind: 'message' as const,
+    role: 'assistant' as const,
+    content: 'All green.',
+  };
+  const amplificationEntry = {
+    kind: 'amplification' as const,
+    idea: 'a faster permit tracker',
+    result: {
+      clarifiedIntent: 'Build X to achieve Y.',
+      missingQuestions: ['What is the budget?'],
+      improvedConcept: 'A stronger X.',
+      recommendedNextStep: 'Draft the one-page spec.',
+      buildReadyPrompt: 'You are building X...',
+    },
+  };
+  const entries = [messageEntry, assistantEntry, amplificationEntry];
 
   it('registers all four channels under their history:* names', () => {
     expect(historySaveContract.channel).toBe(CHANNELS.historySave);
@@ -152,20 +170,30 @@ describe('history contracts (Stage 1A persistence, ADR 0008)', () => {
     expect(CHANNELS.historyDelete).toBe('history:delete');
   });
 
-  it('save takes exactly the chat transcript shape and nothing more', () => {
-    expect(historySaveContract.request.safeParse({ messages }).success).toBe(true);
-    expect(historySaveContract.request.safeParse({ messages: [] }).success).toBe(false);
+  it('save takes ordered entries — messages and amplifications — and nothing more', () => {
+    expect(historySaveContract.request.safeParse({ entries }).success).toBe(true);
+    // An Amplifier-only session is savable (ADR 0009).
+    expect(historySaveContract.request.safeParse({ entries: [amplificationEntry] }).success).toBe(
+      true,
+    );
+    expect(historySaveContract.request.safeParse({ entries: [] }).success).toBe(false);
     // Title and id are main's to assign — a renderer that tries to choose them
     // is rejected at the boundary, not silently ignored.
-    expect(historySaveContract.request.safeParse({ messages, title: 'chosen' }).success).toBe(
-      false,
-    );
-    expect(historySaveContract.request.safeParse({ messages, id }).success).toBe(false);
+    expect(historySaveContract.request.safeParse({ entries, title: 'chosen' }).success).toBe(false);
+    expect(historySaveContract.request.safeParse({ entries, id }).success).toBe(false);
+    // An entry with no discriminant, or an unknown kind, is rejected.
+    expect(
+      historySaveContract.request.safeParse({ entries: [{ role: 'user', content: 'hi' }] }).success,
+    ).toBe(false);
+    expect(
+      historySaveContract.request.safeParse({ entries: [{ kind: 'system', content: 'x' }] })
+        .success,
+    ).toBe(false);
   });
 
   it('save responds with metadata only — never the transcript back', () => {
     expect(historySaveContract.response.safeParse(meta).success).toBe(true);
-    expect(historySaveContract.response.safeParse({ ...meta, messages }).success).toBe(false);
+    expect(historySaveContract.response.safeParse({ ...meta, entries }).success).toBe(false);
   });
 
   it('list takes no payload and returns metadata only', () => {
@@ -174,7 +202,7 @@ describe('history contracts (Stage 1A persistence, ADR 0008)', () => {
     expect(historyListContract.response.safeParse({ conversations: [meta] }).success).toBe(true);
     expect(historyListContract.response.safeParse({ conversations: [] }).success).toBe(true);
     expect(
-      historyListContract.response.safeParse({ conversations: [{ ...meta, messages }] }).success,
+      historyListContract.response.safeParse({ conversations: [{ ...meta, entries }] }).success,
     ).toBe(false);
   });
 
@@ -188,14 +216,24 @@ describe('history contracts (Stage 1A persistence, ADR 0008)', () => {
     }
   });
 
-  it('get returns the full conversation, or null for a stale id', () => {
+  it('get returns the full conversation with its entries, or null for a stale id', () => {
     expect(
-      historyGetContract.response.safeParse({ conversation: { ...meta, messages } }).success,
+      historyGetContract.response.safeParse({ conversation: { ...meta, entries } }).success,
     ).toBe(true);
     expect(historyGetContract.response.safeParse({ conversation: null }).success).toBe(true);
     // An empty transcript can never have been saved, so it can never be served.
     expect(
-      historyGetContract.response.safeParse({ conversation: { ...meta, messages: [] } }).success,
+      historyGetContract.response.safeParse({ conversation: { ...meta, entries: [] } }).success,
+    ).toBe(false);
+    // A malformed amplification entry (missing a field) fails at the boundary.
+    const brokenAmp = {
+      kind: 'amplification',
+      idea: 'x',
+      result: { clarifiedIntent: 'only one field' },
+    };
+    expect(
+      historyGetContract.response.safeParse({ conversation: { ...meta, entries: [brokenAmp] } })
+        .success,
     ).toBe(false);
   });
 
@@ -205,12 +243,12 @@ describe('history contracts (Stage 1A persistence, ADR 0008)', () => {
     expect(historyDeleteContract.response.safeParse({}).success).toBe(false);
   });
 
-  it('rejects malformed metadata: bad uuid, bad timestamp, empty title', () => {
+  it('rejects malformed metadata: bad uuid, bad timestamp, empty title, zero entries', () => {
     const { response } = historySaveContract;
     expect(response.safeParse({ ...meta, id: 'not-a-uuid' }).success).toBe(false);
     expect(response.safeParse({ ...meta, savedAt: 'yesterday' }).success).toBe(false);
     expect(response.safeParse({ ...meta, title: '' }).success).toBe(false);
-    expect(response.safeParse({ ...meta, messageCount: 0 }).success).toBe(false);
+    expect(response.safeParse({ ...meta, entryCount: 0 }).success).toBe(false);
   });
 });
 
