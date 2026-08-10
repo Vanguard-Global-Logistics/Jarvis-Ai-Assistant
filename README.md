@@ -16,16 +16,17 @@ Personal AI assistant and orchestrator for William Lavold. Private, single-user.
 
 ## Start here
 
-| Document                          | What it is                                                                       |
-| --------------------------------- | -------------------------------------------------------------------------------- |
-| `CLAUDE.md`                       | The operating manual. Read before planning or writing anything.                  |
-| `docs/CURRENT-STATE-AUDIT.md`     | 20-section audit of what exists and what does not.                               |
-| `docs/VISUAL-DESIGN-TARGET.md`    | The approved visual north star. Visual work is deferred.                         |
-| `docs/KNOWN-LIMITATIONS.md`       | The honest gap list.                                                             |
-| `docs/IPC-SURFACE.md`             | Every channel crossing the renderer/main trust boundary.                         |
-| `docs/WINDOWS-ACCEPTANCE-TEST.md` | The manual runtime gate. **Passed on Windows development runtime (2026-07-16).** |
-| `docs/DECISIONS/`                 | ADRs.                                                                            |
-| `reference/design-handoff/`       | The behavioral contract. **Archived and immutable.**                             |
+| Document                                 | What it is                                                                       |
+| ---------------------------------------- | -------------------------------------------------------------------------------- |
+| `CLAUDE.md`                              | The operating manual. Read before planning or writing anything.                  |
+| `docs/CURRENT-STATE-AUDIT.md`            | 20-section audit of what exists and what does not.                               |
+| `docs/VISUAL-DESIGN-TARGET.md`           | The approved visual north star. Visual work is deferred.                         |
+| `docs/KNOWN-LIMITATIONS.md`              | The honest gap list.                                                             |
+| `docs/IPC-SURFACE.md`                    | Every channel crossing the renderer/main trust boundary.                         |
+| `docs/WINDOWS-ACCEPTANCE-TEST.md`        | The manual runtime gate. **Passed on Windows development runtime (2026-07-16).** |
+| `docs/MAC-DESKTOP-STAGE1A-ACCEPTANCE.md` | Safe Mac installer, doctor, and open physical checks.                            |
+| `docs/DECISIONS/`                        | ADRs.                                                                            |
+| `reference/design-handoff/`              | The behavioral contract. **Archived and immutable.**                             |
 
 ## Quick start
 
@@ -38,6 +39,13 @@ npm run verify       # format + lint + typecheck + test
 npm run build        # build every workspace, and assert the Electron artifacts
 npm run dev:desktop  # launch the Electron shell
 npm run probe:runtime  # launch the app for real and assert what it does
+```
+
+On William's Mac, the dedicated entry point installs, proves, and starts this Electron desktop
+without touching the separate R13.3 voice runtime:
+
+```bash
+bash runtime/macos/desktop-stage1a/INSTALL-AND-START-STAGE1A.command
 ```
 
 `npm run verify` cannot see whether the app runs — twice it was green on a build that

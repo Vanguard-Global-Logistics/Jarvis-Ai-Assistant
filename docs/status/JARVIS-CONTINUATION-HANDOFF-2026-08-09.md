@@ -66,6 +66,19 @@ bash runtime/macos/voice-r13.3/INSTALL-AND-START-R13-3.command
 
 Do not re-enroll or replace William's locked voice profile without explicit approval.
 
+Install, prove, and start the separate Stage 1A Electron desktop:
+
+```bash
+cd /Users/amylavold/Jarvis-Ai-Assistant
+bash runtime/macos/desktop-stage1a/INSTALL-AND-START-STAGE1A.command
+```
+
+Its read-only doctor is
+`runtime/macos/desktop-stage1a/desktop-stage1a-doctor.sh`. These entry points deliberately do not
+read, change, enroll, copy, or start R13.3 or the locked voice profile. Their automated tests pass;
+the physical Mac Stage 1A acceptance remains open until William runs the checklist in
+`docs/MAC-DESKTOP-STAGE1A-ACCEPTANCE.md`.
+
 ## Verified Mac evidence
 
 ### Hermes
