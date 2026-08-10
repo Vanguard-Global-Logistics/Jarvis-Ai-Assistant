@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Jarvis orchestration runtime, isolated from the renderer. Not implemented.",
+  "description": "Jarvis orchestration runtime with provider-neutral cloud and Hive local model adapters.",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
@@ -15,7 +15,8 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.112.1",
     "@jarvis/config": "*",
-    "@jarvis/contracts": "*"
+    "@jarvis/contracts": "*",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "typescript": "^5.9.3"

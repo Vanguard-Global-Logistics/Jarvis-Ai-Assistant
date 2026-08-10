@@ -17,15 +17,24 @@ const APP_INFO: AppInfo = {
   isPackaged: false,
 };
 
+function historyBridgeStubs(): object {
+  return {
+    saveSession: vi.fn(),
+    listSessions: vi.fn().mockResolvedValue([]),
+    getSession: vi.fn().mockResolvedValue(null),
+    deleteSession: vi.fn().mockResolvedValue({ deleted: false }),
+  };
+}
+
 function stubBridge(): void {
-  // The full bridge: host facts plus the two Stage 1A model calls. The
-  // conversation surface reads sendChat/amplify from here; these Shell tests do
-  // not invoke them (Conversation.test.tsx covers that), but the bridge should
-  // be shaped realistically.
+  // The exact bridge shape. Conversation and history behavior have focused
+  // tests; these Shell tests still provide every preload method so mounting the
+  // composed application exercises a realistic trust boundary.
   vi.stubGlobal('jarvis', {
     getAppInfo: vi.fn().mockResolvedValue(APP_INFO),
     sendChat: vi.fn().mockResolvedValue({ text: 'hi', provider: 'mock' }),
     amplify: vi.fn(),
+    ...historyBridgeStubs(),
   });
 }
 
@@ -100,6 +109,9 @@ describe('Shell', () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     vi.stubGlobal('jarvis', {
       getAppInfo: vi.fn().mockRejectedValue(new Error('ipc validation failed')),
+      sendChat: vi.fn(),
+      amplify: vi.fn(),
+      ...historyBridgeStubs(),
     });
     render(<Shell devStateSwitcher={false} />);
     expect(await screen.findByRole('alert')).toBeTruthy();

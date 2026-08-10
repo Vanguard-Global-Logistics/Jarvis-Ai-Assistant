@@ -1,0 +1,41 @@
+schemaVersion: 1
+companyId: replace-with-company-id
+tenantId: replace-with-tenant-id
+status: proposed
+business:
+  legalName: null
+  displayName: null
+  businessType: null
+  owner: null
+  seoApprover: null
+  regulatedClaimsApprover: null
+domains: []
+locations: []
+serviceAreas: []
+targetMarkets:
+  cities: []
+  state: null
+  customers: []
+authoritativeFacts:
+  servicesSource: null
+  hoursSource: null
+  contactSource: null
+connections:
+  searchConsole: not-enrolled
+  businessProfile: not-enrolled
+  analytics: not-enrolled
+  crmOrBooking: not-enrolled
+permissions:
+  publicReadAudit: false
+  privateMetricsRead: false
+  draftChanges: false
+  publishChanges: false
+  businessProfileWrite: false
+  reviewReply: false
+  paidSpend: false
+metrics:
+  primaryOutcome: null
+  baselineDate: null
+  baselineEvidence: null
+prohibitedClaims: []
+notes: null

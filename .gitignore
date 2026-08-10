@@ -38,6 +38,16 @@ pnpm-debug.log*
 *.sqlite3
 *.db
 
+# --- Private biometric / voice enrollment material ---
+.jarvis-owner-voice/
+owner-profile.npz
+owner-profile.json
+*owner-bootstrap*.wav
+*owner-enroll*.wav
+
+# --- Generated deterministic runtime reconstructions ---
+runtime/macos/voice-r13.3/live_voice_loop_r13_3.py
+
 # --- OS files ---
 .DS_Store
 Thumbs.db

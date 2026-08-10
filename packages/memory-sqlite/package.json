@@ -1,0 +1,22 @@
+{
+  "name": "@jarvis/memory-sqlite",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Outer-ring adapter connecting governed Memory v1 ports to local SQLite persistence.",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@jarvis/database": "*",
+    "@jarvis/jarvis-core": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

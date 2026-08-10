@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "enabled": true,
+  "ownerProfileId": "william",
+  "monitorIntervalSeconds": 3600,
+  "reviewHour": 4,
+  "reviewMinute": 15,
+  "lookbackDays": 7,
+  "requestTimeoutMs": 12000,
+  "maxResponseBytes": 262144,
+  "maxSources": 12,
+  "allowedHosts": ["api.github.com"],
+  "sources": [
+    {
+      "id": "prime-agent-release",
+      "companyId": "vanguard-global-logistics",
+      "topic": "ai-agent-runtime",
+      "kind": "github-release",
+      "authority": "primary",
+      "enabled": true,
+      "url": "https://api.github.com/repos/PrimeIntellect-ai/prime-agent/releases/latest"
+    },
+    {
+      "id": "hermes-agent-release",
+      "companyId": "vanguard-global-logistics",
+      "topic": "ai-agent-runtime",
+      "kind": "github-release",
+      "authority": "primary",
+      "enabled": true,
+      "url": "https://api.github.com/repos/NousResearch/hermes-agent/releases/latest"
+    },
+    {
+      "id": "openjarvis-release",
+      "companyId": "vanguard-global-logistics",
+      "topic": "local-first-ai",
+      "kind": "github-release",
+      "authority": "primary",
+      "enabled": true,
+      "url": "https://api.github.com/repos/open-jarvis/OpenJarvis/releases/latest"
+    },
+    {
+      "id": "ollama-release",
+      "companyId": "vanguard-global-logistics",
+      "topic": "local-model-runtime",
+      "kind": "github-release",
+      "authority": "primary",
+      "enabled": true,
+      "url": "https://api.github.com/repos/ollama/ollama/releases/latest"
+    }
+  ]
+}

@@ -1,31 +1,48 @@
 /**
- * @jarvis/database — SQLite foundation.
+ * @jarvis/database — SQLite foundation plus governed persistence adapters.
  *
  * STATUS: PARTIAL.
- *   - Connection ownership and the migration runner: IMPLEMENTED AND VERIFIED
- *     (unit tests, in-memory).
- *   - Feature schema: NOT IMPLEMENTED. There are zero migrations. `migrations`
- *     is deliberately an empty array — no memory, projects, tasks, or audit-log
- *     tables exist, because those are feature design work that is not approved.
+ *   - Connection ownership and forward-only migration runner: IMPLEMENTED AND VERIFIED.
+ *   - Memory v1 schema/store: IMPLEMENTED AND TESTED at the package boundary.
+ *   - Stage 1A explicit-save session history: IMPLEMENTED AND TESTED at the package boundary.
+ *   - Electron runtime wiring: NOT IMPLEMENTED. The renderer never opens SQLite.
  *
- * NOT YET WIRED TO ELECTRON. `better-sqlite3` is a native module and must be
- * rebuilt against Electron's ABI (via @electron/rebuild) before the main process
- * can open a database. That step is intentionally deferred until something
- * actually needs to persist. Recorded in docs/KNOWN-LIMITATIONS.md.
+ * `better-sqlite3` is a native module and still requires Electron ABI rebuild before
+ * the desktop main process can own the production database. Until that composition
+ * gate is implemented, persistence is proven by package/integration tests, not by
+ * the desktop or voice runtime.
  */
 
+import { memoryV1Migration } from './memory-migration.js';
+import { sessionHistoryMigration } from './session-history-migration.js';
 import type { Migration } from './migrator.js';
 
 export { openDatabase } from './connection.js';
 export type { OpenDatabaseOptions, SqliteDatabase } from './connection.js';
 
+export { memoryV1Migration } from './memory-migration.js';
+export { MemoryStoreError, MemoryStoreOwnershipError, SqliteMemoryStore } from './memory-store.js';
+export type {
+  MemoryAuditEvent,
+  MemoryTombstone,
+  ReplaceActiveResult,
+  StoredMemoryRecord,
+} from './memory-store.js';
+
+export { sessionHistoryMigration } from './session-history-migration.js';
+export { SessionHistoryStoreError, SqliteSessionHistoryStore } from './session-history-store.js';
+export type {
+  StoredSession,
+  StoredSessionMessage,
+  StoredSessionProvider,
+  StoredSessionSummary,
+} from './session-history-store.js';
+
 export { MigrationError, appliedMigrations, migrate } from './migrator.js';
 export type { AppliedMigration, Migration } from './migrator.js';
 
 /**
- * The application's migration list, applied in ascending id order.
- *
- * Empty by design. Each future feature appends exactly one migration here and
- * never edits an applied one.
+ * The application's forward-only migration list, applied in ascending id order.
+ * Applied migrations are immutable; schema changes append a new migration.
  */
-export const migrations: readonly Migration[] = [];
+export const migrations: readonly Migration[] = [memoryV1Migration, sessionHistoryMigration];

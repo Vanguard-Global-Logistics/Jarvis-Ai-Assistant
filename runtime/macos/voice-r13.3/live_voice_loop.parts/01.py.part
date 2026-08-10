@@ -1,0 +1,250 @@
+        return bool(response.get("ok") and response.get("ready"))
+    except Exception:
+        return False
+    finally:
+        try:
+            client.close()
+        except Exception:
+            pass
+
+
+def ensure_warm_kokoro_worker() -> None:
+    global OWNED_KOKORO_WORKER
+
+    if kokoro_worker_ready():
+        print("Kokoro warm worker: READY (reused)", flush=True)
+        return
+
+    if WORKER_SOCKET.exists():
+        print("Kokoro warm worker: stale socket removed", flush=True)
+        try:
+            WORKER_SOCKET.unlink()
+        except FileNotFoundError:
+            pass
+
+    if not KOKORO_PY.is_file() or not KOKORO_WORKER.is_file():
+        print(
+            "Warm Kokoro worker files unavailable; safe Kokoro fallback remains enabled.",
+            flush=True,
+        )
+        return
+
+    KOKORO_LOG.parent.mkdir(parents=True, exist_ok=True)
+    log_handle = KOKORO_LOG.open("ab")
+    try:
+        OWNED_KOKORO_WORKER = subprocess.Popen(
+            [str(KOKORO_PY), str(KOKORO_WORKER)],
+            stdout=log_handle,
+            stderr=subprocess.STDOUT,
+            env={**os.environ, "TOKENIZERS_PARALLELISM": "false"},
+            start_new_session=True,
+        )
+    finally:
+        log_handle.close()
+
+    deadline = time.monotonic() + 30.0
+    while time.monotonic() < deadline:
+        if kokoro_worker_ready(timeout=0.5):
+            print("Kokoro warm worker: READY (new)", flush=True)
+            return
+        if OWNED_KOKORO_WORKER.poll() is not None:
+            print(
+                "Warm Kokoro worker exited; safe Kokoro fallback remains enabled.",
+                flush=True,
+            )
+            return
+        time.sleep(0.1)
+    print("Warm Kokoro worker timed out; safe Kokoro fallback remains enabled.", flush=True)
+
+
+atexit.register(stop_owned_kokoro_worker)
+ensure_warm_kokoro_worker()
+
+
+raw_plane = RuntimeControlPlane(
+    HERMES_HOME / "runtime-public.json",
+    HERMES_HOME / "runtime-events.jsonl",
+)
+hud_plane = NonBlockingControlPlane(raw_plane)
+fast_backend = WorkerKokoroBackend(os.environ.get("JARVIS_VOICE", ""))
+for _phrase in ("Yes?", "Standing by.", "Jarvis is ready to help."):
+    fast_backend.precache(_phrase)
+print("George fast phrases: PRECACHED", flush=True)
+print("George active worker speed: 1.30x", flush=True)
+voice = SpeechRuntime(HERMES_HOME, control_plane=hud_plane, backend=fast_backend)
+brain = HiveLocalBrain()
+owner_voice_lock = OwnerVoiceLock()
+print(
+    "Owner Voice Lock: READY "
+    f"(owner={owner_voice_lock.meta.get('owner_name', 'owner')} "
+    f"strong={owner_voice_lock.strong_threshold:.3f} "
+    f"wake-assist={owner_voice_lock.wake_assist_threshold:.3f})",
+    flush=True,
+)
+live_speaker = None
+BARGE_QUEUE = deque(maxlen=4)
+FIELD_LOCK_UNTIL = 0.0
+OWNER_COMMAND_SLOT_UNTIL = 0.0
+
+
+def aegis_state() -> str:
+    try:
+        data = json.loads(AEGIS_PUBLIC.read_text(encoding="utf-8"))
+        state = str(data.get("state", "")).strip().lower()
+    except (OSError, ValueError, TypeError):
+        return "unavailable"
+    return state or "unavailable"
+
+
+def aegis_allows_voice() -> bool:
+    # Read-only enforcement. Jarvis never writes or lowers AEGIS.
+    return aegis_state() in {"optimal", "guarded", "restricted"}
+
+
+initial_aegis = aegis_state()
+if initial_aegis == "unavailable":
+    raise SystemExit("AEGIS public state is unavailable. Voice fails closed; AEGIS was not modified.")
+if not aegis_allows_voice():
+    raise SystemExit(f"AEGIS state {initial_aegis!r} does not permit voice. Jarvis remains silent.")
+
+print("Loading Whisper base model...")
+stt_started = time.perf_counter()
+model = WhisperModel("base", device="cpu", compute_type="int8")
+print(f"Whisper ready in {time.perf_counter() - stt_started:.2f}s.")
+
+
+def set_voice_state(state: str) -> None:
+    try:
+        hud_plane.set_voice(state)
+    except Exception:
+        pass
+
+
+def set_local_model_status() -> None:
+    try:
+        hud_plane.set_model("hive-local", HIVE_MODEL, "local_default", "personal", 0.0)
+    except Exception as exc:
+        print("HUD model status warning:", repr(exc))
+
+
+
+class ContinuousMicReader:
+    """Continuously drain shell-owned PCM so TTS can never create stale backlog."""
+
+    def __init__(self, fifo_path: Path) -> None:
+        self.fifo_path = fifo_path
+        self.frames: queue.Queue[bytes] = queue.Queue(maxsize=512)
+        self.stop_event = threading.Event()
+        self.drop_event = threading.Event()
+        self.drop_event.set()  # drop startup / TTS audio until listening is armed
+        self.error: str | None = None
+        self.last_frame_at = 0.0
+        self.thread = threading.Thread(
+            target=self._run,
+            name="jarvis-mic-reader",
+            daemon=True,
+        )
+
+    def start(self) -> None:
+        self.thread.start()
+
+    def _run(self) -> None:
+        try:
+            fd = os.open(self.fifo_path, os.O_RDONLY)
+            try:
+                pending = bytearray()
+                while not self.stop_event.is_set():
+                    chunk = os.read(fd, max(FRAME_BYTES * 8, 4096))
+                    if not chunk:
+                        if self.stop_event.is_set():
+                            return
+                        self.error = "microphone FIFO writer closed"
+                        return
+                    pending.extend(chunk)
+                    while len(pending) >= FRAME_BYTES:
+                        frame = bytes(pending[:FRAME_BYTES])
+                        del pending[:FRAME_BYTES]
+                        self.last_frame_at = time.monotonic()
+                        if self.drop_event.is_set():
+                            continue
+                        try:
+                            self.frames.put_nowait(frame)
+                        except queue.Full:
+                            # Always favor the newest live microphone audio.
+                            try:
+                                self.frames.get_nowait()
+                            except queue.Empty:
+                                pass
+                            try:
+                                self.frames.put_nowait(frame)
+                            except queue.Full:
+                                pass
+            finally:
+                os.close(fd)
+        except Exception as exc:
+            self.error = repr(exc)
+
+    def wait_for_pcm(self, timeout: float = 10.0) -> bool:
+        deadline = time.monotonic() + timeout
+        baseline = self.last_frame_at
+        while time.monotonic() < deadline:
+            if self.error:
+                return False
+            if self.last_frame_at > baseline:
+                return True
+            time.sleep(0.05)
+        return False
+
+    def pause_and_drop(self) -> None:
+        self.drop_event.set()
+        self.flush()
+
+    def resume(self) -> None:
+        self.flush()
+        self.drop_event.clear()
+
+    def flush(self) -> None:
+        while True:
+            try:
+                self.frames.get_nowait()
+            except queue.Empty:
+                return
+
+    def get_frame(self, timeout: float = 0.75) -> bytes | None:
+        if self.error:
+            return None
+        try:
+            return self.frames.get(timeout=timeout)
+        except queue.Empty:
+            return None
+
+    def close(self) -> None:
+        self.stop_event.set()
+        self.drop_event.set()
+        self.flush()
+
+
+MIC_FIFO = Path(os.environ.get("JARVIS_MIC_FIFO", "")).expanduser()
+if not str(MIC_FIFO) or not MIC_FIFO.exists():
+    raise SystemExit(
+        "Shell-owned microphone FIFO is unavailable. "
+        "Start Jarvis through START-JARVIS-HIVE.command."
+    )
+
+mic_reader = ContinuousMicReader(MIC_FIFO)
+mic_reader.start()
+
+
+def frame_rms(frame: bytes) -> float:
+    import array
+    samples = array.array("h")
+    samples.frombytes(frame)
+    if sys.byteorder != "little":
+        samples.byteswap()
+    if not samples:
+        return 0.0
+    return math.sqrt(sum(int(s) * int(s) for s in samples) / len(samples))
+
+
+class SpeechDetector:
+    """WebRTC speech shape plus a rolling near-field acoustic gate."""

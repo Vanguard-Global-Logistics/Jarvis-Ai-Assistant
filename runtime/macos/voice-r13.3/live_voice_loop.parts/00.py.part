@@ -1,0 +1,261 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import ast
+import hashlib
+import shutil
+import atexit
+import json
+import math
+import operator
+import os
+import re
+import signal
+import socket
+import queue
+import threading
+import subprocess
+import sys
+import tempfile
+import time
+import wave
+from collections import deque
+from pathlib import Path
+
+try:
+    sys.stdout.reconfigure(line_buffering=True)
+except Exception:
+    pass
+
+HOME = Path.home()
+JARVIS_CODE = HOME / "jarvis-code"
+HERMES_HOME = HOME / ".hermes"
+AEGIS_PUBLIC = HOME / ".jarvis-aegis" / "public.json"
+WAKE = os.environ.get("JARVIS_WAKE_PHRASE", "jarvis").strip().lower()
+MIC = os.environ.get("JARVIS_MIC_DEVICE", ":0")
+WAKE_ARM_SECONDS = float(os.environ.get("JARVIS_WAKE_ARM_SECONDS", "12.0"))
+CONVERSATION_SECONDS = float(os.environ.get("JARVIS_CONVERSATION_SECONDS", "30.0"))
+MAX_UTTERANCE_SECONDS = float(os.environ.get("JARVIS_MAX_UTTERANCE_SECONDS", "30.0"))
+END_SILENCE_MS = int(os.environ.get("JARVIS_END_SILENCE_MS", "650"))
+WORKER_SOCKET = HOME / "Jarvis-Live-Voice" / "kokoro-worker.sock"
+HIVE_MODEL = os.environ.get("JARVIS_HIVE_MODEL", "qwen3.5:4b")
+OWNER_DEVELOPMENT_MODE = (
+    os.environ.get("JARVIS_OWNER_DEVELOPMENT_MODE", "0").strip().lower()
+    not in {"", "0", "false", "off", "no"}
+)
+
+RATE = 16000
+SAMPLE_WIDTH = 2
+FRAME_MS = 30
+FRAME_BYTES = int(RATE * FRAME_MS / 1000) * SAMPLE_WIDTH
+PRE_ROLL_FRAMES = max(1, 300 // FRAME_MS)
+END_SILENCE_FRAMES = max(1, END_SILENCE_MS // FRAME_MS)
+MAX_FRAMES = int(MAX_UTTERANCE_SECONDS * 1000 / FRAME_MS)
+
+# R11.11 acoustic front-end tuning.
+ACOUSTIC_HISTORY_FRAMES = max(80, int(4_000 / FRAME_MS))
+LOUD_WAKE_SCAN_SECONDS = float(os.environ.get("JARVIS_LOUD_WAKE_SCAN_SECONDS", "3.2"))
+NORMAL_WAKE_SCAN_SECONDS = float(os.environ.get("JARVIS_NORMAL_WAKE_SCAN_SECONDS", "6.0"))
+LOUD_NOISE_RMS = float(os.environ.get("JARVIS_LOUD_NOISE_RMS", "520"))
+LOUD_VOICE_DUTY = float(os.environ.get("JARVIS_LOUD_VOICE_DUTY", "0.42"))
+QUIET_GATE_RATIO = float(os.environ.get("JARVIS_QUIET_GATE_RATIO", "1.45"))
+LOUD_GATE_RATIO = float(os.environ.get("JARVIS_LOUD_GATE_RATIO", "1.72"))
+QUIET_GATE_MARGIN = float(os.environ.get("JARVIS_QUIET_GATE_MARGIN", "130"))
+LOUD_GATE_MARGIN = float(os.environ.get("JARVIS_LOUD_GATE_MARGIN", "260"))
+FIELD_HOLD_SECONDS = float(os.environ.get("JARVIS_FIELD_HOLD_SECONDS", "60"))
+FIELD_RELEASE_SPEECH_DUTY = float(os.environ.get("JARVIS_FIELD_RELEASE_SPEECH_DUTY", "0.25"))
+FIELD_RELEASE_NOISE_RMS = float(os.environ.get("JARVIS_FIELD_RELEASE_NOISE_RMS", "250"))
+WAKE_COMMAND_SLOT_SECONDS = float(os.environ.get("JARVIS_WAKE_COMMAND_SLOT_SECONDS", "30.0"))
+COMMAND_END_SILENCE_MS = int(os.environ.get("JARVIS_COMMAND_END_SILENCE_MS", "1200"))
+OWNER_WAKE_RESCUE_THRESHOLD = float(
+    os.environ.get("JARVIS_OWNER_WAKE_RESCUE_THRESHOLD", "0.56")
+)
+OWNER_WAKE_RESCUE_NEARFIELD = float(
+    os.environ.get("JARVIS_OWNER_WAKE_RESCUE_NEARFIELD", "4.0")
+)
+OWNER_TERMINAL_HANDSHAKE_THRESHOLD = float(
+    os.environ.get("JARVIS_OWNER_TERMINAL_HANDSHAKE_THRESHOLD", "0.42")
+)
+OWNER_TERMINAL_HANDSHAKE_NEARFIELD = float(
+    os.environ.get("JARVIS_OWNER_TERMINAL_HANDSHAKE_NEARFIELD", "12.0")
+)
+
+sys.path.insert(0, str(HOME / "Jarvis-Live-Voice"))
+from hive_local_brain_r11 import HiveLocalBrain  # noqa: E402
+from live_local_speech_r13_3 import LiveLocalSpeechPipeline, DuplexInterruptProbe  # noqa: E402
+from owner_voice_lock_r13 import OwnerVoiceLock  # noqa: E402
+from hud_bridge_r11_1 import NonBlockingControlPlane  # noqa: E402
+
+sys.path.insert(0, str(JARVIS_CODE / "voice"))
+from runtime import SpeechRuntime, KokoroSpeechBackend  # noqa: E402
+
+sys.path.insert(0, str(JARVIS_CODE / "runtime"))
+from control_plane import RuntimeControlPlane  # noqa: E402
+
+from faster_whisper import WhisperModel  # noqa: E402
+
+try:
+    import webrtcvad  # type: ignore
+except Exception:
+    webrtcvad = None
+
+STOP = False
+STARTUP_PHASE = True
+STARTUP_SIGNALS: list[str] = []
+
+
+def handle_stop(signum, _frame):
+    global STOP
+    name = signal.Signals(signum).name
+    if STARTUP_PHASE:
+        STARTUP_SIGNALS.append(name)
+        print(f"Startup signal deferred: {name}", flush=True)
+        return
+    print(f"Stop signal received: {name}", flush=True)
+    STOP = True
+
+
+signal.signal(signal.SIGINT, handle_stop)
+signal.signal(signal.SIGTERM, handle_stop)
+
+
+class WorkerKokoroBackend(KokoroSpeechBackend):
+    """Persistent George worker with bounded cache and fast emergency fallback.
+
+    Important: if the persistent MLX worker fails, do NOT spawn another
+    Python/Kokoro model process. On an 8 GB Mac that caused severe swapping.
+    """
+
+    def __init__(self, fallback_voice: str = "") -> None:
+        super().__init__(fallback_voice)
+        self.last_generation_seconds = None
+        self.last_worker_memory = {}
+        self.cache_dir = HOME / "Jarvis-Hive-Core" / "tts-cache"
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+
+    def _cache_path(self, text: str) -> Path:
+        digest = hashlib.sha256(
+            (self.kokoro_voice + "|" + self.speed + "|" + text).encode("utf-8")
+        ).hexdigest()
+        return self.cache_dir / f"{digest}.wav"
+
+    def _worker_synthesize(self, text: str, wav_file: Path) -> tuple[bool, str]:
+        if not WORKER_SOCKET.exists():
+            return False, "worker socket missing"
+        try:
+            client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            client.settimeout(60)
+            client.connect(str(WORKER_SOCKET))
+            payload = {"op": "synthesize", "text": text, "output": str(wav_file)}
+            client.sendall((json.dumps(payload) + "\n").encode("utf-8"))
+            data = b""
+            while b"\n" not in data:
+                chunk = client.recv(65536)
+                if not chunk:
+                    break
+                data += chunk
+            client.close()
+            if not data:
+                return False, "worker returned no response"
+            response = json.loads(data.split(b"\n", 1)[0].decode("utf-8"))
+            if response.get("ok") and wav_file.exists():
+                self.last_generation_seconds = response.get("generation_seconds")
+                self.last_worker_memory = {
+                    key: response.get(key)
+                    for key in ("mlx_active_mb", "mlx_cache_mb", "mlx_peak_mb")
+                    if response.get(key) is not None
+                }
+                return True, ""
+            return False, str(response.get("error") or "unknown worker error")
+        except Exception as exc:
+            return False, repr(exc)
+
+    def precache(self, text: str) -> bool:
+        cached = self._cache_path(text)
+        if cached.exists() and cached.stat().st_size > 512:
+            return True
+        try:
+            with tempfile.TemporaryDirectory(prefix="jarvis-tts-precache-") as td:
+                root = Path(td)
+                tmp = root / "phrase.wav"
+                ok, error = self._worker_synthesize(text, tmp)
+                if not ok:
+                    print(f"TTS pre-cache failed for {text!r}: {error}", flush=True)
+                    return False
+                shutil.copy2(tmp, cached)
+                os.chmod(cached, 0o600)
+                return True
+        except Exception as exc:
+            print(f"TTS pre-cache failed for {text!r}: {exc!r}", flush=True)
+            return False
+
+    def synthesize(self, text_file: Path, wav_file: Path) -> None:
+        body = text_file.read_text(encoding="utf-8").strip()
+        cached = self._cache_path(body)
+        if cached.exists() and cached.stat().st_size > 512:
+            shutil.copy2(cached, wav_file)
+            self.last_generation_seconds = 0.0
+            return
+
+        ok, error = self._worker_synthesize(body, wav_file)
+        if ok:
+            try:
+                shutil.copy2(wav_file, cached)
+                os.chmod(cached, 0o600)
+            except Exception:
+                pass
+            return
+
+        # Never recursively launch another MLX/Python model here.
+        self.last_generation_seconds = None
+        print(
+            f"George worker synthesis failed: {error}. "
+            "Using fast macOS emergency voice for this phrase.",
+            flush=True,
+        )
+        self.fallback.synthesize(text_file, wav_file)
+
+
+KOKORO_PY = HOME / "Jarvis-Kokoro-MLX-Eval" / ".venv" / "bin" / "python"
+KOKORO_WORKER = HOME / "Jarvis-Live-Voice" / "kokoro_worker_r7.py"
+KOKORO_LOG = HOME / "Jarvis-Live-Voice" / "kokoro-worker.log"
+OWNED_KOKORO_WORKER: subprocess.Popen | None = None
+
+
+def stop_owned_kokoro_worker() -> None:
+    global OWNED_KOKORO_WORKER
+    proc = OWNED_KOKORO_WORKER
+    OWNED_KOKORO_WORKER = None
+    if proc is None:
+        return
+    try:
+        proc.terminate()
+        proc.wait(timeout=2)
+    except Exception:
+        try:
+            proc.kill()
+        except Exception:
+            pass
+    try:
+        WORKER_SOCKET.unlink()
+    except FileNotFoundError:
+        pass
+
+
+def kokoro_worker_ready(timeout: float = 1.5) -> bool:
+    if not WORKER_SOCKET.exists():
+        return False
+    client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        client.settimeout(timeout)
+        client.connect(str(WORKER_SOCKET))
+        client.sendall(b'{"op":"ping"}\n')
+        data = b""
+        while b"\n" not in data and len(data) < 65536:
+            chunk = client.recv(65536)
+            if not chunk:
+                break
+            data += chunk
+        if not data:
+            return False
+        response = json.loads(data.split(b"\n", 1)[0].decode("utf-8"))

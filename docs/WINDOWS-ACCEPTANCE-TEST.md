@@ -87,7 +87,7 @@ Until every step below passes **on Windows**, the shell and the IPC channel are
 
 - Windows 10/11
 - Node 22+ (`node --version`)
-- The repository cloned, on `feature/jarvis-phase-1-foundation`
+- The repository cloned, on `agent/jarvis-whole-macbook-2026-08-08`
 
 ```powershell
 npm install
@@ -120,7 +120,7 @@ Open DevTools (`Ctrl+Shift+I`) → Console.
 | #   | Run                                           | Expected                                                                                                         | Meaning if it fails                                                                                                                                                                                               |
 | --- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 2.1 | `typeof window.jarvis`                        | `'object'`                                                                                                       | `'undefined'` ⇒ **the preload failed to load.** The whole boundary is dead. Check the terminal for a preload error and inspect `apps/desktop/out/preload/index.cjs` for any `require(...)` other than `electron`. |
-| 2.2 | `Object.keys(window.jarvis)`                  | `['getAppInfo']` — exactly                                                                                       | Any extra key is an unintended widening of the trust boundary.                                                                                                                                                    |
+| 2.2 | `Object.keys(window.jarvis)`                  | `['getAppInfo','sendChat','amplify','saveSession','listSessions','getSession','deleteSession']` — exactly        | Any other key is an unintended widening of the trust boundary.                                                                                                                                                    |
 | 2.3 | `await window.jarvis.getAppInfo()`            | An object with `appVersion`, `electronVersion`, `chromeVersion`, `nodeVersion`, `platform`, `arch`, `isPackaged` | A throw ⇒ the handler or validation is broken.                                                                                                                                                                    |
 | 2.4 | `(await window.jarvis.getAppInfo()).platform` | `'win32'`                                                                                                        | Any other value ⇒ the closed enum is wrong.                                                                                                                                                                       |
 | 2.5 | The **Host** section in the UI                | Real values, matching 2.3. Not "Reading host info…", not an error.                                               | "The preload bridge did not load" ⇒ same as 2.1.                                                                                                                                                                  |
@@ -132,6 +132,20 @@ Open DevTools (`Ctrl+Shift+I`) → Console.
 | 2.6 | `window.jarvis.invoke`                               | `undefined`                                                                                                          |
 | 2.7 | `window.jarvis.send`                                 | `undefined`                                                                                                          |
 | 2.8 | `await window.jarvis.getAppInfo('../../etc/passwd')` | Resolves normally, ignoring the argument (the bridge takes no parameters, and the request schema is `z.undefined()`) |
+
+### Step 2c — Stage 1A explicit-save history
+
+1. Start a new conversation and exchange one complete turn.
+2. Close the app without saving, reopen it, and confirm that conversation is absent.
+3. Exchange another turn, press **Save Session**, give it a name, and confirm.
+4. Close and reopen the app. Open **History** and confirm the named transcript is intact and
+   read-only.
+5. Press **New Session** and confirm the archived transcript is not modified.
+6. Delete the saved session. Cancel once and prove it remains; confirm once and prove it is gone
+   after another restart.
+
+Any automatic save, editable archived transcript, missing confirmation, lost saved transcript,
+or deleted transcript returning after restart is a failed acceptance.
 
 ---
 

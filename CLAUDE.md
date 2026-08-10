@@ -70,6 +70,11 @@ Repository: `github.com/Vanguard-Global-Logistics/Jarvis-Ai-Assistant`.
 **Jarvis** is William Lavold's personal AI assistant and orchestrator — a private,
 single-user system, not a product for other users. There is no multi-user auth in scope.
 
+**Professional-use identity ruling (ADR 0013):** Jarvis may help William master his job
+through an isolated Professional Mode, but Jarvis is not an employer program, employer
+product, or employer-owned agent. **BCI Agent is preserved as a separate William-owned
+project-management productivity program that Jarvis may supervise through narrow, governed
+contracts.** Employer systems and records are authorized sources only.
 It is a **modular architecture**: independent subsystems that communicate only through
 narrow, typed, schema-validated contracts. The modularity is a security requirement, not
 a code-organization preference — see §2. Subsystems must be separable at the process
@@ -361,12 +366,29 @@ Jarvis / Throne OS ecosystem with defined purpose and ownership. **All are NOT I
 | **Forge** | The **software engineering system** | Build/dev pipeline state and approval evidence | **NOT IMPLEMENTED** (Phase 1 ships a shell) |
 | **Ledger** | **Manages finances** — read-only, advisory | Financial advisory state | **NOT IMPLEMENTED** (Phase 1 ships a shell) |
 | **AEGIS** | **Manages security, independently** of Jarvis | Security level, capability grants, audit log | **NOT IMPLEMENTED** (Phase 1 builds the real state engine) |
-| **BCI Agent** | **Internal AV project management AI** | AV project management | **NOT IMPLEMENTED** |
+| **Jarvis Professional Mode** | **William's private job-mastery and productivity compartment; never employer-owned or employer-branded** | Isolated professional workflows, approved-source context, and owner-controlled skills | **NOT IMPLEMENTED** |
+| **BCI Agent** | **William's separate personal project-management productivity program; supervised by Jarvis, not employer-owned** | Source-grounded job workflows, project evidence, recurring-problem reduction, and time recovery | **PARTIAL — preserve and reconcile existing work before new implementation** |
 | **Sophisticated Sips** | **Business operating system for Amy Lavold's coffee business**, including **Menu OS** | Coffee business operations; Menu OS | **NOT IMPLEMENTED** |
 | **Vanguard Performance Labs** | **Research peptide business platform** with an **AI concierge** | Research peptide business operations; concierge surface | **NOT IMPLEMENTED** |
 | **Peptastic** | **Clinical and business operating platform for clinics and med spas** | Clinical + business operations for clinics/med spas | **NOT IMPLEMENTED** |
 | **Saltline** | **Fishing and outdoor platform** | Fishing/outdoor domain | **NOT IMPLEMENTED** (future) |
 | **Future AI agents** | Additional agents, unnamed | — | **NOT IMPLEMENTED** |
+
+### Standing public-product SEO standard
+
+William approved ADR 0019: every public-facing Vanguard-built program must carry the
+Jarvis-owned Relentless SEO release contract from product design onward. Every future sold
+Peptastic tenant includes the isolated SEO capability, disabled until that customer's verified
+business identity, locations/service areas, domain ownership, approvers, target geography,
+regulated-claims policy, and authorized data connections are enrolled.
+
+The default is A1: audits, code/content drafts, structured-data proposals, and measurable
+improvement plans. Publishing, Business Profile edits, review replies, outreach, credentials,
+ads, or spending require explicit approval until a narrower written policy and real AEGIS
+enforcement authorize the exact action. Never guarantee ranking or use fake reviews, bought
+links, doorway/location spam, fabricated business facts, keyword stuffing, or unsupported
+medical/regulatory claims. Passing the gate proves release readiness evidence, not search
+dominance or a live SEO automation.
 
 **What is defined above is purpose and ownership — nothing more.** No implementation
 detail, data model, integration surface, permission set, or dependency has been specified

@@ -1,7 +1,7 @@
 # Known Limitations
 
-Date: 2026-07-30
-Scope: the Stage 6 foundation plus the Stage 1A conversation slice (ADR 0007).
+Date: 2026-08-07
+Scope: the Stage 6 foundation, Stage 1A conversation slice, Hive local-core branch, and Memory v1 policy foundation.
 
 Per `CLAUDE.md` §8, gaps are stated plainly here rather than implied to be solved.
 This file is the honest counterweight to the scaffold: it records what the foundation
@@ -9,17 +9,20 @@ does **not** do.
 
 ---
 
-## 0. The conversation is in-memory only — nothing is saved
+## 0. Session history is explicit-save only; durable Memory v1 is not implemented
 
-**Status: persistence NOT IMPLEMENTED.**
+**Status: Stage 1A session persistence IMPLEMENTED; physical acceptance pending.**
 
-ADR 0007 added a working conversation (`jarvis:chat`) and Thought Amplifier
-(`jarvis:amplify`), but no part of Stage 1A's persistence exists yet: there are no
-`history:*` channels, `packages/database` has zero migrations, and `better-sqlite3` has
-not been rebuilt against Electron's ABI. Closing the app discards the conversation, and
-the UI says so on every screen. Do not describe Jarvis as remembering, saving, or
-recalling anything. The persistence slice is a separate, separately-approved widening
-(ADR 0006 defines it).
+Memory v1 now has an approved constitution, ADR 0009, and a tested pure domain/policy layer in `services/jarvis-core/src/memory`. It still has **no durable storage or runtime recall**: no SQLite memory migration/repository, no memory IPC surface, and no orchestration injection. Do not describe Jarvis as persistently remembering until those later gates are implemented and physically accepted.
+
+Stage 1A now has four `history:*` channels, a forward-only session migration/store, one
+Electron-main SQLite owner, an Electron ABI rebuild, and explicit Save Session/list/read-only
+open/confirmed-delete UI. Nothing is saved automatically. Closing an unsaved session discards
+it. History v1 stores chat messages; Amplifier and error cards remain visibly transient.
+
+This is **session history**, not self-learning or durable personal memory. Memory v1 still has
+no admitted runtime retrieval or orchestration injection. Do not describe saved transcripts as
+Jarvis learning, canonical knowledge, or autonomous memory promotion.
 
 With no `ANTHROPIC_API_KEY` set, replies come from the deterministic **mock** provider,
 labeled MOCK PROVIDER in the UI. A real key is opt-in and usage-billed; the mock default
@@ -50,13 +53,13 @@ storage, separate credentials. Phase 1 will not deliver OS-level enforcement. Wh
 state engine ships, this gap must be restated wherever AEGIS is described — not quietly
 dropped once the UI looks convincing.
 
-## 3. The IPC bridge exposes exactly one channel, and it does nothing useful
+## 3. The IPC bridge exposes exactly seven narrow operations
 
 **Status: PARTIAL — intended for this stage.**
 
-`window.jarvis` now exists and exposes a single function, `getAppInfo()`, backed by the
-`app:get-info` channel. It returns versions, platform, and packaged state. That is all it
-does. It grants no authority: no filesystem, shell, environment, user data, or AEGIS.
+`window.jarvis` exposes exactly `getAppInfo`, `sendChat`, `amplify`, `saveSession`,
+`listSessions`, `getSession`, and `deleteSession`. There is no generic invoke, filesystem,
+shell, environment, credential, raw SQL, or AEGIS surface.
 
 It exists to prove the boundary machinery — allowlist, schema validation in both
 directions, named-function bridge — against a channel where a mistake costs nothing. **No
@@ -71,35 +74,34 @@ confirmed to fail against a deliberately injected passthrough, not merely to pas
 a **unit test against a mocked `electron`**; it constrains what the code intends to
 expose, and proves nothing about what Electron enforces at runtime (§7, §9).
 
-## 4. SQLite is not wired to Electron
+## 4. SQLite is wired to Electron main, but target-platform acceptance remains open
 
 **Status: PARTIAL.**
 
-`@jarvis/database` has a working connection module and migration runner, verified by unit
-tests against in-memory databases. It is **not** connected to the desktop app.
+Electron main opens the single database under Electron's user-data directory, applies
+forward-only migrations, and owns the only store. `@electron/rebuild` rebuilds
+`better-sqlite3` for Electron before the runtime probe and desktop development launch.
+The remaining limitation is physical target-platform acceptance and backup/restore policy,
+not missing composition.
 
-`better-sqlite3` is a native module and must be rebuilt against Electron's ABI (via
-`@electron/rebuild`) before the main process can open a database. That step is deferred
-until something actually needs to persist. Nothing does yet — there are zero migrations
-and no feature schema.
+## 5. Two migrations exist; durable Memory v1 admission remains separate
 
-## 5. There are zero migrations
+**Status: PARTIAL — Memory v1 policy/schema approved; persistence NOT IMPLEMENTED.**
 
-**Status: NOT IMPLEMENTED, by instruction.**
+The forward-only list contains Memory v1 schema migration 1 and Stage 1A session-history
+migration 2. The existence of Memory tables and a tested store does not authorize desktop
+memory IPC, automatic transcript ingestion, retrieval injection, or self-promotion.
 
-`migrations` in `@jarvis/database` is an empty array. No tables exist for memory,
-projects, tasks, or the audit log. Those are feature design work and are not approved.
+## 6. The model provider is wired, but real cloud use is opt-in
 
-## 6. The model provider abstraction exists, but is not wired to the app
-
-**Status: PARTIAL — implemented and unit-tested, not wired to the app.**
+**Status: IMPLEMENTED in the conversation and Amplifier paths; real-provider acceptance open.**
 
 The provider-neutral model abstraction named in `CURRENT-STATE-AUDIT.md` §20 now exists: a
 deterministic mock provider (`MockProvider`) and a real Anthropic provider
 (`AnthropicProvider`) live in `services/jarvis-core` alongside the amplifier prompt
-builder. Both are covered by unit tests. The provider framework is **not** wired to the
-desktop app (integration is Checkpoint 2). No API key is required to run or verify the
-foundation.
+builder. Both are covered by unit tests and the shared provider is created once in Electron
+main. No API key is required: without one the deterministic, visibly labeled mock provider is
+used. Paid cloud fallback remains disabled unless explicitly configured and accepted.
 
 ## 7. The shell runs and is observed on Linux and Windows development runtime
 

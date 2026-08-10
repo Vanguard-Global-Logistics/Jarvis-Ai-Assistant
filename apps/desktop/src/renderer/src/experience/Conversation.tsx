@@ -1,7 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties, JSX, KeyboardEvent } from 'react';
-import type { AmplifierResult, ChatMessage, OrbState, ProviderId } from '@jarvis/contracts';
+import type {
+  AmplifierResult,
+  ChatMessage,
+  OrbState,
+  ProviderId,
+  SavedSession,
+  SavedSessionMessage,
+} from '@jarvis/contracts';
 import { GlassPanel, accent, fontFamily, letterSpacing, surface, text } from '@jarvis/ui';
+import { SessionHistory, type HistoryBridge } from './SessionHistory.js';
 
 /**
  * The Stage 1A conversation surface (ADR 0006, ADR 0007).
@@ -29,7 +37,7 @@ import { GlassPanel, accent, fontFamily, letterSpacing, surface, text } from '@j
  */
 
 /** What the renderer needs from the preload bridge. Kept minimal on purpose. */
-export interface ConversationBridge {
+export interface ConversationBridge extends HistoryBridge {
   sendChat: (request: { messages: ChatMessage[] }) => Promise<{
     text: string;
     provider: ProviderId;
@@ -45,12 +53,13 @@ export interface ConversationProps {
 }
 
 type TranscriptItem =
+  | { kind: 'message'; id: number; role: 'user'; content: string }
   | {
       kind: 'message';
       id: number;
-      role: 'user' | 'assistant';
+      role: 'assistant';
       content: string;
-      provider?: ProviderId;
+      provider: ProviderId;
     }
   | { kind: 'amplify'; id: number; idea: string; result: AmplifierResult }
   | { kind: 'error'; id: number; text: string };
@@ -59,6 +68,7 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
   const [items, setItems] = useState<TranscriptItem[]>([]);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
+  const [readOnlySession, setReadOnlySession] = useState<SavedSession | null>(null);
   const nextId = useRef(0);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -86,9 +96,46 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
       .filter((it): it is Extract<TranscriptItem, { kind: 'message' }> => it.kind === 'message')
       .map((it) => ({ role: it.role, content: it.content }));
 
+  const savedMessages = (list: TranscriptItem[]): SavedSessionMessage[] =>
+    list
+      .filter(
+        (item): item is Extract<TranscriptItem, { kind: 'message' }> => item.kind === 'message',
+      )
+      .map((item) =>
+        item.role === 'user'
+          ? { role: 'user', content: item.content }
+          : { role: 'assistant', content: item.content, provider: item.provider },
+      );
+
+  const openSavedSession = (session: SavedSession): void => {
+    setReadOnlySession(session);
+    setDraft('');
+    setItems(
+      session.messages.map((message) =>
+        message.role === 'user'
+          ? { kind: 'message', id: allocId(), role: 'user', content: message.content }
+          : {
+              kind: 'message',
+              id: allocId(),
+              role: 'assistant',
+              content: message.content,
+              provider: message.provider,
+            },
+      ),
+    );
+    setOrb('idle');
+  };
+
+  const startNewSession = (): void => {
+    setReadOnlySession(null);
+    setDraft('');
+    setItems([]);
+    setOrb('idle');
+  };
+
   const send = useCallback(async () => {
     const content = draft.trim();
-    if (content === '' || busy || bridge === null) return;
+    if (content === '' || busy || bridge === null || readOnlySession !== null) return;
 
     const userItem: TranscriptItem = { kind: 'message', id: allocId(), role: 'user', content };
     // Snapshot the transcript INCLUDING this new user turn, so the request the
@@ -136,11 +183,11 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
     } finally {
       setBusy(false);
     }
-  }, [draft, busy, bridge, items, setOrb]);
+  }, [draft, busy, bridge, items, readOnlySession, setOrb]);
 
   const amplify = useCallback(async () => {
     const idea = draft.trim();
-    if (idea === '' || busy || bridge === null) return;
+    if (idea === '' || busy || bridge === null || readOnlySession !== null) return;
 
     setDraft('');
     setBusy(true);
@@ -170,7 +217,7 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
     } finally {
       setBusy(false);
     }
-  }, [draft, busy, bridge, setOrb]);
+  }, [draft, busy, bridge, readOnlySession, setOrb]);
 
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
     // Enter sends; Shift+Enter is a newline. A composer that eats every Enter
@@ -181,7 +228,8 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
     }
   };
 
-  const disabled = bridge === null;
+  const disabled = bridge === null || readOnlySession !== null;
+  const transientCards = items.some((item) => item.kind !== 'message');
 
   return (
     <section
@@ -210,9 +258,19 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
           textAlign: 'center',
         }}
       >
-        STAGE 1A · CONVERSATION + THOUGHT AMPLIFIER · NOTHING IS SAVED — CLOSING DISCARDS THIS
-        SESSION
+        {readOnlySession === null
+          ? 'STAGE 1A · NOTHING IS SAVED AUTOMATICALLY — UNSAVED WORK IS DISCARDED ON CLOSE'
+          : `SAVED SESSION · ${readOnlySession.name} · READ-ONLY`}
       </p>
+
+      <SessionHistory
+        bridge={bridge}
+        messages={savedMessages(items)}
+        readOnlySession={readOnlySession}
+        hasTransientCards={transientCards}
+        onOpen={openSavedSession}
+        onNew={startNewSession}
+      />
 
       <div
         ref={scrollRef}
@@ -249,7 +307,7 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
               key={item.id}
               role={item.role}
               content={item.content}
-              provider={item.provider}
+              provider={item.role === 'assistant' ? item.provider : undefined}
             />
           ) : item.kind === 'amplify' ? (
             <AmplifierCard key={item.id} idea={item.idea} result={item.result} />
@@ -269,6 +327,11 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
         onAmplify={() => void amplify()}
         busy={busy}
         disabled={disabled}
+        disabledReason={
+          readOnlySession !== null
+            ? 'Saved sessions are read-only — start a new session to continue'
+            : 'Preload bridge unavailable — conversation needs the Electron runtime (npm run dev:desktop)'
+        }
       />
     </section>
   );
@@ -500,6 +563,7 @@ function Composer({
   onAmplify,
   busy,
   disabled,
+  disabledReason,
 }: {
   draft: string;
   onDraftChange: (value: string) => void;
@@ -508,6 +572,7 @@ function Composer({
   onAmplify: () => void;
   busy: boolean;
   disabled: boolean;
+  disabledReason: string;
 }): JSX.Element {
   const canAct = !busy && !disabled && draft.trim() !== '';
 
@@ -521,7 +586,7 @@ function Composer({
             textAlign: 'center',
           }}
         >
-          Preload bridge unavailable — conversation needs the Electron runtime (npm run dev:desktop)
+          {disabledReason}
         </span>
       )}
       <div

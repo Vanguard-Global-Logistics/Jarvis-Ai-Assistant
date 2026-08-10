@@ -19,7 +19,14 @@ const EnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().max(65535).default(3000),
 
-  // --- AI providers (server-side only; Phase 1 uses the mock provider) ---
+  // --- AI providers (server-side only) ---
+  // `local-only` is intentionally stronger than "prefer local": if the local
+  // engine fails, Jarvis fails visibly instead of silently spending cloud tokens.
+  HIVE_LOCAL_AI_MODE: z.enum(['off', 'local-only']).default('off'),
+  HIVE_LOCAL_AI_URL: z.url().default('http://127.0.0.1:8000'),
+  HIVE_LOCAL_AI_MODEL: z.string().min(1).optional(),
+  HIVE_LOCAL_AI_FAST_MODEL: z.string().min(1).optional(),
+  HIVE_LOCAL_AI_REASONING_MODEL: z.string().min(1).optional(),
   OPENAI_API_KEY: z.string().min(1).optional(),
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
 
@@ -99,10 +106,6 @@ export function requireEnv<K extends keyof Env>(env: Env, key: K): NonNullable<E
   return value;
 }
 
-/**
- * A log-safe view of the environment: secret values are replaced with a presence
- * marker, never truncated or partially shown. A prefix of a key is still a leak.
- */
 /**
  * Every declared key, sourced from the schema itself. Iterating the parsed object
  * instead would silently omit unset optional keys — Zod does not materialise them —

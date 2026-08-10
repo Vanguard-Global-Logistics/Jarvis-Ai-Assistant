@@ -1,21 +1,16 @@
 /**
  * @jarvis/jarvis-core — the Jarvis orchestration runtime.
  *
- * STATUS: PARTIAL — model provider abstraction and Thought Amplifier v1 logic
- * implemented; orchestration, personality, memory, and sub-agent coordination
- * NOT IMPLEMENTED.
+ * STATUS: PARTIAL — provider-neutral model abstraction, Hive local provider,
+ * Anthropic adapter, mock provider, Thought Amplifier v1, and the pure Memory v1
+ * policy/domain foundation are implemented. Durable persistence, runtime memory
+ * injection, broader orchestration, and sub-agent coordination remain separate
+ * milestones.
  *
  * Why it exists as its own workspace rather than living in apps/desktop: the
  * orchestrator must run isolated from the renderer (CURRENT-STATE-AUDIT.md §16).
  * Keeping it a separate package means the renderer physically cannot import it
  * — a constraint that is trivial to hold now and expensive to retrofit later.
- *
- * What will live here (not designed, not approved):
- *   - The conversation and state machine (sleeping/wake/listening/thinking/
- *     speaking/vision/delegating/aegisReview)
- *   - The personality pipeline: facts → validation → risk → permitted level →
- *     optional humor → clarity check
- *   - Sub-agent coordination
  *
  * Two rules that bind this package specifically:
  *   - It may coordinate approved tools and sub-agents but must NEVER hold
@@ -26,7 +21,12 @@
  */
 
 export { AMPLIFIER_SYSTEM_PROMPT, buildAmplifierUserMessage } from './amplifier/prompt.js';
+export * from './memory/index.js';
 export { AnthropicProvider, DEFAULT_MODEL, ModelRefusalError } from './model/anthropic-provider.js';
 export { createProvider } from './model/create-provider.js';
+export { HiveLocalProvider, validateHiveLocalBaseUrl } from './model/hive-local-provider.js';
+export type { HiveLocalHttpClient } from './model/hive-local-provider.js';
 export { MockProvider } from './model/mock-provider.js';
 export type { JarvisModelProvider } from './model/provider.js';
+export { classifyChatRequest, selectHiveChatModel } from './model/routing.js';
+export type { ChatRoute, HiveModelSet } from './model/routing.js';

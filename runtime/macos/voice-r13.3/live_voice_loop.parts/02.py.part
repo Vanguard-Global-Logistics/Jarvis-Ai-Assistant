@@ -1,0 +1,261 @@
+
+    def __init__(self) -> None:
+        self.vad = webrtcvad.Vad(2) if webrtcvad else None
+        self.rms_history = deque(maxlen=ACOUSTIC_HISTORY_FRAMES)
+        self.vad_history = deque(maxlen=ACOUSTIC_HISTORY_FRAMES)
+        self.noise_rms = 180.0
+        self.last_rms = 0.0
+        self.last_threshold = 260.0
+        self.last_ratio = 0.0
+        self._last_mode = None
+
+    @property
+    def mode(self) -> str:
+        return "WebRTC + adaptive near-field gate" if self.vad else "adaptive near-field gate"
+
+    @staticmethod
+    def _percentile(values, fraction: float) -> float:
+        if not values:
+            return 0.0
+        vals = sorted(values)
+        idx = max(0, min(len(vals) - 1, int((len(vals) - 1) * fraction)))
+        return float(vals[idx])
+
+    def _update_environment(self, rms: float, vad_positive: bool) -> None:
+        self.rms_history.append(rms)
+        self.vad_history.append(1 if vad_positive else 0)
+        if len(self.rms_history) >= 20:
+            target = max(70.0, self._percentile(self.rms_history, 0.25))
+            alpha = 0.035 if target > self.noise_rms else 0.09
+            self.noise_rms = (1.0 - alpha) * self.noise_rms + alpha * target
+
+    def vad_duty(self) -> float:
+        if not self.vad_history:
+            return 0.0
+        return sum(self.vad_history) / len(self.vad_history)
+
+    def is_loud_environment(self) -> bool:
+        return (
+            self.noise_rms >= LOUD_NOISE_RMS
+            or (
+                len(self.vad_history) >= 40
+                and self.vad_duty() >= LOUD_VOICE_DUTY
+                and self.noise_rms >= 300.0
+            )
+        )
+
+    def environment_label(self) -> str:
+        return "FIELD/LOUD" if self.is_loud_environment() else "NORMAL"
+
+    def threshold(self) -> float:
+        if self.is_loud_environment():
+            return max(
+                360.0,
+                self.noise_rms * LOUD_GATE_RATIO,
+                self.noise_rms + LOUD_GATE_MARGIN,
+            )
+        return max(
+            230.0,
+            self.noise_rms * QUIET_GATE_RATIO,
+            self.noise_rms + QUIET_GATE_MARGIN,
+        )
+
+    def classify(self, frame: bytes) -> tuple[bool, float, float]:
+        rms = frame_rms(frame)
+        if self.vad:
+            try:
+                vad_positive = bool(self.vad.is_speech(frame, RATE))
+            except Exception:
+                vad_positive = False
+        else:
+            vad_positive = True
+
+        self._update_environment(rms, vad_positive)
+        threshold = self.threshold()
+        ratio = rms / max(self.noise_rms, 1.0)
+
+        self.last_rms = rms
+        self.last_threshold = threshold
+        self.last_ratio = ratio
+
+        speech = (vad_positive and rms >= threshold) if self.vad else (rms >= threshold)
+        return speech, rms, threshold
+
+    def report_environment_if_changed(self) -> None:
+        label = self.environment_label()
+        if label == self._last_mode:
+            return
+        self._last_mode = label
+        print(
+            f"Acoustic mode: {label} "
+            f"(floor≈{self.noise_rms:.0f} RMS, "
+            f"gate≈{self.threshold():.0f}, "
+            f"speech-duty={self.vad_duty():.0%})",
+            flush=True,
+        )
+
+
+def listen_for_utterance(
+    reader: ContinuousMicReader,
+    detector: SpeechDetector,
+    *,
+    max_seconds: float | None = None,
+    end_silence_ms: int | None = None,
+    start_deadline: float | None = None,
+) -> tuple[bytes | None, dict]:
+    pre = deque(maxlen=PRE_ROLL_FRAMES)
+    frames: list[bytes] = []
+    triggered = False
+    votes = deque(maxlen=8)
+    silence = 0
+    rms_values: list[float] = []
+
+    limit_frames = MAX_FRAMES
+    if max_seconds is not None:
+        limit_frames = max(1, min(MAX_FRAMES, int(max_seconds * 1000 / FRAME_MS)))
+
+    while not STOP:
+        if not aegis_allows_voice():
+            return None, {}
+        if (
+            not triggered
+            and start_deadline is not None
+            and time.time() >= start_deadline
+        ):
+            return None, {"slot_expired": True}
+        frame = reader.get_frame(timeout=0.75)
+        if frame is None:
+            if reader.error:
+                print(f"Microphone reader error: {reader.error}", flush=True)
+                return None, {}
+            continue
+
+        voiced, rms, threshold = detector.classify(frame)
+        detector.report_environment_if_changed()
+
+        if not triggered:
+            pre.append(frame)
+            votes.append(1 if voiced else 0)
+            if len(votes) == votes.maxlen and sum(votes) >= 5:
+                triggered = True
+                frames.extend(pre)
+                rms_values.extend([rms] * len(pre))
+                pre.clear()
+                print(
+                    f"Listening... [acoustic={detector.environment_label()} "
+                    f"floor={detector.noise_rms:.0f} gate={threshold:.0f}]",
+                    flush=True,
+                )
+        else:
+            frames.append(frame)
+            rms_values.append(rms)
+            silence = 0 if voiced else silence + 1
+
+            if end_silence_ms is not None:
+                dynamic_end_frames = max(1, int(end_silence_ms / FRAME_MS))
+            else:
+                dynamic_end_frames = (
+                    END_SILENCE_FRAMES
+                    if detector.is_loud_environment()
+                    else max(1, int(360 / FRAME_MS))
+                )
+            done = silence >= dynamic_end_frames or len(frames) >= limit_frames
+            if done:
+                if silence >= dynamic_end_frames and silence < len(frames):
+                    usable_frames = frames[:-silence]
+                    usable_rms = rms_values[:-silence]
+                else:
+                    usable_frames = frames
+                    usable_rms = rms_values
+
+                if not usable_frames:
+                    return None, {}
+
+                peak = max(usable_rms) if usable_rms else 0.0
+                stats = {
+                    "environment": detector.environment_label(),
+                    "noise_rms": round(detector.noise_rms, 1),
+                    "peak_rms": round(peak, 1),
+                    "mean_rms": round(
+                        sum(usable_rms) / len(usable_rms) if usable_rms else 0.0,
+                        1,
+                    ),
+                    "peak_to_floor": round(peak / max(detector.noise_rms, 1.0), 2),
+                    "vad_duty": round(detector.vad_duty(), 3),
+                    "window_capped": len(frames) >= limit_frames,
+                }
+                return b"".join(usable_frames), stats
+
+    return None, {}
+
+
+def transcribe_pcm(pcm: bytes) -> tuple[str, float]:
+    with tempfile.TemporaryDirectory(prefix="jarvis-turn-") as td:
+        wav = Path(td) / "turn.wav"
+        with wave.open(str(wav), "wb") as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(SAMPLE_WIDTH)
+            wf.setframerate(RATE)
+            wf.writeframes(pcm)
+        started = time.perf_counter()
+        segments, _ = model.transcribe(
+            str(wav),
+            language="en",
+            vad_filter=False,
+            beam_size=1,
+            condition_on_previous_text=False,
+            temperature=0.0,
+        )
+        text = " ".join(s.text.strip() for s in segments if s.text.strip()).strip()
+        return text, time.perf_counter() - started
+
+
+def edit_distance(a: str, b: str) -> int:
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        cur = [i]
+        for j, cb in enumerate(b, 1):
+            cur.append(min(cur[-1] + 1, prev[j] + 1, prev[j - 1] + (ca != cb)))
+        prev = cur
+    return prev[-1]
+
+
+WAKE_VARIANTS = ("jarvis", "jervis", "dervis", "jaros", "jarvus", "jarves")
+
+
+def _first_spoken_sentence(text: str) -> str:
+    """Keep the user's command after wake, not unrelated TV speech after it."""
+    body = text.strip(" ,.!?:;-")
+    if not body:
+        return ""
+    # Stop at the first completed spoken sentence. Preserve the punctuation-free
+    # tail when Whisper did not emit sentence punctuation.
+    match = re.search(r"(.+?[.!?])(?:\s+|$)", body)
+    if match and len(match.group(1).split()) >= 2:
+        return match.group(1).strip(" ,")
+    return body
+
+
+def parse_wake(text: str) -> tuple[bool, str]:
+    """Recognize deliberate wake language even when TV speech precedes it.
+
+    Strong forms such as "Hey Jarvis" / "Okay Jarvis" are accepted anywhere
+    in the transcript. Bare/fuzzy Jarvis remains limited to the opening words
+    to reduce accidental TV activations.
+    """
+    cleaned = text.strip()
+    tokens = list(re.finditer(r"[A-Za-z']+", cleaned))
+    if not tokens:
+        return False, ""
+
+    # Strong explicit address: accept anywhere in the transcript.
+    # This fixes cases where TV dialogue and the owner's wake phrase are merged
+    # into one Whisper utterance.
+    for idx in range(len(tokens) - 1):
+        prefix = tokens[idx].group(0).lower()
+        if prefix not in {"hey", "okay", "ok"}:
+            continue
+        wake_token = tokens[idx + 1].group(0).lower()
+        explicit = wake_token in WAKE_VARIANTS
+        fuzzy = (
+            wake_token.startswith("j")

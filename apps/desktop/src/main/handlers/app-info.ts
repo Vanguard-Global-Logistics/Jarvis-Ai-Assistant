@@ -2,6 +2,7 @@ import { app } from 'electron';
 import type { AppInfo } from '@jarvis/contracts';
 import { appGetInfoContract } from '@jarvis/contracts';
 import { handleContract } from '../ipc.js';
+import type { IpcSenderValidator } from '../ipc-sender.js';
 
 /**
  * `app:get-info` — static host facts for the status bar and bug reports.
@@ -12,24 +13,28 @@ import { handleContract } from '../ipc.js';
  * being added to the contract fails at the boundary instead of reaching the
  * renderer.
  */
-export function registerAppInfoHandler(): void {
-  handleContract(appGetInfoContract, (): AppInfo => {
-    // `process.platform` is typed as the full NodeJS.Platform union, but the
-    // contract admits only the three we support. Narrow explicitly rather than
-    // casting — an unsupported platform should fail loudly at the boundary.
-    const platform = process.platform;
-    if (platform !== 'win32' && platform !== 'darwin' && platform !== 'linux') {
-      throw new Error(`Unsupported platform: ${platform}`);
-    }
+export function registerAppInfoHandler(validateSender: IpcSenderValidator): void {
+  handleContract(
+    appGetInfoContract,
+    (): AppInfo => {
+      // `process.platform` is typed as the full NodeJS.Platform union, but the
+      // contract admits only the three we support. Narrow explicitly rather than
+      // casting — an unsupported platform should fail loudly at the boundary.
+      const platform = process.platform;
+      if (platform !== 'win32' && platform !== 'darwin' && platform !== 'linux') {
+        throw new Error(`Unsupported platform: ${platform}`);
+      }
 
-    return {
-      appVersion: app.getVersion(),
-      electronVersion: process.versions.electron,
-      chromeVersion: process.versions.chrome,
-      nodeVersion: process.versions.node,
-      platform,
-      arch: process.arch,
-      isPackaged: app.isPackaged,
-    };
-  });
+      return {
+        appVersion: app.getVersion(),
+        electronVersion: process.versions.electron,
+        chromeVersion: process.versions.chrome,
+        nodeVersion: process.versions.node,
+        platform,
+        arch: process.arch,
+        isPackaged: app.isPackaged,
+      };
+    },
+    validateSender,
+  );
 }

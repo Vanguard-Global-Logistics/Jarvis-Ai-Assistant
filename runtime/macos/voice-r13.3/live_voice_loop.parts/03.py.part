@@ -1,0 +1,271 @@
+            and 5 <= len(wake_token) <= 7
+            and edit_distance(wake_token, WAKE) <= 2
+        )
+        if explicit or fuzzy:
+            tail = cleaned[tokens[idx + 1].end():].strip(" ,.!?:;-")
+            return True, _first_spoken_sentence(tail)
+
+    # Bare Jarvis remains conservative: only near the beginning.
+    for idx, match in enumerate(tokens[:4]):
+        token = match.group(0).lower()
+        explicit = token in WAKE_VARIANTS
+        fuzzy = token.startswith("j") and 5 <= len(token) <= 7 and edit_distance(token, WAKE) <= 2
+        if explicit or fuzzy:
+            if fuzzy and not explicit and idx > 0:
+                previous = tokens[idx - 1].group(0).lower()
+                if previous not in {"hey", "okay", "ok"}:
+                    continue
+            tail = cleaned[match.end():].strip(" ,.!?:;-")
+            return True, _first_spoken_sentence(tail)
+
+    return False, ""
+
+
+def is_terminal_wake_handshake(text: str) -> bool:
+    """Recognize a close, exact sentence-ending Jarvis as wake-only.
+
+    This deliberately does not return a command. It exists for natural direct
+    addresses such as "Do you hear me, Jarvis?" that the conservative opening
+    wake parser must not reinterpret as an inline request.
+    """
+    tokens = re.findall(r"[A-Za-z']+", text.strip())
+    return 2 <= len(tokens) <= 8 and tokens[-1].lower() == WAKE
+
+
+class NoisyRoomGuard:
+    """Session-only guard against TV dialogue hijacking follow-up mode."""
+
+    def __init__(self) -> None:
+        self.nonwake_times = deque(maxlen=24)
+        self.noisy_announced = False
+
+    def observe_nonwake(self, now: float) -> None:
+        self.nonwake_times.append(now)
+        self._expire(now)
+
+    def observe_wake(self, now: float) -> None:
+        self._expire(now)
+
+    def _expire(self, now: float) -> None:
+        while self.nonwake_times and now - self.nonwake_times[0] > 18.0:
+            self.nonwake_times.popleft()
+
+    def is_noisy(self, now: float) -> bool:
+        self._expire(now)
+        # Three unrelated speech turns in 18 seconds is a strong TV/room-noise signal.
+        return len(self.nonwake_times) >= 3
+
+    def report_if_changed(self, now: float) -> None:
+        noisy = self.is_noisy(now)
+        if noisy and not self.noisy_announced:
+            print(
+                "Room mode: NOISY — 'Hey Jarvis' required for each command "
+                "until background speech subsides.",
+                flush=True,
+            )
+            self.noisy_announced = True
+        elif not noisy and self.noisy_announced:
+            print(
+                "Room mode: QUIET — natural follow-up conversation restored.",
+                flush=True,
+            )
+            self.noisy_announced = False
+
+
+_ALLOWED_BINOPS = {
+    ast.Add: operator.add,
+    ast.Sub: operator.sub,
+    ast.Mult: operator.mul,
+    ast.Div: operator.truediv,
+    ast.FloorDiv: operator.floordiv,
+    ast.Mod: operator.mod,
+    ast.Pow: operator.pow,
+}
+_ALLOWED_UNARY = {ast.UAdd: operator.pos, ast.USub: operator.neg}
+
+
+def _eval_math(node, depth: int = 0):
+    if depth > 24:
+        raise ValueError
+    if isinstance(node, ast.Expression):
+        return _eval_math(node.body, depth + 1)
+    if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
+        return node.value
+    if isinstance(node, ast.BinOp) and type(node.op) in _ALLOWED_BINOPS:
+        left = _eval_math(node.left, depth + 1)
+        right = _eval_math(node.right, depth + 1)
+        if isinstance(node.op, ast.Pow):
+            if abs(right) > 10 or abs(left) > 1_000_000:
+                raise ValueError
+        value = _ALLOWED_BINOPS[type(node.op)](left, right)
+        if abs(value) > 1e15:
+            raise ValueError
+        return value
+    if isinstance(node, ast.UnaryOp) and type(node.op) in _ALLOWED_UNARY:
+        return _ALLOWED_UNARY[type(node.op)](_eval_math(node.operand, depth + 1))
+    raise ValueError
+
+
+def local_math(prompt: str):
+    p = prompt.lower().strip()
+    for old, new in {
+        "multiplied by": "*", "divided by": "/", "plus": "+",
+        "minus": "-", "times": "*",
+    }.items():
+        p = p.replace(old, new)
+    p = re.sub(r"^(can you |could you |please |what is |what's |calculate )+", "", p)
+    p = re.sub(r"[^0-9+\-*/().% ]", " ", p)
+    p = re.sub(r"\s+", " ", p).strip()
+    if p and len(p) <= 120 and re.fullmatch(r"[0-9+\-*/().% ]{3,}", p):
+        try:
+            value = _eval_math(ast.parse(p, mode="eval"))
+            if isinstance(value, float) and value.is_integer():
+                value = int(value)
+            return str(value)
+        except Exception:
+            pass
+    return None
+
+
+def ask_local(prompt: str) -> tuple[str, float, str]:
+    answer = local_math(prompt)
+    if answer is not None:
+        return answer, 0.0, "local-code"
+
+    deterministic = brain.deterministic_answer(prompt)
+    if deterministic is not None:
+        # Add to the brain's short session history so follow-up turns retain context.
+        brain.history.append({"role": "user", "content": prompt})
+        brain.history.append({"role": "assistant", "content": deterministic})
+        return deterministic, 0.0, "local-code"
+
+    started = time.perf_counter()
+    result = brain.ask(prompt)
+    return result, time.perf_counter() - started, "hive-local"
+
+
+def speech_friendly(text: str) -> str:
+    body = str(text or "").strip()
+    if re.fullmatch(r"[-+]?\d+(?:\.\d+)?\.?", body):
+        return f"The answer is {body.rstrip('.')}."
+    return body
+
+
+def _barge_baseline() -> tuple[float, float, bool]:
+    field_locked = time.time() < FIELD_LOCK_UNTIL
+    return (
+        detector.noise_rms,
+        detector.threshold(),
+        detector.is_loud_environment() or field_locked,
+    )
+
+
+def _queue_barge(text: str) -> None:
+    clean = re.sub(r"\s+", " ", text.strip())
+    if clean:
+        BARGE_QUEUE.append(clean)
+
+
+def get_live_speaker() -> LiveLocalSpeechPipeline:
+    global live_speaker
+    if live_speaker is None:
+        probe = DuplexInterruptProbe(
+            transcribe_pcm=transcribe_pcm,
+            wake_parser=parse_wake,
+            baseline_provider=_barge_baseline,
+            owner_verify_pcm=owner_voice_lock.verify_pcm,
+        )
+        live_speaker = LiveLocalSpeechPipeline(
+            backend=fast_backend,
+            set_state=set_voice_state,
+            allows_voice=aegis_allows_voice,
+            stop_requested=lambda: STOP,
+            privacy_log=HERMES_HOME / "voice-privacy.jsonl",
+            interrupt_probe=probe,
+            on_interrupt=_queue_barge,
+        )
+    return live_speaker
+
+
+def speak_without_mic_backlog(
+    reader: ContinuousMicReader,
+    text: str,
+    label: str,
+) -> ContinuousMicReader | None:
+    result = get_live_speaker().speak_text(reader, text, label)
+    return reader if result is not None else None
+
+
+def is_end_session(text: str) -> bool:
+    normalized = re.sub(r"[^a-z ]", "", text.lower()).strip()
+    return any(phrase in normalized for phrase in ("goodbye jarvis", "goodbye", "bye bye", "end session", "go to sleep", "stop listening"))
+
+
+
+LATENCY_LOG = Path(
+    os.environ.get(
+        "JARVIS_LATENCY_LOG",
+        str(HOME / "Jarvis-Hive-Core" / "latency-r13-3-live-calibration.jsonl"),
+    )
+)
+
+
+def log_latency(row: dict) -> None:
+    try:
+        LATENCY_LOG.parent.mkdir(parents=True, exist_ok=True)
+        clean = {"at": int(time.time()), **row}
+        with LATENCY_LOG.open("a", encoding="utf-8") as h:
+            h.write(json.dumps(clean, sort_keys=True) + "\n")
+        os.chmod(LATENCY_LOG, 0o600)
+    except Exception:
+        pass
+
+
+detector = SpeechDetector()
+set_local_model_status()
+print()
+print("============================================================")
+print(" JARVIS / HIVE R13.3 — LIVE CALIBRATION")
+print("============================================================")
+print("Paid cloud model fallback: DISABLED")
+print("Reasoning: direct warm Ollama Reflex Lane (think=false)")
+print(f"Model: {HIVE_MODEL}")
+print("Simple deterministic tasks: local Python")
+print(f"Turn detection: {detector.mode}")
+if OWNER_DEVELOPMENT_MODE:
+    print("Speaker attention: OWNER DEVELOPMENT — wake/slot priority; biometrics diagnostic")
+    print("Owner development mode: explicit Jarvis wake or active slot is accepted")
+else:
+    print("Speaker attention: local CAM++ Owner Voice Lock before Whisper")
+    print(f"Live wake rescue: score >= {OWNER_WAKE_RESCUE_THRESHOLD:.2f} + Jarvis + {OWNER_WAKE_RESCUE_NEARFIELD:.1f}x near-field")
+print(f"End-of-turn silence: {END_SILENCE_MS} ms")
+print("Speech recognition: local Whisper base, greedy decode")
+print("Voice: local Kokoro George bm_george @ 1.30x, phrase-pipelined")
+print(f"AEGIS read-only state: {aegis_state()}")
+print("Local Live: model generation is decoupled from speech playback")
+print("Model producer: direct Ollama JSONL drains continuously while George talks")
+print("Full-duplex-style barge-in: local mic stays active while George speaks")
+print("Interrupt phrases: Jarvis / stop / wait / hold on / pause / never mind")
+print("Wake isolation: strong Hey/Okay Jarvis accepted anywhere in noisy transcripts")
+print("Field gate: WebRTC speech + rolling near-field acoustic threshold")
+print("Crowd control: loud pre-wake audio is scanned in short windows")
+print("Field hysteresis: wake-only mode releases only after sustained quiet")
+print(
+    f"Wake slot: {'wake-confirmed' if OWNER_DEVELOPMENT_MODE else 'verified owner'} "
+    f"gets one {WAKE_COMMAND_SLOT_SECONDS:.1f}s protected command"
+)
+print("Noisy-room guard: non-owner voices are rejected before STT")
+print("Echo control: strict near-field interrupt gate rejects most speaker/crowd audio")
+if OWNER_DEVELOPMENT_MODE:
+    print("Tonight mode: say 'Hey Jarvis' with the command, or say 'Jarvis' then the command.")
+else:
+    print("Say 'Jarvis' once, then continue naturally. You can interrupt George while he talks.")
+print("Say 'Goodbye Jarvis' to end the active conversation.")
+print("Press Control-C to stop.")
+print("============================================================")
+print()
+
+print("Startup voice check...", flush=True)
+try:
+    startup_voice = voice.speak("Jarvis is listening.")
+    print(

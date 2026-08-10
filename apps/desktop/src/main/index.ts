@@ -1,18 +1,22 @@
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { BrowserWindow, app } from 'electron';
 import { createLogger, describeEnv, parseEnv } from '@jarvis/config';
 import { createProvider } from '@jarvis/jarvis-core';
 import { registerAmplifyHandler } from './handlers/amplify.js';
 import { registerAppInfoHandler } from './handlers/app-info.js';
 import { registerChatHandler } from './handlers/chat.js';
+import { registerHistoryHandlers } from './handlers/history.js';
+import { createIpcSenderValidator } from './ipc-sender.js';
 import { applyContentSecurityPolicy, denyAllPermissions, lockNavigation } from './security.js';
+import { createSessionHistoryRuntime, type SessionHistoryRuntime } from './session-history.js';
 
 /**
  * Electron main process — the trusted side of the boundary.
  *
  * STATUS: PARTIAL. The shell launches, is hardened, renders, and now serves the
- * Stage 1A conversation surface: `app:get-info`, `jarvis:chat`, and
- * `jarvis:amplify`. It still has NO persistence, no database, no AEGIS, and no
+ * Stage 1A conversation surface plus explicit-save session history. Electron
+ * main owns the only SQLite connection. It still has no AEGIS and no
  * orchestrator beyond a single stateless model call per turn.
  */
 
@@ -28,8 +32,13 @@ const env = parseEnv();
 // configured this is the deterministic MockProvider (ADR 0006: $0, offline,
 // self-labeling), which is exactly what ships by default.
 const modelProvider = createProvider(env);
+let sessionHistoryRuntime: SessionHistoryRuntime | null = null;
 
 const RENDERER_DEV_URL = process.env.ELECTRON_RENDERER_URL ?? null;
+const validateIpcSender = createIpcSenderValidator({
+  packagedEntryUrl: pathToFileURL(join(__dirname, '../renderer/index.html')).href,
+  developmentUrl: RENDERER_DEV_URL,
+});
 
 // DEV-ONLY: allow Chromium's software WebGL (SwiftShader) so the V2 renderer
 // study can run in headless/GPU-less environments (Codespaces, CI probes).
@@ -123,9 +132,11 @@ void app.whenReady().then(() => {
   // the trust boundary (ADR 0002): a read-only host-facts call, and two calls
   // that reach only the model provider — never the filesystem, shell, env, or
   // AEGIS.
-  registerAppInfoHandler();
-  registerChatHandler(modelProvider);
-  registerAmplifyHandler(modelProvider);
+  registerAppInfoHandler(validateIpcSender);
+  registerChatHandler(modelProvider, validateIpcSender);
+  registerAmplifyHandler(modelProvider, validateIpcSender);
+  sessionHistoryRuntime = createSessionHistoryRuntime(app.getPath('userData'));
+  registerHistoryHandlers(sessionHistoryRuntime.repository, validateIpcSender);
 
   createWindow();
 
@@ -134,14 +145,19 @@ void app.whenReady().then(() => {
   });
 });
 
+app.on('before-quit', () => {
+  sessionHistoryRuntime?.close();
+  sessionHistoryRuntime = null;
+});
+
 app.on('window-all-closed', () => {
   // Phase 1 targets Windows only. macOS is out of scope, so there is no
   // dock-resident behaviour to preserve.
   if (process.platform !== 'darwin') app.quit();
 });
 
-// Every IPC channel is registered above via `registerAppInfoHandler` and its
-// successors. A channel is a hole in the trust boundary: each one is opened only
+// Every IPC channel is registered above by a purpose-named handler. A channel
+// is a hole in the trust boundary: each one is opened only
 // when a feature needs it, with a Zod-validated request AND response from
 // @jarvis/contracts and an explicit named function in the preload allowlist.
 // There is no generic invoke bridge and there must never be one — see

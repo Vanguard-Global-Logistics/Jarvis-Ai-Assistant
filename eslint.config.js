@@ -27,13 +27,17 @@ const AEGIS_INTERNALS = {
 
 export default tseslint.config(
   {
-    // Not ours to lint. The archived design handoff is immutable (CLAUDE.md §0).
+    // Not ours to lint as part of the active TypeScript monorepo. The archived
+    // design handoff is immutable, and jarvis-hermes/jarvis-web are preserved
+    // runtime snapshots whose own toolchains are validated separately.
     ignores: [
       '**/dist/**',
       '**/out/**',
       '**/node_modules/**',
       '**/.vite/**',
       'reference/**',
+      'jarvis-hermes/**',
+      'jarvis-web/**',
       'coverage/**',
     ],
   },
