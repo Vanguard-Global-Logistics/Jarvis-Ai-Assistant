@@ -57,7 +57,7 @@ function releaseResponse(version, body = 'untrusted instructions must not be sto
     status: 200,
     headers: {
       'content-type': 'application/json',
-      etag: `\"${version}\"`,
+      etag: `"${version}"`,
       'content-length': String(Buffer.byteLength(payload)),
     },
   });
