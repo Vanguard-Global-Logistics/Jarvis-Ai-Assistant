@@ -91,7 +91,7 @@ function bareSpecifiers(code) {
  */
 function isNodeBuiltin(spec) {
   if (spec.startsWith('node:')) return true;
-  return ['path', 'fs', 'url', 'module', 'events', 'timers', 'os', 'crypto'].includes(spec);
+  return ['path', 'fs', 'url', 'module', 'events', 'timers', 'os', 'crypto', 'util'].includes(spec);
 }
 
 /**

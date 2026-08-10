@@ -320,6 +320,8 @@ async function settle(page, timeoutMs = 20_000) {
 // --- the acceptance criteria ----------------------------------------------
 
 const PLATFORMS = ['win32', 'darwin', 'linux'];
+const historyProbeId = `runtime-probe-${String(process.pid)}-${String(Date.now())}`;
+let historySavedForRestart = false;
 
 /**
  * @param {{ evaluate: (e: string) => Promise<any>, consoleErrors: string[] }} page
@@ -374,16 +376,19 @@ async function runChecks(page, mode) {
   );
 
   const keys = await page.evaluate('window.jarvis ? Object.keys(window.jarvis) : null');
-  // Checkpoint 2 (ADR 0007) widened the bridge to the two model calls. This stays an
-  // EXACT match, in insertion order: it is the runtime half of the preload surface test,
-  // and its whole value is that an unlisted function fails it.
-  const keysOk =
-    JSON.stringify(keys.value) === JSON.stringify(['getAppInfo', 'sendChat', 'amplify']);
-  add(
-    'Object.keys is exactly ["getAppInfo","sendChat","amplify"]',
-    keysOk,
-    JSON.stringify(keys.value),
-  );
+  // Stage 1A widens the bridge by exactly four history operations. This stays an
+  // EXACT match, in insertion order: an unlisted function must fail the probe.
+  const expectedKeys = [
+    'getAppInfo',
+    'sendChat',
+    'amplify',
+    'saveSession',
+    'listSessions',
+    'getSession',
+    'deleteSession',
+  ];
+  const keysOk = JSON.stringify(keys.value) === JSON.stringify(expectedKeys);
+  add('Object.keys matches the exact Stage 1A bridge', keysOk, JSON.stringify(keys.value));
 
   const info = await page.evaluate('window.jarvis ? await window.jarvis.getAppInfo() : null');
   const i = info.value;
@@ -405,6 +410,19 @@ async function runChecks(page, mode) {
     info.error ? `THREW: ${String(info.error).split('\n')[0]}` : JSON.stringify(i),
   );
 
+  const historyBefore = await page.evaluate(
+    'window.jarvis ? await window.jarvis.listSessions() : null',
+  );
+  const historyBeforeValue = historyBefore.value;
+  const historyBeforeOk = Array.isArray(historyBeforeValue);
+  add(
+    'history:list returns a session array',
+    historyBeforeOk,
+    historyBefore.error
+      ? `THREW: ${String(historyBefore.error).split('\n')[0]}`
+      : `count = ${Array.isArray(historyBeforeValue) ? String(historyBeforeValue.length) : 'invalid'}`,
+  );
+
   // Checkpoint 2: drive a real conversation turn across the boundary. The probe
   // runs with no API key, so this exercises the deterministic mock provider —
   // and asserts the reply names its provider, which is what lets the UI label
@@ -423,6 +441,19 @@ async function runChecks(page, mode) {
     'jarvis:chat round-trips with a provider-labeled reply',
     chatOk,
     chat.error ? `THREW: ${String(chat.error).split('\n')[0]}` : JSON.stringify(c).slice(0, 160),
+  );
+
+  // A chat call alone must never persist. Explicit save is the only write path.
+  const historyAfterChat = await page.evaluate(
+    'window.jarvis ? await window.jarvis.listSessions() : null',
+  );
+  add(
+    'chat does not auto-save a session',
+    Array.isArray(historyBeforeValue) &&
+      Array.isArray(historyAfterChat.value) &&
+      historyAfterChat.value.length === historyBeforeValue.length,
+    `before = ${Array.isArray(historyBeforeValue) ? String(historyBeforeValue.length) : 'invalid'}, ` +
+      `after = ${Array.isArray(historyAfterChat.value) ? String(historyAfterChat.value.length) : 'invalid'}`,
   );
 
   // Thought Amplifier v1: one idea in, the five validated fields out. The
@@ -447,6 +478,80 @@ async function runChecks(page, mode) {
     ampOk,
     amp.error ? `THREW: ${String(amp.error).split('\n')[0]}` : JSON.stringify(a).slice(0, 160),
   );
+
+  const savedAt = '2026-08-09T12:00:00.000Z';
+  const historyRequest = {
+    id: historyProbeId,
+    name: 'Runtime probe session',
+    createdAt: savedAt,
+    updatedAt: savedAt,
+    messages: [
+      { role: 'user', content: 'Persist across a restart.' },
+      { role: 'assistant', content: 'Persistence acknowledged.', provider: 'mock' },
+    ],
+  };
+
+  if (mode === 'dev' && historySavedForRestart) {
+    const recalled = await page.evaluate(
+      `window.jarvis ? await window.jarvis.getSession(${JSON.stringify(historyProbeId)}) : null`,
+    );
+    add(
+      'saved session survives process restart',
+      recalled.value?.id === historyProbeId && recalled.value?.messages?.length === 2,
+      recalled.error
+        ? `THREW: ${String(recalled.error).split('\n')[0]}`
+        : JSON.stringify(recalled.value).slice(0, 160),
+    );
+  } else {
+    const saved = await page.evaluate(
+      `window.jarvis ? await window.jarvis.saveSession(${JSON.stringify(historyRequest)}) : null`,
+    );
+    add(
+      'history:save persists one explicit snapshot',
+      saved.value?.id === historyProbeId && saved.value?.messages?.length === 2,
+      saved.error
+        ? `THREW: ${String(saved.error).split('\n')[0]}`
+        : JSON.stringify(saved.value).slice(0, 160),
+    );
+
+    const recalled = await page.evaluate(
+      `window.jarvis ? await window.jarvis.getSession(${JSON.stringify(historyProbeId)}) : null`,
+    );
+    add(
+      'history:get recalls the ordered transcript',
+      recalled.value?.id === historyProbeId && recalled.value?.messages?.length === 2,
+      recalled.error
+        ? `THREW: ${String(recalled.error).split('\n')[0]}`
+        : JSON.stringify(recalled.value).slice(0, 160),
+    );
+  }
+
+  const listed = await page.evaluate('window.jarvis ? await window.jarvis.listSessions() : null');
+  add(
+    'history:list includes the explicit snapshot',
+    Array.isArray(listed.value) && listed.value.some((session) => session.id === historyProbeId),
+    listed.error
+      ? `THREW: ${String(listed.error).split('\n')[0]}`
+      : `count = ${Array.isArray(listed.value) ? String(listed.value.length) : 'invalid'}`,
+  );
+
+  if (mode === 'prod' && wantDev) {
+    historySavedForRestart = true;
+  } else {
+    const removed = await page.evaluate(
+      `window.jarvis ? await window.jarvis.deleteSession(${JSON.stringify(historyProbeId)}) : null`,
+    );
+    const afterDelete = await page.evaluate(
+      `window.jarvis ? await window.jarvis.getSession(${JSON.stringify(historyProbeId)}) : null`,
+    );
+    add(
+      'confirmed-delete path removes the snapshot',
+      removed.value?.deleted === true && afterDelete.value === null,
+      removed.error
+        ? `THREW: ${String(removed.error).split('\n')[0]}`
+        : `delete = ${JSON.stringify(removed.value)}, get = ${JSON.stringify(afterDelete.value)}`,
+    );
+  }
 
   // E2: the Experience Shell mounts the Orb. Assert the real component is
   // live — state, ARIA meaning, and its canvas — not merely that React

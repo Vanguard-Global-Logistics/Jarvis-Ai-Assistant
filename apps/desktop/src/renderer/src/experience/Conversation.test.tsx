@@ -19,6 +19,10 @@ function fakeBridge(overrides: Partial<ConversationBridge> = {}): ConversationBr
   return {
     sendChat: vi.fn().mockResolvedValue({ text: 'Hello from the mock.', provider: 'mock' }),
     amplify: vi.fn().mockResolvedValue(AMP),
+    saveSession: vi.fn(async (request) => request),
+    listSessions: vi.fn().mockResolvedValue([]),
+    getSession: vi.fn().mockResolvedValue(null),
+    deleteSession: vi.fn().mockResolvedValue({ deleted: true }),
     ...overrides,
   };
 }
@@ -150,5 +154,102 @@ describe('Conversation', () => {
     const convo = screen.getByRole('region', { name: /jarvis conversation/i });
     expect(within(convo).getByText('first')).toBeTruthy();
     expect(within(convo).getByText('second')).toBeTruthy();
+  });
+
+  it('never persists a chat turn until Save Session is explicitly confirmed', async () => {
+    const bridge = fakeBridge();
+    const { unmount } = render(<Conversation bridge={bridge} />);
+
+    type('keep this only in memory');
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+    await screen.findByText('Hello from the mock.');
+
+    expect(bridge.saveSession).not.toHaveBeenCalled();
+    unmount();
+    expect(bridge.saveSession).not.toHaveBeenCalled();
+  });
+
+  it('saves only after explicit naming and opens the saved snapshot read-only', async () => {
+    const saveSession = vi.fn(async (request) => request);
+    const bridge = fakeBridge({ saveSession });
+    render(<Conversation bridge={bridge} />);
+
+    type('save this conversation');
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+    await screen.findByText('Hello from the mock.');
+
+    fireEvent.click(screen.getByRole('button', { name: /save session/i }));
+    fireEvent.change(screen.getByRole('textbox', { name: /session name/i }), {
+      target: { value: 'Site readiness' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /confirm save/i }));
+
+    expect(await screen.findByText(/SAVED SESSION · Site readiness · READ-ONLY/i)).toBeTruthy();
+    expect(saveSession).toHaveBeenCalledTimes(1);
+    expect(saveSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'Site readiness',
+        messages: [
+          { role: 'user', content: 'save this conversation' },
+          { role: 'assistant', content: 'Hello from the mock.', provider: 'mock' },
+        ],
+      }),
+    );
+    expect(screen.getByRole('textbox', { name: /message jarvis/i })).toHaveProperty(
+      'disabled',
+      true,
+    );
+  });
+
+  it('opens saved history read-only and starts a separate new session', async () => {
+    const summary = {
+      id: 'saved-1',
+      name: 'Yesterday briefing',
+      createdAt: '2026-08-09T12:00:00.000Z',
+      updatedAt: '2026-08-09T12:00:00.000Z',
+      messageCount: 1,
+    };
+    const saved = {
+      ...summary,
+      messages: [{ role: 'user' as const, content: 'Archived work' }],
+    };
+    const bridge = fakeBridge({
+      listSessions: vi.fn().mockResolvedValue([summary]),
+      getSession: vi.fn().mockResolvedValue(saved),
+    });
+    render(<Conversation bridge={bridge} />);
+
+    const history = await screen.findByRole('button', { name: /History \(1\)/i });
+    fireEvent.click(history);
+    fireEvent.click(screen.getByRole('button', { name: /Yesterday briefing · 1 messages/i }));
+
+    expect(await screen.findByText('Archived work')).toBeTruthy();
+    expect(screen.getByText(/SAVED SESSION · Yesterday briefing · READ-ONLY/i)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /new session/i }));
+    expect(screen.queryByText('Archived work')).toBeNull();
+    expect(screen.getByText(/NOTHING IS SAVED AUTOMATICALLY/i)).toBeTruthy();
+  });
+
+  it('requires confirmation before deleting saved history', async () => {
+    const summary = {
+      id: 'saved-1',
+      name: 'Delete me',
+      createdAt: '2026-08-09T12:00:00.000Z',
+      updatedAt: '2026-08-09T12:00:00.000Z',
+      messageCount: 1,
+    };
+    const deleteSession = vi.fn().mockResolvedValue({ deleted: true });
+    const listSessions = vi.fn().mockResolvedValueOnce([summary]).mockResolvedValueOnce([]);
+    const bridge = fakeBridge({ listSessions, deleteSession });
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<Conversation bridge={bridge} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /History \(1\)/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Delete Delete me/i }));
+
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(deleteSession).toHaveBeenCalledWith(summary.id);
+    expect(await screen.findByRole('button', { name: /History \(0\)/i })).toBeTruthy();
+    confirm.mockRestore();
   });
 });

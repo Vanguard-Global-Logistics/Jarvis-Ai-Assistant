@@ -33,9 +33,11 @@ describe('registerHistoryHandlers', () => {
 
     registerHistoryHandlers(repository, validateSender);
 
-    const calls = boundary.handleContract.mock.calls as unknown as Array<
-      readonly [{ readonly channel: string }, (request: unknown) => unknown, typeof validateSender]
-    >;
+    const calls = boundary.handleContract.mock.calls as unknown as (readonly [
+      { readonly channel: string },
+      (request: unknown) => unknown,
+      typeof validateSender,
+    ])[];
 
     expect(boundary.handleContract).toHaveBeenCalledTimes(4);
     expect(calls.map(([contract]) => contract.channel)).toEqual([
