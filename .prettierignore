@@ -20,3 +20,12 @@ node_modules/
 coverage/
 .vite/
 package-lock.json
+
+# Standalone artifact trees, not monorepo source. `jarvis-hermes/` is an
+# uploaded snapshot of the ChatGPT-built Hermes engine (commit c5ec68f) — a
+# restore archive whose bytes should stay exactly as uploaded. `jarvis-web/`
+# is the separately-deployed Vercel companion. Neither is built, linted, or
+# tested by this repo's toolchain, and reformatting them would bury their real
+# content in churn.
+jarvis-hermes/
+jarvis-web/

@@ -28,6 +28,11 @@ const AEGIS_INTERNALS = {
 export default tseslint.config(
   {
     // Not ours to lint. The archived design handoff is immutable (CLAUDE.md §0).
+    // `jarvis-hermes/` is an uploaded snapshot archive (commit c5ec68f) whose
+    // bytes must stay as uploaded; `jarvis-web/` is the separately-deployed
+    // Vercel companion with its own runtime conventions. Neither is built or
+    // tested by this repo's toolchain, so this config's monorepo rules do not
+    // apply to them.
     ignores: [
       '**/dist/**',
       '**/out/**',
@@ -35,6 +40,8 @@ export default tseslint.config(
       '**/.vite/**',
       'reference/**',
       'coverage/**',
+      'jarvis-hermes/**',
+      'jarvis-web/**',
     ],
   },
 
