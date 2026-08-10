@@ -47,11 +47,15 @@ describe('registerHistoryHandlers', () => {
       'history:delete',
     ]);
 
-    const implementations = calls.map(([, implementation]) => implementation);
-    expect(implementations[0](saved)).toEqual(saved);
-    expect(implementations[1](undefined)).toEqual([]);
-    expect(implementations[2]({ id: saved.id })).toEqual(saved);
-    expect(implementations[3]({ id: saved.id })).toEqual({ deleted: true });
+    const [saveCall, listCall, getCall, deleteCall] = calls;
+    if (!saveCall || !listCall || !getCall || !deleteCall) {
+      throw new Error('Expected all four history handlers to be registered');
+    }
+
+    expect(saveCall[1](saved)).toEqual(saved);
+    expect(listCall[1](undefined)).toEqual([]);
+    expect(getCall[1]({ id: saved.id })).toEqual(saved);
+    expect(deleteCall[1]({ id: saved.id })).toEqual({ deleted: true });
 
     expect(save).toHaveBeenCalledWith(saved);
     expect(list).toHaveBeenCalledWith();
