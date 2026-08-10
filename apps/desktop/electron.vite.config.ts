@@ -44,6 +44,7 @@ import { contentSecurityPolicy } from './src/shared/csp.js';
 const INTERNAL_PACKAGES = [
   '@jarvis/config',
   '@jarvis/contracts',
+  '@jarvis/database',
   '@jarvis/jarvis-core',
   '@jarvis/ui',
 ];
