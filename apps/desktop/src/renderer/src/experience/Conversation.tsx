@@ -583,6 +583,17 @@ function HistoryPanel({
   onOpen: (id: string) => void;
   onDelete: (id: string) => void;
 }): JSX.Element {
+  // Filtering happens over metadata the renderer already holds — no query
+  // crosses the boundary, so search adds no channel and no authority. Titles
+  // are derived from the transcript, so this searches what the session was
+  // about.
+  const [filter, setFilter] = useState('');
+  const needle = filter.trim().toLowerCase();
+  const visible =
+    needle === ''
+      ? conversations
+      : conversations.filter((meta) => meta.title.toLowerCase().includes(needle));
+
   return (
     <section
       aria-label="Saved sessions"
@@ -591,7 +602,7 @@ function HistoryPanel({
         borderRadius: surface.radiusMin,
         background: surface.glass,
         padding: 10,
-        maxHeight: 220,
+        maxHeight: 260,
         overflowY: 'auto',
         display: 'flex',
         flexDirection: 'column',
@@ -601,6 +612,30 @@ function HistoryPanel({
       <span style={{ ...MONO_LABEL, color: text.secondaryDim }}>
         Saved sessions — stored on this PC, via history:list
       </span>
+
+      {/* Only worth the space once there is enough to sift through. */}
+      {conversations.length > 3 && (
+        <input
+          type="search"
+          value={filter}
+          onChange={(e) => {
+            setFilter(e.target.value);
+          }}
+          placeholder="Filter saved sessions…"
+          aria-label="Filter saved sessions"
+          style={{
+            background: 'transparent',
+            border: `1px solid ${surface.hairline}`,
+            borderRadius: 6,
+            outline: 'none',
+            color: text.body,
+            fontFamily: fontFamily.body,
+            fontSize: 13,
+            padding: '5px 8px',
+          }}
+        />
+      )}
+
       {error !== null && (
         <span role="alert" style={{ ...MONO_LABEL, color: accent.danger }}>
           {error}
@@ -611,7 +646,12 @@ function HistoryPanel({
           Nothing saved yet. Save Session stores the current conversation.
         </span>
       )}
-      {conversations.map((meta) => {
+      {conversations.length > 0 && visible.length === 0 && (
+        <span style={{ color: text.faint, fontFamily: fontFamily.body, fontSize: 13 }}>
+          No saved session matches “{filter.trim()}”.
+        </span>
+      )}
+      {visible.map((meta) => {
         const arming = confirmDeleteId === meta.id;
         return (
           <div

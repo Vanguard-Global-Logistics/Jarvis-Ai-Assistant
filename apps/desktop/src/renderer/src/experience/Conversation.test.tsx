@@ -265,6 +265,36 @@ describe('Conversation', () => {
     });
   });
 
+  it('filters the saved-session list once it is long enough to need it', async () => {
+    const many = Array.from({ length: 5 }, (_, i) => ({
+      ...SAVED_META,
+      id: `f4b1c1d2-3a4b-4c5d-8e6f-7a8b9c0d1e2${String(i)}`,
+      title: i === 0 ? 'Henderson permit question' : `Unrelated session ${String(i)}`,
+    }));
+    const bridge = fakeBridge({
+      listConversations: vi.fn().mockResolvedValue({ conversations: many }),
+    });
+    render(<Conversation bridge={bridge} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /history/i }));
+    const panel = await screen.findByRole('region', { name: /saved sessions/i });
+    expect(within(panel).getAllByRole('button', { name: 'Open' })).toHaveLength(5);
+
+    fireEvent.change(within(panel).getByRole('searchbox', { name: /filter saved sessions/i }), {
+      target: { value: 'henderson' },
+    });
+
+    // Case-insensitive match on the derived title; the rest are hidden.
+    expect(within(panel).getAllByRole('button', { name: 'Open' })).toHaveLength(1);
+    expect(within(panel).getByText('Henderson permit question')).toBeTruthy();
+
+    fireEvent.change(within(panel).getByRole('searchbox', { name: /filter saved sessions/i }), {
+      target: { value: 'nothing matches this' },
+    });
+    expect(within(panel).queryAllByRole('button', { name: 'Open' })).toHaveLength(0);
+    expect(within(panel).getByText(/No saved session matches/)).toBeTruthy();
+  });
+
   it('states plainly when a saved session no longer exists', async () => {
     const bridge = fakeBridge({
       listConversations: vi.fn().mockResolvedValue({ conversations: [SAVED_META] }),
