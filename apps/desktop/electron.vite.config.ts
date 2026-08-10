@@ -122,6 +122,10 @@ export default defineConfig(({ command }) => {
         // resolves to TypeScript, which Node cannot execute. Bundle them.
         externalizeDeps: { exclude: INTERNAL_PACKAGES },
         rollupOptions: {
+          // @jarvis/database is bundled because it is workspace TypeScript, but
+          // its native dependency must remain a real runtime import. Bundling
+          // better-sqlite3's JS loader breaks its dynamic .node resolution.
+          external: ['better-sqlite3'],
           input: { index: resolve(__dirname, 'src/main/index.ts') },
         },
       },
