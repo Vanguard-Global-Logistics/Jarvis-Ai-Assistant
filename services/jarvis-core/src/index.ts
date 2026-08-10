@@ -28,3 +28,5 @@ export { HiveLocalProvider, validateHiveLocalBaseUrl } from './model/hive-local-
 export type { HiveLocalHttpClient } from './model/hive-local-provider.js';
 export { MockProvider } from './model/mock-provider.js';
 export type { JarvisModelProvider } from './model/provider.js';
+export { classifyChatRequest, selectHiveChatModel } from './model/routing.js';
+export type { ChatRoute, HiveModelSet } from './model/routing.js';

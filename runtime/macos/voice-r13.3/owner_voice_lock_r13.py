@@ -64,8 +64,11 @@ def _read_wav_pcm(path: Path) -> np.ndarray:
 
 
 def _pcm_bytes_to_samples(pcm: bytes) -> np.ndarray:
-    if len(pcm) < SAMPLE_RATE * 2 // 2:
-        raise ValueError("speaker sample is too short")
+    # CAM++ requires 0.70 s in _features(). Reject the same boundary here so
+    # normal VAD fragments never reach the embedder or appear as validation
+    # errors in the live listener.
+    if len(pcm) < int(SAMPLE_RATE * 2 * 0.70):
+        raise ValueError("speaker sample is too short (minimum 0.7 seconds)")
     return np.frombuffer(pcm, dtype="<i2").astype(np.float32)
 
 

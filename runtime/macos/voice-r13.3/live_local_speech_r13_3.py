@@ -42,13 +42,19 @@ def _wav_duration(path: Path) -> float:
         return 0.0
 
 
-def chunk_spoken_text(text: str, target_words: int = 12) -> list[str]:
+def chunk_spoken_text(
+    text: str,
+    first_words: int = 4,
+    later_words: int = 12,
+) -> list[str]:
+    """Split static answers aggressively once, then use natural later chunks."""
     body = re.sub(r"\s+", " ", str(text or "").strip())
     if not body:
         return []
     chunks: list[str] = []
     rest = body
     while rest:
+        target_words = first_words if not chunks else later_words
         sentence = re.search(r"^(.+?[.!?])(?:\s+|$)", rest)
         if sentence and len(sentence.group(1).split()) <= target_words + 4:
             chunks.append(sentence.group(1).strip())
@@ -107,7 +113,7 @@ class DuplexInterruptProbe:
         self.baseline_provider = baseline_provider
         self.owner_verify_pcm = owner_verify_pcm
         self.owner_wake_rescue_threshold = float(
-            os.environ.get("JARVIS_OWNER_WAKE_RESCUE_THRESHOLD", "0.62")
+            os.environ.get("JARVIS_OWNER_WAKE_RESCUE_THRESHOLD", "0.56")
         )
         self.vad = webrtcvad.Vad(3) if webrtcvad else None
         self.votes = deque(maxlen=7)

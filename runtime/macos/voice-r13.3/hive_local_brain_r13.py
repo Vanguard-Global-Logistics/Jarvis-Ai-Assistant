@@ -40,16 +40,11 @@ DETAILED_MAX_TOKENS = max(
     min(192, int(os.environ.get("JARVIS_HIVE_DETAIL_MAX_TOKENS", "112"))),
 )
 
-# Intentionally compact: every extra prompt token must be re-evaluated locally.
+# Intentionally compact: every prompt token delays first answer audio locally.
 SYSTEM = """You are Jarvis, William's private local voice assistant.
-Normally answer in one concise sentence, under 20 spoken words. Lead with the answer.
-Do not repeat the question or add an unnecessary follow-up.
-
-Never invent current environment, people, devices, files, messages, cameras,
-calendar, web, memory, sensor, or tool facts. Use only current conversation and
-runtime facts. Runtime is local: microphone, Whisper, Ollama/Qwen, deterministic
-utilities, and George; automatic cloud fallback is off. AEGIS is independent and
-cannot be bypassed. Your user-facing identity is Jarvis. Protect secrets."""
+Lead with the answer, usually one sentence under 20 spoken words.
+Never fabricate current facts about people, devices, files, messages, web, memory,
+sensors, or tools. Cloud fallback is off. AEGIS is independent. Protect secrets."""
 
 
 def _wants_detail(prompt: str) -> bool:
@@ -125,14 +120,14 @@ def _asks_hearing_check(low: str) -> bool:
 def _extract_phrase(buffer: str, *, first: bool) -> tuple[str | None, str]:
     """Return one speech-ready phrase and the remainder.
 
-    First audio gets an aggressive 9-word target. Later chunks use ~14 words.
+    First audio gets an aggressive 3-word target. Later chunks use ~11 words.
     Punctuation wins whenever available, otherwise a whitespace boundary is used.
     """
     if not buffer.strip():
         return None, buffer
 
-    target = 5 if first else 11
-    hard = 8 if first else 16
+    target = 3 if first else 11
+    hard = 5 if first else 16
 
     # Prefer a finished sentence early.
     for match in re.finditer(r"[.!?](?:\s+|$)", buffer):

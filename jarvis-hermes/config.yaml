@@ -1,8 +1,67 @@
-# Jarvis engine configuration (Hermes Agent)
-# Install location: ~/.hermes/config.yaml
+# Jarvis defaults for Hermes Agent v0.20.0.
+# install.sh merges missing keys into ~/.hermes/config.yaml; it does not erase
+# an owner's existing model, profile, gateway, or memory configuration.
 model:
   default: anthropic/claude-sonnet-5
   provider: anthropic
+
 memory:
   memory_enabled: true
   user_profile_enabled: true
+
+# Keep transcription local and light enough for the 8 GB Apple-silicon Mac.
+stt:
+  enabled: true
+  provider: local
+  local:
+    model: base
+    language: ""
+    device: cpu
+    compute_type: int8
+
+voice:
+  auto_tts: true
+  beep_enabled: true
+  max_recording_seconds: 120
+  silence_duration: 1.5
+  stop_phrases:
+    - stop
+    - never mind
+    - goodbye
+    - cancel
+    - that's all
+
+# Hermes v0.20 can call the physically tested R13.3 Kokoro/MLX worker. The
+# installer replaces __HERMES_HOME__ with the absolute local path. The adapter
+# falls back to the built-in macOS voice if the worker is not running.
+tts:
+  provider: jarvis-kokoro
+  providers:
+    jarvis-kokoro:
+      type: command
+      command: "__HERMES_HOME__/bin/jarvis-kokoro-tts.py --input {input_path} --output {output_path}"
+      output_format: wav
+      timeout: 120
+      max_text_length: 5000
+
+# Installation includes the wake engine, but first activation remains manual so
+# macOS can show its microphone permission prompt. Auto lets Hermes select
+# TFLite on Apple Silicon; forcing ONNX there can produce a silent listener.
+wake_word:
+  enabled: false
+  surface: auto
+  input_device: null
+  provider: openwakeword
+  phrase: hey jarvis
+  sensitivity: 0.6
+  confirmation_frames: 3
+  start_new_session: true
+  profile_routing: true
+  openwakeword:
+    model: hey_jarvis
+    inference_framework: ""
+
+display:
+  streaming: true
+  turn_summary: true
+  interim_assistant_messages: true

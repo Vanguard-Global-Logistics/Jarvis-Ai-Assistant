@@ -39,7 +39,15 @@ vi.mock('electron', () => ({
  * narrow, purpose-named model call, each documented in docs/IPC-SURFACE.md.
  * This edit is the deliberate act; the failure it resolves was the checkpoint.
  */
-const ALLOWED_API = ['getAppInfo', 'sendChat', 'amplify'] as const;
+const ALLOWED_API = [
+  'getAppInfo',
+  'sendChat',
+  'amplify',
+  'saveSession',
+  'listSessions',
+  'getSession',
+  'deleteSession',
+] as const;
 
 /** Load the bridge fresh and return what it handed to `exposeInMainWorld`. */
 async function loadBridge(): Promise<{ namespace: string; api: Record<string, unknown> }> {
@@ -168,5 +176,44 @@ describe('jarvis.amplify', () => {
     expect(mocks.invoke).toHaveBeenCalledWith(CHANNELS.jarvisAmplify, {
       idea: 'a faster permit tracker',
     });
+  });
+});
+
+describe('jarvis history', () => {
+  it('maps four purpose-named methods to four fixed history channels', async () => {
+    const { api } = await loadBridge();
+    const saveSession = api.saveSession;
+    const listSessions = api.listSessions;
+    const getSession = api.getSession;
+    const deleteSession = api.deleteSession;
+    if (
+      typeof saveSession !== 'function' ||
+      typeof listSessions !== 'function' ||
+      typeof getSession !== 'function' ||
+      typeof deleteSession !== 'function'
+    ) {
+      throw new Error('history bridge is incomplete');
+    }
+
+    const session = {
+      id: 'session-1',
+      name: 'Morning plan',
+      createdAt: '2026-08-09T12:00:00.000Z',
+      updatedAt: '2026-08-09T12:00:00.000Z',
+      messages: [{ role: 'user', content: 'Plan my day.' }],
+    };
+    mocks.invoke.mockResolvedValue(undefined);
+
+    await (saveSession as (request: unknown) => Promise<unknown>)(session);
+    await (listSessions as () => Promise<unknown>)();
+    await (getSession as (id: string) => Promise<unknown>)(session.id);
+    await (deleteSession as (id: string) => Promise<unknown>)(session.id);
+
+    expect(mocks.invoke.mock.calls).toEqual([
+      [CHANNELS.historySave, session],
+      [CHANNELS.historyList],
+      [CHANNELS.historyGet, { id: session.id }],
+      [CHANNELS.historyDelete, { id: session.id }],
+    ]);
   });
 });

@@ -23,7 +23,7 @@ echo "  0.906 -> strong OWNER"
 echo "  0.664 -> William + Jarvis wake + 10.79x near-field, falsely rejected"
 echo
 echo "Fix: keep strong threshold 0.760; rescue UNCERTAIN only when:"
-echo "  score >= 0.62 + explicit Jarvis wake + near-field >= 4.0x"
+echo "  score >= 0.56 + explicit Jarvis wake + near-field >= 4.0x"
 echo
 
 [ -x "$PY" ] || fail "Jarvis Python is missing."
@@ -36,6 +36,8 @@ META_BEFORE="$(shasum -a 256 "$META" | awk '{print $1}')"
 mkdir -p "$VOICE_ROOT/backups-r13-3" "$CORE/backups-r13-3"
 [ -f "$VOICE_ROOT/live_voice_loop.py" ] && cp "$VOICE_ROOT/live_voice_loop.py" "$VOICE_ROOT/backups-r13-3/live_voice_loop.py.before-r13-3"
 [ -f "$ACTIVE_START" ] && cp "$ACTIVE_START" "$CORE/backups-r13-3/START-JARVIS-HIVE.command.before-r13-3"
+
+bash "$DIR/reconstruct-live-voice-loop.sh"
 
 cp "$DIR/live_voice_loop_r13_3.py" "$VOICE_ROOT/live_voice_loop.py"
 cp "$DIR/live_local_speech_r13_3.py" "$VOICE_ROOT/live_local_speech_r13_3.py"

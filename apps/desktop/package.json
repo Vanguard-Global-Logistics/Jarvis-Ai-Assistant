@@ -18,6 +18,7 @@
     "@fontsource/space-grotesk": "^5.2.10",
     "@jarvis/config": "*",
     "@jarvis/contracts": "*",
+    "@jarvis/database": "*",
     "@jarvis/jarvis-core": "*",
     "@jarvis/ui": "*",
     "zod": "^4.4.3"

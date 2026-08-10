@@ -6,6 +6,10 @@ import type {
   AppInfo,
   ChatReply,
   ChatRequest,
+  DeleteSessionResult,
+  SaveSessionRequest,
+  SavedSession,
+  SavedSessionSummary,
 } from '@jarvis/contracts';
 
 /**
@@ -62,6 +66,22 @@ const api = {
     ipcRenderer.invoke(CHANNELS.jarvisAmplify, {
       idea,
     } satisfies AmplifyRequest) as Promise<AmplifierResult>,
+
+  /** Persist one named transcript only after the owner presses Save Session. */
+  saveSession: (request: SaveSessionRequest): Promise<SavedSession> =>
+    ipcRenderer.invoke(CHANNELS.historySave, request) as Promise<SavedSession>,
+
+  /** List metadata for explicitly saved sessions. */
+  listSessions: (): Promise<SavedSessionSummary[]> =>
+    ipcRenderer.invoke(CHANNELS.historyList) as Promise<SavedSessionSummary[]>,
+
+  /** Open one saved transcript by opaque id. */
+  getSession: (id: string): Promise<SavedSession | null> =>
+    ipcRenderer.invoke(CHANNELS.historyGet, { id }) as Promise<SavedSession | null>,
+
+  /** Delete one saved transcript by opaque id after renderer confirmation. */
+  deleteSession: (id: string): Promise<DeleteSessionResult> =>
+    ipcRenderer.invoke(CHANNELS.historyDelete, { id }) as Promise<DeleteSessionResult>,
 } as const;
 
 export type JarvisApi = typeof api;

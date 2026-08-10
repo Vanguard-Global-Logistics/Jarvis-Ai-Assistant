@@ -6,6 +6,13 @@ import {
   ChatReplySchema,
   ChatRequestSchema,
 } from '../model/contracts.js';
+import {
+  DeleteSessionResultSchema,
+  SaveSessionRequestSchema,
+  SavedSessionSchema,
+  SavedSessionSummarySchema,
+  SessionIdRequestSchema,
+} from '../history/contracts.js';
 
 /**
  * IPC contracts — the single definition of every message that crosses the
@@ -105,6 +112,36 @@ export const jarvisAmplifyContract = defineContract({
   response: AmplifierResultSchema,
 });
 
+// --- history:* --------------------------------------------------------------
+
+/** Explicit owner action: persist one complete named transcript. */
+export const historySaveContract = defineContract({
+  channel: CHANNELS.historySave,
+  request: SaveSessionRequestSchema,
+  response: SavedSessionSchema,
+});
+
+/** Read bounded metadata only; opening the transcript is a separate call. */
+export const historyListContract = defineContract({
+  channel: CHANNELS.historyList,
+  request: z.undefined(),
+  response: z.array(SavedSessionSummarySchema).max(10_000),
+});
+
+/** Read one transcript by its opaque, bounded id. */
+export const historyGetContract = defineContract({
+  channel: CHANNELS.historyGet,
+  request: SessionIdRequestSchema,
+  response: SavedSessionSchema.nullable(),
+});
+
+/** Delete one transcript by id; the renderer owns the confirmation UI. */
+export const historyDeleteContract = defineContract({
+  channel: CHANNELS.historyDelete,
+  request: SessionIdRequestSchema,
+  response: DeleteSessionResultSchema,
+});
+
 // --- registry ---------------------------------------------------------------
 
 /**
@@ -116,4 +153,8 @@ export const IPC_CONTRACTS = {
   [CHANNELS.appGetInfo]: appGetInfoContract,
   [CHANNELS.jarvisChat]: jarvisChatContract,
   [CHANNELS.jarvisAmplify]: jarvisAmplifyContract,
+  [CHANNELS.historySave]: historySaveContract,
+  [CHANNELS.historyList]: historyListContract,
+  [CHANNELS.historyGet]: historyGetContract,
+  [CHANNELS.historyDelete]: historyDeleteContract,
 } as const;

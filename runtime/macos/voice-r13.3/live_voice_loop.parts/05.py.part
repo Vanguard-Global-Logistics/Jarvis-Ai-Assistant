@@ -18,7 +18,7 @@
         noisy_room = room_guard.is_noisy(now)
         in_conversation = conversation_until > now
 
-        owner_slot = OWNER_COMMAND_SLOT_UNTIL > now
+        owner_slot = owner_slot_for_capture
 
         if field_locked and not heard_wake and not owner_slot:
             # At a game or similarly loud environment, a temporary dip back to
@@ -27,23 +27,16 @@
 
         if heard_wake and not inline:
             print("Wake word accepted.")
-            if field_locked or noisy_room:
-                print(
-                    f"Owner command slot: ARMED for {WAKE_COMMAND_SLOT_SECONDS:.1f}s",
-                    flush=True,
-                )
-            mic_state = speak_without_mic_backlog(mic_reader, "Yes?", "Acknowledgement")
-            if mic_state is None:
-                break
-            # Start the protected owner slot AFTER the acknowledgement finishes.
-            # R12.3 consumed much of the slot while George was saying "Yes?".
+            # Arm command capture immediately. The old spoken "Yes?" acknowledgement
+            # paused and flushed the microphone, dropping words spoken right after
+            # "Jarvis". Keep listening so the next complete utterance reaches STT.
             OWNER_COMMAND_SLOT_UNTIL = time.time() + WAKE_COMMAND_SLOT_SECONDS
+            armed_until = OWNER_COMMAND_SLOT_UNTIL
+            conversation_until = time.time() + CONVERSATION_SECONDS
             print(
-                f"Owner command slot: STARTED now for {WAKE_COMMAND_SLOT_SECONDS:.1f}s",
+                f"Owner command capture: LISTENING now for {WAKE_COMMAND_SLOT_SECONDS:.1f}s",
                 flush=True,
             )
-            armed_until = time.time() + WAKE_ARM_SECONDS
-            conversation_until = time.time() + CONVERSATION_SECONDS
             continue
 
         if heard_wake and inline:
@@ -55,7 +48,12 @@
             OWNER_COMMAND_SLOT_UNTIL = 0.0
             armed_until = 0.0
             print("Owner command slot: CONSUMED", flush=True)
-        elif (armed_until > now or in_conversation) and not noisy_room and not field_locked:
+        elif (
+            not OWNER_DEVELOPMENT_MODE
+            and (armed_until > now or in_conversation)
+            and not noisy_room
+            and not field_locked
+        ):
             command = text.strip()
             armed_until = 0.0
         else:

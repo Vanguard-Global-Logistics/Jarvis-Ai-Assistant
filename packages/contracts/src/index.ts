@@ -6,8 +6,9 @@
  * demo scripts, mission control, ventures) are also defined and tested —
  * pure Zod, client-agnostic, no UI wired to them yet (E1a of the experience
  * workstream; see `docs/superpowers/plans/2026-07-17-experience-prototype-plan.md`).
- * AEGIS, permission, and database contracts are NOT defined — those depend
- * on design decisions that have not been made.
+ * Stage 1A explicit-save history contracts are defined at the client-neutral
+ * domain boundary. AEGIS and permission contracts are NOT defined — those
+ * depend on design decisions that have not been made.
  *
  * CLAUDE.md §3 requires no duplicated logic: "If a rule exists in two files, it
  * will drift, and for AEGIS rules, drift is a security failure." Every schema
@@ -22,6 +23,10 @@ export {
   AppInfoSchema,
   IPC_CONTRACTS,
   appGetInfoContract,
+  historyDeleteContract,
+  historyGetContract,
+  historyListContract,
+  historySaveContract,
   jarvisAmplifyContract,
   jarvisChatContract,
 } from './ipc/contracts.js';
@@ -43,6 +48,25 @@ export type {
   ChatRequest,
   ProviderId,
 } from './model/contracts.js';
+
+export {
+  DeleteSessionResultSchema,
+  SaveSessionRequestSchema,
+  SavedSessionMessageSchema,
+  SavedSessionSchema,
+  SavedSessionSummarySchema,
+  SessionIdRequestSchema,
+  SessionIdSchema,
+  SessionNameSchema,
+} from './history/contracts.js';
+export type {
+  DeleteSessionResult,
+  SaveSessionRequest,
+  SavedSession,
+  SavedSessionMessage,
+  SavedSessionSummary,
+  SessionIdRequest,
+} from './history/contracts.js';
 
 export { ORB_STATES, OrbStateSchema } from './experience/orb.js';
 export type { OrbState } from './experience/orb.js';

@@ -25,6 +25,8 @@ const EnvSchema = z.object({
   HIVE_LOCAL_AI_MODE: z.enum(['off', 'local-only']).default('off'),
   HIVE_LOCAL_AI_URL: z.url().default('http://127.0.0.1:8000'),
   HIVE_LOCAL_AI_MODEL: z.string().min(1).optional(),
+  HIVE_LOCAL_AI_FAST_MODEL: z.string().min(1).optional(),
+  HIVE_LOCAL_AI_REASONING_MODEL: z.string().min(1).optional(),
   OPENAI_API_KEY: z.string().min(1).optional(),
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
 

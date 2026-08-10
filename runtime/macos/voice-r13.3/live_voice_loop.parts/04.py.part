@@ -127,11 +127,19 @@ try:
             print("Field lock: OFF — sustained quiet verified; natural follow-up restored.", flush=True)
             field_lock_announced = False
 
+        owner_slot_waiting = OWNER_COMMAND_SLOT_UNTIL > now_before_listen
+        # Freeze authorization for an utterance that starts before the slot
+        # deadline. Finishing STT or a long sentence must not revoke it mid-turn.
+        owner_slot_for_capture = owner_slot_waiting
         preexisting_conversation = (
             conversation_until > now_before_listen or armed_until > now_before_listen
         )
 
-        if field_locked_before_listen:
+        # A standalone wake is an explicit request to capture the owner's whole
+        # next command. Do not truncate it to the short noisy-room scan window.
+        if owner_slot_waiting:
+            listen_limit = MAX_UTTERANCE_SECONDS
+        elif field_locked_before_listen:
             listen_limit = LOUD_WAKE_SCAN_SECONDS
         elif preexisting_conversation and not detector.is_loud_environment():
             listen_limit = MAX_UTTERANCE_SECONDS
@@ -144,6 +152,12 @@ try:
             mic_reader,
             detector,
             max_seconds=listen_limit,
+            end_silence_ms=(
+                COMMAND_END_SILENCE_MS if owner_slot_waiting else None
+            ),
+            start_deadline=(
+                OWNER_COMMAND_SLOT_UNTIL if owner_slot_waiting else None
+            ),
         )
         if STOP:
             break
@@ -151,6 +165,10 @@ try:
             print(f"AEGIS changed to {aegis_state()!r}; voice stopped without altering AEGIS.")
             break
         if not pcm:
+            if acoustic.get("slot_expired"):
+                OWNER_COMMAND_SLOT_UNTIL = 0.0
+                armed_until = 0.0
+                print("Owner command capture: EXPIRED — say Jarvis again.", flush=True)
             if mic_reader.error:
                 if not STOP:
                     print(f"Microphone stream stopped: {mic_reader.error}", flush=True)
@@ -164,6 +182,45 @@ try:
         except ValueError as exc:
             message = str(exc).lower()
             if "too short" in message or "not enough" in message:
+                # CAM++ needs a longer biometric sample than a naturally spoken
+                # "Jarvis". In owner-development mode only, let Whisper inspect
+                # the short near-field clip and accept it solely as a wake—not
+                # as a command—when the explicit wake parser agrees.
+                short_ratio = (
+                    float(acoustic.get("peak_to_floor", 0.0)) if acoustic else 0.0
+                )
+                try:
+                    short_text, short_stt = transcribe_pcm(pcm)
+                except Exception:
+                    short_text, short_stt = "", 0.0
+                short_wake, short_inline = parse_wake(short_text)
+                if (
+                    OWNER_DEVELOPMENT_MODE
+                    and short_wake
+                    and not short_inline
+                    and short_ratio >= OWNER_WAKE_RESCUE_NEARFIELD
+                ):
+                    print(
+                        f"Heard: {short_text}  "
+                        f"[STT {short_stt:.2f}s owner=short-wake "
+                        f"peak/floor={short_ratio:.2f}x]"
+                    )
+                    print(
+                        "Owner Voice Lock: OWNER DEVELOPMENT short-wake acceptance",
+                        flush=True,
+                    )
+                    OWNER_COMMAND_SLOT_UNTIL = (
+                        time.time() + WAKE_COMMAND_SLOT_SECONDS
+                    )
+                    armed_until = OWNER_COMMAND_SLOT_UNTIL
+                    conversation_until = time.time() + CONVERSATION_SECONDS
+                    print("Wake word accepted.", flush=True)
+                    print(
+                        f"Owner command capture: LISTENING now for "
+                        f"{WAKE_COMMAND_SLOT_SECONDS:.1f}s",
+                        flush=True,
+                    )
+                    continue
                 print("Owner Voice Lock: SHORT/NON-SPEECH — ignored", flush=True)
                 continue
             print(f"Owner Voice Lock validation error: {exc!r}", flush=True)
@@ -176,7 +233,7 @@ try:
         owner_score = float(owner_check.get("score", 0.0))
         owner_seconds = float(owner_check.get("seconds", 0.0))
 
-        if owner_decision == "other":
+        if owner_decision == "other" and not OWNER_DEVELOPMENT_MODE:
             print(
                 f"Owner Voice Lock: OTHER — ignored "
                 f"(score={owner_score:.3f}, verify={owner_seconds:.2f}s)",
@@ -199,20 +256,61 @@ try:
         )
 
         heard_wake, inline = parse_wake(text)
-        now = time.time()
+        terminal_wake_handshake = False
+        if not heard_wake and is_terminal_wake_handshake(text):
+            # A sentence-ending Jarvis is only a wake handshake. Discard all
+            # preceding words so this path can never execute them as a command.
+            terminal_wake_handshake = True
+            heard_wake = True
+            inline = ""
 
-        if owner_decision == "uncertain":
-            nearfield_ratio = (
-                float(acoustic.get("peak_to_floor", 0.0)) if acoustic else 0.0
+        now = time.time()
+        nearfield_ratio = (
+            float(acoustic.get("peak_to_floor", 0.0)) if acoustic else 0.0
+        )
+        development_accept = OWNER_DEVELOPMENT_MODE and (
+            heard_wake or owner_slot_for_capture
+        )
+
+        if owner_decision == "other":
+            if not development_accept:
+                print(
+                    f"Owner Voice Lock: OTHER — ignored "
+                    f"(score={owner_score:.3f}, wake={heard_wake}, "
+                    f"slot={owner_slot_for_capture})",
+                    flush=True,
+                )
+                continue
+            print(
+                f"Owner Voice Lock: OWNER DEVELOPMENT acceptance "
+                f"(score={owner_score:.3f}, wake={heard_wake}, "
+                f"slot={owner_slot_for_capture})",
+                flush=True,
             )
+
+        if owner_decision == "uncertain" and not development_accept:
+            # Uncertain non-wake speech is not authorized as a command, but it
+            # is still strong evidence that the room is conversational. Count
+            # it before rejection so TV/family chatter closes natural follow-up
+            # mode before an owner utterance can be mistaken for a command.
+            if not heard_wake:
+                room_guard.observe_nonwake(now)
+                room_guard.report_if_changed(now)
+
             live_rescue = (
                 heard_wake
                 and owner_score >= OWNER_WAKE_RESCUE_THRESHOLD
                 and nearfield_ratio >= OWNER_WAKE_RESCUE_NEARFIELD
             )
+            terminal_rescue = (
+                terminal_wake_handshake
+                and not inline
+                and owner_score >= OWNER_TERMINAL_HANDSHAKE_THRESHOLD
+                and nearfield_ratio >= OWNER_TERMINAL_HANDSHAKE_NEARFIELD
+            )
             profile_accept = owner_voice_lock.wake_assisted_accept(owner_score, heard_wake)
 
-            if not (live_rescue or profile_accept):
+            if not (live_rescue or terminal_rescue or profile_accept):
                 print(
                     f"Owner Voice Lock: UNCERTAIN — ignored "
                     f"(score={owner_score:.3f}, wake={heard_wake}, "
@@ -221,11 +319,23 @@ try:
                 )
                 continue
 
-            route = "live-calibrated wake-rescue" if live_rescue else "profile wake-assist"
+            if terminal_rescue:
+                route = "terminal-address handshake"
+            elif live_rescue:
+                route = "live-calibrated wake-rescue"
+            else:
+                route = "profile wake-assist"
             print(
                 f"Owner Voice Lock: OWNER via {route} "
                 f"(score={owner_score:.3f}, nearfield={nearfield_ratio:.2f}x, "
                 f"verify={owner_seconds:.2f}s)",
+                flush=True,
+            )
+        elif owner_decision == "uncertain":
+            print(
+                f"Owner Voice Lock: OWNER DEVELOPMENT acceptance "
+                f"(score={owner_score:.3f}, wake={heard_wake}, "
+                f"slot={owner_slot_for_capture})",
                 flush=True,
             )
         else:
@@ -236,7 +346,7 @@ try:
             )
 
         # Always honor explicit local shutdown, even in field/noisy mode.
-        if is_end_session(text):
+        if not terminal_wake_handshake and is_end_session(text):
             brain.reset()
             armed_until = 0.0
             conversation_until = 0.0

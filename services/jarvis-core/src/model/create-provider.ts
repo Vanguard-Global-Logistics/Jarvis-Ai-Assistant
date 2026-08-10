@@ -22,6 +22,8 @@ export function createProvider(env: Env): JarvisModelProvider {
     return new HiveLocalProvider({
       baseUrl: env.HIVE_LOCAL_AI_URL,
       model: env.HIVE_LOCAL_AI_MODEL,
+      fastModel: env.HIVE_LOCAL_AI_FAST_MODEL,
+      reasoningModel: env.HIVE_LOCAL_AI_REASONING_MODEL,
     });
   }
 

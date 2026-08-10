@@ -39,6 +39,10 @@ MAX_UTTERANCE_SECONDS = float(os.environ.get("JARVIS_MAX_UTTERANCE_SECONDS", "30
 END_SILENCE_MS = int(os.environ.get("JARVIS_END_SILENCE_MS", "650"))
 WORKER_SOCKET = HOME / "Jarvis-Live-Voice" / "kokoro-worker.sock"
 HIVE_MODEL = os.environ.get("JARVIS_HIVE_MODEL", "qwen3.5:4b")
+OWNER_DEVELOPMENT_MODE = (
+    os.environ.get("JARVIS_OWNER_DEVELOPMENT_MODE", "0").strip().lower()
+    not in {"", "0", "false", "off", "no"}
+)
 
 RATE = 16000
 SAMPLE_WIDTH = 2
@@ -61,12 +65,19 @@ LOUD_GATE_MARGIN = float(os.environ.get("JARVIS_LOUD_GATE_MARGIN", "260"))
 FIELD_HOLD_SECONDS = float(os.environ.get("JARVIS_FIELD_HOLD_SECONDS", "60"))
 FIELD_RELEASE_SPEECH_DUTY = float(os.environ.get("JARVIS_FIELD_RELEASE_SPEECH_DUTY", "0.25"))
 FIELD_RELEASE_NOISE_RMS = float(os.environ.get("JARVIS_FIELD_RELEASE_NOISE_RMS", "250"))
-WAKE_COMMAND_SLOT_SECONDS = float(os.environ.get("JARVIS_WAKE_COMMAND_SLOT_SECONDS", "6.0"))
+WAKE_COMMAND_SLOT_SECONDS = float(os.environ.get("JARVIS_WAKE_COMMAND_SLOT_SECONDS", "30.0"))
+COMMAND_END_SILENCE_MS = int(os.environ.get("JARVIS_COMMAND_END_SILENCE_MS", "1200"))
 OWNER_WAKE_RESCUE_THRESHOLD = float(
-    os.environ.get("JARVIS_OWNER_WAKE_RESCUE_THRESHOLD", "0.62")
+    os.environ.get("JARVIS_OWNER_WAKE_RESCUE_THRESHOLD", "0.56")
 )
 OWNER_WAKE_RESCUE_NEARFIELD = float(
     os.environ.get("JARVIS_OWNER_WAKE_RESCUE_NEARFIELD", "4.0")
+)
+OWNER_TERMINAL_HANDSHAKE_THRESHOLD = float(
+    os.environ.get("JARVIS_OWNER_TERMINAL_HANDSHAKE_THRESHOLD", "0.42")
+)
+OWNER_TERMINAL_HANDSHAKE_NEARFIELD = float(
+    os.environ.get("JARVIS_OWNER_TERMINAL_HANDSHAKE_NEARFIELD", "12.0")
 )
 
 sys.path.insert(0, str(HOME / "Jarvis-Live-Voice"))

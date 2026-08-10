@@ -100,6 +100,8 @@ def listen_for_utterance(
     detector: SpeechDetector,
     *,
     max_seconds: float | None = None,
+    end_silence_ms: int | None = None,
+    start_deadline: float | None = None,
 ) -> tuple[bytes | None, dict]:
     pre = deque(maxlen=PRE_ROLL_FRAMES)
     frames: list[bytes] = []
@@ -115,6 +117,12 @@ def listen_for_utterance(
     while not STOP:
         if not aegis_allows_voice():
             return None, {}
+        if (
+            not triggered
+            and start_deadline is not None
+            and time.time() >= start_deadline
+        ):
+            return None, {"slot_expired": True}
         frame = reader.get_frame(timeout=0.75)
         if frame is None:
             if reader.error:
@@ -143,11 +151,14 @@ def listen_for_utterance(
             rms_values.append(rms)
             silence = 0 if voiced else silence + 1
 
-            dynamic_end_frames = (
-                END_SILENCE_FRAMES
-                if detector.is_loud_environment()
-                else max(1, int(360 / FRAME_MS))
-            )
+            if end_silence_ms is not None:
+                dynamic_end_frames = max(1, int(end_silence_ms / FRAME_MS))
+            else:
+                dynamic_end_frames = (
+                    END_SILENCE_FRAMES
+                    if detector.is_loud_environment()
+                    else max(1, int(360 / FRAME_MS))
+                )
             done = silence >= dynamic_end_frames or len(frames) >= limit_frames
             if done:
                 if silence >= dynamic_end_frames and silence < len(frames):
@@ -209,7 +220,7 @@ def edit_distance(a: str, b: str) -> int:
     return prev[-1]
 
 
-WAKE_VARIANTS = ("jarvis", "jervis", "jaros", "jarvus", "jarves")
+WAKE_VARIANTS = ("jarvis", "jervis", "dervis", "jaros", "jarvus", "jarves")
 
 
 def _first_spoken_sentence(text: str) -> str:

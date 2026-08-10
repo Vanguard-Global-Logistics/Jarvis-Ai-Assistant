@@ -3,6 +3,7 @@ import type { AmplifierResult, ChatReply, ChatRequest } from '@jarvis/contracts'
 import { AmplifierResultSchema, ChatReplySchema } from '@jarvis/contracts';
 import { AMPLIFIER_SYSTEM_PROMPT, buildAmplifierUserMessage } from '../amplifier/prompt.js';
 import type { JarvisModelProvider } from './provider.js';
+import { selectHiveChatModel } from './routing.js';
 
 const DEFAULT_BASE_URL = 'http://127.0.0.1:8000';
 const DEFAULT_MAX_TOKENS = 2048;
@@ -101,20 +102,31 @@ export class HiveLocalProvider implements JarvisModelProvider {
 
   private readonly client: HiveLocalHttpClient;
   private readonly configuredModel: string | undefined;
+  private readonly fastModel: string | undefined;
+  private readonly reasoningModel: string | undefined;
   private resolvedModel?: string;
 
   public constructor(options?: {
     baseUrl?: string;
     model?: string | undefined;
+    fastModel?: string | undefined;
+    reasoningModel?: string | undefined;
     client?: HiveLocalHttpClient;
   }) {
     const baseUrl = options?.baseUrl ?? DEFAULT_BASE_URL;
     this.client = options?.client ?? new FetchHiveLocalHttpClient(baseUrl);
     this.configuredModel = options?.model;
+    this.fastModel = options?.fastModel;
+    this.reasoningModel = options?.reasoningModel;
   }
 
   public async chat(request: ChatRequest): Promise<ChatReply> {
-    const model = await this.resolveModel();
+    const defaultModel = await this.resolveModel();
+    const model = selectHiveChatModel(request, {
+      defaultModel,
+      fastModel: this.fastModel,
+      reasoningModel: this.reasoningModel,
+    });
     const payload = {
       model,
       messages: request.messages.map((message) => ({
@@ -142,7 +154,7 @@ export class HiveLocalProvider implements JarvisModelProvider {
   }
 
   public async amplify(idea: string): Promise<AmplifierResult> {
-    const model = await this.resolveModel();
+    const model = this.reasoningModel ?? (await this.resolveModel());
     const payload = {
       model,
       messages: [

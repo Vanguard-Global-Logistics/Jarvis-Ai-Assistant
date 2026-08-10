@@ -96,6 +96,12 @@ jobs:
       - name: Download the Electron binary
         run: node node_modules/electron/install.js
 
+      # better-sqlite3 is compiled for the Node ABI by npm ci. Electron uses a
+      # different ABI, so the real application cannot open its database until
+      # the native module is rebuilt against this repository's Electron version.
+      - name: Rebuild native modules for Electron
+        run: npm run rebuild:electron-native
+
       # Electron links ~12 GUI libraries that a CI runner does not necessarily have,
       # and Chromium needs a display. Without these it dies before any of our code runs.
       - name: Install Electron's runtime libraries and Xvfb

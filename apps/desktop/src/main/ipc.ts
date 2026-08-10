@@ -2,6 +2,7 @@ import { ipcMain } from 'electron';
 import type { z } from 'zod';
 import type { IpcContract } from '@jarvis/contracts';
 import { createLogger } from '@jarvis/config';
+import type { IpcSenderValidator } from './ipc-sender.js';
 
 const log = createLogger({ scope: 'desktop:main:ipc' });
 
@@ -14,22 +15,32 @@ const log = createLogger({ scope: 'desktop:main:ipc' });
  * cross-boundary contract be "authenticated, schema-validated" and reject
  * anything outside it.
  *
- * Three guarantees:
+ * Four guarantees:
  *
- *   1. The request is parsed before the implementation runs. A renderer cannot
+ *   1. The sending frame is authenticated before its payload is inspected. A
+ *      hostile frame cannot invoke privileged main-process code.
+ *   2. The request is parsed before the implementation runs. A renderer cannot
  *      reach `impl` with a payload the schema does not admit.
- *   2. The response is parsed before it is returned. This catches OUR bugs —
+ *   3. The response is parsed before it is returned. This catches OUR bugs —
  *      a main-process change that starts leaking an extra field fails here
  *      rather than in the UI.
- *   3. Errors are logged with the channel and returned as a flat message. The
+ *   4. Errors are logged with the channel and returned as a flat message. The
  *      renderer never receives a stack trace, which would disclose filesystem
  *      paths.
  */
 export function handleContract<Req extends z.ZodType, Res extends z.ZodType>(
   contract: IpcContract<Req, Res>,
   impl: (request: z.infer<Req>) => z.infer<Res> | Promise<z.infer<Res>>,
+  validateSender: IpcSenderValidator,
 ): void {
-  ipcMain.handle(contract.channel, async (_event, rawRequest: unknown): Promise<z.infer<Res>> => {
+  ipcMain.handle(contract.channel, async (event, rawRequest: unknown): Promise<z.infer<Res>> => {
+    const senderFrameUrl = event.senderFrame?.url;
+    if (senderFrameUrl === undefined || !validateSender(senderFrameUrl)) {
+      // Do not log an untrusted URL: its path/query may contain secrets.
+      log.warn('rejected untrusted sender', { channel: contract.channel });
+      throw new Error(`Untrusted sender for ${contract.channel}`);
+    }
+
     const request = contract.request.safeParse(rawRequest);
 
     if (!request.success) {

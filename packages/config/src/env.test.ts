@@ -26,10 +26,14 @@ describe('parseEnv', () => {
       HIVE_LOCAL_AI_MODE: 'local-only',
       HIVE_LOCAL_AI_URL: 'http://127.0.0.1:8000',
       HIVE_LOCAL_AI_MODEL: 'qwen3:4b',
+      HIVE_LOCAL_AI_FAST_MODEL: 'qwen3:1.7b',
+      HIVE_LOCAL_AI_REASONING_MODEL: 'qwen3:14b',
     });
 
     expect(env.HIVE_LOCAL_AI_MODE).toBe('local-only');
     expect(env.HIVE_LOCAL_AI_MODEL).toBe('qwen3:4b');
+    expect(env.HIVE_LOCAL_AI_FAST_MODEL).toBe('qwen3:1.7b');
+    expect(env.HIVE_LOCAL_AI_REASONING_MODEL).toBe('qwen3:14b');
     expect(env.ANTHROPIC_API_KEY).toBeUndefined();
   });
 

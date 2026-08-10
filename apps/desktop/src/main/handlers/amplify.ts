@@ -2,6 +2,7 @@ import type { AmplifierResult } from '@jarvis/contracts';
 import { jarvisAmplifyContract } from '@jarvis/contracts';
 import type { JarvisModelProvider } from '@jarvis/jarvis-core';
 import { handleContract } from '../ipc.js';
+import type { IpcSenderValidator } from '../ipc-sender.js';
 import { toSafeModelError } from './model-error.js';
 
 /**
@@ -14,12 +15,19 @@ import { toSafeModelError } from './model-error.js';
  * before it leaves main — a provider that returns a malformed card fails at the
  * boundary rather than reaching the amplifier UI.
  */
-export function registerAmplifyHandler(provider: JarvisModelProvider): void {
-  handleContract(jarvisAmplifyContract, async (request): Promise<AmplifierResult> => {
-    try {
-      return await provider.amplify(request.idea);
-    } catch (cause) {
-      throw toSafeModelError(cause);
-    }
-  });
+export function registerAmplifyHandler(
+  provider: JarvisModelProvider,
+  validateSender: IpcSenderValidator,
+): void {
+  handleContract(
+    jarvisAmplifyContract,
+    async (request): Promise<AmplifierResult> => {
+      try {
+        return await provider.amplify(request.idea);
+      } catch (cause) {
+        throw toSafeModelError(cause);
+      }
+    },
+    validateSender,
+  );
 }
