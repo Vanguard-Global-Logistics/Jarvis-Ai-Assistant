@@ -25,11 +25,11 @@ GitHub and tested runtime evidence are the source of truth. This file contains n
 - Draft pull request: **#2 — Pin Hermes v0.20 and add governed update intake**
 - PR URL: `https://github.com/Vanguard-Global-Logistics/Jarvis-Ai-Assistant/pull/2`
 - PR target: `main`
-- Verified implementation head immediately before the latest documentation update:
-  `cd83743764f3d189be7bf08ac9f82d3b7331913d`
+- Verified implementation and physical Mac acceptance head immediately before the latest
+  documentation update: `53af8c060cb39e6217bc925868cefead78eae2d1`
 - Base at the verified PR inspection: `c5ec68f04ecb8049287d4990073c390f25ba0ecc`
 - PR state at handoff creation: open, draft, mergeable.
-- CI evidence for `cd83743`: workflow **CI**, run **275**, completed successfully: format,
+- CI evidence for `53af8c0`: workflow **CI**, run **279**, completed successfully: format,
   lint, typecheck, tests, build, real Electron runtime probe, and archived-handoff integrity.
 - Never modify `main` directly, force-push shared history, reset away user work, or treat a dirty worktree as disposable.
 - Read `CLAUDE.md`, `docs/CURRENT-STATE-AUDIT.md`, `docs/KNOWN-LIMITATIONS.md`, `docs/IPC-SURFACE.md`, `docs/BACKLOG.md`, relevant ADRs, and this handoff before changing code.
@@ -69,10 +69,10 @@ Do not re-enroll or replace William's locked voice profile without explicit appr
 
 ### Hermes
 
-The most recent physical Mac result, on repository commit `7609f2c`, is:
+The most recent physical Mac result, on repository commit `53af8c0`, is:
 
 - Hermes **0.20.0**
-- **25 pass, 0 fail, 1 warning**
+- **32 pass, 0 fail, 1 warning**
 - Warning: Hermes microphone permission and `/wake on` require a physical acceptance step; this is not an installation failure.
 - Signed tag and exact upstream commit are pinned.
 - Daily signed-release staging runs at 03:15 local time.
@@ -89,26 +89,30 @@ The most recent physical Mac result, on repository commit `7609f2c`, is:
   - `INFRASTRUCTURE-AND-MEMORY-ADOPTION.md`
   - `PRIME-AGENT-CONTINUAL-IMPROVEMENT.md`
   - `AEGIS-DEFENSIVE-PRIME-SWARM.md`
+  - `RESEARCH-PRIME-KNOWLEDGE-ADVANCEMENT.md`
+  - `RELENTLESS-SEO-PRODUCT-STANDARD.md`
 
 The proposal-only daily improvement runner and its 03:45 launchd job are installed and
 physically doctor-verified on the Mac. This proves scheduling and packaging, not autonomous
 skill promotion or AEGIS enforcement.
 
-The branch now also contains a bounded Research Prime implementation. It checks
+The bounded Research Prime implementation is physically installed and doctor-verified. It checks
 four explicitly enrolled official GitHub release endpoints at most hourly and writes a daily
-04:15 A1 knowledge-candidate review. It stores structural release facts rather than raw release
-prose, makes no model call, follows no redirect, sends no credential, and never promotes
-knowledge, changes code or policy, sends messages, spends money, or changes AEGIS. It is
-CI-verified but has not yet been pulled, installed, or physically accepted on the Mac; record
-the observed doctor and report results after installation rather than assuming them.
+04:15 A1 knowledge-candidate review. Its hourly monitoring job, daily review job, proposal runner,
+and source policy all passed the physical doctor. It stores structural release facts rather than
+raw release prose, makes no model call, follows no redirect, sends no credential, and never
+promotes knowledge, changes code or policy, sends messages, spends money, or changes AEGIS.
 
-The branch also contains the Jarvis-owned **Relentless SEO** Hermes skill and product standard at
-`cd83743`. Hermes v0.20 does not include an official Hermes SEO Agent; this is a governed Jarvis
-skill built around the real Hermes skills system and primary Google guidance. It is CI-verified
-but has not yet been pulled, installed, or physically accepted on the Mac. It defaults to A1
-drafts. Publishing, Search Console or Business Profile changes, review replies, sitemap submission,
-outreach, credential use, and spend remain A2 until the required approval and AEGIS boundary exist.
-Passing the release gate does not prove live SEO automation or a search-ranking outcome.
+The Jarvis-owned **Relentless SEO** Hermes skill and product standard are physically installed and
+doctor-verified. Hermes v0.20 does not include an official Hermes SEO Agent; this is a governed
+Jarvis skill built around the real Hermes skills system and primary Google guidance. It defaults
+to A1 drafts. Publishing, Search Console or Business Profile changes, review replies, sitemap
+submission, outreach, credential use, and spend remain A2 until the required approval and AEGIS
+boundary exist. Passing the release gate does not prove live SEO automation, Peptastic runtime
+integration, an enrolled production tenant, or a search-ranking outcome.
+
+The executable-mode repair at `53af8c0` restored `100755` on the Hermes installer and doctor after
+the physical Mac exposed a `Permission denied` regression. CI now asserts both critical Git modes.
 
 These Markdown memories are governed knowledge packages; they do not prove that durable conversational Memory v1 is connected to the live desktop or R13.3 runtime.
 
@@ -400,10 +404,9 @@ Never include actual secrets in this table. A connector being present in ChatGPT
 
 ### P2 — Daily-use desktop foundation
 
-- Pull the current draft branch onto the Mac; run the Hermes installer and doctor and record the
-  actual result.
-- Confirm Research Prime and Relentless SEO install without replacing personal memory; keep SEO
-  proposal-only and do not add production credentials during package acceptance.
+- Preserve the accepted `53af8c0` Hermes baseline and its **32 pass, 0 fail, 1 warning** evidence.
+- Keep Relentless SEO proposal-only until a real tenant and its production accounts are explicitly
+  enrolled; package acceptance did not authorize credentials or publishing.
 - Governed durable Memory v1 connected to trusted active profile/session.
 - One-click startup, shutdown, restart, crash recovery, visible status, and uninstall/update recovery.
 - Connect the accepted voice lane without broadening Electron IPC unsafely.
