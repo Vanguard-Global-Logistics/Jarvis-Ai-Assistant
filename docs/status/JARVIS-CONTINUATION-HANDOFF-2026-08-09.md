@@ -26,10 +26,10 @@ GitHub and tested runtime evidence are the source of truth. This file contains n
 - PR URL: `https://github.com/Vanguard-Global-Logistics/Jarvis-Ai-Assistant/pull/2`
 - PR target: `main`
 - Verified implementation head immediately before the latest documentation update:
-  `b04c2a49f34b23661b98b91c9c15240b41a54024`
+  `cd83743764f3d189be7bf08ac9f82d3b7331913d`
 - Base at the verified PR inspection: `c5ec68f04ecb8049287d4990073c390f25ba0ecc`
 - PR state at handoff creation: open, draft, mergeable.
-- CI evidence for `b04c2a4`: workflow **CI**, run **271**, completed successfully: format,
+- CI evidence for `cd83743`: workflow **CI**, run **275**, completed successfully: format,
   lint, typecheck, tests, build, real Electron runtime probe, and archived-handoff integrity.
 - Never modify `main` directly, force-push shared history, reset away user work, or treat a dirty worktree as disposable.
 - Read `CLAUDE.md`, `docs/CURRENT-STATE-AUDIT.md`, `docs/KNOWN-LIMITATIONS.md`, `docs/IPC-SURFACE.md`, `docs/BACKLOG.md`, relevant ADRs, and this handoff before changing code.
@@ -94,13 +94,21 @@ The proposal-only daily improvement runner and its 03:45 launchd job are install
 physically doctor-verified on the Mac. This proves scheduling and packaging, not autonomous
 skill promotion or AEGIS enforcement.
 
-The branch now also contains a bounded Research Prime implementation at `b04c2a4`. It checks
+The branch now also contains a bounded Research Prime implementation. It checks
 four explicitly enrolled official GitHub release endpoints at most hourly and writes a daily
 04:15 A1 knowledge-candidate review. It stores structural release facts rather than raw release
 prose, makes no model call, follows no redirect, sends no credential, and never promotes
 knowledge, changes code or policy, sends messages, spends money, or changes AEGIS. It is
 CI-verified but has not yet been pulled, installed, or physically accepted on the Mac; record
 the observed doctor and report results after installation rather than assuming them.
+
+The branch also contains the Jarvis-owned **Relentless SEO** Hermes skill and product standard at
+`cd83743`. Hermes v0.20 does not include an official Hermes SEO Agent; this is a governed Jarvis
+skill built around the real Hermes skills system and primary Google guidance. It is CI-verified
+but has not yet been pulled, installed, or physically accepted on the Mac. It defaults to A1
+drafts. Publishing, Search Console or Business Profile changes, review replies, sitemap submission,
+outreach, credential use, and spend remain A2 until the required approval and AEGIS boundary exist.
+Passing the release gate does not prove live SEO automation or a search-ranking outcome.
 
 These Markdown memories are governed knowledge packages; they do not prove that durable conversational Memory v1 is connected to the live desktop or R13.3 runtime.
 
@@ -322,6 +330,27 @@ Use only as an optional sandboxed prototype factory for non-core applications su
 
 Never place AEGIS, Cipher, biometrics, private Jarvis memory, credentials, R13.3, or the Tool Bridge inside Base44. The Base44 connector installation was offered but not confirmed at the time of this handoff.
 
+### Relentless SEO
+
+- Hermes 0.20 has no official bundled SEO Agent. Do not repeat that rumor as a product fact.
+- Jarvis owns the implementation under
+  `jarvis-hermes/skills/marketing/relentless-seo/`; third-party SEO packages were evaluated for
+  concepts but were not copied wholesale or installed as an opaque dependency.
+- Every future public Vanguard-built product must pass the SEO product release gate: crawl and
+  index controls, canonical and metadata hygiene, structured-data eligibility, performance and
+  accessibility evidence, truthful local-business data where applicable, measurement readiness,
+  and approval state.
+- Relentless means persistent, measured improvement—not manipulation. Never promise city or state
+  domination or guaranteed rankings. Fake reviews, paid-link schemes, doorway pages, keyword
+  stuffing, fabricated locations, copied competitor content, and unsupported medical or regulatory
+  claims are prohibited.
+- Each sold Peptastic instance includes a tenant-isolated capability blueprint, disabled until
+  verified onboarding supplies the real business, domain, locations or service areas, approvers,
+  regulated-claim policy, and authorized measurement accounts. Tenant credentials, profiles,
+  metrics, history, recommendations, and approvals must never cross boundaries.
+- The current `Vanguard-Global-Logistics/Peptastic` repository is only a placeholder. The blueprint
+  is reusable product policy; it is not evidence that Peptastic has a production SEO runtime.
+
 ## Connector and credential continuation
 
 Connector access cannot be transferred by prose. A future session must use the account's installed connector and may need the owner to sign in again.
@@ -333,6 +362,7 @@ Connector access cannot be transferred by prose. A future session must use the a
 | Google Calendar                      | Connector may be available; not wired into Jarvis                              | Use only for explicit calendar tasks; do not imply Jarvis runtime access                                        |
 | Base44                               | Recommended connector was offered; installation not confirmed                  | If approved, create only a separate sandbox prototype/repository                                                |
 | Remotion                             | Plugin not confirmed installed                                                 | Treat as evaluated future worker, not current Jarvis capability                                                 |
+| Search/SEO accounts                  | No Search Console, Business Profile, analytics, or publishing grant recorded   | Keep Relentless SEO proposal-only until each tenant is enrolled and every external action is approved           |
 | Simpro / Procore                     | No connector, OAuth grant, recipient map, or employer authorization recorded   | Stop and obtain formal read-only scope before integration                                                       |
 | Coolify                              | No production server or account approved                                       | Do not deploy                                                                                                   |
 | Anthropic/cloud models               | No Anthropic key supplied; paid fallback disabled                              | Preserve local-only behavior unless William explicitly approves provider, cost, and data scope                  |
@@ -370,6 +400,10 @@ Never include actual secrets in this table. A connector being present in ChatGPT
 
 ### P2 — Daily-use desktop foundation
 
+- Pull the current draft branch onto the Mac; run the Hermes installer and doctor and record the
+  actual result.
+- Confirm Research Prime and Relentless SEO install without replacing personal memory; keep SEO
+  proposal-only and do not add production credentials during package acceptance.
 - Governed durable Memory v1 connected to trusted active profile/session.
 - One-click startup, shutdown, restart, crash recovery, visible status, and uninstall/update recovery.
 - Connect the accepted voice lane without broadening Electron IPC unsafely.
@@ -404,6 +438,8 @@ Never include actual secrets in this table. A connector being present in ChatGPT
 - Slides generator.
 - Isolated Remotion worker.
 - Base44 prototype lane.
+- Peptastic tenant enrollment and SEO adapter only after a real application runtime and tenant
+  isolation exist.
 - Octagon MVP.
 - Separate-VPS Coolify pilot.
 - Throne distribution and Hive federation only after AEGIS exists.
@@ -418,7 +454,7 @@ A strategy document, installed memory file, UI tile, mock, shell, prototype, mod
 
 Use this exact starting instruction:
 
-> Continue Jarvis from `Vanguard-Global-Logistics/Jarvis-Ai-Assistant`, draft PR #2, branch `agent/jarvis-whole-macbook-2026-08-08`. Read `CLAUDE.md`, the current audit/known limitations/backlog, and `docs/status/JARVIS-CONTINUATION-HANDOFF-2026-08-09.md` completely. Verify the remote branch head, PR state, CI, and working tree before changes. Preserve the proven R13.3 SHA-256 baseline and locked owner profile. Do not claim AEGIS, the Defensive Prime Swarm, clone prevention, durable memory, tools, connectors, BCI Agent, Job Site Progress, Octagon, Throne, or Hive federation are implemented without evidence. The immediate programming milestone is the deterministic AEGIS incident/containment foundation paired with the governed Jarvis Tool Bridge: company/Hive isolation, capability leases, reversible allowlisted containment, append-only evidence, capability registry, deterministic action routing, owner approval, narrow tool adapters, result-to-voice, failure containment, independent review, and physical Mac acceptance. Preserve the proposal-only continual-improvement loop and bounded Research Prime: four enrolled primary release sources, structural facts only, no raw web prose, no automatic knowledge/code promotion, and no open-ended business search before its provider, cost ceiling, per-company source charter, prompt-injection isolation, and A1-only output are approved. Attacker content and raw transcripts must never become trusted learning. Never hack back, put credentials in chat or GitHub, or enable silent paid-cloud fallback.
+> Continue Jarvis from `Vanguard-Global-Logistics/Jarvis-Ai-Assistant`, draft PR #2, branch `agent/jarvis-whole-macbook-2026-08-08`. Read `CLAUDE.md`, the current audit/known limitations/backlog, and `docs/status/JARVIS-CONTINUATION-HANDOFF-2026-08-09.md` completely. Verify the remote branch head, PR state, CI, and working tree before changes. Preserve the proven R13.3 SHA-256 baseline and locked owner profile. Do not claim AEGIS, the Defensive Prime Swarm, clone prevention, durable memory, tools, connectors, BCI Agent, Job Site Progress, Octagon, Throne, Hive federation, live SEO automation, Peptastic runtime integration, or search-ranking results are implemented without evidence. The immediate programming milestone is the deterministic AEGIS incident/containment foundation paired with the governed Jarvis Tool Bridge: company/Hive isolation, capability leases, reversible allowlisted containment, append-only evidence, capability registry, deterministic action routing, owner approval, narrow tool adapters, result-to-voice, failure containment, independent review, and physical Mac acceptance. Preserve the proposal-only continual-improvement loop and bounded Research Prime: four enrolled primary release sources, structural facts only, no raw web prose, no automatic knowledge/code promotion, and no open-ended business search before its provider, cost ceiling, per-company source charter, prompt-injection isolation, and A1-only output are approved. Preserve the Jarvis-owned Relentless SEO standard as an A1-by-default public-product release gate using primary sources: no fake reviews, paid-link schemes, doorway pages, fabricated locations, unsupported regulated claims, ranking guarantees, automatic publishing, or cross-tenant Peptastic data. Attacker content and raw transcripts must never become trusted learning. Never hack back, put credentials in chat or GitHub, or enable silent paid-cloud fallback.
 
 ## Handoff verification checklist
 
@@ -434,6 +470,8 @@ A new session has successfully resumed only after it can state:
 - Defensive Prime Swarm, poisoned-learning, no-hack-back, and clone-resistance boundaries;
 - the job-mastery sequence;
 - which evaluated tools are adopted, rejected, or candidate-only;
+- whether Relentless SEO is merely packaged, physically installed, or connected to an enrolled
+  production tenant;
 - which connectors are actually authenticated in that new session.
 
 If any answer cannot be verified, stop and inspect the source rather than guessing.
