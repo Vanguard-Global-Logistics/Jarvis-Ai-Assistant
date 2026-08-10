@@ -10,6 +10,7 @@ import type {
   TranscriptEntry,
 } from '@jarvis/contracts';
 import { GlassPanel, accent, fontFamily, letterSpacing, surface, text } from '@jarvis/ui';
+import { transcriptToMarkdown } from './transcript-markdown.js';
 
 /**
  * The Stage 1A conversation surface (ADR 0006, ADR 0007, ADR 0008).
@@ -717,6 +718,12 @@ function SavedConversationView({
         <span style={{ ...MONO_LABEL, color: accent.warning }}>
           Saved session · read-only · {formatSavedAt(conversation.savedAt)}
         </span>
+        <CopyMarkdownButton
+          markdown={transcriptToMarkdown(conversation.entries, {
+            title: conversation.title,
+            savedAt: conversation.savedAt,
+          })}
+        />
         <button
           type="button"
           onClick={onContinue}
@@ -769,6 +776,56 @@ function SavedConversationView({
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * Copy a transcript out of Jarvis as Markdown.
+ *
+ * Clipboard only — no filesystem, no IPC, no new authority. `navigator.clipboard`
+ * is genuinely `undefined` in an insecure context (the DOM lib types it as
+ * always present), so the cast keeps the union and the runtime guard real; a
+ * denied clipboard reports failure rather than silently claiming success.
+ */
+function CopyMarkdownButton({ markdown }: { markdown: string }): JSX.Element {
+  const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle');
+
+  const copy = (): void => {
+    const clipboard = navigator.clipboard as Clipboard | undefined;
+    if (clipboard === undefined) {
+      setState('failed');
+      return;
+    }
+    clipboard
+      .writeText(markdown)
+      .then(() => {
+        setState('copied');
+        window.setTimeout(() => {
+          setState('idle');
+        }, 1800);
+      })
+      .catch(() => {
+        setState('failed');
+      });
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={copy}
+      title="Copy this session as Markdown to paste into notes, email, or a document"
+      style={{
+        ...MONO_LABEL,
+        color: state === 'failed' ? accent.danger : accent.claudePurple,
+        background: 'transparent',
+        border: `1px solid ${state === 'failed' ? accent.danger : accent.claudePurple}`,
+        borderRadius: 6,
+        padding: '4px 10px',
+        cursor: 'pointer',
+      }}
+    >
+      {state === 'copied' ? 'Copied' : state === 'failed' ? 'Copy failed' : 'Copy as Markdown'}
+    </button>
   );
 }
 
