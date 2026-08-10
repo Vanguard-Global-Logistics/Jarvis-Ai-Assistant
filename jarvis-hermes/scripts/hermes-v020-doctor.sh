@@ -61,9 +61,16 @@ else
   fail "Hermes CLI is missing"
 fi
 
-for required in "$HERMES_HOME/SOUL.md" "$HERMES_HOME/memories/HERMES-V0.20-CAPABILITIES.md" "$HERMES_HOME/memories/LEARNING-GOVERNANCE.md" "$HERMES_HOME/memories/PRIME-AGENT-CONTINUAL-IMPROVEMENT.md" "$HERMES_HOME/memories/AEGIS-DEFENSIVE-PRIME-SWARM.md" "$HERMES_HOME/memories/RESEARCH-PRIME-KNOWLEDGE-ADVANCEMENT.md" "$HERMES_HOME/memories/OCTAGON-COMMERCIAL-STRATEGY.md" "$HERMES_HOME/memories/JARVIS-PROFESSIONAL-MODE.md" "$HERMES_HOME/memories/JARVIS-JOB-MASTERY-ROADMAP.md" "$HERMES_HOME/memories/INFRASTRUCTURE-AND-MEMORY-ADOPTION.md" "$HERMES_HOME/bin/jarvis-kokoro-tts.py"; do
+for required in "$HERMES_HOME/SOUL.md" "$HERMES_HOME/memories/HERMES-V0.20-CAPABILITIES.md" "$HERMES_HOME/memories/LEARNING-GOVERNANCE.md" "$HERMES_HOME/memories/PRIME-AGENT-CONTINUAL-IMPROVEMENT.md" "$HERMES_HOME/memories/AEGIS-DEFENSIVE-PRIME-SWARM.md" "$HERMES_HOME/memories/RESEARCH-PRIME-KNOWLEDGE-ADVANCEMENT.md" "$HERMES_HOME/memories/RELENTLESS-SEO-PRODUCT-STANDARD.md" "$HERMES_HOME/memories/OCTAGON-COMMERCIAL-STRATEGY.md" "$HERMES_HOME/memories/JARVIS-PROFESSIONAL-MODE.md" "$HERMES_HOME/memories/JARVIS-JOB-MASTERY-ROADMAP.md" "$HERMES_HOME/memories/INFRASTRUCTURE-AND-MEMORY-ADOPTION.md" "$HERMES_HOME/bin/jarvis-kokoro-tts.py"; do
   [[ -s "$required" ]] && pass "$required installed" || fail "$required missing"
 done
+
+SEO_SKILL="$HERMES_HOME/skills/marketing/relentless-seo"
+if [[ -s "$SEO_SKILL/SKILL.md" ]] && [[ -s "$SEO_SKILL/references/google-source-policy.md" ]] && [[ -s "$SEO_SKILL/references/product-release-gate.md" ]] && [[ -s "$SEO_SKILL/references/peptastic-tenant-blueprint.md" ]] && [[ -s "$SEO_SKILL/templates/business-seo-profile.yaml" ]]; then
+  pass "Jarvis-owned Relentless SEO Hermes skill is installed"
+else
+  fail "Jarvis-owned Relentless SEO Hermes skill is incomplete"
+fi
 
 if grep -q 'phrase: hey jarvis' "$HERMES_HOME/config.yaml" 2>/dev/null; then
   pass "Hey Jarvis wake configuration is present"

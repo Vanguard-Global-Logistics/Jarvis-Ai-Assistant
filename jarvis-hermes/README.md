@@ -52,6 +52,14 @@ VPS, never a workload for the 8 GB MacBook. BrainOutside is not installed;
 Jarvis adopts only selected proposal-preview, capability-separation,
 source-linked context, ledger, and signed-history patterns.
 
+The installer now includes the Jarvis-owned `relentless-seo` Hermes skill and
+its product standard. It makes truthful, evidence-led SEO a release requirement
+for public-facing Vanguard programs and an isolated, disabled-until-enrolled
+capability in every future Peptastic tenant. Audits and proposals begin read-only
+or A1; publishing, Business Profile edits, review replies, outreach, credentials,
+and spending remain approval-gated. This is not an official Hermes SEO Agent,
+does not import an unaudited community runtime, and cannot guarantee rankings.
+
 The physically tested R13.3 local voice remains the production baseline.
 Hermes uses its Kokoro/MLX bm_george worker through a narrow local adapter and
 falls back to the macOS system voice, not a paid TTS service.
@@ -68,10 +76,13 @@ Detailed contracts:
 - memories/JARVIS-PROFESSIONAL-MODE.md — personal ownership and professional-use boundaries.
 - memories/JARVIS-JOB-MASTERY-ROADMAP.md — locked automation and field-progress sequence.
 - memories/INFRASTRUCTURE-AND-MEMORY-ADOPTION.md — Coolify boundary and adopted memory safeguards.
+- memories/RELENTLESS-SEO-PRODUCT-STANDARD.md — portfolio SEO inclusion, tenant isolation, and publishing boundaries.
+- skills/marketing/relentless-seo/ — Jarvis-owned SEO procedure, release gate, Peptastic blueprint, and intake template.
 - docs/DECISIONS/0011-hermes-v020-governed-updates.md — update gates.
 - docs/DECISIONS/0016-prime-agent-governed-continual-improvement.md — adopted Prime Agent patterns and promotion gates.
 - docs/DECISIONS/0017-aegis-defensive-prime-swarm-and-ip-protection.md — defensive swarm and commercial IP boundary.
 - docs/DECISIONS/0018-bounded-research-prime-and-knowledge-advancement.md — A4 monitoring, A1 proposals, and permanent-knowledge requirements.
+- docs/DECISIONS/0019-relentless-seo-product-standard.md — mandatory public-product SEO gate and Peptastic tenant contract.
 
 ## Historical notes
 

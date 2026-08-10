@@ -374,6 +374,22 @@ Jarvis / Throne OS ecosystem with defined purpose and ownership. **All are NOT I
 | **Saltline** | **Fishing and outdoor platform** | Fishing/outdoor domain | **NOT IMPLEMENTED** (future) |
 | **Future AI agents** | Additional agents, unnamed | — | **NOT IMPLEMENTED** |
 
+### Standing public-product SEO standard
+
+William approved ADR 0019: every public-facing Vanguard-built program must carry the
+Jarvis-owned Relentless SEO release contract from product design onward. Every future sold
+Peptastic tenant includes the isolated SEO capability, disabled until that customer's verified
+business identity, locations/service areas, domain ownership, approvers, target geography,
+regulated-claims policy, and authorized data connections are enrolled.
+
+The default is A1: audits, code/content drafts, structured-data proposals, and measurable
+improvement plans. Publishing, Business Profile edits, review replies, outreach, credentials,
+ads, or spending require explicit approval until a narrower written policy and real AEGIS
+enforcement authorize the exact action. Never guarantee ranking or use fake reviews, bought
+links, doorway/location spam, fabricated business facts, keyword stuffing, or unsupported
+medical/regulatory claims. Passing the gate proves release readiness evidence, not search
+dominance or a live SEO automation.
+
 **What is defined above is purpose and ownership — nothing more.** No implementation
 detail, data model, integration surface, permission set, or dependency has been specified
 for any of these modules. Do not infer any of it. Do not scaffold, design, or build for

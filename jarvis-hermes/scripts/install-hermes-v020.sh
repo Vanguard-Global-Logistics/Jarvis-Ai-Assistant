@@ -56,8 +56,8 @@ VERSION="$("$PYTHON" -c 'from importlib.metadata import version; print(version("
 [[ "$VERSION" == "$HERMES_RELEASE_VERSION" ]] || die "package version mismatch"
 
 step "Preserving memory and installing Jarvis-owned knowledge"
-mkdir -p "$HERMES_HOME/memories" "$HERMES_HOME/bin"
-chmod 700 "$HERMES_HOME" "$HERMES_HOME/memories" "$HERMES_HOME/bin"
+mkdir -p "$HERMES_HOME/memories" "$HERMES_HOME/bin" "$HERMES_HOME/skills/marketing"
+chmod 700 "$HERMES_HOME" "$HERMES_HOME/memories" "$HERMES_HOME/bin" "$HERMES_HOME/skills" "$HERMES_HOME/skills/marketing"
 if [[ -f "$HERMES_HOME/SOUL.md" ]] && ! cmp -s "$HERE/SOUL.md" "$HERMES_HOME/SOUL.md"; then
   cp -p "$HERMES_HOME/SOUL.md" "$HERMES_HOME/SOUL.md.backup.$(date +%Y%m%d-%H%M%S)"
 fi
@@ -72,8 +72,21 @@ cp "$HERE/memories/OCTAGON-COMMERCIAL-STRATEGY.md" "$HERMES_HOME/memories/"
 cp "$HERE/memories/JARVIS-PROFESSIONAL-MODE.md" "$HERMES_HOME/memories/"
 cp "$HERE/memories/JARVIS-JOB-MASTERY-ROADMAP.md" "$HERMES_HOME/memories/"
 cp "$HERE/memories/INFRASTRUCTURE-AND-MEMORY-ADOPTION.md" "$HERMES_HOME/memories/"
+cp "$HERE/memories/RELENTLESS-SEO-PRODUCT-STANDARD.md" "$HERMES_HOME/memories/"
 cp "$HERE/scripts/jarvis-kokoro-tts.py" "$HERMES_HOME/bin/"
 chmod 700 "$HERMES_HOME/bin/jarvis-kokoro-tts.py"
+
+SEO_SKILL_SOURCE="$HERE/skills/marketing/relentless-seo"
+SEO_SKILL_TARGET="$HERMES_HOME/skills/marketing/relentless-seo"
+if [[ -d "$SEO_SKILL_TARGET" ]] && ! diff -qr "$SEO_SKILL_SOURCE" "$SEO_SKILL_TARGET" >/dev/null 2>&1; then
+  cp -R "$SEO_SKILL_TARGET" "$SEO_SKILL_TARGET.backup.$(date +%Y%m%d-%H%M%S)"
+fi
+mkdir -p "$SEO_SKILL_TARGET/references" "$SEO_SKILL_TARGET/templates"
+cp "$SEO_SKILL_SOURCE/SKILL.md" "$SEO_SKILL_TARGET/SKILL.md"
+cp "$SEO_SKILL_SOURCE/references/"*.md "$SEO_SKILL_TARGET/references/"
+cp "$SEO_SKILL_SOURCE/templates/business-seo-profile.yaml" "$SEO_SKILL_TARGET/templates/"
+find "$SEO_SKILL_TARGET" -type d -exec chmod 700 {} +
+find "$SEO_SKILL_TARGET" -type f -exec chmod 600 {} +
 
 "$PYTHON" - "$HERE/config.yaml" "$HERMES_HOME/config.yaml" "$HERMES_HOME" <<'PY'
 import shutil
