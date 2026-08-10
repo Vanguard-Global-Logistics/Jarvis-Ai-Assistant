@@ -25,11 +25,12 @@ GitHub and tested runtime evidence are the source of truth. This file contains n
 - Draft pull request: **#2 — Pin Hermes v0.20 and add governed update intake**
 - PR URL: `https://github.com/Vanguard-Global-Logistics/Jarvis-Ai-Assistant/pull/2`
 - PR target: `main`
-- Verified implementation and physical Mac acceptance head immediately before the latest
-  documentation update: `53af8c060cb39e6217bc925868cefead78eae2d1`
+- Verified implementation head immediately before the latest documentation update:
+  `82501984522959d89b222e0700069ad2a25cbf7d`
+- Verified physical Mac Hermes acceptance head: `53af8c060cb39e6217bc925868cefead78eae2d1`
 - Base at the verified PR inspection: `c5ec68f04ecb8049287d4990073c390f25ba0ecc`
 - PR state at handoff creation: open, draft, mergeable.
-- CI evidence for `53af8c0`: workflow **CI**, run **279**, completed successfully: format,
+- CI evidence for `8250198`: workflow **CI**, run **283**, completed successfully: format,
   lint, typecheck, tests, build, real Electron runtime probe, and archived-handoff integrity.
 - Never modify `main` directly, force-push shared history, reset away user work, or treat a dirty worktree as disposable.
 - Read `CLAUDE.md`, `docs/CURRENT-STATE-AUDIT.md`, `docs/KNOWN-LIMITATIONS.md`, `docs/IPC-SURFACE.md`, `docs/BACKLOG.md`, relevant ADRs, and this handoff before changing code.
@@ -150,7 +151,7 @@ Latest field evidence showed voice capture working reliably. The remaining visib
 
 Do not use success in one runtime as proof that the other contains the same feature.
 
-## Immediate root blockers: AEGIS containment foundation and Jarvis Tool Bridge
+## Immediate milestone: Stage 1A explicit-save desktop persistence
 
 The latest physical R13.3 transcript proved that Jarvis hears and answers but cannot discover or execute tools. The log explicitly reported:
 
@@ -160,15 +161,43 @@ The latest physical R13.3 transcript proved that Jarvis hears and answers but ca
 
 Therefore the local Qwen voice lane can converse, but it cannot inspect the filesystem, list tools, research the internet, download a file, or execute an automation. It correctly answered that those capabilities were unavailable.
 
-The next programming milestone is a deterministic AEGIS incident/containment foundation
-paired with a governed Tool Bridge, not another microphone rewrite. External actions must not
-arrive before enforceable isolation, denial, evidence, and rollback.
+The authoritative backlog keeps Stage 1A as the single NOW milestone. AEGIS v1 remains NEXT and
+must not begin until Stage 1A is implemented, runtime-verified, used for one real task, and accepted
+by William. The continuation handoff previously contradicted this gate; repository commit `8250198`
+corrects the implementation direction without weakening the future AEGIS requirement.
+
+Implemented and CI-verified at `8250198`:
+
+- forward-only migration 2 creates strict `sessions` and ordered `messages` tables;
+- explicit-save-only `SqliteSessionHistoryStore` supports save, list, get, delete, cascade, bounded
+  validation, atomic duplicate failure, and restart-safe recall;
+- client-neutral Zod history contracts define the one permitted saved-transcript shape;
+- 11 focused tests cover the storage and contract foundation;
+- no IPC, renderer, filesystem path, automatic save, Memory v1 admission, or new runtime authority
+  was added by this checkpoint.
+
+Remaining Stage 1A work:
+
+1. Add exactly four schema-validated channels: `history:save`, `history:list`, `history:get`, and
+   `history:delete`.
+2. Compose one SQLite owner in Electron main, apply migrations once, close it cleanly, and add the
+   required Electron ABI rebuild for `better-sqlite3`.
+3. Expose four purpose-named preload functions—never a generic invoke bridge.
+4. Add Save Session naming, a history list, read-only open, and confirmed deletion to the renderer.
+5. Preserve the rule that closing without Save Session writes nothing.
+6. Extend exact IPC, preload, bundle, and runtime-probe assertions.
+7. Re-run the Windows development-runtime acceptance and have William use one real task and accept
+   the milestone.
+
+Only after that gate may AEGIS v1 be promoted. The future Tool Bridge still requires deterministic
+AEGIS denial, isolation, evidence, rollback, capability leases, and owner approval before any
+external action.
 
 Required design:
 
 `voice request -> deterministic intent route -> capability registry -> AEGIS/owner preflight -> Hermes adapter -> tool execution -> evidence/result -> George response`
 
-Required behavior:
+Future Tool Bridge behavior, preserved for after the Stage 1A and AEGIS gates:
 
 1. Preserve the proven R13.3 baseline byte-for-byte unless a test requires a narrow source change.
 2. Keep ordinary conversation on the fast Qwen reflex lane.
@@ -384,34 +413,30 @@ Never include actual secrets in this table. A connector being present in ChatGPT
 - Keep generated reconstruction ignored.
 - Keep personal memory and locked voice profile outside Git.
 
-### P1 — Build the AEGIS containment foundation and Tool Bridge
+### P1 — Finish and accept Stage 1A explicit-save desktop persistence
 
-- Deterministic AEGIS incident state, capability leases, reversible containment allowlist,
-  stop control, and append-only evidence.
-- Signed security events with company/Hive/tenant isolation.
-- Capability registry and health checks.
-- Deterministic conversation/action router.
-- Narrow Hermes adapter.
-- AEGIS/owner approval contract.
-- Tool-result return to George.
-- Audit, cancellation, timeouts, duplicate protection, restart recovery.
-- Physical Mac acceptance.
-- Connect owner review to the existing proposal-only Research Prime without granting canonical
-  knowledge or code-promotion authority.
-- After Tool Bridge containment, design an approved open-ended discovery adapter with a provider,
-  cost ceiling, per-company source charter, prompt-injection isolation, and A1-only output.
-- No external actions until denial, isolation, evidence, rollback, and independent review pass.
-
-### P2 — Daily-use desktop foundation
-
+- Wire the CI-verified session store and contracts through four narrow history IPC channels.
+- Keep one SQLite owner in Electron main and rebuild `better-sqlite3` for Electron's ABI.
+- Add explicit Save Session naming, list, read-only open, and confirmed deletion.
+- Extend preload exact-surface, IPC, bundle, and runtime-probe tests.
+- Prove unsaved sessions disappear and saved sessions survive restart.
+- Re-run Windows development-runtime acceptance, use one real task, and obtain William's explicit
+  Stage 1A acceptance.
 - Preserve the accepted `53af8c0` Hermes baseline and its **32 pass, 0 fail, 1 warning** evidence.
 - Keep Relentless SEO proposal-only until a real tenant and its production accounts are explicitly
   enrolled; package acceptance did not authorize credentials or publishing.
-- Governed durable Memory v1 connected to trusted active profile/session.
-- One-click startup, shutdown, restart, crash recovery, visible status, and uninstall/update recovery.
-- Connect the accepted voice lane without broadening Electron IPC unsafely.
-- Implement and independently review real AEGIS enforcement before external actions.
-- Full-workday 8 GB Mac acceptance covering memory, swap, heat, sleep/wake, network loss, and microphone recovery.
+
+### P2 — Build AEGIS v1, then the governed Tool Bridge
+
+- Promote AEGIS only after Stage 1A is accepted and its definition/review gate passes.
+- Deterministic incident state, capability leases, reversible containment allowlist, stop control,
+  and append-only evidence.
+- Signed security events with company/Hive/tenant isolation.
+- Capability registry, deterministic action router, narrow Hermes adapters, owner approval,
+  timeouts, cancellation, duplicate protection, restart recovery, and result-to-voice.
+- Connect owner review to Research Prime without granting canonical knowledge or code-promotion
+  authority.
+- No external actions until denial, isolation, evidence, rollback, and independent review pass.
 
 ### P3 — Model and latency acceptance
 
@@ -457,7 +482,7 @@ A strategy document, installed memory file, UI tile, mock, shell, prototype, mod
 
 Use this exact starting instruction:
 
-> Continue Jarvis from `Vanguard-Global-Logistics/Jarvis-Ai-Assistant`, draft PR #2, branch `agent/jarvis-whole-macbook-2026-08-08`. Read `CLAUDE.md`, the current audit/known limitations/backlog, and `docs/status/JARVIS-CONTINUATION-HANDOFF-2026-08-09.md` completely. Verify the remote branch head, PR state, CI, and working tree before changes. Preserve the proven R13.3 SHA-256 baseline and locked owner profile. Do not claim AEGIS, the Defensive Prime Swarm, clone prevention, durable memory, tools, connectors, BCI Agent, Job Site Progress, Octagon, Throne, Hive federation, live SEO automation, Peptastic runtime integration, or search-ranking results are implemented without evidence. The immediate programming milestone is the deterministic AEGIS incident/containment foundation paired with the governed Jarvis Tool Bridge: company/Hive isolation, capability leases, reversible allowlisted containment, append-only evidence, capability registry, deterministic action routing, owner approval, narrow tool adapters, result-to-voice, failure containment, independent review, and physical Mac acceptance. Preserve the proposal-only continual-improvement loop and bounded Research Prime: four enrolled primary release sources, structural facts only, no raw web prose, no automatic knowledge/code promotion, and no open-ended business search before its provider, cost ceiling, per-company source charter, prompt-injection isolation, and A1-only output are approved. Preserve the Jarvis-owned Relentless SEO standard as an A1-by-default public-product release gate using primary sources: no fake reviews, paid-link schemes, doorway pages, fabricated locations, unsupported regulated claims, ranking guarantees, automatic publishing, or cross-tenant Peptastic data. Attacker content and raw transcripts must never become trusted learning. Never hack back, put credentials in chat or GitHub, or enable silent paid-cloud fallback.
+> Continue Jarvis from `Vanguard-Global-Logistics/Jarvis-Ai-Assistant`, draft PR #2, branch `agent/jarvis-whole-macbook-2026-08-08`. Read `CLAUDE.md`, the current audit/known limitations/backlog, and `docs/status/JARVIS-CONTINUATION-HANDOFF-2026-08-09.md` completely. Verify the remote branch head, PR state, CI, and working tree before changes. Preserve the proven R13.3 SHA-256 baseline and locked owner profile. Do not claim AEGIS, the Defensive Prime Swarm, clone prevention, durable memory, tools, connectors, BCI Agent, Job Site Progress, Octagon, Throne, Hive federation, live SEO automation, Peptastic runtime integration, or search-ranking results are implemented without evidence. The single active milestone is Stage 1A explicit-save desktop persistence. Commit `8250198` implements and CI-verifies the forward-only session migration, single-writer save/list/get/delete store, restart-safe recall, and client-neutral history contracts, but adds no IPC or UI. Next add exactly four schema-validated history channels, one Electron-main SQLite owner with ABI rebuild, four purpose-named preload methods, Save Session/history/read-only-open/confirmed-delete UI, exact boundary and runtime-probe tests, Windows development-runtime acceptance, one real task, and William's explicit acceptance. Do not start AEGIS v1 or the Tool Bridge until Stage 1A is accepted; preserve their future deterministic containment, capability leases, isolation, append-only evidence, owner approval, failure containment, independent review, and no-external-action boundary. Preserve the proposal-only continual-improvement loop and bounded Research Prime: four enrolled primary release sources, structural facts only, no raw web prose, no automatic knowledge/code promotion, and no open-ended business search before its provider, cost ceiling, per-company source charter, prompt-injection isolation, and A1-only output are approved. Preserve the Jarvis-owned Relentless SEO standard as an A1-by-default public-product release gate using primary sources: no fake reviews, paid-link schemes, doorway pages, fabricated locations, unsupported regulated claims, ranking guarantees, automatic publishing, or cross-tenant Peptastic data. Attacker content and raw transcripts must never become trusted learning. Never hack back, put credentials in chat or GitHub, or enable silent paid-cloud fallback.
 
 ## Handoff verification checklist
 
@@ -468,7 +493,7 @@ A new session has successfully resumed only after it can state:
 - Hermes doctor result;
 - R13.3 accepted checksum;
 - difference between Electron monorepo and R13.3/Hermes runtime;
-- immediate AEGIS containment and Tool Bridge milestone;
+- immediate Stage 1A explicit-save persistence milestone and the `8250198` backend boundary;
 - AEGIS and external-action limitation;
 - Defensive Prime Swarm, poisoned-learning, no-hack-back, and clone-resistance boundaries;
 - the job-mastery sequence;
