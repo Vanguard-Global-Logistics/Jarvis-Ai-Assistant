@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -19,6 +19,13 @@ const scripts = [
 ];
 
 describe('Hermes shell entry points', () => {
+  it.each([
+    'jarvis-hermes/scripts/install-hermes-v020.sh',
+    'jarvis-hermes/scripts/hermes-v020-doctor.sh',
+  ])('%s preserves its executable Git mode', (script) => {
+    expect(statSync(resolve(root, script)).mode & 0o111).not.toBe(0);
+  });
+
   it.each(scripts)('%s passes Bash syntax validation', (script) => {
     expect(() =>
       execFileSync('bash', ['-n', resolve(root, script)], {
