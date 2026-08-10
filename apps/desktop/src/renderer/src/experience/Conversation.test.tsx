@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { AmplifierResult } from '@jarvis/contracts';
+import type { AmplifierResult, SaveSessionRequest, SavedSession } from '@jarvis/contracts';
 import { Conversation } from './Conversation.js';
 import type { ConversationBridge } from './Conversation.js';
 
@@ -19,7 +19,9 @@ function fakeBridge(overrides: Partial<ConversationBridge> = {}): ConversationBr
   return {
     sendChat: vi.fn().mockResolvedValue({ text: 'Hello from the mock.', provider: 'mock' }),
     amplify: vi.fn().mockResolvedValue(AMP),
-    saveSession: vi.fn(async (request) => request),
+    saveSession: vi.fn((request: SaveSessionRequest): Promise<SavedSession> =>
+      Promise.resolve(request),
+    ),
     listSessions: vi.fn().mockResolvedValue([]),
     getSession: vi.fn().mockResolvedValue(null),
     deleteSession: vi.fn().mockResolvedValue({ deleted: true }),
@@ -170,7 +172,9 @@ describe('Conversation', () => {
   });
 
   it('saves only after explicit naming and opens the saved snapshot read-only', async () => {
-    const saveSession = vi.fn(async (request) => request);
+    const saveSession = vi.fn((request: SaveSessionRequest): Promise<SavedSession> =>
+      Promise.resolve(request),
+    );
     const bridge = fakeBridge({ saveSession });
     render(<Conversation bridge={bridge} />);
 

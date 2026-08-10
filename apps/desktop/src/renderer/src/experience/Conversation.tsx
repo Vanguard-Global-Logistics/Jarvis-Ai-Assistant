@@ -307,7 +307,7 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
               key={item.id}
               role={item.role}
               content={item.content}
-              provider={item.provider}
+              provider={item.role === 'assistant' ? item.provider : undefined}
             />
           ) : item.kind === 'amplify' ? (
             <AmplifierCard key={item.id} idea={item.idea} result={item.result} />

@@ -151,7 +151,9 @@ export function SessionHistory({
         {readOnlySession === null ? (
           <button
             type="button"
-            onClick={() => setNaming((open) => !open)}
+            onClick={() => {
+              setNaming((open) => !open);
+            }}
             disabled={!canSave}
             style={{
               ...BUTTON,
@@ -177,7 +179,9 @@ export function SessionHistory({
         )}
         <button
           type="button"
-          onClick={() => setHistoryOpen((open) => !open)}
+          onClick={() => {
+            setHistoryOpen((open) => !open);
+          }}
           disabled={bridge === null}
           aria-expanded={historyOpen}
           style={{
@@ -195,7 +199,9 @@ export function SessionHistory({
           <input
             aria-label="Session name"
             value={name}
-            onChange={(event) => setName(event.target.value)}
+            onChange={(event) => {
+              setName(event.target.value);
+            }}
             maxLength={120}
             autoFocus
             style={{
