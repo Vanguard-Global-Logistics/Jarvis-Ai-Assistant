@@ -26,10 +26,10 @@ GitHub and tested runtime evidence are the source of truth. This file contains n
 - PR URL: `https://github.com/Vanguard-Global-Logistics/Jarvis-Ai-Assistant/pull/2`
 - PR target: `main`
 - Verified implementation head immediately before the latest documentation update:
-  `cac2b7be96e8f53c633483ca83fdeb969fc48ce7`
+  `b04c2a49f34b23661b98b91c9c15240b41a54024`
 - Base at the verified PR inspection: `c5ec68f04ecb8049287d4990073c390f25ba0ecc`
 - PR state at handoff creation: open, draft, mergeable.
-- CI evidence for `cac2b7b`: workflow **CI**, run **265**, completed successfully: format,
+- CI evidence for `b04c2a4`: workflow **CI**, run **271**, completed successfully: format,
   lint, typecheck, tests, build, real Electron runtime probe, and archived-handoff integrity.
 - Never modify `main` directly, force-push shared history, reset away user work, or treat a dirty worktree as disposable.
 - Read `CLAUDE.md`, `docs/CURRENT-STATE-AUDIT.md`, `docs/KNOWN-LIMITATIONS.md`, `docs/IPC-SURFACE.md`, `docs/BACKLOG.md`, relevant ADRs, and this handoff before changing code.
@@ -69,10 +69,10 @@ Do not re-enroll or replace William's locked voice profile without explicit appr
 
 ### Hermes
 
-The most recent physical Mac result is:
+The most recent physical Mac result, on repository commit `7609f2c`, is:
 
 - Hermes **0.20.0**
-- **21 pass, 0 fail, 1 warning**
+- **25 pass, 0 fail, 1 warning**
 - Warning: Hermes microphone permission and `/wake on` require a physical acceptance step; this is not an installation failure.
 - Signed tag and exact upstream commit are pinned.
 - Daily signed-release staging runs at 03:15 local time.
@@ -87,13 +87,20 @@ The most recent physical Mac result is:
   - `JARVIS-PROFESSIONAL-MODE.md`
   - `JARVIS-JOB-MASTERY-ROADMAP.md`
   - `INFRASTRUCTURE-AND-MEMORY-ADOPTION.md`
+  - `PRIME-AGENT-CONTINUAL-IMPROVEMENT.md`
+  - `AEGIS-DEFENSIVE-PRIME-SWARM.md`
 
-The branch now also contains `PRIME-AGENT-CONTINUAL-IMPROVEMENT.md`,
-`AEGIS-DEFENSIVE-PRIME-SWARM.md`, a tested proposal-only daily improvement runner, and a
-03:45 launchd installer. They are CI-verified but have not yet been pulled and physically
-accepted on the Mac. After installation, the doctor is expected to add checks for the two
-new memories, the daily proposal job, and its runner; record the observed result rather than
-assuming it.
+The proposal-only daily improvement runner and its 03:45 launchd job are installed and
+physically doctor-verified on the Mac. This proves scheduling and packaging, not autonomous
+skill promotion or AEGIS enforcement.
+
+The branch now also contains a bounded Research Prime implementation at `b04c2a4`. It checks
+four explicitly enrolled official GitHub release endpoints at most hourly and writes a daily
+04:15 A1 knowledge-candidate review. It stores structural release facts rather than raw release
+prose, makes no model call, follows no redirect, sends no credential, and never promotes
+knowledge, changes code or policy, sends messages, spends money, or changes AEGIS. It is
+CI-verified but has not yet been pulled, installed, or physically accepted on the Mac; record
+the observed doctor and report results after installation rather than assuming them.
 
 These Markdown memories are governed knowledge packages; they do not prove that durable conversational Memory v1 is connected to the live desktop or R13.3 runtime.
 
@@ -297,9 +304,17 @@ Prime Agent itself is not installed or embedded. Jarvis selectively adopted its 
 Continual Harness patterns in ADR 0016: bounded observations, seven-day pattern comparison,
 the owner-approved three-occurrences-per-week skill threshold, proposal generation, sandbox
 tests, independent review, owner-visible promotion, monitoring, and rollback. The first
-executable slice writes proposals only and never self-promotes. An approved structural
-observation adapter remains pending; do not alter the accepted R13.3 voice source merely to
-collect learning data.
+executable slice writes proposals only and never self-promotes. The first approved structural
+observation adapter is the bounded Research Prime described below; do not alter the accepted
+R13.3 voice source merely to collect learning data.
+
+The bounded Research Prime is the first approved structural observation adapter. It monitors
+only four enrolled primary GitHub release sources: Prime Agent, Hermes Agent, OpenJarvis, and
+Ollama. Its hourly monitor is A4 deterministic observation, but its output remains A1 proposals
+only. It is not the upstream Prime Agent runtime, an unrestricted web crawler, a business-model
+research agent, a self-modifying system, or proof of durable Memory v1. Broader business
+discovery requires a separately approved provider, cost ceiling, per-company source charter,
+prompt-injection isolation, Tool Bridge capability, and proposal-only output.
 
 ### Base44
 
@@ -347,7 +362,10 @@ Never include actual secrets in this table. A connector being present in ChatGPT
 - Tool-result return to George.
 - Audit, cancellation, timeouts, duplicate protection, restart recovery.
 - Physical Mac acceptance.
-- Approved structural observation adapter feeding the proposal-only daily improvement loop.
+- Connect owner review to the existing proposal-only Research Prime without granting canonical
+  knowledge or code-promotion authority.
+- After Tool Bridge containment, design an approved open-ended discovery adapter with a provider,
+  cost ceiling, per-company source charter, prompt-injection isolation, and A1-only output.
 - No external actions until denial, isolation, evidence, rollback, and independent review pass.
 
 ### P2 — Daily-use desktop foundation
@@ -400,7 +418,7 @@ A strategy document, installed memory file, UI tile, mock, shell, prototype, mod
 
 Use this exact starting instruction:
 
-> Continue Jarvis from `Vanguard-Global-Logistics/Jarvis-Ai-Assistant`, draft PR #2, branch `agent/jarvis-whole-macbook-2026-08-08`. Read `CLAUDE.md`, the current audit/known limitations/backlog, and `docs/status/JARVIS-CONTINUATION-HANDOFF-2026-08-09.md` completely. Verify the remote branch head, PR state, CI, and working tree before changes. Preserve the proven R13.3 SHA-256 baseline and locked owner profile. Do not claim AEGIS, the Defensive Prime Swarm, clone prevention, durable memory, tools, connectors, BCI Agent, Job Site Progress, Octagon, Throne, or Hive federation are implemented without evidence. The immediate programming milestone is the deterministic AEGIS incident/containment foundation paired with the governed Jarvis Tool Bridge: company/Hive isolation, capability leases, reversible allowlisted containment, append-only evidence, capability registry, deterministic action routing, owner approval, narrow tool adapters, result-to-voice, failure containment, independent review, and physical Mac acceptance. Preserve the proposal-only continual-improvement loop and add only a bounded structural observation adapter; attacker content and raw transcripts must never become trusted learning. Never hack back, put credentials in chat or GitHub, or enable silent paid-cloud fallback.
+> Continue Jarvis from `Vanguard-Global-Logistics/Jarvis-Ai-Assistant`, draft PR #2, branch `agent/jarvis-whole-macbook-2026-08-08`. Read `CLAUDE.md`, the current audit/known limitations/backlog, and `docs/status/JARVIS-CONTINUATION-HANDOFF-2026-08-09.md` completely. Verify the remote branch head, PR state, CI, and working tree before changes. Preserve the proven R13.3 SHA-256 baseline and locked owner profile. Do not claim AEGIS, the Defensive Prime Swarm, clone prevention, durable memory, tools, connectors, BCI Agent, Job Site Progress, Octagon, Throne, or Hive federation are implemented without evidence. The immediate programming milestone is the deterministic AEGIS incident/containment foundation paired with the governed Jarvis Tool Bridge: company/Hive isolation, capability leases, reversible allowlisted containment, append-only evidence, capability registry, deterministic action routing, owner approval, narrow tool adapters, result-to-voice, failure containment, independent review, and physical Mac acceptance. Preserve the proposal-only continual-improvement loop and bounded Research Prime: four enrolled primary release sources, structural facts only, no raw web prose, no automatic knowledge/code promotion, and no open-ended business search before its provider, cost ceiling, per-company source charter, prompt-injection isolation, and A1-only output are approved. Attacker content and raw transcripts must never become trusted learning. Never hack back, put credentials in chat or GitHub, or enable silent paid-cloud fallback.
 
 ## Handoff verification checklist
 
