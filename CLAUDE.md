@@ -20,8 +20,8 @@ Repository: `github.com/Vanguard-Global-Logistics/Jarvis-Ai-Assistant`.
   layer on Node's builtin `node:sqlite` (one migration: conversation history), a
   hardened Electron shell, the typed IPC boundary, a working conversation surface
   (chat + Thought Amplifier v1, mock-default), and **explicit-save conversation
-  persistence** (Save Session / History / read-only reopen / confirmed delete; unsaved
-  conversations are discarded on close, and the runtime probe proves it). It still has
+  persistence** (Save Session / History / read-only reopen / Continue / confirmed delete;
+  unsaved conversations are discarded on close, and the runtime probe proves it). It still has
   **no** AEGIS, no orchestrator beyond a single stateless model call, no Forge, no
   Ledger, no memory (a saved transcript is a stored record, not recall), no voice, and
   no vision. Do not describe any part of Jarvis as protected, or as remembering
@@ -195,7 +195,7 @@ packages/contracts     Zod schemas + shared types                  PARTIAL — I
 packages/ui            Design-system components                    PARTIAL — tokens, motion, Orb + glass primitives
 packages/config        Env validation + structured logging         IMPLEMENTED, unit-tested
 packages/database      SQLite (node:sqlite) + migration runner     PARTIAL — wired to Electron main, 2 migrations: conversation history + amplifications (ADR 0008, 0009)
-docs/DECISIONS/        ADRs                                        0001–0009
+docs/DECISIONS/        ADRs                                        0001–0010
 docs/foundation/       Layer 2 foundation documents (ADR 0005)     PARTIAL — 01 APPROVED; 02, 07, 09 DRAFT; rest CONCEPTUAL
 ```
 

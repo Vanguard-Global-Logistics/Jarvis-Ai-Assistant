@@ -26,8 +26,10 @@ cards (ADR 0009), so an Amplifier-only session is savable. What this is **not**:
 - **No memory.** A saved transcript is a stored record, not recall. Jarvis does not
   read saved sessions back into new conversations, does not learn from them, and has
   no Memory module (§7 of CLAUDE.md — Memory CRUD is a separate milestone).
-- **No resume.** Opening a saved session is read-only. Continuing one is a future,
-  separately-designed feature.
+- **Resume forks, it does not mutate.** Opening a saved session is read-only, but
+  **Continue** (ADR 0010) loads it back into the live composer to keep working.
+  Continuing never edits the stored record; saving afterwards creates a new saved
+  conversation with its own id.
 - **No sync, no encryption at rest.** One local file (`jarvis.db` under Electron's
   userData), plain SQLite.
 

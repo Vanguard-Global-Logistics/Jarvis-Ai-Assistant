@@ -229,6 +229,42 @@ describe('Conversation', () => {
     expect(screen.getByRole('textbox', { name: /message jarvis/i })).toBeTruthy();
   });
 
+  it('continues a saved session into the live composer and saves it as a new record (ADR 0010)', async () => {
+    const saved = {
+      ...SAVED_META,
+      entryCount: 2,
+      entries: [
+        { kind: 'message' as const, role: 'user' as const, content: 'resume me' },
+        { kind: 'amplification' as const, idea: 'resume idea', result: AMP },
+      ],
+    };
+    const bridge = fakeBridge({
+      listConversations: vi.fn().mockResolvedValue({ conversations: [SAVED_META] }),
+      getConversation: vi.fn().mockResolvedValue({ conversation: saved }),
+    });
+    render(<Conversation bridge={bridge} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /history/i }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Open' }));
+    fireEvent.click(await screen.findByRole('button', { name: /continue this session/i }));
+
+    // Back in the live composer, with the saved content loaded and editable.
+    expect(screen.getByRole('textbox', { name: /message jarvis/i })).toBeTruthy();
+    expect(screen.getByText('resume me')).toBeTruthy();
+    expect(screen.getByText(AMP.clarifiedIntent)).toBeTruthy();
+
+    // Continuing does not itself save; saving now writes the loaded entries as a
+    // fresh record.
+    expect(bridge.saveConversation).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: /save session/i }));
+    expect(bridge.saveConversation).toHaveBeenCalledWith({
+      entries: [
+        { kind: 'message', role: 'user', content: 'resume me' },
+        { kind: 'amplification', idea: 'resume idea', result: AMP },
+      ],
+    });
+  });
+
   it('states plainly when a saved session no longer exists', async () => {
     const bridge = fakeBridge({
       listConversations: vi.fn().mockResolvedValue({ conversations: [SAVED_META] }),

@@ -25,9 +25,10 @@ import { GlassPanel, accent, fontFamily, letterSpacing, surface, text } from '@j
  *     that call is the only thing in the application that writes a
  *     conversation. Until it is pressed, closing the app discards the session,
  *     and the banner says exactly that.
- *   - **History** lists what was saved; opening an entry is READ-ONLY (a saved
- *     conversation is a record, not a resumable session — resuming is a later,
- *     separately-designed feature, not quietly implied here).
+ *   - **History** lists what was saved; opening an entry is READ-ONLY. From
+ *     there **Continue** (ADR 0010) loads the saved transcript into a fresh live
+ *     session so work can resume — it never mutates the stored record; saving
+ *     again creates a new saved conversation with its own id.
  *   - **Delete asks first.** A delete is two clicks — the second confirms —
  *     and the result reflects what main actually did.
  *
@@ -311,6 +312,30 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
     [bridge, confirmDeleteId, viewing, refreshHistory],
   );
 
+  /**
+   * Continue a saved session (ADR 0010): load its entries back into the LIVE
+   * transcript so the user can keep chatting or amplifying. This forks — it does
+   * not mutate the stored record. Saving afterwards creates a new saved
+   * conversation (new id). Loaded assistant messages carry no provider chip:
+   * we did not generate them this session and must not claim mock/anthropic for
+   * a historical line (CLAUDE.md §8).
+   */
+  const continueSaved = (conversation: SavedConversation): void => {
+    const loaded: TranscriptItem[] = conversation.entries.map((entry) =>
+      entry.kind === 'message'
+        ? { kind: 'message', id: allocId(), role: entry.role, content: entry.content }
+        : { kind: 'amplify', id: allocId(), idea: entry.idea, result: entry.result },
+    );
+    setItems(loaded);
+    setViewing(null);
+    setHistoryOpen(false);
+    setConfirmDeleteId(null);
+    setSaveNotice('Continued from a saved session — Save to keep the new version');
+    window.setTimeout(() => {
+      setSaveNotice(null);
+    }, 3200);
+  };
+
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
     // Enter sends; Shift+Enter is a newline. A composer that eats every Enter
     // is a worse text box than the one it replaces.
@@ -420,6 +445,9 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
           conversation={viewing}
           onBack={() => {
             setViewing(null);
+          }}
+          onContinue={() => {
+            continueSaved(viewing);
           }}
         />
       ) : (
@@ -665,9 +693,11 @@ function HistoryPanel({
 function SavedConversationView({
   conversation,
   onBack,
+  onContinue,
 }: {
   conversation: SavedConversation;
   onBack: () => void;
+  onContinue: () => void;
 }): JSX.Element {
   return (
     <div
@@ -675,10 +705,34 @@ function SavedConversationView({
       role="region"
       style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 8 }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 10,
+          flexWrap: 'wrap',
+        }}
+      >
         <span style={{ ...MONO_LABEL, color: accent.warning }}>
           Saved session · read-only · {formatSavedAt(conversation.savedAt)}
         </span>
+        <button
+          type="button"
+          onClick={onContinue}
+          title="Load this session into the live composer to keep working (saves as a new session)"
+          style={{
+            ...MONO_LABEL,
+            color: background_fieldTop,
+            background: accent.jarvisBlue,
+            border: `1px solid ${accent.jarvisBlue}`,
+            borderRadius: 6,
+            padding: '4px 10px',
+            cursor: 'pointer',
+          }}
+        >
+          Continue this session
+        </button>
         <button
           type="button"
           onClick={onBack}
