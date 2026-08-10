@@ -28,6 +28,18 @@ export const CHANNELS = {
    * nothing more.
    */
   jarvisAmplify: 'jarvis:amplify',
+
+  /** Persist one named transcript only after the owner explicitly saves it. */
+  historySave: 'history:save',
+
+  /** List bounded metadata for explicitly saved sessions. */
+  historyList: 'history:list',
+
+  /** Open one explicitly saved session by opaque id. */
+  historyGet: 'history:get',
+
+  /** Delete one explicitly saved session by opaque id. */
+  historyDelete: 'history:delete',
 } as const;
 
 export type ChannelName = (typeof CHANNELS)[keyof typeof CHANNELS];

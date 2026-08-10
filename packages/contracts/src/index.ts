@@ -23,6 +23,10 @@ export {
   AppInfoSchema,
   IPC_CONTRACTS,
   appGetInfoContract,
+  historyDeleteContract,
+  historyGetContract,
+  historyListContract,
+  historySaveContract,
   jarvisAmplifyContract,
   jarvisChatContract,
 } from './ipc/contracts.js';

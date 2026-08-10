@@ -4,6 +4,10 @@ import {
   AppInfoSchema,
   IPC_CONTRACTS,
   appGetInfoContract,
+  historyDeleteContract,
+  historyGetContract,
+  historyListContract,
+  historySaveContract,
   jarvisAmplifyContract,
   jarvisChatContract,
 } from './contracts.js';
@@ -151,5 +155,65 @@ describe('jarvisAmplifyContract', () => {
     expect(jarvisAmplifyContract.response.safeParse(valid).success).toBe(true);
     const { buildReadyPrompt: _omitted, ...missing } = valid;
     expect(jarvisAmplifyContract.response.safeParse(missing).success).toBe(false);
+  });
+});
+
+describe('history IPC contracts', () => {
+  const saved = {
+    id: 'session-1',
+    name: 'Morning plan',
+    createdAt: '2026-08-09T12:00:00.000Z',
+    updatedAt: '2026-08-09T12:00:00.000Z',
+    messages: [
+      { role: 'user' as const, content: 'Plan my day.' },
+      {
+        role: 'assistant' as const,
+        content: 'Start with the site report.',
+        provider: 'mock' as const,
+      },
+    ],
+  };
+
+  it('registers exactly four purpose-named history channels', () => {
+    expect(historySaveContract.channel).toBe('history:save');
+    expect(historyListContract.channel).toBe('history:list');
+    expect(historyGetContract.channel).toBe('history:get');
+    expect(historyDeleteContract.channel).toBe('history:delete');
+  });
+
+  it('accepts a bounded explicit-save transcript and rejects smuggled fields', () => {
+    expect(historySaveContract.request.safeParse(saved).success).toBe(true);
+    expect(historySaveContract.request.safeParse({ ...saved, autoSave: true }).success).toBe(false);
+    expect(historySaveContract.response.safeParse(saved).success).toBe(true);
+  });
+
+  it('allows no list request payload and bounds the list response', () => {
+    expect(historyListContract.request.safeParse(undefined).success).toBe(true);
+    expect(historyListContract.request.safeParse({ all: true }).success).toBe(false);
+    expect(
+      historyListContract.response.safeParse([{ ...saved, messages: undefined, messageCount: 2 }])
+        .success,
+    ).toBe(false);
+    expect(
+      historyListContract.response.safeParse([
+        {
+          id: saved.id,
+          name: saved.name,
+          createdAt: saved.createdAt,
+          updatedAt: saved.updatedAt,
+          messageCount: 2,
+        },
+      ]).success,
+    ).toBe(true);
+  });
+
+  it('uses only a bounded id for reads and deletes', () => {
+    expect(historyGetContract.request.safeParse({ id: saved.id }).success).toBe(true);
+    expect(historyDeleteContract.request.safeParse({ id: saved.id }).success).toBe(true);
+    expect(historyGetContract.request.safeParse({ id: saved.id, path: '/tmp/db' }).success).toBe(
+      false,
+    );
+    expect(historyGetContract.response.safeParse(null).success).toBe(true);
+    expect(historyDeleteContract.response.safeParse({ deleted: true }).success).toBe(true);
   });
 });
