@@ -27,7 +27,7 @@ import { fileURLToPath } from 'node:url';
  * Usage:
  *   node scripts/runtime-probe.mjs            # both modes
  *   node scripts/runtime-probe.mjs --prod     # built HTML (file://), production CSP
- *   node scripts/runtime-probe.mjs --dev      # real `dev:desktop`, Vite + dev CSP
+ *   node scripts/runtime-probe.mjs --dev      # desktop workspace dev path, Vite + dev CSP
  *
  * Both modes matter. The module-resolution bug only appeared in a real launch; the CSP bug
  * only appeared in dev. A probe that ran one mode would have missed one of them.
@@ -633,11 +633,16 @@ async function probe(mode) {
           ['apps/desktop', `--remote-debugging-port=${port}`, '--no-sandbox'],
           {},
         )
-      : // The REAL `npm run dev:desktop`. electron-vite forwards
+      : // Run the same desktop workspace dev path as `npm run dev:desktop`, but
+        // do not repeat the root predev native rebuild. Production above already
+        // proves the rebuilt native module loads, and CI explicitly performs the
+        // rebuild before this probe. Rebuilding again can exceed the 60-second
+        // CDP startup deadline while compiling better-sqlite3 without exercising
+        // any additional application behavior. electron-vite forwards
         // REMOTE_DEBUGGING_PORT and NO_SANDBOX to Electron itself, so this
         // exercises the actual dev path — including the CSP nonce travelling
         // through electron-vite's spawn — rather than a reconstruction of it.
-        launch('npm', ['run', 'dev:desktop'], {
+        launch('npm', ['run', 'dev', '--workspace', '@jarvis/desktop'], {
           REMOTE_DEBUGGING_PORT: String(port),
           NO_SANDBOX: '1',
         });
@@ -680,7 +685,10 @@ for (const mode of /** @type {const} */ (['prod', 'dev'])) {
   if (mode === 'prod' && !wantProd) continue;
   if (mode === 'dev' && !wantDev) continue;
 
-  const label = mode === 'prod' ? 'PRODUCTION (built HTML, file://)' : 'DEVELOPMENT (dev:desktop)';
+  const label =
+    mode === 'prod'
+      ? 'PRODUCTION (built HTML, file://)'
+      : 'DEVELOPMENT (desktop workspace dev path)';
   console.log(`\n──────── ${label} ────────\n`);
 
   const checks = await probe(mode);
