@@ -23,6 +23,7 @@ export {
   IPC_CONTRACTS,
   appGetInfoContract,
   historyDeleteContract,
+  historyExportContract,
   historyGetContract,
   historyListContract,
   historySaveContract,

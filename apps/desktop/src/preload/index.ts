@@ -100,6 +100,18 @@ const api = {
     ipcRenderer.invoke(CHANNELS.historyDelete, { id } satisfies HistoryIdRequest) as Promise<{
       deleted: boolean;
     }>,
+
+  /**
+   * Back up every saved conversation to a file the user picks (ADR 0011).
+   * Takes no path and returns none: main opens the native save dialog and keeps
+   * the destination on the trusted side. `exported: false` means the user
+   * cancelled the dialog.
+   */
+  exportHistory: (): Promise<{ exported: boolean; conversationCount: number }> =>
+    ipcRenderer.invoke(CHANNELS.historyExport) as Promise<{
+      exported: boolean;
+      conversationCount: number;
+    }>,
 } as const;
 
 export type JarvisApi = typeof api;

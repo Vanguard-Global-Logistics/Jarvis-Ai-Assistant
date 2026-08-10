@@ -175,6 +175,29 @@ export const historyDeleteContract = defineContract({
     .strict(),
 });
 
+/**
+ * `history:export` — no payload in, what actually happened out (ADR 0011).
+ *
+ * No path crosses the boundary in either direction. The renderer cannot choose
+ * where the backup goes (main opens the native save dialog), and it never
+ * learns where the file landed — a filesystem path is exactly the kind of value
+ * SECURITY-BOUNDARIES.md keeps out of the untrusted side.
+ *
+ * `exported: false` is the normal "the user cancelled the dialog" outcome,
+ * stated as a value rather than thrown as an error.
+ */
+export const historyExportContract = defineContract({
+  channel: CHANNELS.historyExport,
+  request: z.undefined(),
+  response: z
+    .object({
+      exported: z.boolean(),
+      /** How many conversations the backup contains. Zero when cancelled. */
+      conversationCount: z.number().int().min(0),
+    })
+    .strict(),
+});
+
 // --- registry ---------------------------------------------------------------
 
 /**
@@ -190,4 +213,5 @@ export const IPC_CONTRACTS = {
   [CHANNELS.historyList]: historyListContract,
   [CHANNELS.historyGet]: historyGetContract,
   [CHANNELS.historyDelete]: historyDeleteContract,
+  [CHANNELS.historyExport]: historyExportContract,
 } as const;

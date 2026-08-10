@@ -6,6 +6,7 @@ import { migrate, migrations, openDatabase } from '@jarvis/database';
 import {
   deleteConversation,
   deriveTitle,
+  exportAllConversations,
   getConversation,
   listConversations,
   saveConversation,
@@ -143,6 +144,28 @@ describe('getConversation', () => {
     const meta = saveConversation(db, [{ kind: 'amplification', idea: 'x', result: AMP }]);
     const loaded = getConversation(db, meta.id);
     expect(loaded?.entries[0]).toEqual({ kind: 'amplification', idea: 'x', result: AMP });
+  });
+});
+
+describe('exportAllConversations', () => {
+  it('returns every conversation IN FULL, newest first', () => {
+    saveConversation(db, TRANSCRIPT);
+    const second = saveConversation(db, [
+      { kind: 'amplification', idea: 'second session', result: AMP },
+    ]);
+
+    const all = exportAllConversations(db);
+    expect(all).toHaveLength(2);
+    expect(all[0]?.id).toBe(second.id);
+    // Full transcripts — a backup of metadata alone would be worthless.
+    expect(all[1]?.entries).toEqual(TRANSCRIPT);
+    for (const conversation of all) {
+      expect(SavedConversationSchema.parse(conversation)).toEqual(conversation);
+    }
+  });
+
+  it('is empty when nothing has been saved', () => {
+    expect(exportAllConversations(db)).toEqual([]);
   });
 });
 

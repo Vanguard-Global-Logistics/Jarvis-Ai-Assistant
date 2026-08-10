@@ -30,6 +30,7 @@ function fakeBridge(overrides: Partial<ConversationBridge> = {}): ConversationBr
     listConversations: vi.fn().mockResolvedValue({ conversations: [] }),
     getConversation: vi.fn().mockResolvedValue({ conversation: null }),
     deleteConversation: vi.fn().mockResolvedValue({ deleted: true }),
+    exportHistory: vi.fn().mockResolvedValue({ exported: true, conversationCount: 1 }),
     ...overrides,
   };
 }
@@ -293,6 +294,44 @@ describe('Conversation', () => {
     });
     expect(within(panel).queryAllByRole('button', { name: 'Open' })).toHaveLength(0);
     expect(within(panel).getByText(/No saved session matches/)).toBeTruthy();
+  });
+
+  it('backs up all sessions and reports what happened, including cancellation (ADR 0011)', async () => {
+    const exportHistory = vi.fn().mockResolvedValue({ exported: true, conversationCount: 4 });
+    const bridge = fakeBridge({
+      listConversations: vi.fn().mockResolvedValue({ conversations: [SAVED_META] }),
+      exportHistory,
+    });
+    render(<Conversation bridge={bridge} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /history/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /back up all/i }));
+
+    // No argument crosses: main picks the destination via the OS dialog.
+    expect(exportHistory).toHaveBeenCalledWith();
+    expect((await screen.findByRole('status')).textContent).toContain('Backed up 4 sessions');
+
+    // Cancelling is stated, never mistaken for success.
+    exportHistory.mockResolvedValue({ exported: false, conversationCount: 0 });
+    fireEvent.click(screen.getByRole('button', { name: /back up all/i }));
+    expect((await screen.findByRole('status')).textContent).toContain('Backup cancelled');
+  });
+
+  it('surfaces a failed backup instead of silently not backing up', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const bridge = fakeBridge({
+      listConversations: vi.fn().mockResolvedValue({ conversations: [SAVED_META] }),
+      exportHistory: vi.fn().mockRejectedValue(new Error('history:export failed')),
+    });
+    render(<Conversation bridge={bridge} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /history/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /back up all/i }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toContain('could not be written');
+    expect(consoleError).toHaveBeenCalled();
+    consoleError.mockRestore();
   });
 
   it('states plainly when a saved session no longer exists', async () => {

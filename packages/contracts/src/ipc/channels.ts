@@ -46,6 +46,17 @@ export const CHANNELS = {
 
   /** Delete one saved conversation by id. The UI confirms before invoking. */
   historyDelete: 'history:delete',
+
+  /**
+   * Back up every saved conversation to a file the USER picks (ADR 0011).
+   *
+   * The renderer never names a path and never receives one: main opens the
+   * native save dialog, so the only writable location is the one a human chose
+   * in an OS dialog this turn. Read-only against the database; the sole
+   * filesystem write in the application, and it cannot be aimed by the
+   * renderer.
+   */
+  historyExport: 'history:export',
 } as const;
 
 export type ChannelName = (typeof CHANNELS)[keyof typeof CHANNELS];

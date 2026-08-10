@@ -49,6 +49,7 @@ const ALLOWED_API = [
   'listConversations',
   'getConversation',
   'deleteConversation',
+  'exportHistory',
 ] as const;
 
 /** Load the bridge fresh and return what it handed to `exposeInMainWorld`. */
@@ -196,6 +197,19 @@ describe('history bridge functions (ADR 0008)', () => {
     await (getConversation as (id: string) => Promise<unknown>)(ID);
 
     expect(mocks.invoke).toHaveBeenCalledWith(CHANNELS.historyGet, { id: ID });
+  });
+
+  it('exportHistory sends no payload — no path can cross the boundary', async () => {
+    const { api } = await loadBridge();
+    const exportHistory = api.exportHistory;
+    if (typeof exportHistory !== 'function') throw new Error('exportHistory is missing');
+
+    mocks.invoke.mockResolvedValue({ exported: true, conversationCount: 2 });
+    // Try to smuggle a destination through; the bridge takes none, so main must
+    // see the channel alone and pick the path itself via the OS dialog.
+    await (exportHistory as (smuggled?: unknown) => Promise<unknown>)('/etc/passwd');
+
+    expect(mocks.invoke.mock.calls[0]).toEqual([CHANNELS.historyExport]);
   });
 
   it('deleteConversation wraps the id the same way', async () => {

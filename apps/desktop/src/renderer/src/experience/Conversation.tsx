@@ -61,6 +61,7 @@ export interface ConversationBridge {
   listConversations: () => Promise<{ conversations: SavedConversationMeta[] }>;
   getConversation: (id: string) => Promise<{ conversation: SavedConversation | null }>;
   deleteConversation: (id: string) => Promise<{ deleted: boolean }>;
+  exportHistory: () => Promise<{ exported: boolean; conversationCount: number }>;
 }
 
 export interface ConversationProps {
@@ -337,6 +338,31 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
     }, 3200);
   };
 
+  /**
+   * Back up every saved session to a file the user picks (ADR 0011). The
+   * outcome is stated plainly in all three cases — written, cancelled, failed —
+   * because a backup that silently did nothing is the worst possible lie for a
+   * feature whose entire purpose is not losing data (CLAUDE.md §8).
+   */
+  const backupHistory = useCallback(async (): Promise<void> => {
+    if (bridge === null) return;
+    try {
+      const { exported, conversationCount } = await bridge.exportHistory();
+      setHistoryError(null);
+      setSaveNotice(
+        exported
+          ? `Backed up ${String(conversationCount)} ${conversationCount === 1 ? 'session' : 'sessions'}`
+          : 'Backup cancelled — nothing was written',
+      );
+      window.setTimeout(() => {
+        setSaveNotice(null);
+      }, 3200);
+    } catch (cause) {
+      console.error('[conversation] history:export failed:', cause);
+      setHistoryError('The backup could not be written. See the console for details.');
+    }
+  }, [bridge]);
+
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
     // Enter sends; Shift+Enter is a newline. A composer that eats every Enter
     // is a worse text box than the one it replaces.
@@ -438,6 +464,7 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
           confirmDeleteId={confirmDeleteId}
           onOpen={(id) => void openSaved(id)}
           onDelete={(id) => void deleteSaved(id)}
+          onBackup={() => void backupHistory()}
         />
       )}
 
@@ -576,12 +603,14 @@ function HistoryPanel({
   confirmDeleteId,
   onOpen,
   onDelete,
+  onBackup,
 }: {
   conversations: SavedConversationMeta[];
   error: string | null;
   confirmDeleteId: string | null;
   onOpen: (id: string) => void;
   onDelete: (id: string) => void;
+  onBackup: () => void;
 }): JSX.Element {
   // Filtering happens over metadata the renderer already holds — no query
   // crosses the boundary, so search adds no channel and no authority. Titles
@@ -609,9 +638,37 @@ function HistoryPanel({
         gap: 6,
       }}
     >
-      <span style={{ ...MONO_LABEL, color: text.secondaryDim }}>
-        Saved sessions — stored on this PC, via history:list
-      </span>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 8,
+        }}
+      >
+        <span style={{ ...MONO_LABEL, color: text.secondaryDim }}>
+          Saved sessions — stored on this PC, via history:list
+        </span>
+        {conversations.length > 0 && (
+          <button
+            type="button"
+            onClick={onBackup}
+            title="Write every saved session to a file you choose — put it somewhere that outlives this computer"
+            style={{
+              ...MONO_LABEL,
+              color: accent.success,
+              background: 'transparent',
+              border: `1px solid ${accent.success}`,
+              borderRadius: 6,
+              padding: '4px 8px',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Back up all
+          </button>
+        )}
+      </div>
 
       {/* Only worth the space once there is enough to sift through. */}
       {conversations.length > 3 && (

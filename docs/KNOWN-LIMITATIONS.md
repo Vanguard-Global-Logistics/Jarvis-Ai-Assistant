@@ -32,6 +32,12 @@ cards (ADR 0009), so an Amplifier-only session is savable. What this is **not**:
   conversation with its own id.
 - **No sync, no encryption at rest.** One local file (`jarvis.db` under Electron's
   userData), plain SQLite.
+- **Backup exists; restore does not.** `history:export` (ADR 0011) writes every saved
+  conversation to a file you choose, so sessions can outlive the machine. Jarvis
+  **cannot load one back** — restoring is a write path into the store and is a separate,
+  unbuilt decision. The dialog-and-write path is also **`IMPLEMENTED, NOT YET VERIFIED`**:
+  the runtime probe asserts the channel is exposed but deliberately does not invoke it,
+  because a native modal dialog would hang a headless run. Verifying it is a manual step.
 
 With no `ANTHROPIC_API_KEY` set, replies come from the deterministic **mock** provider,
 labeled MOCK PROVIDER in the UI. A real key is opt-in and usage-billed; the mock default
@@ -62,15 +68,17 @@ storage, separate credentials. Phase 1 will not deliver OS-level enforcement. Wh
 state engine ships, this gap must be restated wherever AEGIS is described — not quietly
 dropped once the UI looks convincing.
 
-## 3. The IPC bridge exposes exactly seven narrow channels
+## 3. The IPC bridge exposes exactly eight narrow channels
 
 **Status: PARTIAL — intended for this stage.**
 
-`window.jarvis` exposes exactly seven purpose-named functions: `getAppInfo` (host
-facts), `sendChat` and `amplify` (model calls, ADR 0007), and the four history
-operations (ADR 0008). The authority envelope remains deliberately small: a model call
-and a conversation store. No shell, no arbitrary filesystem paths, no SQL, no env, no
-AEGIS. The audit names an over-exposed preload as the single highest-risk failure in
+`window.jarvis` exposes exactly eight purpose-named functions: `getAppInfo` (host
+facts), `sendChat` and `amplify` (model calls, ADR 0007), the four history
+operations (ADR 0008), and `exportHistory` (ADR 0011). The authority envelope remains
+deliberately small: a model call, a conversation store, and one backup write whose
+destination the renderer can neither name nor learn — main opens the native save
+dialog, so only a human picks the path. No shell, no arbitrary filesystem paths, no
+SQL, no env, no AEGIS. The audit names an over-exposed preload as the single highest-risk failure in
 Phase 1, so every further channel must still be argued for individually (ADR 0002) and
 recorded in `docs/IPC-SURFACE.md`.
 

@@ -224,6 +224,24 @@ export function getConversation(db: SqliteDatabase, id: string): SavedConversati
 }
 
 /**
+ * Every saved conversation, in full, newest first — the backup payload
+ * (ADR 0011). Read-only. This is the one place that pulls whole transcripts in
+ * bulk; the `history:list` path deliberately does not, because listing must
+ * stay cheap.
+ */
+export function exportAllConversations(db: SqliteDatabase): SavedConversation[] {
+  const conversations: SavedConversation[] = [];
+  for (const meta of listConversations(db)) {
+    const full = getConversation(db, meta.id);
+    // A conversation cannot vanish mid-export (one process, one thread), but a
+    // null here would mean the store is inconsistent — skip rather than write a
+    // malformed backup, and let the count reported to the user reflect reality.
+    if (full !== null) conversations.push(full);
+  }
+  return conversations;
+}
+
+/**
  * Delete one saved conversation. Returns whether a row was actually removed —
  * a stale id reports `false` rather than pretending success (CLAUDE.md §8).
  * Messages and amplifications go with it via ON DELETE CASCADE (migrations 1, 2).

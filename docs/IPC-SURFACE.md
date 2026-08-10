@@ -1,7 +1,10 @@
 # The IPC Surface
 
 Date: 2026-08-10
-Status: **SEVEN channels.** `app:get-info` is IMPLEMENTED AND VERIFIED (observed live on
+Status: **EIGHT channels.** `history:export` (ADR 0011) is `IMPLEMENTED, NOT YET
+VERIFIED` — the probe asserts it is exposed but deliberately does not invoke it (a
+native modal dialog would hang a headless run), so the dialog-and-write path awaits
+manual acceptance. `app:get-info` is IMPLEMENTED AND VERIFIED (observed live on
 Windows development runtime, 2026-07-16). `jarvis:chat` and `jarvis:amplify` are
 IMPLEMENTED AND VERIFIED on the Linux runtime probe (prod + dev, real Electron, a mock
 round-trip driven end to end, 2026-07-30). The four `history:*` channels (ADR 0008) are
@@ -182,6 +185,23 @@ asserts the history list is still empty, which is the runtime proof behind the U
 | **Contract**          | `historyDeleteContract`                                                                                                          |
 | **Side effects**      | One DELETE; messages cascade via the schema's ON DELETE CASCADE.                                                                 |
 | **Authority granted** | Remove one saved conversation. Confirmation is the UI's job (two-click confirm); the boundary only refuses to lie about outcome. |
+
+### `history:export`
+
+|                       |                                                                                                                                                               |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Status**            | IMPLEMENTED, NOT YET VERIFIED — the dialog-and-write path has no automated coverage (modal dialog); unit-tested document builder + manual acceptance pending. |
+| **Renderer call**     | `window.jarvis.exportHistory(): Promise<{ exported: boolean, conversationCount: number }>`                                                                    |
+| **Request**           | `z.undefined()` — **no path**. The bridge takes no argument; a smuggled one never reaches `invoke`.                                                           |
+| **Response**          | `{ exported, conversationCount }`, `.strict()` — **no path back**. A response carrying one fails validation (tested).                                         |
+| **Handler**           | `registerHistoryHandlers(db)` → `exportHistoryToFile` in `apps/desktop/src/main/history/backup.ts`                                                            |
+| **Contract**          | `historyExportContract`                                                                                                                                       |
+| **Side effects**      | Reads every conversation; writes ONE file to a path chosen by a human in the native save dialog. The only filesystem write in the application.                |
+| **Authority granted** | Write a backup where the user just pointed. Nothing else: no configurable default path, no renderer-supplied destination, no read of any other file.          |
+
+Cancelling the dialog returns `exported: false` — a normal outcome, not an error. A real
+write failure throws, so the UI can state it: a backup that silently did nothing is the
+worst possible failure for this feature.
 
 ---
 

@@ -387,6 +387,7 @@ async function runChecks(page, mode) {
     'listConversations',
     'getConversation',
     'deleteConversation',
+    'exportHistory',
   ];
   const keysOk = JSON.stringify(keys.value) === JSON.stringify(EXPECTED_KEYS);
   add(
@@ -563,6 +564,20 @@ async function runChecks(page, mode) {
     'After delete: list empty, get reports null (no ghost data)',
     afterOk,
     JSON.stringify(after.value),
+  );
+
+  // `history:export` (ADR 0011) is present but deliberately NOT invoked here: it
+  // opens a native modal save dialog, which would hang a headless run forever.
+  // Asserting the function exists is the honest limit of what this probe can
+  // claim — the dialog-and-write path is covered by unit tests on the document
+  // builder and by manual acceptance. Recorded in docs/KNOWN-LIMITATIONS.md.
+  const exportFn = await page.evaluate(
+    'window.jarvis ? typeof window.jarvis.exportHistory : "no-bridge"',
+  );
+  add(
+    'history:export is exposed (NOT invoked — modal dialog)',
+    exportFn.value === 'function',
+    `typeof = ${String(exportFn.value)}`,
   );
 
   // E2: the Experience Shell mounts the Orb. Assert the real component is

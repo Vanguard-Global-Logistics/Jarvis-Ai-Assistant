@@ -5,6 +5,7 @@ import {
   IPC_CONTRACTS,
   appGetInfoContract,
   historyDeleteContract,
+  historyExportContract,
   historyGetContract,
   historyListContract,
   historySaveContract,
@@ -234,6 +235,32 @@ describe('history contracts (Stage 1A persistence, ADR 0008; amplifications ADR 
     expect(
       historyGetContract.response.safeParse({ conversation: { ...meta, entries: [brokenAmp] } })
         .success,
+    ).toBe(false);
+  });
+
+  it('export takes no payload and returns no path (ADR 0011)', () => {
+    expect(historyExportContract.channel).toBe(CHANNELS.historyExport);
+    expect(CHANNELS.historyExport).toBe('history:export');
+
+    // The renderer cannot name a destination.
+    expect(historyExportContract.request.safeParse(undefined).success).toBe(true);
+    expect(historyExportContract.request.safeParse({ path: '/tmp/x.json' }).success).toBe(false);
+    expect(historyExportContract.request.safeParse('/tmp/x.json').success).toBe(false);
+
+    expect(
+      historyExportContract.response.safeParse({ exported: true, conversationCount: 3 }).success,
+    ).toBe(true);
+    // Cancelled is a value, not an error.
+    expect(
+      historyExportContract.response.safeParse({ exported: false, conversationCount: 0 }).success,
+    ).toBe(true);
+    // And the response must never carry a path back to the renderer.
+    expect(
+      historyExportContract.response.safeParse({
+        exported: true,
+        conversationCount: 1,
+        path: '/Users/someone/backup.json',
+      }).success,
     ).toBe(false);
   });
 
