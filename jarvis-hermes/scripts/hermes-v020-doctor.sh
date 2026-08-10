@@ -61,7 +61,7 @@ else
   fail "Hermes CLI is missing"
 fi
 
-for required in "$HERMES_HOME/SOUL.md" "$HERMES_HOME/memories/HERMES-V0.20-CAPABILITIES.md" "$HERMES_HOME/memories/LEARNING-GOVERNANCE.md" "$HERMES_HOME/memories/PRIME-AGENT-CONTINUAL-IMPROVEMENT.md" "$HERMES_HOME/memories/AEGIS-DEFENSIVE-PRIME-SWARM.md" "$HERMES_HOME/memories/OCTAGON-COMMERCIAL-STRATEGY.md" "$HERMES_HOME/memories/JARVIS-PROFESSIONAL-MODE.md" "$HERMES_HOME/memories/JARVIS-JOB-MASTERY-ROADMAP.md" "$HERMES_HOME/memories/INFRASTRUCTURE-AND-MEMORY-ADOPTION.md" "$HERMES_HOME/bin/jarvis-kokoro-tts.py"; do
+for required in "$HERMES_HOME/SOUL.md" "$HERMES_HOME/memories/HERMES-V0.20-CAPABILITIES.md" "$HERMES_HOME/memories/LEARNING-GOVERNANCE.md" "$HERMES_HOME/memories/PRIME-AGENT-CONTINUAL-IMPROVEMENT.md" "$HERMES_HOME/memories/AEGIS-DEFENSIVE-PRIME-SWARM.md" "$HERMES_HOME/memories/RESEARCH-PRIME-KNOWLEDGE-ADVANCEMENT.md" "$HERMES_HOME/memories/OCTAGON-COMMERCIAL-STRATEGY.md" "$HERMES_HOME/memories/JARVIS-PROFESSIONAL-MODE.md" "$HERMES_HOME/memories/JARVIS-JOB-MASTERY-ROADMAP.md" "$HERMES_HOME/memories/INFRASTRUCTURE-AND-MEMORY-ADOPTION.md" "$HERMES_HOME/bin/jarvis-kokoro-tts.py"; do
   [[ -s "$required" ]] && pass "$required installed" || fail "$required missing"
 done
 
@@ -110,6 +110,15 @@ IMPROVEMENT_PLIST="$HOME/Library/LaunchAgents/com.vanguard.jarvis.daily-improvem
 IMPROVEMENT_RUNNER="$HOME/.jarvis/continual-learning/bin/daily-improvement-loop.mjs"
 [[ -s "$IMPROVEMENT_PLIST" ]] && pass "daily continual-improvement job is installed" || warn "daily continual-improvement job is not installed yet"
 [[ -x "$IMPROVEMENT_RUNNER" ]] && pass "continual-improvement proposal runner is installed" || warn "continual-improvement proposal runner is not installed yet"
+
+RESEARCH_MONITOR_PLIST="$HOME/Library/LaunchAgents/com.vanguard.jarvis.research-prime-monitor.plist"
+RESEARCH_REVIEW_PLIST="$HOME/Library/LaunchAgents/com.vanguard.jarvis.research-prime-review.plist"
+RESEARCH_RUNNER="$HOME/.jarvis/research-prime/bin/research-prime-loop.mjs"
+RESEARCH_CONFIG="$HOME/.jarvis/research-prime/config.json"
+[[ -s "$RESEARCH_MONITOR_PLIST" ]] && pass "hourly Research Prime monitoring job is installed" || warn "Research Prime monitoring job is not installed yet"
+[[ -s "$RESEARCH_REVIEW_PLIST" ]] && pass "daily Research Prime review job is installed" || warn "Research Prime review job is not installed yet"
+[[ -x "$RESEARCH_RUNNER" ]] && pass "Research Prime proposal runner is installed" || warn "Research Prime proposal runner is not installed yet"
+[[ -s "$RESEARCH_CONFIG" ]] && pass "Research Prime source policy is installed" || warn "Research Prime source policy is not installed yet"
 
 printf '\nHermes v0.20 doctor: %d pass, %d fail, %d warning.\n' "$PASS" "$FAIL" "$WARN"
 (( FAIL == 0 ))

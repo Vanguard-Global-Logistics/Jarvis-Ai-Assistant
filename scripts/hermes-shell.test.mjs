@@ -12,6 +12,7 @@ const scripts = [
   'jarvis-hermes/scripts/hermes-v020-doctor.sh',
   'jarvis-hermes/scripts/install-daily-update-check.sh',
   'jarvis-hermes/scripts/install-daily-improvement-loop.sh',
+  'jarvis-hermes/scripts/install-research-prime.sh',
   'jarvis-hermes/scripts/install-hermes-v020.sh',
   'runtime/macos/voice-r13.3/INSTALL-AND-START-R13-3.command',
   'runtime/macos/voice-r13.3/reconstruct-live-voice-loop.sh',
@@ -207,6 +208,39 @@ describe('Hermes shell entry points', () => {
     expect(memory).toContain('does not prove AEGIS');
     expect(installer).toContain(`$HERE/${memoryPath}`);
     expect(doctor).toContain(`$HERMES_HOME/${memoryPath}`);
+  });
+  it('installs bounded Research Prime monitoring without automatic knowledge promotion', () => {
+    const installer = readFileSync(
+      resolve(root, 'jarvis-hermes/scripts/install-hermes-v020.sh'),
+      'utf8',
+    );
+    const doctor = readFileSync(
+      resolve(root, 'jarvis-hermes/scripts/hermes-v020-doctor.sh'),
+      'utf8',
+    );
+    const scheduler = readFileSync(
+      resolve(root, 'jarvis-hermes/scripts/install-research-prime.sh'),
+      'utf8',
+    );
+    const memoryPath = 'memories/RESEARCH-PRIME-KNOWLEDGE-ADVANCEMENT.md';
+    const memory = readFileSync(resolve(root, 'jarvis-hermes', memoryPath), 'utf8');
+    const sourcePolicy = JSON.parse(
+      readFileSync(resolve(root, 'jarvis-hermes/research-prime.sources.json'), 'utf8'),
+    );
+
+    expect(memory).toContain('does not seek unlimited');
+    expect(memory).toContain('knowledge, authority, or a godlike identity');
+    expect(memory).toContain('never silently enters canonical memory');
+    expect(sourcePolicy.monitorIntervalSeconds).toBe(3600);
+    expect(sourcePolicy.sources).toHaveLength(4);
+    expect(sourcePolicy.sources.every((source) => source.authority === 'primary')).toBe(true);
+    expect(scheduler).toContain('com.vanguard.jarvis.research-prime-monitor');
+    expect(scheduler).toContain('com.vanguard.jarvis.research-prime-review');
+    expect(installer).toContain(`$HERE/${memoryPath}`);
+    expect(installer).toContain('install-research-prime.sh');
+    expect(doctor).toContain(`$HERMES_HOME/${memoryPath}`);
+    expect(doctor).toContain('research-prime-monitor.plist');
+    expect(doctor).toContain('research-prime-review.plist');
   });
   it('ignores the deterministic R13.3 reconstruction artifact', () => {
     const gitignore = readFileSync(resolve(root, '.gitignore'), 'utf8');

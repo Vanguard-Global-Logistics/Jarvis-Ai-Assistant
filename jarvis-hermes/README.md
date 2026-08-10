@@ -26,6 +26,16 @@ proposal or rewrites live code, policy, identity, permissions, AEGIS, voice,
 credentials, or external actions. An approved observation adapter remains the
 next gate before normal use can populate meaningful reports.
 
+The Mac installer also installs the first bounded Research Prime slice. Every
+hour it checks four enrolled primary release endpoints—Prime Agent, Hermes
+Agent, OpenJarvis, and Ollama—using conditional HTTPS requests, strict host and
+public-address validation, response/time limits, and no credentials. At 04:15
+it turns verified change signals into company-isolated A1 knowledge proposals.
+It never stores arbitrary release prose, follows redirects, searches private
+networks, promotes knowledge, changes code, sends messages, spends money, or
+modifies AEGIS. Open-ended business discovery remains a later Tool Bridge
+adapter requiring an approved provider, per-company charter, and budget.
+
 The installed knowledge also preserves William's AEGIS Defensive Prime Swarm
 decision: fast deterministic containment, incident-scoped defensive Primes,
 isolated patch generation, independent verification, no hack-back, poisoned
@@ -53,6 +63,7 @@ Detailed contracts:
 - memories/LEARNING-GOVERNANCE.md — cumulative-learning rules.
 - memories/PRIME-AGENT-CONTINUAL-IMPROVEMENT.md — daily proposal loop and no-self-promotion boundary.
 - memories/AEGIS-DEFENSIVE-PRIME-SWARM.md — rapid incident response, learning, and clone-resistance boundaries.
+- memories/RESEARCH-PRIME-KNOWLEDGE-ADVANCEMENT.md — continuous public-source monitoring and governed knowledge promotion.
 - memories/OCTAGON-COMMERCIAL-STRATEGY.md — owner-approved product and commercial boundaries.
 - memories/JARVIS-PROFESSIONAL-MODE.md — personal ownership and professional-use boundaries.
 - memories/JARVIS-JOB-MASTERY-ROADMAP.md — locked automation and field-progress sequence.
@@ -60,6 +71,7 @@ Detailed contracts:
 - docs/DECISIONS/0011-hermes-v020-governed-updates.md — update gates.
 - docs/DECISIONS/0016-prime-agent-governed-continual-improvement.md — adopted Prime Agent patterns and promotion gates.
 - docs/DECISIONS/0017-aegis-defensive-prime-swarm-and-ip-protection.md — defensive swarm and commercial IP boundary.
+- docs/DECISIONS/0018-bounded-research-prime-and-knowledge-advancement.md — A4 monitoring, A1 proposals, and permanent-knowledge requirements.
 
 ## Historical notes
 

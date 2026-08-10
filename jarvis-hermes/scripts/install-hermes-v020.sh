@@ -67,6 +67,7 @@ cp "$HERE/memories/HERMES-V0.20-CAPABILITIES.md" "$HERMES_HOME/memories/"
 cp "$HERE/memories/LEARNING-GOVERNANCE.md" "$HERMES_HOME/memories/"
 cp "$HERE/memories/PRIME-AGENT-CONTINUAL-IMPROVEMENT.md" "$HERMES_HOME/memories/"
 cp "$HERE/memories/AEGIS-DEFENSIVE-PRIME-SWARM.md" "$HERMES_HOME/memories/"
+cp "$HERE/memories/RESEARCH-PRIME-KNOWLEDGE-ADVANCEMENT.md" "$HERMES_HOME/memories/"
 cp "$HERE/memories/OCTAGON-COMMERCIAL-STRATEGY.md" "$HERMES_HOME/memories/"
 cp "$HERE/memories/JARVIS-PROFESSIONAL-MODE.md" "$HERMES_HOME/memories/"
 cp "$HERE/memories/JARVIS-JOB-MASTERY-ROADMAP.md" "$HERMES_HOME/memories/"
@@ -139,8 +140,9 @@ fi
 if [[ "$(uname -s)" == Darwin ]]; then
   "$HERE/scripts/install-daily-update-check.sh"
   "$HERE/scripts/install-daily-improvement-loop.sh"
+  "$HERE/scripts/install-research-prime.sh"
 else
-  warn "launchd update and improvement scheduling is Mac-only"
+  warn "launchd update, improvement, and Research Prime scheduling is Mac-only"
 fi
 
 "$HERE/scripts/hermes-v020-doctor.sh" || die "Hermes doctor found a blocking error"
