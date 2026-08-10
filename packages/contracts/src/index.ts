@@ -22,10 +22,25 @@ export {
   AppInfoSchema,
   IPC_CONTRACTS,
   appGetInfoContract,
+  historyDeleteContract,
+  historyGetContract,
+  historyListContract,
+  historySaveContract,
   jarvisAmplifyContract,
   jarvisChatContract,
 } from './ipc/contracts.js';
 export type { AppInfo, IpcContract } from './ipc/contracts.js';
+
+export {
+  HistoryIdRequestSchema,
+  SavedConversationMetaSchema,
+  SavedConversationSchema,
+} from './history/contracts.js';
+export type {
+  HistoryIdRequest,
+  SavedConversation,
+  SavedConversationMeta,
+} from './history/contracts.js';
 
 export {
   AmplifierResultSchema,

@@ -1,7 +1,8 @@
 # Known Limitations
 
-Date: 2026-07-30
-Scope: the Stage 6 foundation plus the Stage 1A conversation slice (ADR 0007).
+Date: 2026-08-10
+Scope: the Stage 6 foundation plus the Stage 1A conversation slice (ADR 0007) and the
+Stage 1A persistence slice (ADR 0008).
 
 Per `CLAUDE.md` §8, gaps are stated plainly here rather than implied to be solved.
 This file is the honest counterweight to the scaffold: it records what the foundation
@@ -9,17 +10,24 @@ does **not** do.
 
 ---
 
-## 0. The conversation is in-memory only — nothing is saved
+## 0. Persistence exists, is explicit-save only, and is not yet accepted
 
-**Status: persistence NOT IMPLEMENTED.**
+**Status: IMPLEMENTED AND VERIFIED on the Linux runtime probe (ADR 0008). Windows
+gates open; not accepted until William saves and reopens a real session.**
 
-ADR 0007 added a working conversation (`jarvis:chat`) and Thought Amplifier
-(`jarvis:amplify`), but no part of Stage 1A's persistence exists yet: there are no
-`history:*` channels, `packages/database` has zero migrations, and `better-sqlite3` has
-not been rebuilt against Electron's ABI. Closing the app discards the conversation, and
-the UI says so on every screen. Do not describe Jarvis as remembering, saving, or
-recalling anything. The persistence slice is a separate, separately-approved widening
-(ADR 0006 defines it).
+The four `history:*` channels store, list, reopen (read-only), and delete
+conversations in a main-process-owned SQLite database. What this is **not**:
+
+- **No autosave.** Only an explicit Save Session persists anything. An unsaved
+  conversation is discarded on close — the banner says so, and the runtime probe
+  proves it (it chats first, then asserts the history list is still empty).
+- **No memory.** A saved transcript is a stored record, not recall. Jarvis does not
+  read saved sessions back into new conversations, does not learn from them, and has
+  no Memory module (§7 of CLAUDE.md — Memory CRUD is a separate milestone).
+- **No resume.** Opening a saved session is read-only. Continuing one is a future,
+  separately-designed feature.
+- **No sync, no encryption at rest.** One local file (`jarvis.db` under Electron's
+  userData), plain SQLite.
 
 With no `ANTHROPIC_API_KEY` set, replies come from the deterministic **mock** provider,
 labeled MOCK PROVIDER in the UI. A real key is opt-in and usage-billed; the mock default
@@ -50,19 +58,17 @@ storage, separate credentials. Phase 1 will not deliver OS-level enforcement. Wh
 state engine ships, this gap must be restated wherever AEGIS is described — not quietly
 dropped once the UI looks convincing.
 
-## 3. The IPC bridge exposes exactly one channel, and it does nothing useful
+## 3. The IPC bridge exposes exactly seven narrow channels
 
 **Status: PARTIAL — intended for this stage.**
 
-`window.jarvis` now exists and exposes a single function, `getAppInfo()`, backed by the
-`app:get-info` channel. It returns versions, platform, and packaged state. That is all it
-does. It grants no authority: no filesystem, shell, environment, user data, or AEGIS.
-
-It exists to prove the boundary machinery — allowlist, schema validation in both
-directions, named-function bridge — against a channel where a mistake costs nothing. **No
-feature is reachable through it.** The audit names an over-exposed preload as the single
-highest-risk failure in Phase 1, so every further channel must still be argued for
-individually (ADR 0002) and recorded in `docs/IPC-SURFACE.md`.
+`window.jarvis` exposes exactly seven purpose-named functions: `getAppInfo` (host
+facts), `sendChat` and `amplify` (model calls, ADR 0007), and the four history
+operations (ADR 0008). The authority envelope remains deliberately small: a model call
+and a conversation store. No shell, no arbitrary filesystem paths, no SQL, no env, no
+AEGIS. The audit names an over-exposed preload as the single highest-risk failure in
+Phase 1, so every further channel must still be argued for individually (ADR 0002) and
+recorded in `docs/IPC-SURFACE.md`.
 
 What is genuinely enforced: the bridge test
 (`apps/desktop/src/preload/index.test.ts`) asserts an exact allowlist and fails if a
@@ -71,24 +77,27 @@ confirmed to fail against a deliberately injected passthrough, not merely to pas
 a **unit test against a mocked `electron`**; it constrains what the code intends to
 expose, and proves nothing about what Electron enforces at runtime (§7, §9).
 
-## 4. SQLite is not wired to Electron
+## 4. SQLite is wired to Electron — via the builtin driver, with one schema
 
-**Status: PARTIAL.**
+**Status: IMPLEMENTED AND VERIFIED on the Linux runtime probe (ADR 0008).**
 
-`@jarvis/database` has a working connection module and migration runner, verified by unit
-tests against in-memory databases. It is **not** connected to the desktop app.
+Electron main — and only main — opens the database at startup, applies migrations, and
+serves the `history:*` channels. The driver is Node's built-in `node:sqlite`
+(ADR 0008), so the native-module ABI rebuild this section used to warn about no longer
+exists as a step at all: there is no native module. The remaining honest caveats:
 
-`better-sqlite3` is a native module and must be rebuilt against Electron's ABI (via
-`@electron/rebuild`) before the main process can open a database. That step is deferred
-until something actually needs to persist. Nothing does yet — there are zero migrations
-and no feature schema.
+- `node:sqlite` is labeled **experimental on Node 22**, the runtime vitest uses. The
+  app itself runs on Electron 43's embedded Node 24, where it is stable. If Node 22
+  changes the API under the tests, the tests will say so loudly.
+- There is exactly **one** migration (`conversation-history`). No tables exist for
+  memory, projects, tasks, or the audit log — those are feature design work and are
+  not approved.
 
-## 5. There are zero migrations
+## 5. (Retired) There are zero migrations
 
-**Status: NOT IMPLEMENTED, by instruction.**
-
-`migrations` in `@jarvis/database` is an empty array. No tables exist for memory,
-projects, tasks, or the audit log. Those are feature design work and are not approved.
+This section closed with ADR 0008 — migration 1 exists and is applied at startup. The
+header remains so cross-references to later section numbers stay valid. The part that
+is still true lives in §4: only the conversation-history schema exists, nothing else.
 
 ## 6. The model provider abstraction exists, but is not wired to the app
 
@@ -159,7 +168,9 @@ Two jobs, and the distinction matters:
   did not.
 - **`runtime`** — installs Electron's GUI libraries and Xvfb, builds, then runs
   `npm run probe:runtime`: launches the real app (packaged path **and** `dev:desktop`) and
-  asserts React mounts, the bridge exposes exactly `getAppInfo`, the renderer has no Node
+  asserts React mounts, the bridge exposes exactly the seven allowlisted functions, a
+  chat/amplify round-trip works, the full history save/list/get/delete loop works against
+  a real SQLite (including that an unsaved chat never persists), the renderer has no Node
   globals, and the console is clean. It is verified red-green against the CSP defect.
 
 A red `verify` means the code is wrong. A red `runtime` means the code is fine and the app

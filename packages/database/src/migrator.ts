@@ -1,3 +1,4 @@
+import { withTransaction } from './connection.js';
 import type { SqliteDatabase } from './connection.js';
 
 /**
@@ -46,7 +47,7 @@ export function appliedMigrations(db: SqliteDatabase): AppliedMigration[] {
   ensureBookkeeping(db);
   return db
     .prepare('SELECT id, name, applied_at FROM schema_migrations ORDER BY id ASC')
-    .all() as AppliedMigration[];
+    .all() as unknown as AppliedMigration[];
 }
 
 /**
@@ -88,13 +89,11 @@ export function migrate(db: SqliteDatabase, migrations: readonly Migration[]): M
   for (const migration of ordered) {
     if (already.has(migration.id)) continue;
 
-    const run = db.transaction(() => {
-      migration.up(db);
-      record.run(migration.id, migration.name, new Date().toISOString());
-    });
-
     try {
-      run();
+      withTransaction(db, () => {
+        migration.up(db);
+        record.run(migration.id, migration.name, new Date().toISOString());
+      });
     } catch (cause) {
       throw new MigrationError(
         `Migration ${String(migration.id)} ("${migration.name}") failed and was rolled back: ${

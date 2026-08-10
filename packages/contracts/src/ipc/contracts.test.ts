@@ -4,6 +4,10 @@ import {
   AppInfoSchema,
   IPC_CONTRACTS,
   appGetInfoContract,
+  historyDeleteContract,
+  historyGetContract,
+  historyListContract,
+  historySaveContract,
   jarvisAmplifyContract,
   jarvisChatContract,
 } from './contracts.js';
@@ -121,6 +125,92 @@ describe('jarvisChatContract', () => {
     expect(jarvisChatContract.response.safeParse({ text: 'hi', provider: 'openai' }).success).toBe(
       false,
     );
+  });
+});
+
+describe('history contracts (Stage 1A persistence, ADR 0008)', () => {
+  const id = 'f4b1c1d2-3a4b-4c5d-8e6f-7a8b9c0d1e2f';
+  const meta = {
+    id,
+    title: 'What is the status?',
+    savedAt: '2026-08-10T12:00:00.000Z',
+    messageCount: 2,
+  };
+  const messages = [
+    { role: 'user' as const, content: 'What is the status?' },
+    { role: 'assistant' as const, content: 'All green.' },
+  ];
+
+  it('registers all four channels under their history:* names', () => {
+    expect(historySaveContract.channel).toBe(CHANNELS.historySave);
+    expect(CHANNELS.historySave).toBe('history:save');
+    expect(historyListContract.channel).toBe(CHANNELS.historyList);
+    expect(CHANNELS.historyList).toBe('history:list');
+    expect(historyGetContract.channel).toBe(CHANNELS.historyGet);
+    expect(CHANNELS.historyGet).toBe('history:get');
+    expect(historyDeleteContract.channel).toBe(CHANNELS.historyDelete);
+    expect(CHANNELS.historyDelete).toBe('history:delete');
+  });
+
+  it('save takes exactly the chat transcript shape and nothing more', () => {
+    expect(historySaveContract.request.safeParse({ messages }).success).toBe(true);
+    expect(historySaveContract.request.safeParse({ messages: [] }).success).toBe(false);
+    // Title and id are main's to assign — a renderer that tries to choose them
+    // is rejected at the boundary, not silently ignored.
+    expect(historySaveContract.request.safeParse({ messages, title: 'chosen' }).success).toBe(
+      false,
+    );
+    expect(historySaveContract.request.safeParse({ messages, id }).success).toBe(false);
+  });
+
+  it('save responds with metadata only — never the transcript back', () => {
+    expect(historySaveContract.response.safeParse(meta).success).toBe(true);
+    expect(historySaveContract.response.safeParse({ ...meta, messages }).success).toBe(false);
+  });
+
+  it('list takes no payload and returns metadata only', () => {
+    expect(historyListContract.request.safeParse(undefined).success).toBe(true);
+    expect(historyListContract.request.safeParse({}).success).toBe(false);
+    expect(historyListContract.response.safeParse({ conversations: [meta] }).success).toBe(true);
+    expect(historyListContract.response.safeParse({ conversations: [] }).success).toBe(true);
+    expect(
+      historyListContract.response.safeParse({ conversations: [{ ...meta, messages }] }).success,
+    ).toBe(false);
+  });
+
+  it('get and delete accept only a UUID id — no paths, no SQL, no extras', () => {
+    for (const contract of [historyGetContract, historyDeleteContract]) {
+      expect(contract.request.safeParse({ id }).success).toBe(true);
+      expect(contract.request.safeParse({ id: '../../etc/passwd' }).success).toBe(false);
+      expect(contract.request.safeParse({ id: '1; DROP TABLE conversations' }).success).toBe(false);
+      expect(contract.request.safeParse({ id, extra: true }).success).toBe(false);
+      expect(contract.request.safeParse(id).success).toBe(false);
+    }
+  });
+
+  it('get returns the full conversation, or null for a stale id', () => {
+    expect(
+      historyGetContract.response.safeParse({ conversation: { ...meta, messages } }).success,
+    ).toBe(true);
+    expect(historyGetContract.response.safeParse({ conversation: null }).success).toBe(true);
+    // An empty transcript can never have been saved, so it can never be served.
+    expect(
+      historyGetContract.response.safeParse({ conversation: { ...meta, messages: [] } }).success,
+    ).toBe(false);
+  });
+
+  it('delete reports whether a row was actually removed', () => {
+    expect(historyDeleteContract.response.safeParse({ deleted: true }).success).toBe(true);
+    expect(historyDeleteContract.response.safeParse({ deleted: false }).success).toBe(true);
+    expect(historyDeleteContract.response.safeParse({}).success).toBe(false);
+  });
+
+  it('rejects malformed metadata: bad uuid, bad timestamp, empty title', () => {
+    const { response } = historySaveContract;
+    expect(response.safeParse({ ...meta, id: 'not-a-uuid' }).success).toBe(false);
+    expect(response.safeParse({ ...meta, savedAt: 'yesterday' }).success).toBe(false);
+    expect(response.safeParse({ ...meta, title: '' }).success).toBe(false);
+    expect(response.safeParse({ ...meta, messageCount: 0 }).success).toBe(false);
   });
 });
 

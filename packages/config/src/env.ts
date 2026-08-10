@@ -24,6 +24,13 @@ const EnvSchema = z.object({
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
 
   // --- Data / storage ---
+  /**
+   * DEV-ONLY override for Electron's userData directory, honored only when the
+   * app is not packaged (`main/index.ts` guards it). Exists so the runtime
+   * probe can point each run at a fresh temporary directory and assert
+   * persistence facts hermetically — a packaged build ignores it entirely.
+   */
+  JARVIS_USER_DATA_DIR: z.string().min(1).optional(),
   DATABASE_URL: z.string().min(1).optional(),
   SUPABASE_URL: z.url().optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),

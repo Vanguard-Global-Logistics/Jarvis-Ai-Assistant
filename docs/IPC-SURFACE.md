@@ -1,11 +1,14 @@
 # The IPC Surface
 
-Date: 2026-07-30
-Status: **THREE channels.** `app:get-info` is IMPLEMENTED AND VERIFIED (observed live on
+Date: 2026-08-10
+Status: **SEVEN channels.** `app:get-info` is IMPLEMENTED AND VERIFIED (observed live on
 Windows development runtime, 2026-07-16). `jarvis:chat` and `jarvis:amplify` are
 IMPLEMENTED AND VERIFIED on the Linux runtime probe (prod + dev, real Electron, a mock
-round-trip driven end to end, 2026-07-30) — the Windows packaged-installer gate is still
-open (ADR 0004), and neither is _accepted_ (ADR 0006) until William uses it for a real task.
+round-trip driven end to end, 2026-07-30). The four `history:*` channels (ADR 0008) are
+IMPLEMENTED AND VERIFIED on the Linux runtime probe (prod + dev, real Electron, a real
+SQLite save/list/get/delete round-trip driven end to end, 2026-08-10) — the Windows gates
+are still open (ADR 0004), and none is _accepted_ (ADR 0006) until William uses it for a
+real task.
 
 `CLAUDE.md` §9 requires every API to be documented, "including the internal typed IPC
 surface, which is the highest-risk boundary in the Electron shell." This file is that
@@ -127,6 +130,59 @@ category in main (`toSafeModelError`) before any logging, and collapse to
 The response schema is `.strict()` and re-validated in main, so a provider that returns a
 malformed card fails at the boundary rather than reaching the amplifier UI.
 
+### `history:save`
+
+|                       |                                                                                                                                                       |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Status**            | IMPLEMENTED AND VERIFIED on the Linux runtime probe (prod + dev, real SQLite round-trip, 2026-08-10). Windows gates open; not yet _accepted_.         |
+| **Renderer call**     | `window.jarvis.saveConversation(request: ChatRequest): Promise<SavedConversationMeta>`                                                                |
+| **Request**           | `ChatRequestSchema` — the SAME schema `jarvis:chat` uses (one definition, no drift), `.strict()`                                                      |
+| **Response**          | `SavedConversationMetaSchema` — `{ id (uuid), title, savedAt (ISO), messageCount }`, `.strict()`. Metadata only, never the transcript back.           |
+| **Handler**           | `registerHistoryHandlers(db)` in `apps/desktop/src/main/handlers/history.ts`                                                                          |
+| **Contract**          | `historySaveContract` in `packages/contracts/src/ipc/contracts.ts`                                                                                    |
+| **Side effects**      | One transactional insert into the main-owned SQLite database. **The ONLY write path for conversations in the application.**                           |
+| **Authority granted** | Persist the submitted transcript, nothing else. Id and title are minted in main — the `.strict()` request has no field to smuggle them. No SQL/paths. |
+
+Saving is explicit. A chat turn never writes; the runtime probe converses first and then
+asserts the history list is still empty, which is the runtime proof behind the UI's
+"unsaved sessions are discarded on close" banner.
+
+### `history:list`
+
+|                       |                                                                                                                       |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| **Status**            | IMPLEMENTED AND VERIFIED on the Linux runtime probe (2026-08-10). Windows gates open; not yet _accepted_.             |
+| **Renderer call**     | `window.jarvis.listConversations(): Promise<{ conversations: SavedConversationMeta[] }>`                              |
+| **Request**           | `z.undefined()` — no payload; a renderer that sends one is rejected.                                                  |
+| **Response**          | `{ conversations: SavedConversationMetaSchema[] }`, `.strict()`. Newest first. Metadata only — transcripts stay home. |
+| **Contract**          | `historyListContract`                                                                                                 |
+| **Side effects**      | Read-only query.                                                                                                      |
+| **Authority granted** | Read saved-conversation metadata. Nothing else.                                                                       |
+
+### `history:get`
+
+|                       |                                                                                                                                             |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Status**            | IMPLEMENTED AND VERIFIED on the Linux runtime probe (2026-08-10). Windows gates open; not yet _accepted_.                                   |
+| **Renderer call**     | `window.jarvis.getConversation(id: string): Promise<{ conversation: SavedConversation \| null }>`                                           |
+| **Request**           | `HistoryIdRequestSchema` — `{ id }`, UUID only, `.strict()`. A path- or SQL-shaped string fails validation.                                 |
+| **Response**          | `{ conversation: SavedConversationSchema \| null }`, `.strict()`. `null` for a stale id — a normal outcome stated as a value, not an error. |
+| **Contract**          | `historyGetContract`                                                                                                                        |
+| **Side effects**      | Read-only query.                                                                                                                            |
+| **Authority granted** | Read one saved conversation by an id main previously issued. The UI renders it read-only.                                                   |
+
+### `history:delete`
+
+|                       |                                                                                                                                  |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| **Status**            | IMPLEMENTED AND VERIFIED on the Linux runtime probe (2026-08-10). Windows gates open; not yet _accepted_.                        |
+| **Renderer call**     | `window.jarvis.deleteConversation(id: string): Promise<{ deleted: boolean }>`                                                    |
+| **Request**           | `HistoryIdRequestSchema` — `{ id }`, UUID only, `.strict()`                                                                      |
+| **Response**          | `{ deleted: boolean }`, `.strict()`. `false` for a stale id — main does not pretend success (CLAUDE.md §8).                      |
+| **Contract**          | `historyDeleteContract`                                                                                                          |
+| **Side effects**      | One DELETE; messages cascade via the schema's ON DELETE CASCADE.                                                                 |
+| **Authority granted** | Remove one saved conversation. Confirmation is the UI's job (two-click confirm); the boundary only refuses to lie about outcome. |
+
 ---
 
 ## Adding a channel
@@ -197,13 +253,14 @@ artifact names a `.ts` file. To check by hand:
 
 ```bash
 grep -oE 'from *"[^"./][^"]*"' apps/desktop/out/main/index.js | sort -u
-# expect only: electron, node:module, node:path, zod
+# expect only: electron, zod, @anthropic-ai/sdk (+ subpaths), and node:* builtins
 grep -oE 'require\("[^"]*"\)' apps/desktop/out/preload/index.cjs | sort -u
 # must print exactly: require("electron")
 ```
 
-`zod` and `better-sqlite3` stay external on purpose: they ship real compiled JavaScript,
-and `better-sqlite3` is a native module that must not be bundled.
+`zod` and the Anthropic SDK stay external on purpose: they ship real compiled
+JavaScript. SQLite needs no external at all — the driver is Node's builtin
+`node:sqlite` (ADR 0008), compiled into Electron itself.
 
 ---
 
@@ -215,10 +272,16 @@ and `better-sqlite3` is a native module that must not be bundled.
   (`packages/contracts/src/ipc/contracts.test.ts`).
 - The `AppInfo` schema rejects unknown platforms, missing fields, empty strings, and
   extra keys; the request schema rejects any payload.
-- The bridge exposes exactly one namespace (`jarvis`) and exactly one function
-  (`getAppInfo`), all values are functions, and no generic passthrough exists
+- The bridge exposes exactly one namespace (`jarvis`) and exactly the seven allowlisted
+  functions, all values are functions, and no generic passthrough exists
   (`apps/desktop/src/preload/index.test.ts`). This test was verified red-green: it fails
   when a generic `invoke` is added to the bridge.
+- The history request schemas reject smuggled titles/ids on save and reject any non-UUID
+  (paths, SQL-shaped strings) on get/delete
+  (`packages/contracts/src/ipc/contracts.test.ts`).
+- The store round-trips, orders, cascades deletes, and reports stale ids honestly against
+  the REAL migration on in-memory databases
+  (`apps/desktop/src/main/history/store.test.ts`).
 
 **Verified by inspecting the built artifact** (`npm run build`):
 

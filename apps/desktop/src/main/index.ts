@@ -1,19 +1,24 @@
 import { join } from 'node:path';
 import { BrowserWindow, app } from 'electron';
 import { createLogger, describeEnv, parseEnv } from '@jarvis/config';
+import { migrate, migrations, openDatabase } from '@jarvis/database';
+import type { SqliteDatabase } from '@jarvis/database';
 import { createProvider } from '@jarvis/jarvis-core';
 import { registerAmplifyHandler } from './handlers/amplify.js';
 import { registerAppInfoHandler } from './handlers/app-info.js';
 import { registerChatHandler } from './handlers/chat.js';
+import { registerHistoryHandlers } from './handlers/history.js';
 import { applyContentSecurityPolicy, denyAllPermissions, lockNavigation } from './security.js';
 
 /**
  * Electron main process — the trusted side of the boundary.
  *
- * STATUS: PARTIAL. The shell launches, is hardened, renders, and now serves the
- * Stage 1A conversation surface: `app:get-info`, `jarvis:chat`, and
- * `jarvis:amplify`. It still has NO persistence, no database, no AEGIS, and no
- * orchestrator beyond a single stateless model call per turn.
+ * STATUS: PARTIAL. The shell launches, is hardened, renders, serves the
+ * Stage 1A conversation surface (`app:get-info`, `jarvis:chat`,
+ * `jarvis:amplify`), and — per ADR 0008 — owns the SQLite database behind the
+ * four `history:*` channels. Saving is explicit; nothing persists without
+ * `history:save`. There is still NO AEGIS and no orchestrator beyond a single
+ * stateless model call per turn.
  */
 
 const log = createLogger({ scope: 'desktop:main' });
@@ -21,6 +26,15 @@ const log = createLogger({ scope: 'desktop:main' });
 // Fail fast on invalid configuration rather than surfacing it later as an
 // unexplained fault. Throws naming offending keys only, never values.
 const env = parseEnv();
+
+// DEV-ONLY: let the runtime probe point each run at a fresh, throwaway
+// userData directory so its persistence assertions are hermetic (an old run's
+// saved conversations must not pollute "the list starts empty"). Guarded on
+// `!app.isPackaged`: a packaged build ignores the variable entirely, so no
+// environment edit can redirect a real user's data. Must run before `ready`.
+if (env.JARVIS_USER_DATA_DIR !== undefined && !app.isPackaged) {
+  app.setPath('userData', env.JARVIS_USER_DATA_DIR);
+}
 
 // The one model provider, created once in the trusted process. It owns the
 // Anthropic client — and the API key inside it — for the whole app lifetime;
@@ -115,24 +129,69 @@ function createWindow(): BrowserWindow {
   return window;
 }
 
-void app.whenReady().then(() => {
-  log.info('starting', { env: describeEnv(env) });
-
-  // Handlers are registered before the first window exists, so no renderer can
-  // invoke a channel that is not yet listening. Each one is a deliberate hole in
-  // the trust boundary (ADR 0002): a read-only host-facts call, and two calls
-  // that reach only the model provider — never the filesystem, shell, env, or
-  // AEGIS.
-  registerAppInfoHandler();
-  registerChatHandler(modelProvider);
-  registerAmplifyHandler(modelProvider);
-
-  createWindow();
-
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+/**
+ * Open the application database and bring the schema current (ADR 0008).
+ *
+ * Main — and only main — ever holds this handle: the single-writer ownership
+ * the audit requires is architectural, not a pragma. The driver is Node's
+ * built-in `node:sqlite` (compiled into Electron itself), so there is no native
+ * module and no ABI rebuild to go wrong. A failure here is a real one — a bad
+ * path, a corrupt file — and "the app silently has no persistence" is exactly
+ * the plausible-looking half-working state CLAUDE.md §8 forbids, so startup
+ * fails loudly instead.
+ */
+function openApplicationDatabase(): SqliteDatabase {
+  const location = join(app.getPath('userData'), 'jarvis.db');
+  let db: SqliteDatabase;
+  try {
+    db = openDatabase({ location });
+  } catch (cause) {
+    throw new Error(`Could not open the application database at ${location}.`, { cause });
+  }
+  const applied = migrate(db, migrations);
+  log.info('database ready', {
+    migrationsApplied: applied.map((m) => `${String(m.id)}-${m.name}`),
   });
-});
+  return db;
+}
+
+void app
+  .whenReady()
+  .then(() => {
+    log.info('starting', { env: describeEnv(env) });
+
+    const db = openApplicationDatabase();
+    app.on('will-quit', () => {
+      db.close();
+    });
+
+    // Handlers are registered before the first window exists, so no renderer can
+    // invoke a channel that is not yet listening. Each one is a deliberate hole in
+    // the trust boundary (ADR 0002): a read-only host-facts call, two calls that
+    // reach only the model provider, and four history calls that reach only the
+    // main-owned conversation store — never the shell, env, arbitrary paths, or
+    // AEGIS.
+    registerAppInfoHandler();
+    registerChatHandler(modelProvider);
+    registerAmplifyHandler(modelProvider);
+    registerHistoryHandlers(db);
+
+    createWindow();
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    });
+  })
+  .catch((cause: unknown) => {
+    // A startup failure must never leave a blank window pretending to load.
+    // Log the full cause for the terminal and exit non-zero — the probe and a
+    // human both read this the same way: the app did not start.
+    log.error('startup failed', {
+      message: cause instanceof Error ? cause.message : String(cause),
+    });
+    console.error(cause);
+    app.exit(1);
+  });
 
 app.on('window-all-closed', () => {
   // Phase 1 targets Windows only. macOS is out of scope, so there is no

@@ -17,13 +17,17 @@ afterEach(() => {
 const createWidgets: Migration = {
   id: 1,
   name: 'create_widgets',
-  up: (d) => d.exec('CREATE TABLE widgets (id INTEGER PRIMARY KEY) STRICT'),
+  up: (d) => {
+    d.exec('CREATE TABLE widgets (id INTEGER PRIMARY KEY) STRICT');
+  },
 };
 
 const addWidgetLabel: Migration = {
   id: 2,
   name: 'add_widget_label',
-  up: (d) => d.exec('ALTER TABLE widgets ADD COLUMN label TEXT'),
+  up: (d) => {
+    d.exec('ALTER TABLE widgets ADD COLUMN label TEXT');
+  },
 };
 
 describe('migrate', () => {
@@ -132,6 +136,6 @@ describe('migrate', () => {
 
 describe('openDatabase', () => {
   it('enforces foreign keys', () => {
-    expect(db.pragma('foreign_keys', { simple: true })).toBe(1);
+    expect(db.prepare('PRAGMA foreign_keys').get()).toEqual({ foreign_keys: 1 });
   });
 });

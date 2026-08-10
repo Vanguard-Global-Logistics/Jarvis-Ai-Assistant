@@ -28,6 +28,24 @@ export const CHANNELS = {
    * nothing more.
    */
   jarvisAmplify: 'jarvis:amplify',
+
+  /**
+   * Stage 1A persistence (ADR 0006, ADR 0008). Four narrow operations against
+   * the main-process-owned SQLite database. Saving is EXPLICIT: nothing writes
+   * without the renderer invoking `history:save`, and the renderer never names
+   * a path, a table, or a query — main owns the file, the schema, and every
+   * statement. No channel accepts SQL or a filesystem path.
+   */
+  historySave: 'history:save',
+
+  /** List saved conversations — metadata only, never full transcripts. */
+  historyList: 'history:list',
+
+  /** Open one saved conversation by id, read-only. */
+  historyGet: 'history:get',
+
+  /** Delete one saved conversation by id. The UI confirms before invoking. */
+  historyDelete: 'history:delete',
 } as const;
 
 export type ChannelName = (typeof CHANNELS)[keyof typeof CHANNELS];

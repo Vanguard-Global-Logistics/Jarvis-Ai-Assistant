@@ -37,16 +37,17 @@ const TARGETS = [
   {
     name: 'main',
     file: join(root, 'apps/desktop/out/main/index.js'),
-    // Main has full Node: real npm packages resolve from node_modules. Native modules
-    // (better-sqlite3) MUST stay external — bundling one would break the ABI rebuild
-    // that Electron requires.
+    // Main has full Node: real npm packages resolve from node_modules.
     //
     // `@anthropic-ai/sdk` is here deliberately (Checkpoint 2, ADR 0007): jarvis-core's
     // Anthropic adapter is now reachable from main, so the SDK is a real runtime
     // dependency of the trusted process. It stays external — it ships compiled JS — and
     // is main-process only: the renderer/preload assertions below still forbid it (and
     // every other secret-bearing dep) from crossing to the client.
-    allowed: new Set(['electron', 'zod', 'better-sqlite3', '@anthropic-ai/sdk']),
+    //
+    // SQLite is NOT here: the driver is Node's builtin `node:sqlite` (ADR 0008),
+    // which imports as a `node:` builtin, not an external package.
+    allowed: new Set(['electron', 'zod', '@anthropic-ai/sdk']),
   },
   {
     name: 'preload',
@@ -91,7 +92,7 @@ function bareSpecifiers(code) {
  */
 function isNodeBuiltin(spec) {
   if (spec.startsWith('node:')) return true;
-  return ['path', 'fs', 'url', 'module', 'events', 'timers', 'os', 'crypto'].includes(spec);
+  return ['path', 'fs', 'url', 'module', 'events', 'timers', 'os', 'crypto', 'util'].includes(spec);
 }
 
 /**

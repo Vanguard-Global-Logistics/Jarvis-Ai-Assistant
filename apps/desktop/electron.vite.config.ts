@@ -38,12 +38,14 @@ import { contentSecurityPolicy } from './src/shared/csp.js';
  * if any of these survives as a runtime import. That assertion, not this list,
  * is what makes the guarantee real — this list is just how it gets satisfied.
  *
- * Third-party deps stay external deliberately: `zod` resolves fine from
- * node_modules in main, and `better-sqlite3` is native and MUST NOT be bundled.
+ * Third-party deps stay external deliberately: `zod` and the Anthropic SDK
+ * resolve fine from node_modules in main. (SQLite needs no entry here at all —
+ * the driver is Node's builtin `node:sqlite`, ADR 0008.)
  */
 const INTERNAL_PACKAGES = [
   '@jarvis/config',
   '@jarvis/contracts',
+  '@jarvis/database',
   '@jarvis/jarvis-core',
   '@jarvis/ui',
 ];

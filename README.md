@@ -2,15 +2,20 @@
 
 Personal AI assistant and orchestrator for William Lavold. Private, single-user.
 
-> **Status: production foundation. Zero application features.**
+> **Status: production foundation plus the Stage 1A conversation + persistence slices.**
 >
-> This repository builds, lints, typechecks, and tests. It does **not** do anything yet.
-> There is no AEGIS, no orchestrator, no Forge, no Ledger, no memory, no voice, and no
-> vision. Nothing here is protected by AEGIS — AEGIS does not exist.
+> The desktop shell holds a conversation (mock provider by default, labeled), runs the
+> Thought Amplifier, and — on an explicit Save Session — persists conversations to a
+> main-process-owned SQLite with list / read-only reopen / confirmed delete
+> (ADR 0007, ADR 0008). Unsaved conversations are discarded on close, by design.
 >
-> One typed IPC channel exists (`app:get-info`, static host facts, no authority granted).
-> It proves the renderer↔main boundary end to end and is the only thing `window.jarvis`
-> exposes — see `docs/IPC-SURFACE.md`.
+> There is still no AEGIS, no orchestrator beyond a single stateless model call, no
+> Forge, no Ledger, no memory (a saved transcript is a record, not recall), no voice,
+> and no vision. Nothing here is protected by AEGIS — AEGIS does not exist.
+>
+> Seven typed IPC channels exist (`app:get-info`, `jarvis:chat`, `jarvis:amplify`, and
+> `history:save/list/get/delete`). They are the whole of what `window.jarvis` exposes —
+> see `docs/IPC-SURFACE.md`.
 >
 > `docs/KNOWN-LIMITATIONS.md` is the authoritative list of what is missing. Read it before
 > concluding anything works.
@@ -67,17 +72,18 @@ expressed in a monorepo — including a precise account of what is and is not en
 ## Layout
 
 ```
-apps/desktop           Electron shell (Windows target)     PARTIAL — hardened, one IPC channel
+apps/desktop           Electron shell (Windows target)     PARTIAL — hardened, 7 IPC channels, conversation + history UI, owns SQLite
 apps/pwa               PWA shell                           NOT IMPLEMENTED — out of scope
-services/jarvis-core   Orchestration                       NOT IMPLEMENTED
+services/jarvis-core   Orchestration                       PARTIAL — model providers + amplifier
 services/aegis         Security engine                     NOT IMPLEMENTED
-packages/contracts     Shared Zod schemas + types          PARTIAL — IPC only
-packages/ui            Design-system components            NOT IMPLEMENTED
+packages/contracts     Shared Zod schemas + types          PARTIAL — IPC, model, history, experience
+packages/ui            Design-system components            PARTIAL — tokens, motion, Orb + glass
 packages/config        Env validation + logging            IMPLEMENTED, unit-tested
-packages/database      SQLite + migration runner           PARTIAL — zero migrations
+packages/database      SQLite (node:sqlite) + migrations   PARTIAL — wired to main, 1 migration (conversation history)
 ```
 
-Most packages are empty. That is deliberate, not unfinished — see `CLAUDE.md` §8.
+`services/aegis` and `apps/pwa` are empty. That is deliberate, not unfinished — see
+`CLAUDE.md` §8.
 
 ## Contributing
 

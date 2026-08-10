@@ -1,7 +1,8 @@
 // @ts-check
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdtempSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -374,13 +375,22 @@ async function runChecks(page, mode) {
   );
 
   const keys = await page.evaluate('window.jarvis ? Object.keys(window.jarvis) : null');
-  // Checkpoint 2 (ADR 0007) widened the bridge to the two model calls. This stays an
-  // EXACT match, in insertion order: it is the runtime half of the preload surface test,
-  // and its whole value is that an unlisted function fails it.
-  const keysOk =
-    JSON.stringify(keys.value) === JSON.stringify(['getAppInfo', 'sendChat', 'amplify']);
+  // Checkpoint 2 (ADR 0007) widened the bridge to the two model calls; Checkpoint 3
+  // (ADR 0008) to the four history operations. This stays an EXACT match, in insertion
+  // order: it is the runtime half of the preload surface test, and its whole value is
+  // that an unlisted function fails it.
+  const EXPECTED_KEYS = [
+    'getAppInfo',
+    'sendChat',
+    'amplify',
+    'saveConversation',
+    'listConversations',
+    'getConversation',
+    'deleteConversation',
+  ];
+  const keysOk = JSON.stringify(keys.value) === JSON.stringify(EXPECTED_KEYS);
   add(
-    'Object.keys is exactly ["getAppInfo","sendChat","amplify"]',
+    `Object.keys is exactly ${JSON.stringify(EXPECTED_KEYS)}`,
     keysOk,
     JSON.stringify(keys.value),
   );
@@ -446,6 +456,96 @@ async function runChecks(page, mode) {
     'jarvis:amplify returns the five validated fields',
     ampOk,
     amp.error ? `THREW: ${String(amp.error).split('\n')[0]}` : JSON.stringify(a).slice(0, 160),
+  );
+
+  // --- Checkpoint 3 (ADR 0008): the persistence slice, against a REAL SQLite ---
+  //
+  // Each probe run points the app at a fresh throwaway userData directory
+  // (JARVIS_USER_DATA_DIR, honored only unpackaged), so these assertions are
+  // hermetic: nothing an earlier run saved can leak in.
+  //
+  // Ordering is the proof that matters: a chat turn ALREADY crossed the boundary
+  // above, so an empty list here is runtime evidence that conversing does not
+  // persist — only an explicit history:save does (CLAUDE.md §8; the UI banner
+  // makes exactly this claim and this is what makes it true).
+  const list0 = await page.evaluate(
+    'window.jarvis ? await window.jarvis.listConversations() : null',
+  );
+  const list0Empty =
+    list0.value !== null &&
+    Array.isArray(list0.value?.conversations) &&
+    list0.value.conversations.length === 0;
+  add(
+    'Unsaved chat did NOT persist (list starts empty)',
+    list0Empty,
+    list0.error ? `THREW: ${String(list0.error).split('\n')[0]}` : JSON.stringify(list0.value),
+  );
+
+  const saved = await page.evaluate(
+    'window.jarvis ? await window.jarvis.saveConversation({ messages: [' +
+      '{ role: "user", content: "probe: save this session" },' +
+      '{ role: "assistant", content: "probe reply" }] }) : null',
+  );
+  const sv = saved.value;
+  const savedOk =
+    sv !== null &&
+    typeof sv === 'object' &&
+    typeof sv.id === 'string' &&
+    /^[0-9a-f-]{36}$/.test(sv.id) &&
+    sv.title === 'probe: save this session' &&
+    typeof sv.savedAt === 'string' &&
+    sv.messageCount === 2;
+  add(
+    'history:save stores and returns metadata',
+    savedOk,
+    saved.error ? `THREW: ${String(saved.error).split('\n')[0]}` : JSON.stringify(sv),
+  );
+
+  const list1 = await page.evaluate(
+    'window.jarvis ? await window.jarvis.listConversations() : null',
+  );
+  const list1Ok =
+    list1.value !== null &&
+    Array.isArray(list1.value?.conversations) &&
+    list1.value.conversations.length === 1 &&
+    list1.value.conversations[0]?.id === sv?.id;
+  add('history:list shows exactly the saved session', list1Ok, JSON.stringify(list1.value));
+
+  const got = await page.evaluate(
+    `window.jarvis ? await window.jarvis.getConversation(${JSON.stringify(String(sv?.id))}) : null`,
+  );
+  const gotOk =
+    got.value?.conversation != null &&
+    JSON.stringify(got.value.conversation.messages) ===
+      JSON.stringify([
+        { role: 'user', content: 'probe: save this session' },
+        { role: 'assistant', content: 'probe reply' },
+      ]);
+  add(
+    'history:get returns the exact saved transcript',
+    gotOk,
+    got.error
+      ? `THREW: ${String(got.error).split('\n')[0]}`
+      : JSON.stringify(got.value).slice(0, 160),
+  );
+
+  const del = await page.evaluate(
+    `window.jarvis ? await window.jarvis.deleteConversation(${JSON.stringify(String(sv?.id))}) : null`,
+  );
+  const delOk = del.value?.deleted === true;
+  add('history:delete removes it and says so', delOk, JSON.stringify(del.value));
+
+  const after = await page.evaluate(
+    `window.jarvis ? [await window.jarvis.listConversations(), await window.jarvis.getConversation(${JSON.stringify(String(sv?.id))})] : null`,
+  );
+  const afterOk =
+    Array.isArray(after.value) &&
+    after.value[0]?.conversations?.length === 0 &&
+    after.value[1]?.conversation === null;
+  add(
+    'After delete: list empty, get reports null (no ghost data)',
+    afterOk,
+    JSON.stringify(after.value),
   );
 
   // E2: the Experience Shell mounts the Orb. Assert the real component is
@@ -520,14 +620,18 @@ async function probe(mode) {
 
   await assertPortFree(port, mode);
 
+  // A fresh throwaway userData per mode, so the persistence checks are
+  // hermetic: the history list must start empty because THIS run has saved
+  // nothing, not because a human remembered to clean up. The app honors the
+  // override only when unpackaged (main/index.ts guards on !app.isPackaged).
+  const userDataDir = mkdtempSync(join(tmpdir(), `jarvis-probe-${mode}-`));
+
   const child =
     mode === 'prod'
       ? // Built HTML over file://, production CSP, no dev server.
-        launch(
-          electronPath,
-          ['apps/desktop', `--remote-debugging-port=${port}`, '--no-sandbox'],
-          {},
-        )
+        launch(electronPath, ['apps/desktop', `--remote-debugging-port=${port}`, '--no-sandbox'], {
+          JARVIS_USER_DATA_DIR: userDataDir,
+        })
       : // The REAL `npm run dev:desktop`. electron-vite forwards
         // REMOTE_DEBUGGING_PORT and NO_SANDBOX to Electron itself, so this
         // exercises the actual dev path — including the CSP nonce travelling
@@ -535,6 +639,7 @@ async function probe(mode) {
         launch('npm', ['run', 'dev:desktop'], {
           REMOTE_DEBUGGING_PORT: String(port),
           NO_SANDBOX: '1',
+          JARVIS_USER_DATA_DIR: userDataDir,
         });
 
   /** @type {string[]} */

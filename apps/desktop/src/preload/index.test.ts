@@ -36,10 +36,20 @@ vi.mock('electron', () => ({
  * claim; the tests below only enforce it.
  *
  * Widened in Checkpoint 2 (ADR 0002) to `sendChat` and `amplify` — each a
- * narrow, purpose-named model call, each documented in docs/IPC-SURFACE.md.
- * This edit is the deliberate act; the failure it resolves was the checkpoint.
+ * narrow, purpose-named model call — and in Checkpoint 3 (ADR 0008) to the
+ * four history operations, each a narrow call against the main-owned
+ * conversation store. All documented in docs/IPC-SURFACE.md. Each edit here is
+ * the deliberate act; the failure it resolves is the checkpoint.
  */
-const ALLOWED_API = ['getAppInfo', 'sendChat', 'amplify'] as const;
+const ALLOWED_API = [
+  'getAppInfo',
+  'sendChat',
+  'amplify',
+  'saveConversation',
+  'listConversations',
+  'getConversation',
+  'deleteConversation',
+] as const;
 
 /** Load the bridge fresh and return what it handed to `exposeInMainWorld`. */
 async function loadBridge(): Promise<{ namespace: string; api: Record<string, unknown> }> {
@@ -146,6 +156,57 @@ describe('jarvis.sendChat', () => {
 
     expect(mocks.invoke).toHaveBeenCalledTimes(1);
     expect(mocks.invoke).toHaveBeenCalledWith(CHANNELS.jarvisChat, request);
+  });
+});
+
+describe('history bridge functions (ADR 0008)', () => {
+  const ID = 'f4b1c1d2-3a4b-4c5d-8e6f-7a8b9c0d1e2f';
+
+  it('saveConversation invokes history:save with the transcript unchanged', async () => {
+    const { api } = await loadBridge();
+    const saveConversation = api.saveConversation;
+    if (typeof saveConversation !== 'function') throw new Error('saveConversation is missing');
+
+    mocks.invoke.mockResolvedValue({ id: ID, title: 't', savedAt: 'x', messageCount: 1 });
+    const request = { messages: [{ role: 'user', content: 'keep this' }] };
+    await (saveConversation as (r: unknown) => Promise<unknown>)(request);
+
+    expect(mocks.invoke).toHaveBeenCalledWith(CHANNELS.historySave, request);
+  });
+
+  it('listConversations sends no payload', async () => {
+    const { api } = await loadBridge();
+    const listConversations = api.listConversations;
+    if (typeof listConversations !== 'function') throw new Error('listConversations is missing');
+
+    mocks.invoke.mockResolvedValue({ conversations: [] });
+    // Try to smuggle an argument through; the bridge takes none and must
+    // reach `invoke` with the channel alone.
+    await (listConversations as (smuggled?: unknown) => Promise<unknown>)({ evil: true });
+
+    expect(mocks.invoke.mock.calls[0]).toEqual([CHANNELS.historyList]);
+  });
+
+  it('getConversation wraps the id into the { id } request the contract expects', async () => {
+    const { api } = await loadBridge();
+    const getConversation = api.getConversation;
+    if (typeof getConversation !== 'function') throw new Error('getConversation is missing');
+
+    mocks.invoke.mockResolvedValue({ conversation: null });
+    await (getConversation as (id: string) => Promise<unknown>)(ID);
+
+    expect(mocks.invoke).toHaveBeenCalledWith(CHANNELS.historyGet, { id: ID });
+  });
+
+  it('deleteConversation wraps the id the same way', async () => {
+    const { api } = await loadBridge();
+    const deleteConversation = api.deleteConversation;
+    if (typeof deleteConversation !== 'function') throw new Error('deleteConversation is missing');
+
+    mocks.invoke.mockResolvedValue({ deleted: true });
+    await (deleteConversation as (id: string) => Promise<unknown>)(ID);
+
+    expect(mocks.invoke).toHaveBeenCalledWith(CHANNELS.historyDelete, { id: ID });
   });
 });
 

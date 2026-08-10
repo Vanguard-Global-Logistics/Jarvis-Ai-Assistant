@@ -6,6 +6,11 @@ import {
   ChatReplySchema,
   ChatRequestSchema,
 } from '../model/contracts.js';
+import {
+  HistoryIdRequestSchema,
+  SavedConversationMetaSchema,
+  SavedConversationSchema,
+} from '../history/contracts.js';
 
 /**
  * IPC contracts — the single definition of every message that crosses the
@@ -105,6 +110,71 @@ export const jarvisAmplifyContract = defineContract({
   response: AmplifierResultSchema,
 });
 
+// --- history:* (Stage 1A persistence, ADR 0008) -----------------------------
+
+/**
+ * `history:save` — the transcript in, the stored metadata out.
+ *
+ * The request is deliberately the SAME `ChatRequestSchema` the chat channel
+ * uses (CLAUDE.md §3 — one definition, no drift): what you save is exactly the
+ * shape you converse in. Title, id, and timestamp are main's to assign, so the
+ * `.strict()` request has nowhere to smuggle them. Saving is the ONLY write
+ * path: no other channel touches the database with a write.
+ */
+export const historySaveContract = defineContract({
+  channel: CHANNELS.historySave,
+  request: ChatRequestSchema,
+  response: SavedConversationMetaSchema,
+});
+
+/**
+ * `history:list` — no payload in, metadata for every saved conversation out,
+ * newest first. Metadata only: transcripts load one at a time via `history:get`,
+ * so listing never hauls every saved conversation across the boundary.
+ */
+export const historyListContract = defineContract({
+  channel: CHANNELS.historyList,
+  // No argument, like app:get-info: a renderer that sends one is rejected.
+  request: z.undefined(),
+  response: z
+    .object({
+      conversations: z.array(SavedConversationMetaSchema),
+    })
+    .strict(),
+});
+
+/**
+ * `history:get` — one id in, the full saved conversation out, or `null` when
+ * the id names nothing. A stale id (deleted elsewhere, held from a previous
+ * run) is a normal outcome, not an exception, so it is a value the renderer
+ * must handle rather than an error that hides what happened.
+ */
+export const historyGetContract = defineContract({
+  channel: CHANNELS.historyGet,
+  request: HistoryIdRequestSchema,
+  response: z
+    .object({
+      conversation: SavedConversationSchema.nullable(),
+    })
+    .strict(),
+});
+
+/**
+ * `history:delete` — one id in, whether a row was actually removed out.
+ * Deleting an id that does not exist reports `deleted: false` rather than
+ * pretending success (CLAUDE.md §8). Confirmation is the UI's job; main just
+ * refuses to lie about what happened.
+ */
+export const historyDeleteContract = defineContract({
+  channel: CHANNELS.historyDelete,
+  request: HistoryIdRequestSchema,
+  response: z
+    .object({
+      deleted: z.boolean(),
+    })
+    .strict(),
+});
+
 // --- registry ---------------------------------------------------------------
 
 /**
@@ -116,4 +186,8 @@ export const IPC_CONTRACTS = {
   [CHANNELS.appGetInfo]: appGetInfoContract,
   [CHANNELS.jarvisChat]: jarvisChatContract,
   [CHANNELS.jarvisAmplify]: jarvisAmplifyContract,
+  [CHANNELS.historySave]: historySaveContract,
+  [CHANNELS.historyList]: historyListContract,
+  [CHANNELS.historyGet]: historyGetContract,
+  [CHANNELS.historyDelete]: historyDeleteContract,
 } as const;

@@ -15,10 +15,21 @@ const AMP: AmplifierResult = {
   buildReadyPrompt: 'You are building a permit tracker. Context: ...',
 };
 
+const SAVED_META = {
+  id: 'f4b1c1d2-3a4b-4c5d-8e6f-7a8b9c0d1e2f',
+  title: 'What is the status?',
+  savedAt: '2026-08-10T12:00:00.000Z',
+  messageCount: 2,
+};
+
 function fakeBridge(overrides: Partial<ConversationBridge> = {}): ConversationBridge {
   return {
     sendChat: vi.fn().mockResolvedValue({ text: 'Hello from the mock.', provider: 'mock' }),
     amplify: vi.fn().mockResolvedValue(AMP),
+    saveConversation: vi.fn().mockResolvedValue(SAVED_META),
+    listConversations: vi.fn().mockResolvedValue({ conversations: [] }),
+    getConversation: vi.fn().mockResolvedValue({ conversation: null }),
+    deleteConversation: vi.fn().mockResolvedValue({ deleted: true }),
     ...overrides,
   };
 }
@@ -30,10 +41,12 @@ function type(value: string): void {
 }
 
 describe('Conversation', () => {
-  it('shows the empty-state hint and the no-persistence banner', () => {
+  it('shows the empty-state hint and the unsaved-sessions banner', () => {
     render(<Conversation bridge={fakeBridge()} />);
     expect(screen.getByText(/Ask Jarvis anything/)).toBeTruthy();
-    expect(screen.getByText(/NOTHING IS SAVED/)).toBeTruthy();
+    // The banner must state the real persistence contract (ADR 0008): unsaved
+    // is discarded; saving is explicit.
+    expect(screen.getByText(/UNSAVED SESSIONS ARE DISCARDED ON CLOSE/)).toBeTruthy();
   });
 
   it('round-trips a chat turn and labels a mock reply as mock', async () => {
@@ -125,6 +138,104 @@ describe('Conversation', () => {
     fireEvent.keyDown(box, { key: 'Enter', shiftKey: false });
     await screen.findByText('Hello from the mock.');
     expect(bridge.sendChat).toHaveBeenCalledTimes(1);
+  });
+
+  it('disables Save Session until there is something to save, then saves exactly the transcript', async () => {
+    const bridge = fakeBridge();
+    render(<Conversation bridge={bridge} />);
+
+    const save = screen.getByRole('button', { name: /save session/i });
+    expect(save).toHaveProperty('disabled', true);
+    fireEvent.click(save);
+    expect(bridge.saveConversation).not.toHaveBeenCalled();
+
+    type('keep this one');
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+    await screen.findByText('Hello from the mock.');
+
+    expect(save).toHaveProperty('disabled', false);
+    fireEvent.click(save);
+    // Exactly the visible transcript crosses the boundary — message items only.
+    expect(bridge.saveConversation).toHaveBeenCalledWith({
+      messages: [
+        { role: 'user', content: 'keep this one' },
+        { role: 'assistant', content: 'Hello from the mock.' },
+      ],
+    });
+    expect(await screen.findByRole('status')).toBeTruthy();
+  });
+
+  it('lists saved sessions from the bridge when History is opened', async () => {
+    const bridge = fakeBridge({
+      listConversations: vi.fn().mockResolvedValue({ conversations: [SAVED_META] }),
+    });
+    render(<Conversation bridge={bridge} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /history/i }));
+    const panel = await screen.findByRole('region', { name: /saved sessions/i });
+    expect(bridge.listConversations).toHaveBeenCalledTimes(1);
+    expect(within(panel).getByText('What is the status?')).toBeTruthy();
+    expect(within(panel).getByText(/2 messages/)).toBeTruthy();
+  });
+
+  it('opens a saved session read-only, with no composer, and returns to live', async () => {
+    const saved = {
+      ...SAVED_META,
+      messages: [
+        { role: 'user' as const, content: 'archived question' },
+        { role: 'assistant' as const, content: 'archived answer' },
+      ],
+    };
+    const bridge = fakeBridge({
+      listConversations: vi.fn().mockResolvedValue({ conversations: [SAVED_META] }),
+      getConversation: vi.fn().mockResolvedValue({ conversation: saved }),
+    });
+    render(<Conversation bridge={bridge} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /history/i }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Open' }));
+
+    const view = await screen.findByRole('region', { name: /saved session \(read-only\)/i });
+    expect(bridge.getConversation).toHaveBeenCalledWith(SAVED_META.id);
+    expect(within(view).getByText('archived question')).toBeTruthy();
+    expect(within(view).getByText('archived answer')).toBeTruthy();
+    // Read-only means READ-ONLY: no composer, no way to append to a record.
+    expect(screen.queryByRole('textbox', { name: /message jarvis/i })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: /back to live session/i }));
+    expect(screen.getByRole('textbox', { name: /message jarvis/i })).toBeTruthy();
+  });
+
+  it('states plainly when a saved session no longer exists', async () => {
+    const bridge = fakeBridge({
+      listConversations: vi.fn().mockResolvedValue({ conversations: [SAVED_META] }),
+      getConversation: vi.fn().mockResolvedValue({ conversation: null }),
+    });
+    render(<Conversation bridge={bridge} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /history/i }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Open' }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toContain('no longer exists');
+  });
+
+  it('requires a second, explicit click before deleting', async () => {
+    const bridge = fakeBridge({
+      listConversations: vi.fn().mockResolvedValue({ conversations: [SAVED_META] }),
+    });
+    render(<Conversation bridge={bridge} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /history/i }));
+    const del = await screen.findByRole('button', { name: 'Delete' });
+
+    // First click only arms the confirmation — nothing crosses the boundary.
+    fireEvent.click(del);
+    expect(bridge.deleteConversation).not.toHaveBeenCalled();
+
+    fireEvent.click(await screen.findByRole('button', { name: /confirm delete/i }));
+    expect(bridge.deleteConversation).toHaveBeenCalledTimes(1);
+    expect(bridge.deleteConversation).toHaveBeenCalledWith(SAVED_META.id);
   });
 
   it('keeps the transcript across turns so history accumulates', async () => {

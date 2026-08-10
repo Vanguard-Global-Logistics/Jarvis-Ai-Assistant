@@ -4,19 +4,21 @@
  * STATUS: PARTIAL.
  *   - Connection ownership and the migration runner: IMPLEMENTED AND VERIFIED
  *     (unit tests, in-memory).
- *   - Feature schema: NOT IMPLEMENTED. There are zero migrations. `migrations`
- *     is deliberately an empty array — no memory, projects, tasks, or audit-log
- *     tables exist, because those are feature design work that is not approved.
+ *   - Feature schema: ONE migration — conversation history (Stage 1A
+ *     persistence, ADR 0008). No memory, projects, tasks, or audit-log tables
+ *     exist; those are feature design work that is not approved.
  *
- * NOT YET WIRED TO ELECTRON. `better-sqlite3` is a native module and must be
- * rebuilt against Electron's ABI (via @electron/rebuild) before the main process
- * can open a database. That step is intentionally deferred until something
- * actually needs to persist. Recorded in docs/KNOWN-LIMITATIONS.md.
+ * Wired to Electron by ADR 0008: the main process — and only the main process —
+ * opens the database and applies `migrations` at startup. The driver is Node's
+ * built-in `node:sqlite` (ADR 0008 records why better-sqlite3 was replaced), so
+ * there is no native module and no ABI rebuild — the same code runs identically
+ * under vitest (Node) and in Electron main.
  */
 
 import type { Migration } from './migrator.js';
+import { conversationHistoryMigration } from './migrations/0001-conversation-history.js';
 
-export { openDatabase } from './connection.js';
+export { openDatabase, withTransaction } from './connection.js';
 export type { OpenDatabaseOptions, SqliteDatabase } from './connection.js';
 
 export { MigrationError, appliedMigrations, migrate } from './migrator.js';
@@ -25,7 +27,7 @@ export type { AppliedMigration, Migration } from './migrator.js';
 /**
  * The application's migration list, applied in ascending id order.
  *
- * Empty by design. Each future feature appends exactly one migration here and
- * never edits an applied one.
+ * Each feature appends exactly one migration here and never edits an applied
+ * one. Recovery is forward-only (see migrator.ts) — write a new migration.
  */
-export const migrations: readonly Migration[] = [];
+export const migrations: readonly Migration[] = [conversationHistoryMigration];

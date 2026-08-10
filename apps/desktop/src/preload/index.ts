@@ -6,6 +6,9 @@ import type {
   AppInfo,
   ChatReply,
   ChatRequest,
+  HistoryIdRequest,
+  SavedConversation,
+  SavedConversationMeta,
 } from '@jarvis/contracts';
 
 /**
@@ -62,6 +65,40 @@ const api = {
     ipcRenderer.invoke(CHANNELS.jarvisAmplify, {
       idea,
     } satisfies AmplifyRequest) as Promise<AmplifierResult>,
+
+  /**
+   * Stage 1A persistence (ADR 0008) — four named operations against the
+   * main-owned conversation store. The renderer hands over a transcript or an
+   * opaque id; it never names a path, a table, or a query. Saving is EXPLICIT:
+   * this is the only function that writes, and it runs only when called.
+   */
+  saveConversation: (request: ChatRequest): Promise<SavedConversationMeta> =>
+    ipcRenderer.invoke(CHANNELS.historySave, request) as Promise<SavedConversationMeta>,
+
+  /** Saved-conversation metadata, newest first. Never full transcripts. */
+  listConversations: (): Promise<{ conversations: SavedConversationMeta[] }> =>
+    ipcRenderer.invoke(CHANNELS.historyList) as Promise<{
+      conversations: SavedConversationMeta[];
+    }>,
+
+  /**
+   * One saved conversation by id, read-only; `conversation: null` for a stale
+   * id. The bridge shapes the string into the `{ id }` request the contract
+   * expects — extra fields cannot be smuggled, and main re-validates anyway.
+   */
+  getConversation: (id: string): Promise<{ conversation: SavedConversation | null }> =>
+    ipcRenderer.invoke(CHANNELS.historyGet, { id } satisfies HistoryIdRequest) as Promise<{
+      conversation: SavedConversation | null;
+    }>,
+
+  /**
+   * Delete one saved conversation by id. Confirmation is the UI's concern;
+   * main reports whether a row was actually removed.
+   */
+  deleteConversation: (id: string): Promise<{ deleted: boolean }> =>
+    ipcRenderer.invoke(CHANNELS.historyDelete, { id } satisfies HistoryIdRequest) as Promise<{
+      deleted: boolean;
+    }>,
 } as const;
 
 export type JarvisApi = typeof api;
