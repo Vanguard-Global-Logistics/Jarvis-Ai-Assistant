@@ -168,6 +168,48 @@ function withSqlite(/** @type {string} */ path) {
   }
 }
 
+/**
+ * How far ahead of `main` this checkout is.
+ *
+ * `origin/main` only exists locally once something has fetched it, and a fresh
+ * clone that only ever pulled one branch has never done so — the first real run
+ * of this script hit exactly that and printed an unhelpful "Command failed".
+ * Fetching the ref is cheap and makes the answer real; if that fails too (no
+ * network), say which it was rather than dumping the git invocation.
+ */
+function aheadOfMain() {
+  const direct = cmd('git', ['rev-list', '--count', 'origin/main..HEAD']);
+  if (/^\d+$/.test(direct)) return direct;
+
+  cmd('git', ['fetch', '--quiet', 'origin', 'main']);
+  const retried = cmd('git', ['rev-list', '--count', 'origin/main..HEAD']);
+  return /^\d+$/.test(retried)
+    ? retried
+    : '(could not compare — origin/main not available offline)';
+}
+
+/**
+ * The working tree, and WHICH files if it is dirty.
+ *
+ * "HAS UNCOMMITTED CHANGES" on its own prompts the exact follow-up question this
+ * script exists to prevent. Listing them is the answer; the list is capped so a
+ * genuinely messy tree does not bury the rest of the report.
+ */
+function describeWorkingTree() {
+  const porcelain = cmd('git', ['status', '--porcelain']);
+  if (porcelain === '') return ['- working tree: clean'];
+
+  const changed = porcelain.split('\n').filter((l) => l.trim() !== '');
+  const shown = changed.slice(0, 10);
+  return [
+    `- working tree: ${String(changed.length)} uncommitted change(s)`,
+    ...shown.map((line) => `  - ${line.trim()}`),
+    ...(changed.length > shown.length
+      ? [`  - …and ${String(changed.length - shown.length)} more`]
+      : []),
+  ];
+}
+
 const local = describeLocalModel();
 const keys = envFileKeys();
 const databases = findDatabases();
@@ -197,9 +239,10 @@ const lines = [
   '### Repository',
   '',
   `- branch: ${cmd('git', ['branch', '--show-current'])}`,
+  `- tracking: ${cmd('git', ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}'])}`,
   `- HEAD: ${cmd('git', ['rev-parse', '--short', 'HEAD'])}`,
-  `- commits ahead of main: ${cmd('git', ['rev-list', '--count', 'origin/main..HEAD'])}`,
-  `- working tree: ${cmd('git', ['status', '--porcelain']) === '' ? 'clean' : 'HAS UNCOMMITTED CHANGES'}`,
+  `- commits ahead of main: ${aheadOfMain()}`,
+  ...describeWorkingTree(),
   '',
   '### Model configuration',
   '',
