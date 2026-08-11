@@ -1,6 +1,6 @@
 // @ts-check
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { DatabaseSync } from 'node:sqlite';
 import { dirname, join, resolve } from 'node:path';
@@ -194,6 +194,12 @@ function aheadOfMain() {
  * "HAS UNCOMMITTED CHANGES" on its own prompts the exact follow-up question this
  * script exists to prevent. Listing them is the answer; the list is capped so a
  * genuinely messy tree does not bury the rest of the report.
+ *
+ * Untracked DIRECTORIES get one more level of detail, because git collapses them
+ * to a single `?? name/` line that says nothing about what is inside. A stray
+ * `?? runtime/` appeared on the Mac and could not be identified from the report
+ * alone — naming a few of its entries is the difference between knowing what it
+ * is and spending a round-trip asking. Names only; nothing is read.
  */
 function describeWorkingTree() {
   const porcelain = cmd('git', ['status', '--porcelain']);
@@ -203,11 +209,32 @@ function describeWorkingTree() {
   const shown = changed.slice(0, 10);
   return [
     `- working tree: ${String(changed.length)} uncommitted change(s)`,
-    ...shown.map((line) => `  - ${line.trim()}`),
+    ...shown.flatMap((line) => [`  - ${line.trim()}`, ...peekUntrackedDirectory(line)]),
     ...(changed.length > shown.length
       ? [`  - …and ${String(changed.length - shown.length)} more`]
       : []),
   ];
+}
+
+/**
+ * A few entry names from an untracked directory, so it can be identified.
+ *
+ * Returns nothing for anything that is not an untracked directory, and never
+ * throws — an unreadable directory is not worth losing the rest of the report
+ * over.
+ * @returns {string[]}
+ */
+function peekUntrackedDirectory(/** @type {string} */ statusLine) {
+  const match = /^\?\?\s+(.+\/)$/.exec(statusLine.trim());
+  if (match === null) return [];
+  const [, relative = ''] = match;
+  try {
+    const entries = readdirSync(join(root, relative)).slice(0, 5);
+    if (entries.length === 0) return ['    - (empty)'];
+    return [`    - contains: ${entries.join(', ')}`];
+  } catch {
+    return [];
+  }
 }
 
 /**
