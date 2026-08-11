@@ -1,6 +1,6 @@
 # Test day — everything to check on the MacBook, in order
 
-Written 2026-08-11 for the overnight batch (ADRs 0013–0018). Work top to bottom;
+Written 2026-08-11 for the overnight batch (ADRs 0013–0019). Work top to bottom;
 each section says what to do, what should happen, and what it means if it does
 not. Anything marked **UNVERIFIED** has never run on real hardware — you are the
 first person to run it, and finding it broken is the expected outcome of a test,
@@ -16,7 +16,7 @@ cd ~/Jarvis-Ai-Assistant          # wherever you cloned it
 git checkout claude/jarvis-migration-chatgpt-19f128
 git pull origin claude/jarvis-migration-chatgpt-19f128
 npm install
-npm run verify                    # ~1 min. Expect: 357 tests passed
+npm run verify                    # ~1 min. Expect: 363 tests passed
 npm run build
 npm run probe:runtime             # launches the real app and asserts ~30 facts
 ```
@@ -41,6 +41,24 @@ passed.
 | 1.6 | Start a chat, do NOT save, quit, relaunch             | It is **gone**. That is correct — there is no autosave, and the banner says so                                                                     |
 | 1.7 | Open a saved session, click **Continue this session** | It loads into the live composer with the notice "Continued from a saved session"; saving again makes a **new** entry and the original is untouched |
 | 1.8 | Delete a session                                      | Asks first, then goes                                                                                                                              |
+
+## 1b. New session (ADR 0019) — NEW, and it fixes a real bug
+
+Until now nothing cleared the live transcript. After saving a conversation about
+one thing and starting another in the same window, the second save stored the
+first topic **again** under a new id — History quietly filled with conversations
+that each contained all the previous ones.
+
+| #    | Do                                                              | Expect                                                              |
+| ---- | --------------------------------------------------------------- | ------------------------------------------------------------------- |
+| 1b.1 | Chat, then click **New session**                                | It turns red: `Discard 2 unsaved?`. Nothing is cleared yet          |
+| 1b.2 | Click it again                                                  | The transcript clears; the empty-state hint returns                 |
+| 1b.3 | Chat, **Save**, then click **New session**                      | Clears in **one** click — nothing would be lost, so it does not ask |
+| 1b.4 | Chat, Save, chat again, click **New session**                   | Asks again — there is new work since the save                       |
+| 1b.5 | Save topic A → New session → chat topic B → Save → open History | Two separate sessions. **Topic B's entry must not contain topic A** |
+
+**1b.5 is the bug.** If the second saved session contains topic A's messages, the
+fix did not work and I need to know.
 
 ## 2. Per-person orbs (ADR 0013) — NEW
 

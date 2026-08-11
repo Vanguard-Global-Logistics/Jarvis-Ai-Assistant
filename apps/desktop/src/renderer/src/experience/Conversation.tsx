@@ -108,6 +108,17 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
   /** The id whose Delete button is one click away from actually deleting. */
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  /**
+   * How many savable entries are known to be on disk already.
+   *
+   * The point is to make the New-session confirmation MEAN something. Asking
+   * "are you sure?" every time trains you to click through it, so it is asked
+   * only when the live transcript has grown past what was last saved (or
+   * continued from) and there is genuinely something to lose.
+   */
+  const [persistedCount, setPersistedCount] = useState(0);
+  /** True while New session is one click away from discarding real work. */
+  const [confirmNew, setConfirmNew] = useState(false);
   const nextId = useRef(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   /** The History filter box, so ⌘F can put the caret in it. */
@@ -265,6 +276,9 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
     if (bridge === null || busy || savableCount === 0) return;
     try {
       const meta = await bridge.saveConversation({ entries: toEntries(items) });
+      // Record how much of the transcript is now safely on disk, so New session
+      // can tell "nothing would be lost" from "you are about to throw work away".
+      setPersistedCount(savableCount);
       setSaveNotice(`Saved “${meta.title}”`);
       window.setTimeout(() => {
         setSaveNotice(null);
@@ -283,6 +297,43 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
       ]);
     }
   }, [bridge, busy, savableCount, items, historyOpen, refreshHistory]);
+
+  /** Entries typed since the last save — what a New session would throw away. */
+  const unsavedCount = Math.max(0, savableCount - persistedCount);
+
+  /**
+   * Start a fresh conversation (ADR 0019).
+   *
+   * Without this there was no way to put a topic down. The transcript grew for
+   * the life of the window, so every later send carried the earlier topic as
+   * context and every later save stored the earlier topic again under a new id
+   * — silently duplicating it.
+   *
+   * Two clicks when there is unsaved work, one when there is not, reusing the
+   * arm-then-confirm pattern Delete already uses. The confirmation is skipped
+   * when nothing would be lost, because a prompt that always appears is a prompt
+   * people learn to click through.
+   */
+  const newSession = useCallback((): void => {
+    if (unsavedCount > 0 && !confirmNew) {
+      setConfirmNew(true);
+      return;
+    }
+    setItems([]);
+    setDraft('');
+    setPersistedCount(0);
+    setConfirmNew(false);
+    setViewing(null);
+    setHistoryError(null);
+    setSaveNotice(null);
+    setOrb('idle');
+  }, [unsavedCount, confirmNew, setOrb]);
+
+  // Disarm the confirmation as soon as the transcript changes under it: the
+  // "discard 3 entries?" the user was answering is no longer the question.
+  useEffect(() => {
+    setConfirmNew(false);
+  }, [items]);
 
   const openSaved = useCallback(
     async (id: string): Promise<void> => {
@@ -347,6 +398,10 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
         : { kind: 'amplify', id: allocId(), idea: entry.idea, result: entry.result },
     );
     setItems(loaded);
+    // Continuing forks a stored record: everything loaded still exists on disk
+    // under its own id, so discarding it loses nothing and must not prompt.
+    setPersistedCount(loaded.length);
+    setConfirmNew(false);
     setViewing(null);
     setHistoryOpen(false);
     setConfirmDeleteId(null);
@@ -541,6 +596,19 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
           }
         />
         <ToolbarButton
+          label={confirmNew ? `Discard ${String(unsavedCount)} unsaved?` : 'New session'}
+          onClick={newSession}
+          enabled={!disabled && !busy && (savableCount > 0 || draft !== '')}
+          title={
+            confirmNew
+              ? 'Click again to discard the unsaved part of this conversation'
+              : unsavedCount > 0
+                ? `Start fresh — ${String(unsavedCount)} unsaved ${unsavedCount === 1 ? 'entry' : 'entries'} would be discarded`
+                : 'Start a fresh conversation'
+          }
+          danger={confirmNew}
+        />
+        <ToolbarButton
           label={historyOpen ? 'History ▾' : 'History ▸'}
           onClick={() => void toggleHistory()}
           enabled={!disabled}
@@ -671,12 +739,16 @@ function ToolbarButton({
   onClick,
   enabled,
   title,
+  danger = false,
 }: {
   label: string;
   onClick: () => void;
   enabled: boolean;
   title: string;
+  /** Armed-destructive styling, so a confirmation does not look like a no-op. */
+  danger?: boolean;
 }): JSX.Element {
+  const tint = danger ? accent.danger : accent.jarvisBlue;
   return (
     <button
       type="button"
@@ -685,9 +757,9 @@ function ToolbarButton({
       title={title}
       style={{
         ...MONO_LABEL,
-        color: enabled ? accent.jarvisBlue : text.faint,
+        color: enabled ? tint : text.faint,
         background: 'transparent',
-        border: `1px solid ${enabled ? accent.jarvisBlue : surface.hairline}`,
+        border: `1px solid ${enabled ? tint : surface.hairline}`,
         borderRadius: 6,
         padding: '5px 10px',
         minHeight: 26,

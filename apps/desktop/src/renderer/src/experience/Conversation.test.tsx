@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AmplifierResult } from '@jarvis/contracts';
 import { Conversation } from './Conversation.js';
@@ -562,6 +562,117 @@ describe('Conversation', () => {
 
       fireEvent.keyDown(document, { key: 'Escape' });
       expect(screen.queryByRole('region', { name: /saved sessions/i })).toBeNull();
+    });
+  });
+  describe('New session (ADR 0019)', () => {
+    const newButton = (): HTMLElement =>
+      screen.getByRole('button', { name: /new session|discard \d+ unsaved/i });
+
+    it('is inert until there is something to clear', () => {
+      render(<Conversation bridge={fakeBridge()} />);
+      expect(newButton()).toHaveProperty('disabled', true);
+    });
+
+    it('asks before discarding unsaved work, and only on the second click', async () => {
+      render(<Conversation bridge={fakeBridge()} />);
+      type('something I care about');
+      fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+      await screen.findByText('Hello from the mock.');
+
+      // First click arms and says exactly how much is at risk.
+      fireEvent.click(newButton());
+      expect(screen.getByRole('button', { name: /discard 2 unsaved/i })).toBeTruthy();
+      expect(screen.getByText('something I care about')).toBeTruthy();
+
+      // Second click actually discards.
+      fireEvent.click(newButton());
+      expect(screen.queryByText('something I care about')).toBeNull();
+      expect(screen.queryByText('Hello from the mock.')).toBeNull();
+      expect(screen.getByText(/Ask Jarvis anything/)).toBeTruthy();
+    });
+
+    it('clears without asking once the work is saved — the prompt has to mean something', async () => {
+      const bridge = fakeBridge();
+      render(<Conversation bridge={bridge} />);
+      type('already stored');
+      fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+      await screen.findByText('Hello from the mock.');
+      fireEvent.click(screen.getByRole('button', { name: /save session/i }));
+      await screen.findByText(/Saved/);
+
+      // Nothing would be lost, so one click clears it.
+      fireEvent.click(newButton());
+      expect(screen.queryByText('already stored')).toBeNull();
+    });
+
+    it('re-arms after new work arrives on top of a save', async () => {
+      const bridge = fakeBridge();
+      render(<Conversation bridge={bridge} />);
+      type('first');
+      fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+      await screen.findByText('Hello from the mock.');
+      fireEvent.click(screen.getByRole('button', { name: /save session/i }));
+      await screen.findByText(/Saved/);
+
+      type('second, unsaved');
+      fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+      // Wait for the SECOND reply specifically: findAllByText resolves on the
+      // first match, which is the reply that was already on screen.
+      await waitFor(() => {
+        expect(screen.getAllByText('Hello from the mock.')).toHaveLength(2);
+      });
+
+      // Two new entries since the save, so it must ask again.
+      fireEvent.click(newButton());
+      expect(screen.getByRole('button', { name: /discard 2 unsaved/i })).toBeTruthy();
+    });
+
+    it('stops the duplicate-save this exists to prevent', async () => {
+      // Before New session, the transcript grew for the life of the window, so
+      // saving a second topic silently re-stored the first one under a new id.
+      const bridge = fakeBridge();
+      render(<Conversation bridge={bridge} />);
+
+      type('topic A');
+      fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+      await screen.findByText('Hello from the mock.');
+      fireEvent.click(screen.getByRole('button', { name: /save session/i }));
+      await screen.findByText(/Saved/);
+
+      fireEvent.click(newButton());
+      type('topic B');
+      fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+      await screen.findByText('Hello from the mock.');
+      fireEvent.click(screen.getByRole('button', { name: /save session/i }));
+
+      const second = (bridge.saveConversation as ReturnType<typeof vi.fn>).mock.calls.at(-1);
+      const entries = (second?.[0] as { entries: { content?: string }[] }).entries;
+      expect(entries.map((e) => e.content)).toEqual(['topic B', 'Hello from the mock.']);
+      expect(JSON.stringify(entries)).not.toContain('topic A');
+    });
+
+    it('does not ask after Continue — the loaded work is already on disk', async () => {
+      const saved = {
+        ...SAVED_META,
+        entries: [
+          { kind: 'message' as const, role: 'user' as const, content: 'archived question' },
+          { kind: 'message' as const, role: 'assistant' as const, content: 'archived answer' },
+        ],
+      };
+      const bridge = fakeBridge({
+        listConversations: vi.fn().mockResolvedValue({ conversations: [SAVED_META] }),
+        getConversation: vi.fn().mockResolvedValue({ conversation: saved }),
+      });
+      render(<Conversation bridge={bridge} />);
+
+      fireEvent.click(screen.getByRole('button', { name: /history/i }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Open' }));
+      fireEvent.click(await screen.findByRole('button', { name: /continue this session/i }));
+      await screen.findByText('archived question');
+
+      // Continuing forks a stored record; discarding the fork loses nothing.
+      fireEvent.click(newButton());
+      expect(screen.queryByText('archived question')).toBeNull();
     });
   });
 });
