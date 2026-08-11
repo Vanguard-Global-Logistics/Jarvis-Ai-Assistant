@@ -59,6 +59,16 @@ export const CHANNELS = {
   historyExport: 'history:export',
 
   /**
+   * Restore conversations from a backup file the USER picks (ADR 0014).
+   *
+   * The mirror of `history:export`: main opens the native OPEN dialog, so the
+   * only readable file is one a human chose this turn. The renderer names no
+   * path and learns none. Restoring MERGES — saved conversations are immutable
+   * and UUID-keyed, so an id already present is skipped, never overwritten.
+   */
+  historyImport: 'history:import',
+
+  /**
    * Read this installation's profile — the name and accent shown on the orb
    * (ADR 0013). Appearance only: a profile grants no capability, and is not a
    * login. Data separation comes from OS user accounts (ADR 0012).

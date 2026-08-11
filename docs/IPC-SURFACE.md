@@ -1,7 +1,7 @@
 # The IPC Surface
 
 Date: 2026-08-10
-Status: **TEN channels.** `profile:get`/`profile:set` (ADR 0013) are IMPLEMENTED AND
+Status: **ELEVEN channels.** `profile:get`/`profile:set` (ADR 0013) are IMPLEMENTED AND
 VERIFIED on the Linux runtime probe. `history:export` (ADR 0011) is `IMPLEMENTED, NOT YET
 VERIFIED` — the probe asserts it is exposed but deliberately does not invoke it (a
 native modal dialog would hang a headless run), so the dialog-and-write path awaits
@@ -203,6 +203,24 @@ asserts the history list is still empty, which is the runtime proof behind the U
 Cancelling the dialog returns `exported: false` — a normal outcome, not an error. A real
 write failure throws, so the UI can state it: a backup that silently did nothing is the
 worst possible failure for this feature.
+
+### `history:import`
+
+|                       |                                                                                                                                            |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Status**            | IMPLEMENTED, NOT YET VERIFIED — the dialog-and-read path has no automated coverage (modal dialog); parsing and merge are unit-tested.      |
+| **Renderer call**     | `window.jarvis.importHistory(): Promise<{ imported, added, skipped }>`                                                                     |
+| **Request**           | `z.undefined()` — **no path**. Main opens the native OPEN dialog.                                                                          |
+| **Response**          | `{ imported, added, skipped }`, `.strict()` — **no path back**.                                                                            |
+| **Handler**           | `registerHistoryHandlers(db)` → `importHistoryFromFile` in `apps/desktop/src/main/history/backup.ts`                                       |
+| **Contract**          | `historyImportContract`                                                                                                                    |
+| **Side effects**      | Reads ONE user-chosen file; inserts conversations that are not already present, in a single transaction.                                   |
+| **Authority granted** | Read the file the user just pointed at, and add conversations. **Never overwrites**: an id already present is skipped, original untouched. |
+
+The file is parsed with `BackupDocumentSchema` from `packages/contracts` — the same
+schema the rest of the system trusts — because this is the only input read from outside
+the application. A non-JSON file and a non-backup file each produce a message a human can
+act on, and nothing partial enters the store (ADR 0014).
 
 ### `profile:get` / `profile:set`
 

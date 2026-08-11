@@ -62,6 +62,7 @@ export interface ConversationBridge {
   getConversation: (id: string) => Promise<{ conversation: SavedConversation | null }>;
   deleteConversation: (id: string) => Promise<{ deleted: boolean }>;
   exportHistory: () => Promise<{ exported: boolean; conversationCount: number }>;
+  importHistory: () => Promise<{ imported: boolean; added: number; skipped: number }>;
 }
 
 export interface ConversationProps {
@@ -363,6 +364,47 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
     }
   }, [bridge]);
 
+  /**
+   * Restore from a backup (ADR 0014). Reports all three outcomes plainly —
+   * restored, cancelled, failed — and says when nothing was added because the
+   * sessions were already here, which is a success a silent UI would make look
+   * like a failure.
+   */
+  const restoreHistory = useCallback(async (): Promise<void> => {
+    if (bridge === null) return;
+    try {
+      const { imported, added, skipped } = await bridge.importHistory();
+      setHistoryError(null);
+      if (!imported) {
+        setSaveNotice('Restore cancelled — nothing was changed');
+      } else if (added === 0) {
+        setSaveNotice(
+          skipped === 0
+            ? 'That backup was empty — nothing to restore'
+            : `Already up to date — ${String(skipped)} already here`,
+        );
+      } else {
+        setSaveNotice(
+          `Restored ${String(added)} ${added === 1 ? 'session' : 'sessions'}` +
+            (skipped > 0 ? ` · ${String(skipped)} already here` : ''),
+        );
+      }
+      window.setTimeout(() => {
+        setSaveNotice(null);
+      }, 3600);
+      await refreshHistory();
+    } catch (cause) {
+      console.error('[conversation] history:import failed:', cause);
+      // The message from main names the real problem ("not a Jarvis backup"),
+      // which is far more useful than a generic failure.
+      setHistoryError(
+        cause instanceof Error && cause.message !== ''
+          ? cause.message
+          : 'The backup could not be restored. See the console for details.',
+      );
+    }
+  }, [bridge, refreshHistory]);
+
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
     // Enter sends; Shift+Enter is a newline. A composer that eats every Enter
     // is a worse text box than the one it replaces.
@@ -465,6 +507,7 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
           onOpen={(id) => void openSaved(id)}
           onDelete={(id) => void deleteSaved(id)}
           onBackup={() => void backupHistory()}
+          onRestore={() => void restoreHistory()}
         />
       )}
 
@@ -604,6 +647,7 @@ function HistoryPanel({
   onOpen,
   onDelete,
   onBackup,
+  onRestore,
 }: {
   conversations: SavedConversationMeta[];
   error: string | null;
@@ -611,6 +655,7 @@ function HistoryPanel({
   onOpen: (id: string) => void;
   onDelete: (id: string) => void;
   onBackup: () => void;
+  onRestore: () => void;
 }): JSX.Element {
   // Filtering happens over metadata the renderer already holds — no query
   // crosses the boundary, so search adds no channel and no authority. Titles
@@ -649,25 +694,45 @@ function HistoryPanel({
         <span style={{ ...MONO_LABEL, color: text.secondaryDim }}>
           Saved sessions — stored on this PC, via history:list
         </span>
-        {conversations.length > 0 && (
+        <div style={{ display: 'flex', gap: 6 }}>
+          {conversations.length > 0 && (
+            <button
+              type="button"
+              onClick={onBackup}
+              title="Write every saved session to a file you choose — put it somewhere that outlives this computer"
+              style={{
+                ...MONO_LABEL,
+                color: accent.success,
+                background: 'transparent',
+                border: `1px solid ${accent.success}`,
+                borderRadius: 6,
+                padding: '4px 8px',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Back up all
+            </button>
+          )}
+          {/* Always available: restore is exactly what an EMPTY history needs. */}
           <button
             type="button"
-            onClick={onBackup}
-            title="Write every saved session to a file you choose — put it somewhere that outlives this computer"
+            onClick={onRestore}
+            title="Restore sessions from a backup file — existing sessions are never overwritten"
             style={{
               ...MONO_LABEL,
-              color: accent.success,
+              color: accent.jarvisBlue,
               background: 'transparent',
-              border: `1px solid ${accent.success}`,
+              border: `1px solid ${accent.jarvisBlue}`,
               borderRadius: 6,
               padding: '4px 8px',
               cursor: 'pointer',
               whiteSpace: 'nowrap',
             }}
           >
-            Back up all
+            Restore
           </button>
-        )}
+        </div>
       </div>
 
       {/* Only worth the space once there is enough to sift through. */}

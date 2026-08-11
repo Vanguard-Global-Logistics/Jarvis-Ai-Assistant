@@ -115,6 +115,18 @@ const api = {
     }>,
 
   /**
+   * Restore conversations from a backup the user picks (ADR 0014). Like
+   * export: no path in, none out — main opens the native open dialog. The
+   * merge is additive; existing conversations are never overwritten.
+   */
+  importHistory: (): Promise<{ imported: boolean; added: number; skipped: number }> =>
+    ipcRenderer.invoke(CHANNELS.historyImport) as Promise<{
+      imported: boolean;
+      added: number;
+      skipped: number;
+    }>,
+
+  /**
    * The orb's name and accent (ADR 0013). Appearance only — these grant no
    * capability and are not a login. Data separation comes from OS user
    * accounts, not from this value.

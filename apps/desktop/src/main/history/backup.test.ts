@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { SavedConversation } from '@jarvis/contracts';
 import { SavedConversationSchema } from '@jarvis/contracts';
-import { buildBackupDocument, defaultBackupFilename } from './backup.js';
+import { buildBackupDocument, defaultBackupFilename, parseBackupDocument } from './backup.js';
 
 /**
  * The dialog-and-write path itself needs a live Electron main process, so it is
@@ -72,5 +72,43 @@ describe('defaultBackupFilename', () => {
     expect(defaultBackupFilename(new Date('2026-08-10T17:45:00.000Z'))).toBe(
       'jarvis-backup-2026-08-10.json',
     );
+  });
+});
+
+describe('parseBackupDocument (ADR 0014)', () => {
+  const valid = JSON.stringify(buildBackupDocument([CONVERSATION]));
+
+  it('accepts a document this application wrote', () => {
+    const parsed = parseBackupDocument(valid);
+    expect(parsed.conversations).toHaveLength(1);
+    expect(parsed.conversations[0]).toEqual(CONVERSATION);
+  });
+
+  it('names the problem when the file is not JSON at all', () => {
+    // A human picked the wrong file. "Unexpected token" helps nobody.
+    expect(() => parseBackupDocument('this is my shopping list')).toThrow(/not valid JSON/i);
+  });
+
+  it('refuses a JSON file that is not a Jarvis backup', () => {
+    expect(() => parseBackupDocument('{"hello":"world"}')).toThrow(/not a Jarvis backup/i);
+  });
+
+  it('refuses a backup from an incompatible future version', () => {
+    const future = JSON.stringify({ ...buildBackupDocument([CONVERSATION]), formatVersion: 2 });
+    expect(() => parseBackupDocument(future)).toThrow(/not a Jarvis backup|incompatible/i);
+  });
+
+  it('refuses a backup whose conversations are malformed', () => {
+    // Tampered or corrupted: an entry missing its discriminant. Importing this
+    // would put data in the store that the rest of the system cannot read.
+    const broken = JSON.stringify({
+      ...buildBackupDocument([CONVERSATION]),
+      conversations: [{ ...CONVERSATION, entries: [{ role: 'user', content: 'no kind' }] }],
+    });
+    expect(() => parseBackupDocument(broken)).toThrow(/not a Jarvis backup/i);
+  });
+
+  it('accepts an empty backup — zero conversations is valid, not corrupt', () => {
+    expect(parseBackupDocument(JSON.stringify(buildBackupDocument([]))).conversations).toEqual([]);
   });
 });

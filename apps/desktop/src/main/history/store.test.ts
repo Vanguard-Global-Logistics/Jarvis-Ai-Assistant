@@ -8,6 +8,7 @@ import {
   deriveTitle,
   exportAllConversations,
   getConversation,
+  importConversations,
   listConversations,
   saveConversation,
 } from './store.js';
@@ -225,5 +226,84 @@ describe('the schema itself (migrations 1 and 2)', () => {
         )
         .run('no-such-conversation', 0, 'i', 'c', '[]', 'ic', 'ns', 'bp'),
     ).toThrow(/FOREIGN KEY/i);
+  });
+});
+
+describe('importConversations (ADR 0014)', () => {
+  it('restores conversations with their ORIGINAL ids and timestamps', () => {
+    const original = saveConversation(db, TRANSCRIPT);
+    const full = getConversation(db, original.id);
+    if (full === null) throw new Error('setup failed');
+
+    // A fresh store, as if restoring onto a new machine.
+    const fresh = openDatabase({ location: ':memory:' });
+    migrate(fresh, migrations);
+
+    const result = importConversations(fresh, [full]);
+    expect(result).toEqual({ added: 1, skipped: 0 });
+    // The SAME conversation, not a new one: id and savedAt are preserved.
+    expect(getConversation(fresh, original.id)).toEqual(full);
+    fresh.close();
+  });
+
+  it('is idempotent — importing the same backup twice adds nothing the second time', () => {
+    const meta = saveConversation(db, TRANSCRIPT);
+    const full = getConversation(db, meta.id);
+    if (full === null) throw new Error('setup failed');
+
+    const fresh = openDatabase({ location: ':memory:' });
+    migrate(fresh, migrations);
+
+    expect(importConversations(fresh, [full])).toEqual({ added: 1, skipped: 0 });
+    expect(importConversations(fresh, [full])).toEqual({ added: 0, skipped: 1 });
+    expect(listConversations(fresh)).toHaveLength(1);
+    fresh.close();
+  });
+
+  it('NEVER overwrites an existing conversation — a restore cannot destroy data', () => {
+    const meta = saveConversation(db, TRANSCRIPT);
+    const mine = getConversation(db, meta.id);
+    if (mine === null) throw new Error('setup failed');
+
+    // A backup claiming the same id but different content, e.g. a tampered file.
+    const impostor = { ...mine, title: 'OVERWRITTEN', entries: mine.entries.slice(0, 1) };
+    const result = importConversations(db, [impostor]);
+
+    expect(result).toEqual({ added: 0, skipped: 1 });
+    expect(getConversation(db, meta.id)).toEqual(mine);
+  });
+
+  it('merges alongside existing conversations rather than replacing them', () => {
+    const kept = saveConversation(db, TRANSCRIPT);
+    const incoming = {
+      id: '00000000-0000-4000-8000-00000000abcd',
+      title: 'From the backup',
+      savedAt: '2026-01-01T00:00:00.000Z',
+      entryCount: 1,
+      entries: [{ kind: 'amplification' as const, idea: 'restored idea', result: AMP }],
+    };
+
+    expect(importConversations(db, [incoming])).toEqual({ added: 1, skipped: 0 });
+    expect(listConversations(db)).toHaveLength(2);
+    expect(getConversation(db, kept.id)?.entries).toEqual(TRANSCRIPT);
+    expect(getConversation(db, incoming.id)?.entries).toEqual(incoming.entries);
+  });
+
+  it('restores amplification entries intact', () => {
+    const incoming = {
+      id: '00000000-0000-4000-8000-00000000ef01',
+      title: 'Amplifier only',
+      savedAt: '2026-01-01T00:00:00.000Z',
+      entryCount: 1,
+      entries: [{ kind: 'amplification' as const, idea: 'restore me', result: AMP }],
+    };
+    importConversations(db, [incoming]);
+    expect(getConversation(db, incoming.id)?.entries[0]).toEqual(incoming.entries[0]);
+  });
+
+  it('handles an empty backup without touching anything', () => {
+    const meta = saveConversation(db, TRANSCRIPT);
+    expect(importConversations(db, [])).toEqual({ added: 0, skipped: 0 });
+    expect(getConversation(db, meta.id)?.entries).toEqual(TRANSCRIPT);
   });
 });

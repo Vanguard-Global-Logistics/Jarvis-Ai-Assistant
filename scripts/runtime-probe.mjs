@@ -388,6 +388,7 @@ async function runChecks(page, mode) {
     'getConversation',
     'deleteConversation',
     'exportHistory',
+    'importHistory',
     'getProfile',
     'setProfile',
   ];
@@ -580,6 +581,15 @@ async function runChecks(page, mode) {
     'history:export is exposed (NOT invoked — modal dialog)',
     exportFn.value === 'function',
     `typeof = ${String(exportFn.value)}`,
+  );
+
+  const importFn = await page.evaluate(
+    'window.jarvis ? typeof window.jarvis.importHistory : "no-bridge"',
+  );
+  add(
+    'history:import is exposed (NOT invoked — modal dialog)',
+    importFn.value === 'function',
+    `typeof = ${String(importFn.value)}`,
   );
 
   // --- ADR 0013: the profile round-trip, against the real database ---

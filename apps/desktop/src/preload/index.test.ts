@@ -50,6 +50,7 @@ const ALLOWED_API = [
   'getConversation',
   'deleteConversation',
   'exportHistory',
+  'importHistory',
   'getProfile',
   'setProfile',
 ] as const;

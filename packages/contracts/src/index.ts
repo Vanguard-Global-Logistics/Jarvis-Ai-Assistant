@@ -25,6 +25,7 @@ export {
   historyDeleteContract,
   historyExportContract,
   historyGetContract,
+  historyImportContract,
   profileGetContract,
   profileSetContract,
   historyListContract,
@@ -35,6 +36,7 @@ export {
 export type { AppInfo, IpcContract } from './ipc/contracts.js';
 
 export {
+  BackupDocumentSchema,
   HistoryIdRequestSchema,
   SaveConversationRequestSchema,
   SavedAmplificationEntrySchema,
@@ -44,6 +46,7 @@ export {
   TranscriptEntrySchema,
 } from './history/contracts.js';
 export type {
+  BackupDocument,
   HistoryIdRequest,
   SaveConversationRequest,
   SavedAmplificationEntry,

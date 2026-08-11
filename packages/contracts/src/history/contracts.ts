@@ -87,6 +87,31 @@ export const SaveConversationRequestSchema = z
 
 export type SaveConversationRequest = z.infer<typeof SaveConversationRequestSchema>;
 
+/**
+ * The backup document written by `history:export` and read by `history:import`
+ * (ADR 0011, ADR 0014).
+ *
+ * Defined here, in contracts, rather than in the main process: a restore must
+ * validate a file that came from **outside the application** — possibly an old
+ * version, possibly hand-edited, possibly not a Jarvis backup at all. Parsing it
+ * with the same schema the rest of the system trusts is what stops malformed
+ * data entering the store through the one door that reads foreign input.
+ *
+ * `format` and `formatVersion` are literals so a wrong file fails immediately
+ * and legibly rather than half-importing.
+ */
+export const BackupDocumentSchema = z
+  .object({
+    format: z.literal('jarvis.conversation-backup'),
+    formatVersion: z.literal(1),
+    exportedAt: z.iso.datetime(),
+    conversationCount: z.number().int().min(0),
+    conversations: z.array(SavedConversationSchema),
+  })
+  .strict();
+
+export type BackupDocument = z.infer<typeof BackupDocumentSchema>;
+
 /** The one-field id request shared by `history:get` and `history:delete`. */
 export const HistoryIdRequestSchema = z
   .object({

@@ -31,6 +31,7 @@ function fakeBridge(overrides: Partial<ConversationBridge> = {}): ConversationBr
     getConversation: vi.fn().mockResolvedValue({ conversation: null }),
     deleteConversation: vi.fn().mockResolvedValue({ deleted: true }),
     exportHistory: vi.fn().mockResolvedValue({ exported: true, conversationCount: 1 }),
+    importHistory: vi.fn().mockResolvedValue({ imported: true, added: 2, skipped: 0 }),
     ...overrides,
   };
 }
@@ -330,6 +331,54 @@ describe('Conversation', () => {
 
     const alert = await screen.findByRole('alert');
     expect(alert.textContent).toContain('could not be written');
+    expect(consoleError).toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
+  it('restores a backup and reports every outcome plainly (ADR 0014)', async () => {
+    const importHistory = vi.fn().mockResolvedValue({ imported: true, added: 3, skipped: 1 });
+    const bridge = fakeBridge({ importHistory });
+    render(<Conversation bridge={bridge} />);
+
+    // Restore is offered even with an EMPTY history — that is exactly when it
+    // is needed (a new machine).
+    fireEvent.click(screen.getByRole('button', { name: /history/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /restore/i }));
+
+    expect(importHistory).toHaveBeenCalledWith();
+    expect((await screen.findByRole('status')).textContent).toContain('Restored 3 sessions');
+    // Refreshed so the restored sessions appear without reopening the panel.
+    expect(bridge.listConversations).toHaveBeenCalledTimes(2);
+
+    // "Nothing added" is a success, not a silent no-op.
+    importHistory.mockResolvedValue({ imported: true, added: 0, skipped: 4 });
+    fireEvent.click(screen.getByRole('button', { name: /restore/i }));
+    expect((await screen.findByRole('status')).textContent).toContain('Already up to date');
+
+    importHistory.mockResolvedValue({ imported: false, added: 0, skipped: 0 });
+    fireEvent.click(screen.getByRole('button', { name: /restore/i }));
+    expect((await screen.findByRole('status')).textContent).toContain('Restore cancelled');
+  });
+
+  it('surfaces the real reason a backup could not be restored', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const bridge = fakeBridge({
+      importHistory: vi
+        .fn()
+        .mockRejectedValue(
+          new Error(
+            'That file is not a Jarvis backup (or was written by an incompatible version). Nothing was imported.',
+          ),
+        ),
+    });
+    render(<Conversation bridge={bridge} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /history/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /restore/i }));
+
+    // Main's specific message reaches the user — far better than "it failed".
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toContain('not a Jarvis backup');
     expect(consoleError).toHaveBeenCalled();
     consoleError.mockRestore();
   });

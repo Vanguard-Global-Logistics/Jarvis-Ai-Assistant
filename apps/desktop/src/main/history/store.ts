@@ -242,6 +242,75 @@ export function exportAllConversations(db: SqliteDatabase): SavedConversation[] 
 }
 
 /**
+ * Restore conversations from a backup, preserving their original ids
+ * (ADR 0014).
+ *
+ * **Merge, never overwrite.** Saved conversations are immutable and UUID-keyed
+ * (ADR 0008), so an id already present is skipped and the existing record is
+ * left exactly as it was. That makes restore idempotent — importing the same
+ * backup twice adds nothing the second time — and means a restore can never
+ * destroy something the user still has. Destroying data is what a restore must
+ * never do; a duplicate is merely noise.
+ *
+ * Unlike `saveConversation` this preserves the incoming id and timestamp: a
+ * restored conversation is the *same* conversation, not a new one.
+ */
+export function importConversations(
+  db: SqliteDatabase,
+  conversations: readonly SavedConversation[],
+): { added: number; skipped: number } {
+  const exists = db.prepare('SELECT 1 FROM conversations WHERE id = ?');
+  const insertConversation = db.prepare(
+    'INSERT INTO conversations (id, title, saved_at) VALUES (?, ?, ?)',
+  );
+  const insertMessage = db.prepare(
+    'INSERT INTO conversation_messages (conversation_id, seq, role, content) VALUES (?, ?, ?, ?)',
+  );
+  const insertAmplification = db.prepare(
+    `INSERT INTO conversation_amplifications
+       (conversation_id, seq, idea, clarified_intent, missing_questions,
+        improved_concept, recommended_next_step, build_ready_prompt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+  );
+
+  let added = 0;
+  let skipped = 0;
+
+  // One transaction for the whole restore: a partial import that left some
+  // conversations half-written would be worse than no import at all.
+  withTransaction(db, () => {
+    for (const conversation of conversations) {
+      if (exists.get(conversation.id) !== undefined) {
+        skipped += 1;
+        continue;
+      }
+
+      insertConversation.run(conversation.id, conversation.title, conversation.savedAt);
+      conversation.entries.forEach((entry, seq) => {
+        if (entry.kind === 'message') {
+          insertMessage.run(conversation.id, seq, entry.role, entry.content);
+        } else {
+          const r = entry.result;
+          insertAmplification.run(
+            conversation.id,
+            seq,
+            entry.idea,
+            r.clarifiedIntent,
+            JSON.stringify(r.missingQuestions),
+            r.improvedConcept,
+            r.recommendedNextStep,
+            r.buildReadyPrompt,
+          );
+        }
+      });
+      added += 1;
+    }
+  });
+
+  return { added, skipped };
+}
+
+/**
  * Delete one saved conversation. Returns whether a row was actually removed —
  * a stale id reports `false` rather than pretending success (CLAUDE.md §8).
  * Messages and amplifications go with it via ON DELETE CASCADE (migrations 1, 2).

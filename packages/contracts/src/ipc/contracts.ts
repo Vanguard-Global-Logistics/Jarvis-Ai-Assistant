@@ -199,6 +199,30 @@ export const historyExportContract = defineContract({
     .strict(),
 });
 
+/**
+ * `history:import` — restore from a backup the user picks (ADR 0014).
+ *
+ * The counterpart to export, and the same boundary argument: no path in, no
+ * path out; main opens the native open dialog. The response reports what
+ * actually happened in three numbers, because a restore that silently did
+ * nothing — or silently overwrote — is exactly the failure this feature must
+ * never have.
+ */
+export const historyImportContract = defineContract({
+  channel: CHANNELS.historyImport,
+  request: z.undefined(),
+  response: z
+    .object({
+      /** False when the user cancelled the dialog. */
+      imported: z.boolean(),
+      /** Conversations added. */
+      added: z.number().int().min(0),
+      /** Conversations already present by id, left untouched. */
+      skipped: z.number().int().min(0),
+    })
+    .strict(),
+});
+
 // --- profile:* (ADR 0013) ---------------------------------------------------
 
 /**
@@ -240,6 +264,7 @@ export const IPC_CONTRACTS = {
   [CHANNELS.historyGet]: historyGetContract,
   [CHANNELS.historyDelete]: historyDeleteContract,
   [CHANNELS.historyExport]: historyExportContract,
+  [CHANNELS.historyImport]: historyImportContract,
   [CHANNELS.profileGet]: profileGetContract,
   [CHANNELS.profileSet]: profileSetContract,
 } as const;

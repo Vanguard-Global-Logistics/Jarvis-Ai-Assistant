@@ -2,12 +2,13 @@ import {
   historyDeleteContract,
   historyExportContract,
   historyGetContract,
+  historyImportContract,
   historyListContract,
   historySaveContract,
 } from '@jarvis/contracts';
 import type { SqliteDatabase } from '@jarvis/database';
 import { handleContract } from '../ipc.js';
-import { exportHistoryToFile } from '../history/backup.js';
+import { exportHistoryToFile, importHistoryFromFile } from '../history/backup.js';
 import {
   deleteConversation,
   getConversation,
@@ -45,4 +46,7 @@ export function registerHistoryHandlers(db: SqliteDatabase): void {
   // The one filesystem write in the app. Main owns the destination entirely:
   // the renderer sends no path and is told none back (ADR 0011).
   handleContract(historyExportContract, () => exportHistoryToFile(db));
+
+  // The mirror: reads one user-chosen file, merges by id, never overwrites.
+  handleContract(historyImportContract, () => importHistoryFromFile(db));
 }
