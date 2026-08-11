@@ -3,7 +3,7 @@
  *
  * STATUS: PARTIAL — tokens, a11y, primitives, and the Orb; Shell in
  * progress (E2). Tokens are pure TypeScript modules: colors, typography, and
- * the motion grammar for the eleven orb states. The a11y utilities and
+ * the motion grammar for the twelve orb states. The a11y utilities and
  * primitives are the first React in this package — props in, pixels out,
  * styled from the token modules only, no CSS files.
  *

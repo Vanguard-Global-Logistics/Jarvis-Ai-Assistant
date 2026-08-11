@@ -4,7 +4,7 @@
   William supplied on 2026-08-10. **The source image is not yet committed** —
   see "Missing asset" below.
 - **Relationship to code:** the master orb and six of its states exist in
-  `packages/ui`; the eleven-state contract is `packages/contracts/src/experience/orb.ts`.
+  `packages/ui`; the twelve-state contract is `packages/contracts/src/experience/orb.ts`.
   **The twelve-orb family does not exist in code at all.**
 - **Why prose:** CLAUDE.md §6 records that three approved mockups were lost
   because they were never committed. This file exists so the same thing cannot
@@ -37,25 +37,39 @@ particle field, deep navy ground. Consistent with `docs/VISUAL-DESIGN-TARGET.md`
 
 ### Reconciliation with the coded state set
 
-`ORB_STATES` currently has **eleven** states. Mapping:
+`ORB_STATES` has **twelve** states. Mapping:
 
-| Designed      | Coded                      | Note                                          |
-| ------------- | -------------------------- | --------------------------------------------- |
-| Idle          | `idle`                     | matches                                       |
-| Listening     | `listening`                | matches                                       |
-| Thinking      | `thinking` (+ `reasoning`) | code splits thinking from amplifier reasoning |
-| Speaking      | `speaking`                 | matches                                       |
-| **Executing** | **— none —**               | **GAP: designed, not coded.** Amber/gold.     |
-| Alert         | `critical` (and `warning`) | code splits severity into two                 |
+| Designed      | Coded                      | Note                                                |
+| ------------- | -------------------------- | --------------------------------------------------- |
+| Idle          | `idle`                     | matches                                             |
+| Listening     | `listening`                | matches                                             |
+| Thinking      | `thinking` (+ `reasoning`) | code splits thinking from amplifier reasoning       |
+| Speaking      | `speaking`                 | matches                                             |
+| **Executing** | **`executing`**            | **coded 2026-08-11.** Amber. Demo-only — see below. |
+| Alert         | `critical` (and `warning`) | code splits severity into two                       |
 
 Coded states with no entry on the sheet — all legitimate, none to be removed:
 `wake` (a transition into idle), `success`, `offline` (honest state reporting),
 and `aegisLockdown` (**demo-only**; AEGIS does not exist —
 `docs/KNOWN-LIMITATIONS.md` §1).
 
-**Action when the orb work resumes:** add `executing` to `ORB_STATES` as a
-deliberate design act (the contract comment requires exactly that), and decide
-whether designed "Alert" renders as `warning`, `critical`, or both.
+### `executing` is coded, and deliberately unreachable
+
+Added 2026-08-11 as the deliberate design act the contract comment required. It
+renders the sheet's amber/gold "systems activate, energy transfers" literally:
+accelerated rings (the machinery spins up), `emit` particles (energy leaving the
+nucleus), and a steady `rhythmic` pulse for sustained work — never speaking's
+amplitude-`reactive` one.
+
+**Nothing drives it, and nothing may.** Jarvis executes nothing: no tools, no
+actions, no orchestrator beyond a single stateless model call. An orb showing
+`executing` would be a claim that Jarvis is _doing_ something to the world. So
+it carries the same demo-only rule as `aegisLockdown`, its motion descriptions
+say so, and a test asserts both labels survive refactoring. It becomes a real
+state the day something real drives it — not before.
+
+**Still open:** whether designed "Alert" renders as `warning`, `critical`, or
+both. That is a decision for William, not a gap to close by guessing.
 
 ## 3. Speaking animation — five intensity stages
 

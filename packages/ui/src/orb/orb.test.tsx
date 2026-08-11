@@ -56,9 +56,9 @@ describe('Orb', () => {
     );
   });
 
-  it('renders every one of the eleven states with the matching data-orb-state', () => {
+  it('renders every one of the twelve states with the matching data-orb-state', () => {
     stubMatchMedia(false);
-    expect(ORB_STATES.length).toBe(11);
+    expect(ORB_STATES.length).toBe(12);
     for (const state of ORB_STATES) {
       const { unmount } = render(<Orb state={state} announce={false} />);
       const orb = screen.getByRole('img');

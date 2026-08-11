@@ -5,13 +5,13 @@ import { orbVisualConfig, orbTiming, toBezier, withAlpha, LUMINOUS_WHITE } from 
 import { mulberry32 } from './particles.js';
 
 describe('orbVisualConfig', () => {
-  it('returns a config for all eleven states', () => {
+  it('returns a config for all twelve states', () => {
     for (const state of ORB_STATES) {
       const config = orbVisualConfig(state, false);
       expect(config).toBeTruthy();
       expect(typeof config.accentColor).toBe('string');
     }
-    expect(ORB_STATES.length).toBe(11);
+    expect(ORB_STATES.length).toBe(12);
   });
 
   it('idle: 1.02 breath @5200ms, 24000ms spin, halo particles, no counter-rotate', () => {
@@ -25,6 +25,34 @@ describe('orbVisualConfig', () => {
     expect(config.bloom).toBe('none');
     expect(config.coreOpacity).toBe(1);
     expect(config.coreScale).toBe(1);
+  });
+
+  it('executing: amber, accelerated rings, energy leaving the nucleus', () => {
+    // Pins the approved Orb Family sheet's sixth state — "systems activate,
+    // energy transfers", amber/gold — so a later edit cannot quietly drift it
+    // away from the design William signed off on.
+    const config = orbVisualConfig('executing', false);
+    expect(config.accentColor).toBe(orbStateMotion.executing.accentColor);
+    // Amber, and specifically NOT the blue every conversational state uses.
+    expect(config.accentColor).not.toBe(orbVisualConfig('idle', false).accentColor);
+    // "Systems activate": the machinery spins faster than idle.
+    expect(config.ringSpinPeriodMs).toBe(orbTiming.thinkingSpinMs);
+    expect(config.ringSpinPeriodMs).toBeLessThan(orbTiming.defaultSpinMs);
+    // "Energy transfers": outward propagation from the nucleus.
+    expect(config.particleMode).toBe('emit');
+    // Sustained work, not speech — rhythmic, never speaking's reactive pulse.
+    expect(config.pulse).toBe('rhythmic');
+    expect(config.bloom).toBe('none');
+  });
+
+  it('executing and aegisLockdown are both marked demo-only in their descriptions', () => {
+    // Neither can be driven by anything real: AEGIS does not exist, and Jarvis
+    // executes nothing. The description is what a human reads when deciding
+    // whether a state is safe to show, so the label has to survive refactors.
+    for (const state of ['executing', 'aegisLockdown'] as const) {
+      expect(orbStateMotion[state].description).toMatch(/demo-only/i);
+      expect(orbStateMotion[state].reducedMotion.description).toMatch(/demo-only/i);
+    }
   });
 
   it('warning: shortened breath — exactly half of idle', () => {

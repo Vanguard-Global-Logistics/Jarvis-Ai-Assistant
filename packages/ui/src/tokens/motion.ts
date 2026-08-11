@@ -54,12 +54,12 @@ export interface OrbStateMotion {
 }
 
 /**
- * The motion vocabulary for all eleven orb states (plan §4, verbatim
- * descriptors mapped onto the approved palette). `aegisLockdown` is a
- * **demo-only visual state** — AEGIS is NOT IMPLEMENTED
- * (`docs/KNOWN-LIMITATIONS.md` §1) — and this grammar entry may only ever be
- * driven from inside a labeled demo, never presented as a real security
- * signal.
+ * The motion vocabulary for all twelve orb states (plan §4, verbatim
+ * descriptors mapped onto the approved palette). Two entries are **demo-only
+ * visual states** and may only ever be driven from inside a labeled demo:
+ * `aegisLockdown` (AEGIS is NOT IMPLEMENTED — `docs/KNOWN-LIMITATIONS.md` §1)
+ * and `executing` (Jarvis has no tools or actions to execute). Neither may be
+ * presented as a real signal about what the system is doing.
  *
  * Every `reducedMotion.description` is a static phrasing of the same state,
  * and `reducedMotion.accentColor` always equals the state's `accentColor`:
@@ -112,6 +112,18 @@ export const orbStateMotion: Record<OrbState, OrbStateMotion> = {
     reducedMotion: {
       description: 'static blue core, speaking label',
       accentColor: accent.jarvisBlue,
+    },
+  },
+  executing: {
+    // The Orb Family sheet's amber/gold "systems activate, energy transfers".
+    // DEMO-ONLY, like aegisLockdown: nothing real drives it, because Jarvis has
+    // no tools and no actions to execute. See the contract's doc comment.
+    description: 'amber energy transfer, rings accelerate (demo-only, labeled)',
+    accentColor: accent.warning,
+    loops: true,
+    reducedMotion: {
+      description: 'static amber core, executing label (demo-only, labeled)',
+      accentColor: accent.warning,
     },
   },
   success: {

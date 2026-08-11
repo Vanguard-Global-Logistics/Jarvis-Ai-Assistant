@@ -253,7 +253,7 @@ Per the approved motion tokens (`prefers-reduced-motion` swaps the entire langua
 - Awakening sequence → a single opacity cross-fade from dark field to composed
   scene; no particle bloom, no expanding rings, no camera-analog transitions.
 - Orb states → static color/intensity presentations from `orbStateMotion[*].reducedMotion`
-  (already defined for all eleven states in `packages/ui/src/tokens/motion.ts`).
+  (already defined for all twelve states in `packages/ui/src/tokens/motion.ts`).
 - Panel emergence → instant-place with a ≤ `duration.instantMs` fade; no rise, no
   scale.
 - Particle field → static gradient halo (plan §4 rule); beams → static hairlines.

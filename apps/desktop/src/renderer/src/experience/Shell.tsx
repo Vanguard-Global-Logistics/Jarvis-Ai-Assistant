@@ -43,14 +43,31 @@ import type { ConversationBridge } from './Conversation.js';
  * The state switcher is a DEV-ONLY tool (stripped from production builds via
  * `import.meta.env.DEV`), docked bottom-right, collapsed by default, labeled
  * MOCK. It drives the Orb's visual state locally and proves nothing about
- * any real state engine. `aegisLockdown` stays labeled demo-only
- * (KNOWN-LIMITATIONS §1). Wake is a transition state (`loops: false`): after
+ * any real state engine. The two states nothing real can drive —
+ * `aegisLockdown` (AEGIS does not exist, KNOWN-LIMITATIONS §1) and `executing`
+ * (Jarvis has no tools or actions) — stay labeled demo-only even here, because
+ * this switcher is the one place a human sees them and the label is what
+ * distinguishes a preview from a claim. Wake is a transition state
+ * (`loops: false`): after
  * the choreography completes, the Shell settles the Orb into idle breathing.
  */
 export interface ShellProps {
   /** Show the dev-only state switcher. Defaults to the build-mode flag. */
   devStateSwitcher?: boolean;
 }
+
+/**
+ * Orb states no real subsystem can drive, so the switcher names them as
+ * previews rather than letting them read as status.
+ *
+ * Kept as data rather than an inline `state === 'aegisLockdown'` check: there
+ * are two of them now, and the next one must be an obvious one-line addition
+ * here rather than a condition someone forgets to widen.
+ */
+const DEMO_ONLY_ORB_STATES: ReadonlySet<OrbState> = new Set<OrbState>([
+  'aegisLockdown',
+  'executing',
+]);
 
 /** How the host-facts line reads, depending on what the environment provides. */
 type HostFacts =
@@ -422,7 +439,7 @@ export function Shell({ devStateSwitcher = import.meta.env.DEV }: ShellProps): J
                     cursor: 'pointer',
                   }}
                 >
-                  {state === 'aegisLockdown' ? 'aegisLockdown (demo-only)' : state}
+                  {DEMO_ONLY_ORB_STATES.has(state) ? `${state} (demo-only)` : state}
                 </button>
               ))}
             </div>

@@ -35,7 +35,12 @@ export const orbTiming = {
   defaultSpinMs: 24000,
   /** wake-state ring spin period — the one-shot entrance is faster than the idle spin. */
   wakeSpinMs: 18000,
-  /** thinking/reasoning gimbal spin period — sits at the top edge of the ambient loop budget. */
+  /**
+   * Accelerated ring spin — thinking, reasoning, and executing. Sits at the top
+   * edge of the ambient loop budget. Shared rather than duplicated: all three
+   * are "the machinery is working faster than idle", and a second constant with
+   * the same value would only drift (CLAUDE.md §3).
+   */
   thinkingSpinMs: 9000,
   /** listening rhythmic pulse period. */
   rhythmicPulseMs: 1200,
@@ -302,6 +307,30 @@ const STATE_VISUALS: Record<OrbState, StateVisualBase> = {
     ringOpacity: 0.85,
     vibration: false,
     nucleusIntensity: 0.8,
+    desaturate: false,
+  },
+  executing: {
+    // The Orb Family sheet's sixth state: "systems activate, energy transfers",
+    // amber/gold. Read the two halves literally — the machinery spins up
+    // (accelerated rings, high ring opacity) and energy leaves the nucleus
+    // (`emit`, the same outward propagation speaking uses). The steady
+    // `rhythmic` pulse reads as sustained work, distinct from speaking's
+    // amplitude-`reactive` one.
+    //
+    // DEMO-ONLY. Jarvis executes nothing — no tools, no actions, no
+    // orchestrator beyond one stateless model call. See the contract comment on
+    // ORB_STATES; this must not be driven outside a labeled demo.
+    ...NO_BREATH,
+    ringSpinPeriodMs: orbTiming.thinkingSpinMs,
+    counterRotate: false,
+    pulse: 'rhythmic',
+    bloom: 'none',
+    particleMode: 'emit',
+    ...NORMAL_CORE,
+    containmentScale: 1,
+    ringOpacity: 0.9,
+    vibration: false,
+    nucleusIntensity: 0.9,
     desaturate: false,
   },
   success: {

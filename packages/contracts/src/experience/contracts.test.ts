@@ -16,11 +16,11 @@ import {
 import { DemoPanelSchema, DemoScriptSchema } from './demo.js';
 
 describe('OrbStateSchema', () => {
-  it('has exactly eleven states', () => {
-    expect(ORB_STATES.length).toBe(11);
+  it('has exactly twelve states', () => {
+    expect(ORB_STATES.length).toBe(12);
   });
 
-  it('accepts each of the eleven states', () => {
+  it('accepts each of the twelve states', () => {
     for (const state of ORB_STATES) {
       expect(OrbStateSchema.safeParse(state).success).toBe(true);
     }

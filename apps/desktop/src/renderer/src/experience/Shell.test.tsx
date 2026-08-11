@@ -132,16 +132,23 @@ describe('Shell', () => {
       expect(within(switcherRegion()).getAllByRole('button')).toHaveLength(1);
     });
 
-    it('expands to all eleven states, labeled MOCK, aegisLockdown marked demo-only', () => {
+    it('expands to every state, labeled MOCK, with both unreachable ones marked demo-only', () => {
       stubMatchMedia();
       stubBridge();
       render(<Shell devStateSwitcher={true} />);
       fireEvent.click(screen.getByRole('button', { name: /DEV · STATES/ }));
       expect(screen.getByText(/MOCK — drives the Orb visual only/)).toBeTruthy();
-      // Eleven state buttons + the drawer toggle + the V2-study toggle, scoped to
+      // One button per state + the drawer toggle + the V2-study toggle, scoped to
       // the switcher region (the composer's Send/Amplify are outside it).
       expect(within(switcherRegion()).getAllByRole('button')).toHaveLength(ORB_STATES.length + 2);
+      // Nothing real drives either of these: AEGIS does not exist, and Jarvis
+      // executes nothing. The label is what keeps a preview from reading as
+      // status, so it is asserted rather than assumed.
       expect(screen.getByRole('button', { name: 'aegisLockdown (demo-only)' })).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'executing (demo-only)' })).toBeTruthy();
+      // A state that IS real must not wear the caveat — otherwise the label
+      // means nothing.
+      expect(screen.getByRole('button', { name: 'thinking' })).toBeTruthy();
       expect(screen.getByRole('button', { name: /renderer V2 study/ })).toBeTruthy();
     });
 
