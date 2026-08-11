@@ -94,28 +94,53 @@ with no per-identity theming.
 
 ---
 
-## 5. Three questions this design raises (unresolved — William's call)
+## 4b. Individual orb sheets (supplied 2026-08-10)
 
-Recorded rather than assumed. Each has architectural consequences.
+Per-orb artwork carries a **subtitle** and a **status line**, both of which are
+design content, not decoration.
 
-### Q1 — Are AMY / JAYDEN / ASHTON people, or agents?
+| Orb        | Subtitle on the sheet          | Status line                          |
+| ---------- | ------------------------------ | ------------------------------------ |
+| **JAYDEN** | AI Engineer                    | — (emblems: wolf, crosshair, bolt)   |
+| **AMY**    | AI Assistant                   | — (emblems: lotus, heart)            |
+| **ASHTON** | **Personal Agent**             | ACTIVE · HIVE CONNECTED              |
+| **AEGIS**  | **Independent Security**       | PERIMETER SECURE · NO ACTIVE THREATS |
+| **COMMS**  | Messages & Communications      | CHANNELS OPEN · OWNER PRIORITY       |
+| **VISION** | Screen & Visual Intelligence   | CONTEXT FOCUSED · FRAME VERIFIED     |
+| **HERMES** | **Skill & Event Router**       | REGISTRY ONLINE · ROUTES READY       |
+| **CIPHER** | (padlock; chroma-key green bg) | —                                    |
 
-ADR 0012 defines Amy, Jayden and Ashton as **people, each with their own private
-Jarvis and their own memories**. This sheet gives them **functional roles**
-(Operations & Events; Engineering & Systems; Security & Defense), which reads
-like specialist agents that happen to be named after family members.
+CIPHER's sheet is on a pure green background: an intentional chroma key for
+compositing, not a design choice to reproduce.
 
-These are very different systems, and one reading collides with a rule already
-accepted:
+### The status lines are claims, and today most of them would be lies
 
-- If **"Ashton" is Ashton's personal Jarvis**, themed to his interests, then
-  "Security & Defense" is flavour and ADR 0012 stands unchanged.
-- If **"Ashton" is a security agent**, then a child-named node holds
-  security-enforcement capability — which ADR 0012 lists as **RED** ("any
-  external-action capability on a child's node").
+`AEGIS — PERIMETER SECURE · NO ACTIVE THREATS` is the sharpest example. AEGIS
+does not exist (`docs/KNOWN-LIMITATIONS.md` §1). Rendering that line today would
+be **mock security presented as real**, which CLAUDE.md §8 identifies as more
+dangerous than a visibly absent control. The same applies to
+`REGISTRY ONLINE · ROUTES READY` and `CHANNELS OPEN · OWNER PRIORITY`.
 
-Most likely intent: each family member's own Jarvis, themed. **Needs confirming
-before any of it is built.**
+**Binding rule for implementation:** a status line renders only when it reflects
+real state from a real subsystem. Until then it is omitted, or shown with an
+explicit MOCK label — never rendered as a bare claim.
+
+## 5. Questions this design raised — two now resolved
+
+### Q1 — Are AMY / JAYDEN / ASHTON people, or agents? **RESOLVED: people.**
+
+The individual sheets settle it. **ASHTON — "Personal Agent"**, **AMY — "AI
+Assistant"**, **JAYDEN — "AI Engineer"**. These are each family member's own
+assistant, themed to them, exactly as ADR 0012 describes. The earlier summary
+sheet's role labels ("Security & Defense" and so on) are **flavour, not
+capability**.
+
+**ADR 0012 stands unchanged**, including its RED rule: no external-action
+capability on a child's node. Ashton's orb being red with a defence theme is
+styling; it grants nothing.
+
+`ACTIVE · HIVE CONNECTED` on Ashton's sheet also confirms the Hive membership
+model of ADR 0012 — nodes belong to the Hive and report their own state.
 
 ### Q2 — Four security-flavoured orbs, one chartered security system
 
@@ -130,15 +155,22 @@ whom" and "which of these is subject to AEGIS" must be answered explicitly.
 Provisional reading, pending William: **AEGIS is the only enforcement authority;
 CIPHER, SCOUT and any others are ordinary subsystems fully subject to it.**
 
-### Q3 — THRONE as a peer, and the HERMES name collision
+### Q3a — HERMES: **RESOLVED — no collision.**
 
-- **THRONE** appears here as one orb among twelve. In CLAUDE.md, **Throne OS is
-  the parent platform** that Jarvis sits _inside_. A peer orb and a parent
-  platform are not the same thing. Which is it?
-- **HERMES** here is "Logistics & Routing" (fitting Vanguard Global Logistics).
-  But `jarvis-hermes/` in this repository is the **ChatGPT-era agent engine**
-  (Hermes Agent framework) — an entirely different thing wearing the same name.
-  One of the two should be renamed before both exist.
+The individual sheet reads **"Skill & Event Router"**, not business logistics.
+That is precisely what `jarvis-hermes/` (the ChatGPT-era agent engine) does:
+skills, routing, event dispatch. They are the **same concept**, not two things
+sharing a name. No rename needed.
+
+This also promotes `jarvis-hermes/` from "unreconciled uploaded snapshot" to
+"prior art for a chartered subsystem" — it still needs a proper reconciliation
+decision, but it is no longer orphaned.
+
+### Q3b — THRONE as a peer: **still open.**
+
+**THRONE** appears as one orb among twelve ("Command & Control"). In CLAUDE.md,
+**Throne OS is the parent platform** that Jarvis sits _inside_. A peer orb and a
+parent platform are not the same thing. Which is it?
 
 Also noted: **KAI (Barista Assistant)** aligns with Sophisticated Sips, Amy's
 coffee business (CLAUDE.md §7) — which serves a second person and whose access
@@ -146,15 +178,54 @@ model ADR 0012 does not cover.
 
 ---
 
+## 5b. The iPhone dashboard (supplied 2026-08-10)
+
+A mobile home screen was also supplied. It is the **mobile design target**, and
+almost everything on it is unbuilt. Recorded so the layout survives:
+
+- **Header:** "JARVIS · Personal AI Assistant", a `System Optimized` pill, notifications bell.
+- **Hero:** the orb, flanked by an **AEGIS** card (`Secure — No threats detected`)
+  and a **System Status** ring (`100% OPTIMAL`).
+- **Current Task** card with a progress bar (shown at 68%).
+- **Recent Activity** feed, attributed per subsystem: FORGE (code commit), COMMS
+  (meeting summarised), LEDGER (spend analysed), AEGIS (login attempt blocked).
+- **Memory** card — "Long-Term Memory · stores preferences, project decisions,
+  and useful records", with a usage bar (42%).
+- **Module tiles:** FORGE (Build & Development), LEDGER (Budget & Finance),
+  DRIVE MODE (Safe & Hands-Free), DRIVE (Navigation & Control).
+- **Quick actions:** New Task · Voice Command · System Scan · Upload File ·
+  Note to Memory.
+- **Bottom nav:** Home · Agents · Tasks · **Voice (centre mic)** · Settings.
+
+**Implementation status of everything on that screen:** the orb exists. AEGIS,
+FORGE, LEDGER, Drive Mode, Drive, Memory, Voice, Tasks, Agents, file upload and
+system scan are all **NOT IMPLEMENTED**. Every number shown (100%, 68%, 42%) is
+sample data.
+
+This screen is exactly the case CLAUDE.md §6 warns about: "every live-looking
+metric, feed, threat count, and Run Security Scan control is MOCKED sample data
+in Phase 1 and must be labeled as such" — with AEGIS status the one surface that
+must be real rather than mocked once it exists.
+
 ## 6. Missing asset
 
-The source sheet is an image supplied in conversation and **cannot be committed
-from there**. To preserve it properly, drop the file at:
+The images were supplied in conversation and **cannot be committed from there**.
+To preserve them properly, drop the files into `reference/visual-targets/` and
+commit:
 
 ```
-reference/visual-targets/jarvis-orb-family.png
+reference/visual-targets/jarvis-orb-family.png     (the twelve-orb summary sheet)
+reference/visual-targets/orb-jayden.png
+reference/visual-targets/orb-amy.png
+reference/visual-targets/orb-ashton.png
+reference/visual-targets/orb-aegis.png
+reference/visual-targets/orb-comms.png
+reference/visual-targets/orb-vision.png
+reference/visual-targets/orb-hermes.png
+reference/visual-targets/orb-cipher.png            (chroma-key green background)
+reference/visual-targets/iphone-home.png           (the mobile dashboard)
 ```
 
-and commit it. This file records the content either way, but the artwork itself
+This file records the content either way, but the artwork itself
 should live in the repository — the same gap CLAUDE.md §6 already flags for the
 three original mockups.
