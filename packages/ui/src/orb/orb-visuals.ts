@@ -393,13 +393,43 @@ if (Object.keys(STATE_VISUALS).length !== ORB_STATES.length) {
  * form while accent and core values keep the state's identity, so meaning
  * never depends on animation.
  */
-export function orbVisualConfig(state: OrbState, reducedMotion: boolean): OrbVisualConfig {
+/**
+ * States whose colour is **identity**, not meaning — the calm, "Jarvis is
+ * working" states. Only these may wear a personal accent (ADR 0013).
+ *
+ * Everything else is excluded on purpose. `warning`, `critical`, `success`,
+ * `offline` and `aegisLockdown` use colour to *mean* something, and a personal
+ * theme that recoloured them would let identity impersonate a warning — on
+ * Ashton's crimson orb, "thinking" and "alarmed" would become the same sight.
+ * Identity may decorate; it may never overwrite a signal.
+ */
+const IDENTITY_ACCENT_STATES: ReadonlySet<OrbState> = new Set<OrbState>([
+  'idle',
+  'wake',
+  'listening',
+  'thinking',
+  'reasoning',
+  'speaking',
+]);
+
+/**
+ * @param identityAccent - optional personal accent (a hex from
+ *   `PROFILE_ACCENTS`). Applied only to `IDENTITY_ACCENT_STATES`; ignored
+ *   everywhere else so semantic colour survives.
+ */
+export function orbVisualConfig(
+  state: OrbState,
+  reducedMotion: boolean,
+  identityAccent?: string,
+): OrbVisualConfig {
   const base = STATE_VISUALS[state];
   const motion = orbStateMotion[state];
+  const personal =
+    identityAccent !== undefined && IDENTITY_ACCENT_STATES.has(state) ? identityAccent : undefined;
 
   if (!reducedMotion) {
     return {
-      accentColor: motion.accentColor,
+      accentColor: personal ?? motion.accentColor,
       coreOpacity: base.coreOpacity,
       coreScale: base.coreScale,
       breathScale: base.breathScale,
@@ -421,7 +451,7 @@ export function orbVisualConfig(state: OrbState, reducedMotion: boolean): OrbVis
   // Static identity survives: intensity, compression, and ring presence are
   // static properties, so they carry the state's structure without motion.
   return {
-    accentColor: motion.reducedMotion.accentColor,
+    accentColor: personal ?? motion.reducedMotion.accentColor,
     coreOpacity: base.coreOpacity,
     coreScale: base.coreScale,
     breathScale: 1,

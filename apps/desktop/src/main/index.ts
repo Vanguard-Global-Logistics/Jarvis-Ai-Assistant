@@ -8,6 +8,7 @@ import { registerAmplifyHandler } from './handlers/amplify.js';
 import { registerAppInfoHandler } from './handlers/app-info.js';
 import { registerChatHandler } from './handlers/chat.js';
 import { registerHistoryHandlers } from './handlers/history.js';
+import { registerProfileHandlers } from './handlers/profile.js';
 import { applyContentSecurityPolicy, denyAllPermissions, lockNavigation } from './security.js';
 
 /**
@@ -175,6 +176,7 @@ void app
     registerChatHandler(modelProvider);
     registerAmplifyHandler(modelProvider);
     registerHistoryHandlers(db);
+    registerProfileHandlers(db);
 
     createWindow();
 

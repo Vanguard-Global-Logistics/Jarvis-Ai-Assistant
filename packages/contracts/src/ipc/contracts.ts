@@ -12,6 +12,7 @@ import {
   SavedConversationMetaSchema,
   SavedConversationSchema,
 } from '../history/contracts.js';
+import { ProfileSchema } from '../profile/contracts.js';
 
 /**
  * IPC contracts — the single definition of every message that crosses the
@@ -198,6 +199,31 @@ export const historyExportContract = defineContract({
     .strict(),
 });
 
+// --- profile:* (ADR 0013) ---------------------------------------------------
+
+/**
+ * `profile:get` / `profile:set` — the orb's name and accent.
+ *
+ * Both are `.strict()` over `ProfileSchema`, whose accent is a closed enum, so
+ * the renderer cannot inject an arbitrary colour string (a free-form colour is
+ * a small injection surface and, worse, could impersonate the alert red).
+ *
+ * These channels carry appearance only. They grant no capability, gate nothing,
+ * and are not authentication — a point worth keeping in the contract itself,
+ * because a field called "profile" invites exactly that misreading later.
+ */
+export const profileGetContract = defineContract({
+  channel: CHANNELS.profileGet,
+  request: z.undefined(),
+  response: ProfileSchema,
+});
+
+export const profileSetContract = defineContract({
+  channel: CHANNELS.profileSet,
+  request: ProfileSchema,
+  response: ProfileSchema,
+});
+
 // --- registry ---------------------------------------------------------------
 
 /**
@@ -214,4 +240,6 @@ export const IPC_CONTRACTS = {
   [CHANNELS.historyGet]: historyGetContract,
   [CHANNELS.historyDelete]: historyDeleteContract,
   [CHANNELS.historyExport]: historyExportContract,
+  [CHANNELS.profileGet]: profileGetContract,
+  [CHANNELS.profileSet]: profileSetContract,
 } as const;

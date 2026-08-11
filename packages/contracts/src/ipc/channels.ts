@@ -57,6 +57,16 @@ export const CHANNELS = {
    * renderer.
    */
   historyExport: 'history:export',
+
+  /**
+   * Read this installation's profile — the name and accent shown on the orb
+   * (ADR 0013). Appearance only: a profile grants no capability, and is not a
+   * login. Data separation comes from OS user accounts (ADR 0012).
+   */
+  profileGet: 'profile:get',
+
+  /** Set the profile. The only write, and it changes nothing but presentation. */
+  profileSet: 'profile:set',
 } as const;
 
 export type ChannelName = (typeof CHANNELS)[keyof typeof CHANNELS];

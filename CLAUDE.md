@@ -27,18 +27,21 @@ Repository: `github.com/Vanguard-Global-Logistics/Jarvis-Ai-Assistant`.
   no vision. Do not describe any part of Jarvis as protected, or as remembering
   anything. **`docs/KNOWN-LIMITATIONS.md` is the authoritative list of what does not
   exist — read it before claiming anything works.**
-- **Eight IPC channels exist: `app:get-info`, `jarvis:chat`, `jarvis:amplify`,
-  `history:save`/`list`/`get`/`delete`, and `history:export`.** `app:get-info` returns static host facts.
+- **Ten IPC channels exist: `app:get-info`, `jarvis:chat`, `jarvis:amplify`,
+  `history:save`/`list`/`get`/`delete`, `history:export`, and
+  `profile:get`/`profile:set`.** `app:get-info` returns static host facts.
   `jarvis:chat` and `jarvis:amplify` (ADR 0007) are narrow model calls: a transcript or
   an idea in, a reply or the five amplifier fields out. The `history:*` four (ADR 0008)
   are narrow calls against the main-owned conversation store: `history:save` is the only
   write path, ids are UUIDs minted in main, and no SQL or filesystem path ever crosses.
   `history:export` (ADR 0011) writes one backup file to a path a human picks in the
-  native save dialog — the renderer neither names nor learns it. None grants authority
-  beyond the model provider, the conversation store, and that one user-aimed write — no
-  shell, env, arbitrary paths, or AEGIS, and the API key never leaves main. These eight
-  are the whole of what `window.jarvis` exposes. `docs/IPC-SURFACE.md` is the authoritative
-  inventory; adding a channel is a boundary change (ADR 0002), not a routine edit.
+  native save dialog — the renderer neither names nor learns it. `profile:*` (ADR 0013)
+  carries only the orb's name and accent: appearance, granting nothing. None grants
+  authority beyond the model provider, the conversation store, and that one user-aimed
+  write — no shell, env, arbitrary paths, or AEGIS, and the API key never leaves main.
+  These ten are the whole of what `window.jarvis` exposes. `docs/IPC-SURFACE.md` is the
+  authoritative inventory; adding a channel is a boundary change (ADR 0002), not a
+  routine edit.
 - **Authoritative documents**, in precedence order:
   1. `reference/design-handoff/*.md` — the behavioral contract (11 spec files).
      **Archived and immutable. Never edit these.**
@@ -189,15 +192,15 @@ The directories exist and the toolchain runs. **Most of them are empty**, and th
 column is the part that matters:
 
 ```
-apps/desktop           Electron shell (main / preload / renderer)  PARTIAL — hardened, 8 IPC channels, conversation + history UI, owns SQLite
+apps/desktop           Electron shell (main / preload / renderer)  PARTIAL — hardened, 10 IPC channels, conversation + history + profile UI, owns SQLite
 apps/pwa               PWA shell                                   NOT IMPLEMENTED — empty, out of scope
 services/jarvis-core   Orchestration, isolated from renderer       PARTIAL — model provider + amplifier, wired to the app via chat/amplify (ADR 0007)
 services/aegis         AEGIS engine — independent, no GenAI        NOT IMPLEMENTED — empty
-packages/contracts     Zod schemas + shared types                  PARTIAL — IPC (8 channels), model, history, and experience contracts
+packages/contracts     Zod schemas + shared types                  PARTIAL — IPC (10 channels), model, history, profile, experience
 packages/ui            Design-system components                    PARTIAL — tokens, motion, Orb + glass primitives
 packages/config        Env validation + structured logging         IMPLEMENTED, unit-tested
-packages/database      SQLite (node:sqlite) + migration runner     PARTIAL — wired to Electron main, 2 migrations: conversation history + amplifications (ADR 0008, 0009)
-docs/DECISIONS/        ADRs                                        0001–0011
+packages/database      SQLite (node:sqlite) + migration runner     PARTIAL — wired to Electron main, 3 migrations: history, amplifications, profile (ADR 0008, 0009, 0013)
+docs/DECISIONS/        ADRs                                        0001–0013
 docs/foundation/       Layer 2 foundation documents (ADR 0005)     PARTIAL — 01 APPROVED; 02, 07, 09 DRAFT; rest CONCEPTUAL
 ```
 

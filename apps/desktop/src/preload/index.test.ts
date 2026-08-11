@@ -50,6 +50,8 @@ const ALLOWED_API = [
   'getConversation',
   'deleteConversation',
   'exportHistory',
+  'getProfile',
+  'setProfile',
 ] as const;
 
 /** Load the bridge fresh and return what it handed to `exposeInMainWorld`. */

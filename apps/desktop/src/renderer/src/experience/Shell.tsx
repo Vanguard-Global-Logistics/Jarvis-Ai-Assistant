@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { JSX } from 'react';
-import type { AppInfo, OrbState } from '@jarvis/contracts';
-import { ORB_STATES } from '@jarvis/contracts';
+import type { AppInfo, OrbState, Profile, ProfileAccentId } from '@jarvis/contracts';
+import {
+  DEFAULT_PROFILE,
+  ORB_STATES,
+  PROFILE_ACCENTS,
+  profileAccentColor,
+} from '@jarvis/contracts';
 import {
   Orb,
   OrbStudyV2,
@@ -70,6 +75,11 @@ export function Shell({ devStateSwitcher = import.meta.env.DEV }: ShellProps): J
   const [orbState, setOrbState] = useState<OrbState>('idle');
   const [host, setHost] = useState<HostFacts>({ kind: 'loading' });
   const [switcherOpen, setSwitcherOpen] = useState(false);
+  /**
+   * Whose orb this is (ADR 0013). Starts at DEFAULT_PROFILE — plain Jarvis in
+   * Jarvis blue — so an unconfigured machine never claims to belong to anyone.
+   */
+  const [profile, setProfile] = useState<Profile>(DEFAULT_PROFILE);
 
   // The preload bridge, read once. `window.jarvis` is stable after the preload
   // runs; it is `undefined` only in a plain-browser preview of the Vite page,
@@ -121,6 +131,29 @@ export function Shell({ devStateSwitcher = import.meta.env.DEV }: ShellProps): J
     };
   }, []);
 
+  // Load whose orb this is. A failure is not worth surfacing in the
+  // composition — the default profile is a correct, honest fallback (plain
+  // Jarvis), so this logs and moves on rather than showing an error for a
+  // cosmetic setting.
+  useEffect(() => {
+    let cancelled = false;
+    const jarvis = window.jarvis;
+    if (jarvis === undefined) return;
+
+    jarvis
+      .getProfile()
+      .then((loaded) => {
+        if (!cancelled) setProfile(loaded);
+      })
+      .catch((cause: unknown) => {
+        console.error('[shell] profile:get failed; using the default profile:', cause);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Wake is a transition, not a resting state: settle into idle breathing
   // after the choreography completes (benchmark §21 — awakening → idle).
   useEffect(() => {
@@ -150,21 +183,51 @@ export function Shell({ devStateSwitcher = import.meta.env.DEV }: ShellProps): J
       }}
     >
       {!cinematic && (
-        <h1
+        // The wordmark is ALWAYS "Jarvis" — one assistant, answering to one
+        // name for everyone (ADR 0013). What is personal is the badge beneath
+        // it and the orb's accent. The probe asserts this h1, and the family
+        // asked for exactly this: their orb, still called Jarvis.
+        <div
           style={{
             marginTop: 22,
-            marginBottom: 0,
-            fontFamily: fontFamily.display,
-            fontSize: 22,
-            fontWeight: 700,
-            letterSpacing: letterSpacing.wordmark,
-            textTransform: 'uppercase',
-            color: text.heading,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 4,
             zIndex: 1,
           }}
         >
-          Jarvis
-        </h1>
+          <h1
+            style={{
+              margin: 0,
+              fontFamily: fontFamily.display,
+              fontSize: 22,
+              fontWeight: 700,
+              letterSpacing: letterSpacing.wordmark,
+              textTransform: 'uppercase',
+              color: text.heading,
+            }}
+          >
+            Jarvis
+          </h1>
+          {profile.displayName !== DEFAULT_PROFILE.displayName && (
+            <span
+              data-profile-name={profile.displayName}
+              style={{
+                fontFamily: fontFamily.mono,
+                fontSize: 9,
+                letterSpacing: letterSpacing.label,
+                textTransform: 'uppercase',
+                color: profileAccentColor(profile.accent),
+                border: `1px solid ${profileAccentColor(profile.accent)}`,
+                borderRadius: 4,
+                padding: '2px 8px',
+              }}
+            >
+              {profile.displayName}
+            </span>
+          )}
+        </div>
       )}
 
       {cinematic ? (
@@ -192,7 +255,11 @@ export function Shell({ devStateSwitcher = import.meta.env.DEV }: ShellProps): J
         // a dev-only manual override.
         <>
           <div style={{ marginTop: 6, marginBottom: 2, zIndex: 1 }}>
-            <Orb state={orbState} sizePx={132} />
+            <Orb
+              state={orbState}
+              sizePx={132}
+              identityAccent={profileAccentColor(profile.accent)}
+            />
           </div>
           <Conversation bridge={bridge} onOrbStateChange={setOrbState} />
         </>
@@ -386,6 +453,28 @@ export function Shell({ devStateSwitcher = import.meta.env.DEV }: ShellProps): J
       )}
 
       {!cinematic && (
+        <ProfilePicker
+          profile={profile}
+          onChange={(next) => {
+            // Optimistic: the orb recolours immediately, then main confirms
+            // what was actually stored. On failure the stored value wins, so
+            // the UI can never show a preference that was not saved.
+            setProfile(next);
+            window.jarvis
+              ?.setProfile(next)
+              .then(setProfile)
+              .catch((cause: unknown) => {
+                console.error('[shell] profile:set failed:', cause);
+                window.jarvis
+                  ?.getProfile()
+                  .then(setProfile)
+                  .catch(() => undefined);
+              });
+          }}
+        />
+      )}
+
+      {!cinematic && (
         <footer
           style={{
             width: '100%',
@@ -430,5 +519,120 @@ export function Shell({ devStateSwitcher = import.meta.env.DEV }: ShellProps): J
         </footer>
       )}
     </main>
+  );
+}
+
+/**
+ * Whose orb this is (ADR 0013).
+ *
+ * Appearance only. Choosing "Jayden" changes the name on the orb and its
+ * accent — it grants nothing, unlocks nothing, and is not a login. Data
+ * separation comes from each person having their own OS user account
+ * (ADR 0012), which is why the copy says "this Mac account" rather than
+ * anything resembling "sign in as".
+ */
+function ProfilePicker({
+  profile,
+  onChange,
+}: {
+  profile: Profile;
+  onChange: (profile: Profile) => void;
+}): JSX.Element {
+  const [open, setOpen] = useState(false);
+  const accents = Object.keys(PROFILE_ACCENTS) as ProfileAccentId[];
+
+  const label = (id: ProfileAccentId): string =>
+    id === 'jarvis' ? 'Jarvis' : id.charAt(0).toUpperCase() + id.slice(1);
+
+  return (
+    <section
+      aria-label="Orb appearance"
+      style={{
+        position: 'absolute',
+        left: 14,
+        bottom: 54,
+        zIndex: 2,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 6,
+      }}
+    >
+      {open && (
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 2,
+            padding: 8,
+            border: `1px solid ${surface.hairline}`,
+            borderRadius: surface.radiusMin,
+            background: 'rgba(5,7,10,0.88)',
+          }}
+        >
+          <span
+            style={{
+              fontFamily: fontFamily.mono,
+              fontSize: 9,
+              letterSpacing: letterSpacing.label,
+              color: text.faint,
+              padding: '2px 6px 6px',
+              maxWidth: 220,
+            }}
+          >
+            WHOSE ORB IS THIS? Appearance only — it is still Jarvis, and it grants nothing. Your
+            sessions are separate because this is your Mac account.
+          </span>
+          {accents.map((id) => {
+            const selected = profile.accent === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => {
+                  onChange({ displayName: label(id), accent: id });
+                }}
+                aria-pressed={selected}
+                style={{
+                  minHeight: 30,
+                  padding: '5px 10px',
+                  textAlign: 'left',
+                  fontFamily: fontFamily.mono,
+                  fontSize: 11,
+                  letterSpacing: letterSpacing.label,
+                  color: selected ? background.fieldTop : profileAccentColor(id),
+                  background: selected ? profileAccentColor(id) : 'transparent',
+                  border: `1px solid ${profileAccentColor(id)}`,
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                }}
+              >
+                {label(id)}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => {
+          setOpen((value) => !value);
+        }}
+        style={{
+          minHeight: 32,
+          padding: '6px 10px',
+          fontFamily: fontFamily.mono,
+          fontSize: 10,
+          letterSpacing: letterSpacing.label,
+          color: profileAccentColor(profile.accent),
+          background: 'rgba(5,7,10,0.7)',
+          border: `1px solid ${surface.hairline}`,
+          borderRadius: surface.radiusMin,
+          cursor: 'pointer',
+        }}
+      >
+        ORB · {profile.displayName.toUpperCase()} {open ? '▾' : '▸'}
+      </button>
+    </section>
   );
 }

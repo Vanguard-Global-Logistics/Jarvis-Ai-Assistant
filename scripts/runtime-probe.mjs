@@ -388,6 +388,8 @@ async function runChecks(page, mode) {
     'getConversation',
     'deleteConversation',
     'exportHistory',
+    'getProfile',
+    'setProfile',
   ];
   const keysOk = JSON.stringify(keys.value) === JSON.stringify(EXPECTED_KEYS);
   add(
@@ -578,6 +580,47 @@ async function runChecks(page, mode) {
     'history:export is exposed (NOT invoked — modal dialog)',
     exportFn.value === 'function',
     `typeof = ${String(exportFn.value)}`,
+  );
+
+  // --- ADR 0013: the profile round-trip, against the real database ---
+  const profile0 = await page.evaluate('window.jarvis ? await window.jarvis.getProfile() : null');
+  const defaultOk = profile0.value?.displayName === 'Jarvis' && profile0.value.accent === 'jarvis';
+  add(
+    'profile:get starts at the default (machine claims no owner)',
+    defaultOk,
+    profile0.error
+      ? `THREW: ${String(profile0.error).split('\n')[0]}`
+      : JSON.stringify(profile0.value),
+  );
+
+  const profileSet = await page.evaluate(
+    'window.jarvis ? await window.jarvis.setProfile({ displayName: "Jayden", accent: "jayden" }) : null',
+  );
+  const setOk = profileSet.value?.displayName === 'Jayden' && profileSet.value.accent === 'jayden';
+  add(
+    'profile:set stores and returns what was stored',
+    setOk,
+    profileSet.error
+      ? `THREW: ${String(profileSet.error).split('\n')[0]}`
+      : JSON.stringify(profileSet.value),
+  );
+
+  // The boundary must refuse a free-form colour: a profile that could wear the
+  // alert red would let identity impersonate a warning (ADR 0013).
+  const badAccent = await page.evaluate(
+    'window.jarvis ? await window.jarvis.setProfile({ displayName: "X", accent: "#ff5a5a" }).then(() => "ACCEPTED").catch(() => "rejected") : null',
+  );
+  add(
+    'profile:set rejects an arbitrary accent colour',
+    badAccent.value === 'rejected',
+    String(badAccent.value),
+  );
+
+  const profile1 = await page.evaluate('window.jarvis ? await window.jarvis.getProfile() : null');
+  add(
+    'profile survives the rejected write unchanged',
+    profile1.value?.displayName === 'Jayden',
+    JSON.stringify(profile1.value),
   );
 
   // E2: the Experience Shell mounts the Orb. Assert the real component is

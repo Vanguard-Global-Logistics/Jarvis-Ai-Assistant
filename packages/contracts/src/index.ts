@@ -25,6 +25,8 @@ export {
   historyDeleteContract,
   historyExportContract,
   historyGetContract,
+  profileGetContract,
+  profileSetContract,
   historyListContract,
   historySaveContract,
   jarvisAmplifyContract,
@@ -67,6 +69,15 @@ export type {
   ChatRequest,
   ProviderId,
 } from './model/contracts.js';
+
+export {
+  DEFAULT_PROFILE,
+  PROFILE_ACCENTS,
+  ProfileAccentSchema,
+  ProfileSchema,
+  profileAccentColor,
+} from './profile/contracts.js';
+export type { Profile, ProfileAccentId } from './profile/contracts.js';
 
 export { ORB_STATES, OrbStateSchema } from './experience/orb.js';
 export type { OrbState } from './experience/orb.js';

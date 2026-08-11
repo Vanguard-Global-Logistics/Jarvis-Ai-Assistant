@@ -2,7 +2,7 @@
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AppInfo } from '@jarvis/contracts';
-import { ORB_STATES } from '@jarvis/contracts';
+import { DEFAULT_PROFILE, ORB_STATES } from '@jarvis/contracts';
 import { orbTiming } from '@jarvis/ui';
 import { Shell } from './Shell.js';
 
@@ -26,6 +26,7 @@ function stubBridge(): void {
     getAppInfo: vi.fn().mockResolvedValue(APP_INFO),
     sendChat: vi.fn().mockResolvedValue({ text: 'hi', provider: 'mock' }),
     amplify: vi.fn(),
+    getProfile: vi.fn().mockResolvedValue(DEFAULT_PROFILE),
   });
 }
 
@@ -100,6 +101,7 @@ describe('Shell', () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     vi.stubGlobal('jarvis', {
       getAppInfo: vi.fn().mockRejectedValue(new Error('ipc validation failed')),
+      getProfile: vi.fn().mockResolvedValue(DEFAULT_PROFILE),
     });
     render(<Shell devStateSwitcher={false} />);
     expect(await screen.findByRole('alert')).toBeTruthy();

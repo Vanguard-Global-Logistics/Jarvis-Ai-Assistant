@@ -7,6 +7,7 @@ import type {
   ChatReply,
   ChatRequest,
   HistoryIdRequest,
+  Profile,
   SaveConversationRequest,
   SavedConversation,
   SavedConversationMeta,
@@ -112,6 +113,16 @@ const api = {
       exported: boolean;
       conversationCount: number;
     }>,
+
+  /**
+   * The orb's name and accent (ADR 0013). Appearance only — these grant no
+   * capability and are not a login. Data separation comes from OS user
+   * accounts, not from this value.
+   */
+  getProfile: (): Promise<Profile> => ipcRenderer.invoke(CHANNELS.profileGet) as Promise<Profile>,
+
+  setProfile: (profile: Profile): Promise<Profile> =>
+    ipcRenderer.invoke(CHANNELS.profileSet, profile) as Promise<Profile>,
 } as const;
 
 export type JarvisApi = typeof api;

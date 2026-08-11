@@ -1,7 +1,8 @@
 # The IPC Surface
 
 Date: 2026-08-10
-Status: **EIGHT channels.** `history:export` (ADR 0011) is `IMPLEMENTED, NOT YET
+Status: **TEN channels.** `profile:get`/`profile:set` (ADR 0013) are IMPLEMENTED AND
+VERIFIED on the Linux runtime probe. `history:export` (ADR 0011) is `IMPLEMENTED, NOT YET
 VERIFIED` — the probe asserts it is exposed but deliberately does not invoke it (a
 native modal dialog would hang a headless run), so the dialog-and-write path awaits
 manual acceptance. `app:get-info` is IMPLEMENTED AND VERIFIED (observed live on
@@ -202,6 +203,23 @@ asserts the history list is still empty, which is the runtime proof behind the U
 Cancelling the dialog returns `exported: false` — a normal outcome, not an error. A real
 write failure throws, so the UI can state it: a backup that silently did nothing is the
 worst possible failure for this feature.
+
+### `profile:get` / `profile:set`
+
+|                       |                                                                                                                                                         |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Status**            | IMPLEMENTED AND VERIFIED on the Linux runtime probe (round-trip against the real database, plus rejection of a free-form accent), 2026-08-11.           |
+| **Renderer call**     | `window.jarvis.getProfile(): Promise<Profile>` · `window.jarvis.setProfile(p: Profile): Promise<Profile>`                                               |
+| **Request**           | get: `z.undefined()`. set: `ProfileSchema` — `{ displayName (1–24), accent }`, `.strict()`, accent a **closed enum** (`jarvis`/`amy`/`jayden`/`ashton`) |
+| **Response**          | `ProfileSchema` — set returns what is now **stored**, not an echo of the request                                                                        |
+| **Handler**           | `registerProfileHandlers(db)` in `apps/desktop/src/main/handlers/profile.ts`                                                                            |
+| **Contract**          | `profileGetContract` / `profileSetContract`                                                                                                             |
+| **Side effects**      | set: one upsert into the single-row `profile` table (migration 3). get: read-only.                                                                      |
+| **Authority granted** | **None.** A profile is a name and a colour. It is not a login, gates nothing, and unlocks nothing — data separation comes from OS user accounts.        |
+
+The closed accent enum is a security property, not tidiness: a free-form colour could
+impersonate the alert red, letting identity look like a warning (ADR 0013). The probe
+asserts the boundary rejects `#ff5a5a` and leaves the stored profile unchanged.
 
 ---
 

@@ -68,13 +68,14 @@ storage, separate credentials. Phase 1 will not deliver OS-level enforcement. Wh
 state engine ships, this gap must be restated wherever AEGIS is described — not quietly
 dropped once the UI looks convincing.
 
-## 3. The IPC bridge exposes exactly eight narrow channels
+## 3. The IPC bridge exposes exactly ten narrow channels
 
 **Status: PARTIAL — intended for this stage.**
 
-`window.jarvis` exposes exactly eight purpose-named functions: `getAppInfo` (host
+`window.jarvis` exposes exactly ten purpose-named functions: `getAppInfo` (host
 facts), `sendChat` and `amplify` (model calls, ADR 0007), the four history
-operations (ADR 0008), and `exportHistory` (ADR 0011). The authority envelope remains
+operations (ADR 0008), `exportHistory` (ADR 0011), and `getProfile`/`setProfile`
+(ADR 0013 — the orb's name and colour, which grant nothing). The authority envelope remains
 deliberately small: a model call, a conversation store, and one backup write whose
 destination the renderer can neither name nor learn — main opens the native save
 dialog, so only a human picks the path. No shell, no arbitrary filesystem paths, no
@@ -101,9 +102,10 @@ exists as a step at all: there is no native module. The remaining honest caveats
 - `node:sqlite` is labeled **experimental on Node 22**, the runtime vitest uses. The
   app itself runs on Electron 43's embedded Node 24, where it is stable. If Node 22
   changes the API under the tests, the tests will say so loudly.
-- There are exactly **two** migrations (`conversation-history`,
-  `conversation-amplifications`, ADR 0009). No tables exist for memory, projects,
-  tasks, or the audit log — those are feature design work and are not approved.
+- There are exactly **three** migrations (`conversation-history`,
+  `conversation-amplifications` ADR 0009, and `profile` ADR 0013 — a single row holding
+  a display name and an accent). No tables exist for memory, projects, tasks, or the
+  audit log — those are feature design work and are not approved.
 
 ## 5. (Retired) There are zero migrations
 

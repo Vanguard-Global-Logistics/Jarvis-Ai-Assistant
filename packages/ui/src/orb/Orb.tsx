@@ -39,6 +39,13 @@ export interface OrbProps {
   sizePx?: number;
   /** Render the aria-live StateAnnouncer (benchmark §17). */
   announce?: boolean;
+  /**
+   * Personal accent (ADR 0013) — a hex from `PROFILE_ACCENTS`. Applied only to
+   * the calm identity states; `warning`, `critical`, `success`, `offline` and
+   * `aegisLockdown` keep their semantic colour, because identity must never be
+   * able to impersonate a signal.
+   */
+  identityAccent?: string;
 }
 
 const STANDARD_BEZIER = toBezier(easing.standard);
@@ -301,9 +308,14 @@ function EnergyPath({
   );
 }
 
-export function Orb({ state, sizePx = 360, announce = true }: OrbProps): JSX.Element {
+export function Orb({
+  state,
+  sizePx = 360,
+  announce = true,
+  identityAccent,
+}: OrbProps): JSX.Element {
   const reducedMotion = useReducedMotion();
-  const config = orbVisualConfig(state, reducedMotion);
+  const config = orbVisualConfig(state, reducedMotion, identityAccent);
   const motionEntry = orbStateMotion[state];
   const glowFilterId = useId();
 
