@@ -1,6 +1,6 @@
 # Test day — everything to check on the MacBook, in order
 
-Written 2026-08-11 for the overnight batch (ADRs 0013–0016). Work top to bottom;
+Written 2026-08-11 for the overnight batch (ADRs 0013–0017). Work top to bottom;
 each section says what to do, what should happen, and what it means if it does
 not. Anything marked **UNVERIFIED** has never run on real hardware — you are the
 first person to run it, and finding it broken is the expected outcome of a test,
@@ -16,7 +16,7 @@ cd ~/Jarvis-Ai-Assistant          # wherever you cloned it
 git checkout claude/jarvis-migration-chatgpt-19f128
 git pull origin claude/jarvis-migration-chatgpt-19f128
 npm install
-npm run verify                    # ~1 min. Expect: 327 tests passed
+npm run verify                    # ~1 min. Expect: 352 tests passed
 npm run build
 npm run probe:runtime             # launches the real app and asserts ~30 facts
 ```
@@ -141,6 +141,26 @@ If **5.6** passes, macOS packaging goes from CONFIGURED to VERIFIED and I will
 update the docs to say so.
 
 **Cosmetic:** the app has the default Electron icon, not the orb. Known.
+
+## 5b. The window remembers where it was (ADR 0017) — NEW
+
+Verified on the Linux probe, so this should just work. Worth thirty seconds.
+
+| #    | Do                                                                     | Expect                                                         |
+| ---- | ---------------------------------------------------------------------- | -------------------------------------------------------------- |
+| 5b.1 | Resize and move the window somewhere deliberate, then Cmd+Q and reopen | It comes back the same size, in the same place                 |
+| 5b.2 | Maximize it, quit, reopen                                              | It reopens maximized; un-maximizing returns it to the old size |
+| 5b.3 | Move it to a second monitor, quit, **unplug that monitor**, reopen     | It opens **on the laptop screen, visible** — not off in space  |
+
+**5b.3 is the one worth actually doing.** Restoring a position blindly is how
+apps end up invisible on an undocked laptop, and "it didn't start" then looks
+identical to "it started off-screen". The size is kept; only the position is
+dropped.
+
+Also new: the app now has an **icon** — the orb, dark navy with blue rings. It is
+a placeholder generated from the approved colour tokens, not the Orb Family
+artwork. Whether macOS actually picks it up is unverified; you will find out at
+step 5.1. If you see the default Electron icon instead, that is the finding.
 
 ## 6. The orb states (ADR: ORB-FAMILY)
 
