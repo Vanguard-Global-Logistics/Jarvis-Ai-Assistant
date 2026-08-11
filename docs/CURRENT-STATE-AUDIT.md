@@ -9,6 +9,24 @@ Status labels used throughout this document (per instruction, exhaustive set):
 
 Runtime acceptance note (2026-07-16): the Windows development runtime gate passed on a Windows x64 laptop. The shell and the `app:get-info` IPC channel are now `IMPLEMENTED AND VERIFIED` for development runtime only; packaged installer verification remains pending.
 
+> **Scope note added 2026-08-11 — read this before using the document as a state report.**
+>
+> This audit analyses **the design handoff as it stood at commit `7583616`, before any
+> Phase 1 code existed**. That is its stated scope and it is still an accurate record of
+> that. It is *not* a live inventory, and several things below are simply older than the
+> repository: it describes one IPC channel where there are now eleven, one model provider
+> where there are now three, and no migrations where there are now four.
+>
+> `CLAUDE.md` lists this file second in precedence for "what exists and what does not",
+> so the distinction matters. **For current state, `docs/KNOWN-LIMITATIONS.md` is the live
+> record and wins**; this document is authoritative for the *analysis* — the risk
+> assessment, the boundary reasoning, and the scope of the original handoff — which has
+> not changed.
+>
+> Everything built since is recorded in `docs/DECISIONS/` (ADR 0007 onward). The audit is
+> deliberately not rewritten: a dated analysis edited to match today's code stops being
+> evidence of what was known when.
+
 ---
 
 ## 1. Every relevant file found

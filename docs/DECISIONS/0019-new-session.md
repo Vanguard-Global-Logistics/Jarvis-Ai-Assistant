@@ -60,6 +60,13 @@ session turns out to be reached for constantly in daily use, that is evidence fo
 a fourth chord and it can be argued for then — with evidence rather than
 enthusiasm.
 
+**The same guard covers Continue.** Looking for other instances of this defect
+turned one up immediately: **Continue** (ADR 0010) replaces the live transcript
+wholesale, so it could destroy unsaved work exactly the way New session could —
+the same bug in a different doorway, and equally silent. It now arms and confirms
+on the same rule, relabelling to `Discard N unsaved and continue?` in danger-red,
+and continuing straight through when the live session is empty.
+
 ## Consequences
 
 **A gap in the model closes.** Saving no longer implies the conversation
@@ -72,11 +79,13 @@ in this app edits entries, so the approximation holds today. If editing is ever
 added, this needs to become a real dirty flag rather than a count comparison.
 Recorded here so that is a decision rather than a surprise.
 
-**Tested, and verified red-green.** Six tests: inert with nothing to clear, the
+**Tested, and verified red-green.** Eight tests. Six on New session: inert with nothing to clear, the
 two-click discard, the one-click clear once saved, re-arming when new work lands
 on top of a save, no prompt after Continue, and — the one that pins the actual
 defect — that a save after New session contains only the new topic and does not
-mention the old one. Removing the confirmation guard fails two of them.
+mention the old one. Two more cover Continue: it arms and then replaces on the
+second click, and it continues immediately when there is nothing to lose.
+Removing either confirmation guard fails the corresponding tests.
 
 **Not covered by the runtime probe.** This is renderer state with no IPC, so
 there is nothing new crossing the boundary for the probe to assert. The unit

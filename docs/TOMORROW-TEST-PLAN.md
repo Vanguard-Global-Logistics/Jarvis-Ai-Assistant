@@ -16,7 +16,7 @@ cd ~/Jarvis-Ai-Assistant          # wherever you cloned it
 git checkout claude/jarvis-migration-chatgpt-19f128
 git pull origin claude/jarvis-migration-chatgpt-19f128
 npm install
-npm run verify                    # ~1 min. Expect: 363 tests passed
+npm run verify                    # ~1 min. Expect: 365 tests passed
 npm run build
 npm run probe:runtime             # launches the real app and asserts ~30 facts
 ```
@@ -59,6 +59,15 @@ that each contained all the previous ones.
 
 **1b.5 is the bug.** If the second saved session contains topic A's messages, the
 fix did not work and I need to know.
+
+The same guard now covers **Continue**, which had the identical problem: it
+replaces the live transcript, so it could silently discard unsaved work.
+
+| #    | Do                                                                        | Expect                                              |
+| ---- | ------------------------------------------------------------------------- | --------------------------------------------------- |
+| 1b.6 | Chat (do not save) → History → open a session → **Continue this session** | It turns red: `Discard N unsaved and continue?`     |
+| 1b.7 | Click it again                                                            | The saved session loads; the unsaved work is gone   |
+| 1b.8 | With an empty live session, Continue a saved one                          | Loads straight away — nothing to lose, so no prompt |
 
 ## 2. Per-person orbs (ADR 0013) — NEW
 

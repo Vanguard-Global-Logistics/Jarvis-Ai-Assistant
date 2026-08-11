@@ -119,6 +119,8 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
   const [persistedCount, setPersistedCount] = useState(0);
   /** True while New session is one click away from discarding real work. */
   const [confirmNew, setConfirmNew] = useState(false);
+  /** True while Continue is one click away from replacing unsaved live work. */
+  const [confirmContinue, setConfirmContinue] = useState(false);
   const nextId = useRef(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   /** The History filter box, so ⌘F can put the caret in it. */
@@ -391,6 +393,20 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
    * we did not generate them this session and must not claim mock/anthropic for
    * a historical line (CLAUDE.md §8).
    */
+  /**
+   * Continue replaces the live transcript wholesale, so it can destroy unsaved
+   * work exactly the way New session could before ADR 0019 — the same defect in
+   * a different doorway. Same remedy: arm, then confirm, and only when there is
+   * genuinely something to lose.
+   */
+  const requestContinue = (conversation: SavedConversation): void => {
+    if (unsavedCount > 0 && !confirmContinue) {
+      setConfirmContinue(true);
+      return;
+    }
+    continueSaved(conversation);
+  };
+
   const continueSaved = (conversation: SavedConversation): void => {
     const loaded: TranscriptItem[] = conversation.entries.map((entry) =>
       entry.kind === 'message'
@@ -402,6 +418,7 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
     // under its own id, so discarding it loses nothing and must not prompt.
     setPersistedCount(loaded.length);
     setConfirmNew(false);
+    setConfirmContinue(false);
     setViewing(null);
     setHistoryOpen(false);
     setConfirmDeleteId(null);
@@ -654,11 +671,14 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
         <SavedConversationView
           conversation={viewing}
           onBack={() => {
+            setConfirmContinue(false);
             setViewing(null);
           }}
           onContinue={() => {
-            continueSaved(viewing);
+            requestContinue(viewing);
           }}
+          confirmContinue={confirmContinue}
+          unsavedCount={unsavedCount}
         />
       ) : (
         <>
@@ -1003,10 +1023,16 @@ function SavedConversationView({
   conversation,
   onBack,
   onContinue,
+  confirmContinue,
+  unsavedCount,
 }: {
   conversation: SavedConversation;
   onBack: () => void;
   onContinue: () => void;
+  /** Armed: the next click replaces unsaved live work. */
+  confirmContinue: boolean;
+  /** How much live work Continue would discard. */
+  unsavedCount: number;
 }): JSX.Element {
   return (
     <div
@@ -1035,18 +1061,24 @@ function SavedConversationView({
         <button
           type="button"
           onClick={onContinue}
-          title="Load this session into the live composer to keep working (saves as a new session)"
+          title={
+            confirmContinue
+              ? `Click again — ${String(unsavedCount)} unsaved ${unsavedCount === 1 ? 'entry' : 'entries'} in the live session will be discarded`
+              : 'Load this session into the live composer to keep working (saves as a new session)'
+          }
           style={{
             ...MONO_LABEL,
             color: background_fieldTop,
-            background: accent.jarvisBlue,
-            border: `1px solid ${accent.jarvisBlue}`,
+            background: confirmContinue ? accent.danger : accent.jarvisBlue,
+            border: `1px solid ${confirmContinue ? accent.danger : accent.jarvisBlue}`,
             borderRadius: 6,
             padding: '4px 10px',
             cursor: 'pointer',
           }}
         >
-          Continue this session
+          {confirmContinue
+            ? `Discard ${String(unsavedCount)} unsaved and continue?`
+            : 'Continue this session'}
         </button>
         <button
           type="button"

@@ -675,4 +675,52 @@ describe('Conversation', () => {
       expect(screen.queryByText('archived question')).toBeNull();
     });
   });
+
+  describe('Continue guards unsaved live work (ADR 0019)', () => {
+    const openSavedSession = (): ReturnType<typeof fakeBridge> => {
+      const saved = {
+        ...SAVED_META,
+        entries: [
+          { kind: 'message' as const, role: 'user' as const, content: 'archived question' },
+          { kind: 'message' as const, role: 'assistant' as const, content: 'archived answer' },
+        ],
+      };
+      const bridge = fakeBridge({
+        listConversations: vi.fn().mockResolvedValue({ conversations: [SAVED_META] }),
+        getConversation: vi.fn().mockResolvedValue({ conversation: saved }),
+      });
+      render(<Conversation bridge={bridge} />);
+      return bridge;
+    };
+
+    it('asks before replacing unsaved live work, then does it on the second click', async () => {
+      // The same defect New session had, in a different doorway: Continue
+      // replaces the live transcript wholesale.
+      openSavedSession();
+
+      type('unsaved and precious');
+      fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+      await screen.findByText('Hello from the mock.');
+
+      fireEvent.click(screen.getByRole('button', { name: /history/i }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Open' }));
+      fireEvent.click(await screen.findByRole('button', { name: /continue this session/i }));
+
+      // Armed, and the live work is still there.
+      expect(screen.getByRole('button', { name: /discard 2 unsaved and continue/i })).toBeTruthy();
+
+      fireEvent.click(screen.getByRole('button', { name: /discard 2 unsaved and continue/i }));
+      expect(await screen.findByText('archived question')).toBeTruthy();
+      expect(screen.queryByText('unsaved and precious')).toBeNull();
+    });
+
+    it('continues immediately when the live session is empty', async () => {
+      openSavedSession();
+      fireEvent.click(screen.getByRole('button', { name: /history/i }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Open' }));
+      fireEvent.click(await screen.findByRole('button', { name: /continue this session/i }));
+      // Nothing to lose, so no prompt.
+      expect(await screen.findByText('archived question')).toBeTruthy();
+    });
+  });
 });
