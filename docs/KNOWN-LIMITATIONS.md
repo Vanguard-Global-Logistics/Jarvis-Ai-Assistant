@@ -40,6 +40,16 @@ cards (ADR 0009), so an Amplifier-only session is savable. What this is **not**:
   exposed but deliberately does not invoke it, because a native modal dialog would hang
   a headless run. Verifying both is a manual step on the Mac.
 
+  **Everything below the dialog is now tested end to end**, across two separate
+  databases with a JSON string in between — the real "the MacBook died, restore onto a
+  new machine" path. That test immediately found a defect the per-layer tests could not:
+  a restore rebuilt rows in the backup file's order (newest first), which is the reverse
+  of creation order, so conversations saved within the same millisecond came back in the
+  **opposite order** on the recovered machine. Fixed by importing in creation order, and
+  guarded by a regression test verified red-green. Worth stating because it is the exact
+  shape of bug a green per-layer suite hides: every layer was correct and the seam
+  between them was not.
+
 With no model configured at all, replies come from the deterministic **mock** provider,
 labeled "Mock provider" in the UI. A real key is opt-in and usage-billed; a local model
 (ADR 0015) is opt-in and free. The mock default is why the app costs $0 to run. See §6.

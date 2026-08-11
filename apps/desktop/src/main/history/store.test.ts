@@ -3,6 +3,7 @@ import type { TranscriptEntry } from '@jarvis/contracts';
 import { SavedConversationMetaSchema, SavedConversationSchema } from '@jarvis/contracts';
 import type { SqliteDatabase } from '@jarvis/database';
 import { migrate, migrations, openDatabase } from '@jarvis/database';
+import { buildBackupDocument, parseBackupDocument } from './backup.js';
 import {
   deleteConversation,
   deriveTitle,
@@ -305,5 +306,122 @@ describe('importConversations (ADR 0014)', () => {
     const meta = saveConversation(db, TRANSCRIPT);
     expect(importConversations(db, [])).toEqual({ added: 0, skipped: 0 });
     expect(getConversation(db, meta.id)?.entries).toEqual(TRANSCRIPT);
+  });
+});
+
+/**
+ * The disaster the backup feature exists for: the MacBook dies, a new machine
+ * clones the repo, and the family's sessions come back.
+ *
+ * Every layer of that path is already tested on its own — save, export, build
+ * the document, parse it, import. This exercises the SEAMS between them, end to
+ * end, across two independent databases with a JSON string in the middle. A
+ * per-layer suite can be entirely green while the layers disagree about a
+ * field name, and this is the test that would notice.
+ *
+ * The only thing still not covered is the native file dialog, which is why
+ * export and import remain IMPLEMENTED, NOT YET VERIFIED at runtime.
+ */
+describe('backup → file → restore, on a different machine', () => {
+  it('rebuilds the whole history byte-for-byte from the backup file alone', () => {
+    // The dying machine.
+    const first = saveConversation(db, TRANSCRIPT);
+    const second = saveConversation(db, [
+      { kind: 'amplification', idea: 'a permit tracker', result: AMP },
+    ]);
+    const before = exportAllConversations(db);
+
+    // What actually lands on the thumb drive: text, not objects.
+    const fileContents = JSON.stringify(buildBackupDocument(before));
+    const document = parseBackupDocument(fileContents);
+
+    // The new machine — a genuinely separate database with the same migrations.
+    const fresh = openDatabase({ location: ':memory:' });
+    migrate(fresh, migrations);
+    expect(listConversations(fresh)).toEqual([]);
+
+    const outcome = importConversations(fresh, document.conversations);
+    expect(outcome).toEqual({ added: 2, skipped: 0 });
+
+    // Identity survives: same ids, same timestamps. A restored conversation is
+    // the SAME conversation, not a copy of it — which is what makes a second
+    // restore idempotent rather than duplicating the family's history.
+    expect(exportAllConversations(fresh)).toEqual(before);
+    expect(getConversation(fresh, first.id)?.entries).toEqual(TRANSCRIPT);
+    expect(getConversation(fresh, second.id)?.entries[0]).toEqual({
+      kind: 'amplification',
+      idea: 'a permit tracker',
+      result: AMP,
+    });
+
+    // Restoring the same file again onto the recovered machine changes nothing.
+    expect(importConversations(fresh, document.conversations)).toEqual({ added: 0, skipped: 2 });
+    expect(exportAllConversations(fresh)).toEqual(before);
+  });
+
+  it('orders identically on the restored machine, even for same-millisecond saves', () => {
+    // Regression: the list used to tiebreak on rowid — machine-local insertion
+    // order — so a restore inserted the rows in the opposite order and the
+    // recovered machine showed a different list from the one backed up. A
+    // backup that cannot reproduce its own ordering is not a faithful backup.
+    // The tie is constructed rather than raced for: timing four saves into one
+    // millisecond is clock-dependent and would make this test flaky on a fast
+    // or slow machine. Import preserves `savedAt` verbatim, so seeding through
+    // it gives a deterministic same-millisecond group — and rows still land in
+    // creation order, which is the property under test.
+    const SAME_MS = '2026-08-11T12:00:00.000Z';
+    const seeded = ['a', 'b', 'c', 'd'].map((k, i) => ({
+      id: `00000000-0000-4000-8000-0000000000${(i + 10).toString()}`,
+      title: `session ${k}`,
+      savedAt: SAME_MS,
+      entryCount: 1,
+      entries: [{ kind: 'message' as const, role: 'user' as const, content: k }],
+    }));
+    // Seeded in BACKUP order — newest first — because that is the documented
+    // precondition of importConversations. `seeded` reads oldest-first, so
+    // reverse it: this stands in for four sessions saved a, b, c, d in
+    // sequence. (Getting this wrong is how the precondition earned its
+    // paragraph in the doc comment.)
+    importConversations(db, [...seeded].reverse());
+    expect(new Set(listConversations(db).map((c) => c.savedAt)).size).toBe(1);
+
+    const document = parseBackupDocument(
+      JSON.stringify(buildBackupDocument(exportAllConversations(db))),
+    );
+    const fresh = openDatabase({ location: ':memory:' });
+    migrate(fresh, migrations);
+    importConversations(fresh, document.conversations);
+
+    expect(listConversations(fresh).map((c) => c.id)).toEqual(
+      listConversations(db).map((c) => c.id),
+    );
+    // And the ordering is the real one, not two machines agreeing on a
+    // reversal: the last of the four saved is the first one listed.
+    expect(listConversations(fresh)[0]?.title).toBe('session d');
+  });
+
+  it('merges a backup into a machine that already has its own sessions', () => {
+    // The realistic case: you kept working on the new machine before getting
+    // round to the restore. Nothing you did in the meantime may be lost.
+    const backedUp = saveConversation(db, TRANSCRIPT);
+    const document = parseBackupDocument(
+      JSON.stringify(buildBackupDocument(exportAllConversations(db))),
+    );
+
+    const other = openDatabase({ location: ':memory:' });
+    migrate(other, migrations);
+    const local = saveConversation(other, [
+      { kind: 'message', role: 'user', content: 'written after the crash' },
+      { kind: 'message', role: 'assistant', content: 'noted' },
+    ]);
+
+    expect(importConversations(other, document.conversations)).toEqual({ added: 1, skipped: 0 });
+    expect(listConversations(other)).toHaveLength(2);
+    expect(getConversation(other, local.id)?.entries[0]).toEqual({
+      kind: 'message',
+      role: 'user',
+      content: 'written after the crash',
+    });
+    expect(getConversation(other, backedUp.id)?.entries).toEqual(TRANSCRIPT);
   });
 });

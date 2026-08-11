@@ -137,7 +137,16 @@ const ENTRY_COUNT_SQL = `
    (SELECT COUNT(*) FROM conversation_amplifications a WHERE a.conversation_id = c.id))
 `;
 
-/** Metadata for every saved conversation, newest save first. No transcripts. */
+/**
+ * Metadata for every saved conversation, newest save first. No transcripts.
+ *
+ * `saved_at` has millisecond precision, so conversations saved in the same
+ * millisecond need a secondary sort, and `rowid DESC` supplies it: rows are only
+ * ever appended, so rowid order *is* chronological order and the tiebreak reads
+ * as "the one saved later". That holds only while every writer appends in
+ * chronological order — see the note on `importConversations`, which had to be
+ * fixed to satisfy it.
+ */
 export function listConversations(db: SqliteDatabase): SavedConversationMeta[] {
   const rows = db
     .prepare(
@@ -254,9 +263,31 @@ export function exportAllConversations(db: SqliteDatabase): SavedConversation[] 
  *
  * Unlike `saveConversation` this preserves the incoming id and timestamp: a
  * restored conversation is the *same* conversation, not a new one.
+ *
+ * **Rows are written oldest-first, and that is not cosmetic.** A backup is
+ * written newest-first (`exportAllConversations` follows `listConversations`),
+ * so importing it in file order appended rows newest-to-oldest — the reverse of
+ * how they were originally created. `listConversations` tiebreaks equal
+ * `saved_at` values on `rowid`, which is chronological only because rows are
+ * appended chronologically, so conversations saved within the same millisecond
+ * came back in the OPPOSITE order on the restored machine. A backup that cannot
+ * reproduce its own list is not a faithful backup. Rebuilding in creation order
+ * keeps the recovered machine byte-identical to the one that died, and is what
+ * "the same conversation, not a copy" has to mean at the list level too.
+ * Regression test: "orders identically on the restored machine".
  */
 export function importConversations(
   db: SqliteDatabase,
+  /**
+   * In **backup order — newest first**, exactly as `exportAllConversations`
+   * emits it and `parseBackupDocument` returns it.
+   *
+   * This is a real precondition, not a formality: for conversations sharing a
+   * `savedAt`, the file's order is the *only* surviving record of which was
+   * saved first, so it is the information this function uses to rebuild them
+   * in creation order. Hand a list in some other order and same-millisecond
+   * groups come back reversed.
+   */
   conversations: readonly SavedConversation[],
 ): { added: number; skipped: number } {
   const exists = db.prepare('SELECT 1 FROM conversations WHERE id = ?');
@@ -279,7 +310,19 @@ export function importConversations(
   // One transaction for the whole restore: a partial import that left some
   // conversations half-written would be worse than no import at all.
   withTransaction(db, () => {
-    for (const conversation of conversations) {
+    // Oldest first — see the note above.
+    //
+    // Reverse BEFORE sorting, and the order of those two steps is the whole
+    // fix. A backup is written newest-first, so reversing puts it in creation
+    // order including within a same-millisecond group; `sort` is stable, so
+    // sorting ascending afterwards preserves that. Sorting alone would leave
+    // ties in file order — still newest-first — which is exactly the case that
+    // was broken.
+    const inCreationOrder = [...conversations]
+      .reverse()
+      .sort((a, b) => (a.savedAt < b.savedAt ? -1 : a.savedAt > b.savedAt ? 1 : 0));
+
+    for (const conversation of inCreationOrder) {
       if (exists.get(conversation.id) !== undefined) {
         skipped += 1;
         continue;
