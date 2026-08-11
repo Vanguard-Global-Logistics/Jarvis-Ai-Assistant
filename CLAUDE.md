@@ -86,9 +86,18 @@ narrow, typed, schema-validated contracts. The modularity is a security requirem
 a code-organization preference — see §2. Subsystems must be separable at the process
 boundary, not merely at the folder boundary.
 
-Phase 1 target is a **local Windows desktop foundation** (Electron). It is a foundation,
-not the final system. Native iOS/watchOS, real voice, real Screen Vision, real banking,
-and real GitHub/Vercel automation are all later phases.
+Phase 1 target is a **local desktop foundation** (Electron). It is a foundation, not the
+final system. Native iOS/watchOS, real voice, real Screen Vision, real banking, and real
+GitHub/Vercel automation are all later phases.
+
+**Correction, 2026-08-11 — the primary machine is a Mac, not a Windows PC.** This file
+and several docs said "Windows desktop" throughout, from a period when that was the
+assumption. William's daily machine is a **MacBook Air** that never leaves the house and
+never sleeps (ADR 0012 — it is the head node of the Hive). The Windows work laptops are
+Dell machines owned by BCI Integrated Solutions and are **not** a deployment target for
+personal Jarvis. `docs/WINDOWS-ACCEPTANCE-TEST.md` remains a valid historical record and
+a valid gate *if* Windows ever ships; it is no longer the gate that matters most.
+macOS packaging is ADR 0016 / `docs/MAC-PACKAGING.md`.
 
 ---
 
@@ -228,12 +237,19 @@ TypeScript) and green again on one that rendered nothing (the CSP blocked Vite's
 React Refresh preamble). Both reached William before anyone noticed.
 
 **`npm run probe:runtime` is the check that catches those.** It launches the real app —
-packaged path and `dev:desktop` — drives it over the DevTools protocol, and asserts React
-mounts, `window.jarvis` exposes exactly the seven allowlisted functions, a chat/amplify
+built HTML and `dev:desktop` — drives it over the DevTools protocol, and asserts React
+mounts, `window.jarvis` exposes exactly the eleven allowlisted functions, a chat/amplify
 round-trip answers, the full history save/list/get/delete loop works against a real
-SQLite (including that an unsaved chat never persists), the renderer has no Node globals,
-and the console is clean. **Run it before claiming any runtime behaviour.** On Linux it
-needs Electron's GUI libraries once: `bash scripts/install-electron-runtime-deps.sh`.
+SQLite (including that an unsaved chat never persists), the profile round-trips and
+rejects an invalid accent, a non-loopback local model URL refuses to start the app
+(ADR 0015), the renderer has no Node globals, and the console is clean. **Run it before
+claiming any runtime behaviour.** On Linux it needs Electron's GUI libraries once:
+`bash scripts/install-electron-runtime-deps.sh`.
+
+`npm run probe:packaged` is the same assertions against a **genuinely packaged** app
+(ADR 0016) — asar archive, collected node_modules, `isPackaged: true`. It needs
+`npm run package:dir` first, which is why it is opt-in and not part of CI. Run it before
+claiming an installer works.
 
 CI runs it too, as the `runtime` job, separate from `verify`. A red `verify` means the code
 is wrong; a red `runtime` means the code is fine and the app is broken.

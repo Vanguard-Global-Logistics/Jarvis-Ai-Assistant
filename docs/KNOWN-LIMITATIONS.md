@@ -222,7 +222,7 @@ Two jobs, and the distinction matters:
   did not.
 - **`runtime`** — installs Electron's GUI libraries and Xvfb, builds, then runs
   `npm run probe:runtime`: launches the real app (packaged path **and** `dev:desktop`) and
-  asserts React mounts, the bridge exposes exactly the seven allowlisted functions, a
+  asserts React mounts, the bridge exposes exactly the eleven allowlisted functions, a
   chat/amplify round-trip works, the full history save/list/get/delete loop works against
   a real SQLite (including that an unsaved chat never persists), the renderer has no Node
   globals, and the console is clean. It is verified red-green against the CSP defect.
