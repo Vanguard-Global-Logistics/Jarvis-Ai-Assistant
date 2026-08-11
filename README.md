@@ -36,7 +36,8 @@ Personal AI assistant and orchestrator for William Lavold. Private, single-user.
 | `docs/IPC-SURFACE.md`             | Every channel crossing the renderer/main trust boundary.                         |
 | `docs/WINDOWS-ACCEPTANCE-TEST.md` | The manual runtime gate. **Passed on Windows development runtime (2026-07-16).** |
 | `docs/DECISIONS/`                 | ADRs.                                                                            |
-| `docs/TOMORROW-TEST-PLAN.md`      | **Start here to test on the Mac.** Ordered checklist + the open questions.       |
+| `docs/SEND-ME-THIS.md`            | **Start here.** Step-by-step: what to run, what to paste back, what to decide.   |
+| `docs/TOMORROW-TEST-PLAN.md`      | The full ordered test checklist, once you are past the steps above.              |
 | `docs/MAC-PACKAGING.md`           | Building the `.dmg`, and why Gatekeeper blocks it (ADR 0016).                    |
 | `docs/LOCAL-MODEL-SETUP.md`       | Running a free model on your own machine (ADR 0015).                             |
 | `reference/design-handoff/`       | The behavioral contract. **Archived and immutable.**                             |
@@ -51,6 +52,7 @@ npm run verify       # format + lint + typecheck + test
 npm run build        # build every workspace, and assert the Electron artifacts
 npm run dev:desktop  # launch the Electron shell
 npm run probe:runtime  # launch the app for real and assert what it does
+npm run diagnostics  # one pasteable report: machine, config, database (no secrets)
 npm run package:dir  # build a real packaged app (electron-builder, unpacked)
 npm run probe:packaged  # drive that packaged app — needs package:dir first
 npm run package:mac  # build the .dmg — Mac only (ADR 0016, docs/MAC-PACKAGING.md)

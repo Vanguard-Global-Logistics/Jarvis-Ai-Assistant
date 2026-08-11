@@ -28,7 +28,8 @@
     "probe:runtime": "node scripts/runtime-probe.mjs",
     "package:dir": "npm run build && electron-builder --dir --project apps/desktop --config.electronDist=../../node_modules/electron/dist",
     "package:mac": "npm run build && electron-builder --mac --project apps/desktop",
-    "probe:packaged": "node scripts/runtime-probe.mjs --packaged"
+    "probe:packaged": "node scripts/runtime-probe.mjs --packaged",
+    "diagnostics": "node scripts/collect-diagnostics.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

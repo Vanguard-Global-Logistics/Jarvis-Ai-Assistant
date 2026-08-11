@@ -16,7 +16,7 @@ cd ~/Jarvis-Ai-Assistant          # wherever you cloned it
 git checkout claude/jarvis-migration-chatgpt-19f128
 git pull origin claude/jarvis-migration-chatgpt-19f128
 npm install
-npm run verify                    # ~1 min. Expect: 367 tests passed
+npm run verify                    # ~1 min. Expect: 377 tests passed
 npm run build
 npm run probe:runtime             # launches the real app and asserts ~30 facts
 ```
