@@ -113,10 +113,15 @@ exists as a step at all: there is no native module. The remaining honest caveats
 - `node:sqlite` is labeled **experimental on Node 22**, the runtime vitest uses. The
   app itself runs on Electron 43's embedded Node 24, where it is stable. If Node 22
   changes the API under the tests, the tests will say so loudly.
-- There are exactly **three** migrations (`conversation-history`,
-  `conversation-amplifications` ADR 0009, and `profile` ADR 0013 — a single row holding
-  a display name and an accent). No tables exist for memory, projects, tasks, or the
-  audit log — those are feature design work and are not approved.
+- There are exactly **four** migrations (`conversation-history`,
+  `conversation-amplifications` ADR 0009, `profile` ADR 0013 — a single row holding a
+  display name and an accent — and `window-state` ADR 0017, a single row holding where
+  the window was). No tables exist for memory, projects, tasks, or the audit log — those
+  are feature design work and are not approved.
+- `window_state` is **not** reached over IPC. Main owns both the window and the database,
+  so the whole feature lives on the trusted side and the bridge stays at eleven
+  functions. It is verified by the runtime probe, which forces a distinctive size onto
+  disk between two launches and asserts the second comes up at it.
 
 ## 5. (Retired) There are zero migrations
 

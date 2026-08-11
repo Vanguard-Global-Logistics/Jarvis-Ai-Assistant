@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { BrowserWindow, app, dialog } from 'electron';
+import { BrowserWindow, app, dialog, screen } from 'electron';
 import { createLogger, describeEnv, parseEnv } from '@jarvis/config';
 import { migrate, migrations, openDatabase } from '@jarvis/database';
 import type { SqliteDatabase } from '@jarvis/database';
@@ -10,6 +10,12 @@ import { registerChatHandler } from './handlers/chat.js';
 import { registerHistoryHandlers } from './handlers/history.js';
 import { registerProfileHandlers } from './handlers/profile.js';
 import { applyContentSecurityPolicy, denyAllPermissions, lockNavigation } from './security.js';
+import {
+  MIN_WINDOW_SIZE,
+  chooseWindowBounds,
+  loadWindowState,
+  saveWindowState,
+} from './window-state.js';
 
 /**
  * Electron main process — the trusted side of the boundary.
@@ -107,12 +113,69 @@ function resolveDevCspNonce(rendererDevUrl: string | null): string | null {
   return nonce;
 }
 
-function createWindow(): BrowserWindow {
+/**
+ * Persist the window's position, debounced (ADR 0017).
+ *
+ * `resize` and `move` fire continuously while a window is being dragged, so
+ * writing on every event would mean hundreds of SQLite writes to drag a window
+ * across the screen. The trailing write is the one that matters.
+ *
+ * Bounds are read with `getNormalBounds()`, not `getBounds()`: while maximized,
+ * `getBounds()` reports the display size, so saving it would lose the
+ * un-maximized geometry and leave nowhere sensible to restore to.
+ */
+function rememberWindowPosition(window: BrowserWindow, db: SqliteDatabase): void {
+  let timer: NodeJS.Timeout | undefined;
+
+  const persist = (): void => {
+    if (window.isDestroyed()) return;
+    try {
+      saveWindowState(db, {
+        bounds: window.getNormalBounds(),
+        maximized: window.isMaximized(),
+      });
+    } catch (cause) {
+      // Losing the window position is a cosmetic failure. It must never take
+      // down a running app, so this is logged and swallowed rather than thrown.
+      log.warn('could not save window position', {
+        message: cause instanceof Error ? cause.message : String(cause),
+      });
+    }
+  };
+
+  const schedule = (): void => {
+    clearTimeout(timer);
+    timer = setTimeout(persist, 400);
+  };
+
+  // Registered one at a time rather than looping a list of names: Electron
+  // types `on` as a per-event overload set, so a union of event names matches
+  // no single overload.
+  window.on('resize', schedule);
+  window.on('move', schedule);
+  window.on('maximize', schedule);
+  window.on('unmaximize', schedule);
+  // Quitting cancels any pending debounce, so the final position is written
+  // synchronously here — otherwise closing right after a drag loses the move.
+  window.on('close', () => {
+    clearTimeout(timer);
+    persist();
+  });
+}
+
+function createWindow(db: SqliteDatabase): BrowserWindow {
+  // Where it was last time, if that place still exists — see window-state.ts
+  // for why a saved position is not simply trusted.
+  const saved = loadWindowState(db);
+  const placement = chooseWindowBounds(
+    saved?.bounds ?? null,
+    screen.getAllDisplays().map((display) => display.workArea),
+  );
+
   const window = new BrowserWindow({
-    width: 1440,
-    height: 900,
-    minWidth: 940,
-    minHeight: 600,
+    ...placement,
+    minWidth: MIN_WINDOW_SIZE.width,
+    minHeight: MIN_WINDOW_SIZE.height,
     show: false,
     // Visual work is deferred; this only avoids a white flash before first paint.
     backgroundColor: '#05070a',
@@ -136,8 +199,12 @@ function createWindow(): BrowserWindow {
   lockNavigation(window, RENDERER_DEV_URL !== null ? new URL(RENDERER_DEV_URL).origin : null);
 
   window.once('ready-to-show', () => {
+    // Maximize before showing, so the window does not visibly jump.
+    if (saved?.maximized === true) window.maximize();
     window.show();
   });
+
+  rememberWindowPosition(window, db);
 
   if (RENDERER_DEV_URL !== null) {
     void window.loadURL(RENDERER_DEV_URL);
@@ -196,10 +263,10 @@ void app
     registerHistoryHandlers(db);
     registerProfileHandlers(db);
 
-    createWindow();
+    createWindow(db);
 
     app.on('activate', () => {
-      if (BrowserWindow.getAllWindows().length === 0) createWindow();
+      if (BrowserWindow.getAllWindows().length === 0) createWindow(db);
     });
   })
   .catch((cause: unknown) => {

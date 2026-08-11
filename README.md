@@ -90,7 +90,7 @@ services/aegis         Security engine                     NOT IMPLEMENTED
 packages/contracts     Shared Zod schemas + types          PARTIAL — IPC, model, history, profile, experience
 packages/ui            Design-system components            PARTIAL — tokens, motion, Orb (12 states) + glass
 packages/config        Env validation + logging            IMPLEMENTED, unit-tested
-packages/database      SQLite (node:sqlite) + migrations   PARTIAL — wired to main, 3 migrations (history, amplifications, profile)
+packages/database      SQLite (node:sqlite) + migrations   PARTIAL — wired to main, 4 migrations (history, amplifications, profile, window-state)
 ```
 
 `services/aegis` and `apps/pwa` are empty. That is deliberate, not unfinished — see

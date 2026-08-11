@@ -1,5 +1,6 @@
 // @ts-check
 import { spawn, spawnSync } from 'node:child_process';
+import { DatabaseSync } from 'node:sqlite';
 import { existsSync, mkdtempSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
@@ -887,6 +888,125 @@ async function probeLocalModelRefusal() {
   ];
 }
 
+/**
+ * Window position survives a restart (ADR 0017), proven against the real app.
+ *
+ * Two launches sharing one userData directory. The first is killed with SIGKILL
+ * so `close` never fires — that deliberately exercises the *debounced* save
+ * rather than the one on quit — and must leave a row behind. Then a distinctive
+ * size is written into that row, and the second launch must come up at it.
+ *
+ * WHY THE WRITE, rather than just comparing the two launches: the first version
+ * of this check did exactly that and passed **with window restore disabled**.
+ * Xvfb clamps the window to the virtual screen, so both runs reported the same
+ * size no matter what the app did — a green check proving nothing, which is the
+ * failure mode this whole script exists to prevent. Forcing an arbitrary size
+ * that nothing else would produce is what makes the assertion mean something.
+ * Verified red-green afterwards.
+ *
+ * Size is asserted, not position: with no window manager under Xvfb, placement
+ * is not meaningful. The size round-trip still proves the migration, the store,
+ * and the restore path are connected end to end.
+ */
+async function probeWindowStateRestore() {
+  if (!existsSync(join(root, 'apps/desktop/out/main/index.js'))) {
+    fail('No build output. Run `npm run build` first.');
+  }
+
+  const port = 9225;
+  const userDataDir = mkdtempSync(join(tmpdir(), 'jarvis-probe-window-'));
+  // Comfortably inside the Xvfb screen so nothing clamps it, and not a size any
+  // default or fallback would produce.
+  const FORCED = { width: 1024, height: 700 };
+
+  /** Launch, wait for a rendered page, optionally read its size, then kill. */
+  const run = async (/** @type {boolean} */ measure) => {
+    const child = launch(
+      electronPath,
+      ['apps/desktop', `--remote-debugging-port=${port}`, '--no-sandbox'],
+      { JARVIS_USER_DATA_DIR: userDataDir },
+    );
+    try {
+      const target = await waitForCdp(port);
+      if (!target) return null;
+      const page = await cdp(target.webSocketDebuggerUrl);
+      await page.send('Runtime.enable');
+      await settle(page);
+      // Comfortably past the 400ms debounce, so the first run has written.
+      await new Promise((r) => setTimeout(r, 1500));
+      const size = measure
+        ? await page.evaluate('[window.outerWidth, window.outerHeight].join("x")')
+        : null;
+      page.close();
+      return measure ? String(size?.value ?? '') : '';
+    } finally {
+      kill(child);
+      await new Promise((r) => setTimeout(r, 1500));
+    }
+  };
+
+  const dbPath = join(userDataDir, 'jarvis.db');
+
+  await run(false);
+  const saved = readWindowStateRow(dbPath);
+
+  const forced = saved !== null && forceWindowStateSize(dbPath, FORCED);
+  const reopened = forced ? await run(true) : null;
+  const expected = `${String(FORCED.width)}x${String(FORCED.height)}`;
+
+  return [
+    {
+      name: 'Window position is recorded without a clean quit',
+      ok: saved !== null,
+      detail: saved === null ? 'no window_state row was written' : JSON.stringify(saved),
+    },
+    {
+      name: 'Window reopens at the size stored on disk',
+      ok: reopened === expected,
+      detail: `expected ${expected}, window reported ${String(reopened)}`,
+    },
+  ];
+}
+
+/**
+ * Overwrite the stored window size, so the next launch has something specific
+ * to restore. Returns false if there was no row to update.
+ */
+function forceWindowStateSize(
+  /** @type {string} */ dbPath,
+  /** @type {{width:number,height:number}} */ size,
+) {
+  const db = new DatabaseSync(dbPath);
+  try {
+    const result = db
+      .prepare('UPDATE window_state SET width = ?, height = ?, maximized = 0 WHERE id = 1')
+      .run(size.width, size.height);
+    return result.changes === 1;
+  } finally {
+    db.close();
+  }
+}
+
+/**
+ * Read the single window_state row straight out of the app's SQLite file.
+ *
+ * The probe asserting against the real database — rather than only against what
+ * the window reports — is what makes this a persistence check instead of a
+ * "the window has a size" check.
+ *
+ * @returns {{x:number,y:number,width:number,height:number,maximized:number}|null}
+ */
+function readWindowStateRow(/** @type {string} */ dbPath) {
+  if (!existsSync(dbPath)) return null;
+  const db = new DatabaseSync(dbPath, { readOnly: true });
+  try {
+    const row = db.prepare('SELECT x, y, width, height, maximized FROM window_state').get();
+    return row === undefined ? null : /** @type {any} */ (row);
+  } finally {
+    db.close();
+  }
+}
+
 // --- report ----------------------------------------------------------------
 
 let failed = 0;
@@ -915,6 +1035,12 @@ for (const mode of /** @type {const} */ (['prod', 'dev', 'packaged'])) {
 if (wantProd) {
   console.log(`\n──────── LOCAL MODEL CONFIG REFUSAL (ADR 0015) ────────\n`);
   for (const c of await probeLocalModelRefusal()) {
+    console.log(`  ${c.ok ? '✓' : '✗'} ${c.name.padEnd(38)} ${c.detail}`);
+    if (!c.ok) failed++;
+  }
+
+  console.log(`\n──────── WINDOW STATE SURVIVES A RESTART (ADR 0017) ────────\n`);
+  for (const c of await probeWindowStateRestore()) {
     console.log(`  ${c.ok ? '✓' : '✗'} ${c.name.padEnd(38)} ${c.detail}`);
     if (!c.ok) failed++;
   }
