@@ -757,6 +757,65 @@ async function probe(mode) {
   }
 }
 
+/**
+ * ADR 0015's security rule, proven at runtime rather than only in a unit test.
+ *
+ * A "local" model pointed off the machine would carry every family conversation
+ * to a stranger while the UI labeled it LOCAL. The rule is that the app REFUSES
+ * TO START — it must not degrade quietly to another provider, because a security
+ * rule that silently falls back is one that gets ignored.
+ *
+ * This launches the real built app with a hostile URL and asserts two things a
+ * unit test cannot: that the process actually dies, and that it says why.
+ * `dialog.showErrorBox` before `ready` writes to stderr on Linux (documented
+ * Electron behaviour), so the message is observable headlessly.
+ */
+async function probeLocalModelRefusal() {
+  if (!existsSync(join(root, 'apps/desktop/out/main/index.js'))) {
+    fail('No build output. Run `npm run build` first.');
+  }
+
+  const child = launch(electronPath, ['apps/desktop', '--no-sandbox'], {
+    JARVIS_LOCAL_MODEL_URL: 'https://someone-elses-server.example.com',
+    JARVIS_LOCAL_MODEL: 'llama3.1:8b',
+    JARVIS_USER_DATA_DIR: mkdtempSync(join(tmpdir(), 'jarvis-probe-refuse-')),
+  });
+
+  /** @type {string[]} */
+  const output = [];
+  child.stdout?.on('data', (d) => output.push(String(d)));
+  child.stderr?.on('data', (d) => output.push(String(d)));
+
+  const exitCode = await new Promise((resolve) => {
+    // If it is still alive after this long it did NOT refuse — which is the
+    // failure this check exists to catch, so resolve with a sentinel.
+    const timer = setTimeout(() => {
+      kill(child);
+      resolve('still running');
+    }, 30_000);
+    child.on('exit', (code) => {
+      clearTimeout(timer);
+      resolve(code);
+    });
+  });
+
+  const text = output.join('');
+  return [
+    {
+      name: 'Non-loopback local model: app refuses to start',
+      ok: exitCode !== 0 && exitCode !== 'still running',
+      detail: `exit = ${String(exitCode)}`,
+    },
+    {
+      name: 'Non-loopback local model: the reason is stated',
+      ok: /must point at this machine/i.test(text),
+      detail: /must point at this machine/i.test(text)
+        ? 'stderr names the loopback rule'
+        : `no explanation found in output: ${text.split('\n').filter(Boolean).slice(-5).join(' | ')}`,
+    },
+  ];
+}
+
 // --- report ----------------------------------------------------------------
 
 let failed = 0;
@@ -770,6 +829,14 @@ for (const mode of /** @type {const} */ (['prod', 'dev'])) {
 
   const checks = await probe(mode);
   for (const c of checks) {
+    console.log(`  ${c.ok ? '✓' : '✗'} ${c.name.padEnd(38)} ${c.detail}`);
+    if (!c.ok) failed++;
+  }
+}
+
+if (wantProd) {
+  console.log(`\n──────── LOCAL MODEL CONFIG REFUSAL (ADR 0015) ────────\n`);
+  for (const c of await probeLocalModelRefusal()) {
     console.log(`  ${c.ok ? '✓' : '✗'} ${c.name.padEnd(38)} ${c.detail}`);
     if (!c.ok) failed++;
   }

@@ -23,6 +23,20 @@ const EnvSchema = z.object({
   OPENAI_API_KEY: z.string().min(1).optional(),
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
 
+  /**
+   * A model running on this machine, exposed over an OpenAI-compatible
+   * `/v1/chat/completions` endpoint — Ollama, LM Studio, llama.cpp server
+   * (ADR 0015). Set this and Jarvis answers for free, offline, unlimited.
+   *
+   * Loopback only. This is validated in `createProvider`, not here, so the
+   * failure names the rule rather than reading as a malformed URL: a local
+   * provider that could point anywhere would be an unreviewed egress channel
+   * carrying every conversation off the machine.
+   */
+  JARVIS_LOCAL_MODEL_URL: z.url().optional(),
+  /** Which local model to ask for, e.g. `llama3.1:8b`. */
+  JARVIS_LOCAL_MODEL: z.string().min(1).optional(),
+
   // --- Data / storage ---
   /**
    * DEV-ONLY override for Electron's userData directory, honored only when the

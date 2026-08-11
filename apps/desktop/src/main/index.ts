@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { BrowserWindow, app } from 'electron';
+import { BrowserWindow, app, dialog } from 'electron';
 import { createLogger, describeEnv, parseEnv } from '@jarvis/config';
 import { migrate, migrations, openDatabase } from '@jarvis/database';
 import type { SqliteDatabase } from '@jarvis/database';
@@ -42,7 +42,25 @@ if (env.JARVIS_USER_DATA_DIR !== undefined && !app.isPackaged) {
 // no request rebuilds it, and the key never leaves this process. With no key
 // configured this is the deterministic MockProvider (ADR 0006: $0, offline,
 // self-labeling), which is exactly what ships by default.
-const modelProvider = createProvider(env);
+//
+// A misconfigured LOCAL model (ADR 0015) throws here by design — a "local"
+// provider pointed off the machine would carry every conversation to a stranger
+// while the UI labeled it local, so it must not degrade quietly to another
+// provider. The catch exists only to turn a stack trace nobody launching from
+// the Dock would ever see into a sentence, then still refuse to run.
+function buildProvider(): ReturnType<typeof createProvider> {
+  try {
+    return createProvider(env);
+  } catch (cause) {
+    const message = cause instanceof Error ? cause.message : String(cause);
+    log.error('model provider configuration rejected', { message });
+    dialog.showErrorBox('Jarvis cannot start', message);
+    app.exit(1);
+    throw cause;
+  }
+}
+
+const modelProvider = buildProvider();
 
 const RENDERER_DEV_URL = process.env.ELECTRON_RENDERER_URL ?? null;
 

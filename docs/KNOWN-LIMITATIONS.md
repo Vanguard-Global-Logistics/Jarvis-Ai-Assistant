@@ -40,9 +40,9 @@ cards (ADR 0009), so an Amplifier-only session is savable. What this is **not**:
   exposed but deliberately does not invoke it, because a native modal dialog would hang
   a headless run. Verifying both is a manual step on the Mac.
 
-With no `ANTHROPIC_API_KEY` set, replies come from the deterministic **mock** provider,
-labeled MOCK PROVIDER in the UI. A real key is opt-in and usage-billed; the mock default
-is why the app costs $0 to run.
+With no model configured at all, replies come from the deterministic **mock** provider,
+labeled "Mock provider" in the UI. A real key is opt-in and usage-billed; a local model
+(ADR 0015) is opt-in and free. The mock default is why the app costs $0 to run. See §6.
 
 ## 1. Nothing in this repository is protected by AEGIS
 
@@ -114,16 +114,41 @@ This section closed with ADR 0008 — migration 1 exists and is applied at start
 header remains so cross-references to later section numbers stay valid. The part that
 is still true lives in §4: only the conversation-history schema exists, nothing else.
 
-## 6. The model provider abstraction exists, but is not wired to the app
+## 6. Three model providers exist; only two have ever answered
 
-**Status: PARTIAL — implemented and unit-tested, not wired to the app.**
+**Status: PARTIAL. `mock` IMPLEMENTED AND VERIFIED · `anthropic` IMPLEMENTED, NOT YET
+VERIFIED · `local` IMPLEMENTED, NOT YET VERIFIED.**
 
-The provider-neutral model abstraction named in `CURRENT-STATE-AUDIT.md` §20 now exists: a
-deterministic mock provider (`MockProvider`) and a real Anthropic provider
-(`AnthropicProvider`) live in `services/jarvis-core` alongside the amplifier prompt
-builder. Both are covered by unit tests. The provider framework is **not** wired to the
-desktop app (integration is Checkpoint 2). No API key is required to run or verify the
-foundation.
+The provider-neutral abstraction named in `CURRENT-STATE-AUDIT.md` §20 exists and **is**
+wired to the desktop app (ADR 0007 — the earlier "not wired" statement was true at
+Checkpoint 1 and is superseded). `createProvider(env)` runs once in main and picks:
+
+| Provider    | Selected when                                                  | Cost         | Verified?                 |
+| ----------- | -------------------------------------------------------------- | ------------ | ------------------------- |
+| `local`     | `JARVIS_LOCAL_MODEL_URL` + `JARVIS_LOCAL_MODEL` set (ADR 0015) | $0           | **No — see below**        |
+| `anthropic` | `ANTHROPIC_API_KEY` set                                        | usage-billed | Not against the live API  |
+| `mock`      | neither — the default                                          | $0           | Yes, on the runtime probe |
+
+**What is not verified about `local`, stated plainly: no real local runner has ever
+answered.** Every test injects a fake `fetch`. Nothing in this repository has spoken to
+an actual Ollama, LM Studio, or `llama.cpp` server. The adapter's logic is covered — the
+request shape, the OpenAI-envelope parsing, the code-fence tolerance, and every error
+path — and that is a different claim from "it works". Verifying it needs a machine with a
+model installed, and is a manual step on the Mac.
+
+Two further honest caveats on `local`:
+
+- **A local model is not as good as Claude.** A model that fits on a MacBook Air will be
+  worse at the Thought Amplifier and at anything needing careful reasoning. The UI labels
+  local replies with a "Local model" chip for exactly this reason. Local hosting makes the
+  model free; it does not make Jarvis as capable.
+- **Loopback is enforced, and enforcement is a startup crash.** A non-loopback URL is
+  refused with a native error box and `exit(1)`, never a silent downgrade to another
+  provider — a "local" model on a remote host would carry every family conversation off
+  the machine while the UI called it local.
+
+No API key and no local runner are required to run or verify the foundation; the mock
+default is why the app costs $0.
 
 ## 7. The shell runs and is observed on Linux and Windows development runtime
 

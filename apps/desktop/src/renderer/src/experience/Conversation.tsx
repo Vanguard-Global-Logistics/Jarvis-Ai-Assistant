@@ -35,9 +35,10 @@ import { transcriptToMarkdown } from './transcript-markdown.js';
  *
  * Three honesty rules from CLAUDE.md §8 and the MVP spec are load-bearing here:
  *
- *   1. **Mock output is labeled mock.** Every reply carries its `provider`, and
- *      a `mock` reply wears a MOCK PROVIDER chip. Nothing may look more real
- *      than it is.
+ *   1. **The brain that answered is named.** Every reply carries its `provider`,
+ *      and anything other than the frontier model wears a chip: `mock` (canned,
+ *      not thinking) and `local` (a smaller model on this machine, ADR 0015).
+ *      They differ in capability, so nothing may look more real than it is.
  *   2. **Unsaved means unsaved.** The banner states that closing discards the
  *      session unless Save Session is pressed. No autosave exists, so none is
  *      implied.
@@ -991,18 +992,48 @@ function CopyMarkdownButton({ markdown }: { markdown: string }): JSX.Element {
   );
 }
 
-function MockChip(): JSX.Element {
+/**
+ * Chips for the providers that are not the frontier model.
+ *
+ * `anthropic` deliberately has no entry: an unchipped reply means "the best
+ * brain available answered". Chipping everything would make the label noise and
+ * the distinction invisible, which is the failure mode this rule exists to
+ * prevent.
+ *
+ * Amber for mock (nothing thought about this) and Jarvis blue for local (a real
+ * model, on this machine, weaker than Claude — a caveat, not a warning).
+ */
+const PROVIDER_CHIPS: Partial<Record<ProviderId, { label: string; color: string; title: string }>> =
+  {
+    mock: {
+      label: 'Mock provider',
+      color: accent.warning,
+      title: 'A canned, deterministic reply. No model was consulted.',
+    },
+    local: {
+      label: 'Local model',
+      color: accent.jarvisBlue,
+      title:
+        'Answered by a model running on this machine — free, offline, private, ' +
+        'and less capable than Claude.',
+    },
+  };
+
+function ProviderChip({ provider }: { provider: ProviderId }): JSX.Element | null {
+  const chip = PROVIDER_CHIPS[provider];
+  if (chip === undefined) return null;
   return (
     <span
+      title={chip.title}
       style={{
         ...MONO_LABEL,
-        color: accent.warning,
-        border: `1px solid ${accent.warning}`,
+        color: chip.color,
+        border: `1px solid ${chip.color}`,
         borderRadius: 4,
         padding: '1px 5px',
       }}
     >
-      Mock provider
+      {chip.label}
     </span>
   );
 }
@@ -1034,7 +1065,7 @@ function MessageBubble({
         style={{ ...MONO_LABEL, color: text.faint, display: 'flex', gap: 6, alignItems: 'center' }}
       >
         {isUser ? 'You' : 'Jarvis'}
-        {provider === 'mock' && <MockChip />}
+        {provider !== undefined && <ProviderChip provider={provider} />}
       </span>
       <div
         style={{

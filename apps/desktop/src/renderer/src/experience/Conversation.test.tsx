@@ -70,6 +70,31 @@ describe('Conversation', () => {
     });
   });
 
+  it('labels a local reply local, and leaves a frontier reply unchipped', async () => {
+    // The chip exists so the family can tell which brain answered — a local
+    // model is free and offline but weaker (ADR 0015). Anthropic wears no chip
+    // on purpose: if every reply had one, the distinction would be invisible.
+    const local = fakeBridge({
+      sendChat: vi.fn().mockResolvedValue({ text: 'Answered on your MacBook.', provider: 'local' }),
+    });
+    const { unmount } = render(<Conversation bridge={local} />);
+    type('hello');
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+    expect(await screen.findByText('Answered on your MacBook.')).toBeTruthy();
+    expect(screen.getByText(/Local model/i)).toBeTruthy();
+    expect(screen.queryByText(/Mock provider/i)).toBeNull();
+    unmount();
+
+    const cloud = fakeBridge({
+      sendChat: vi.fn().mockResolvedValue({ text: 'From Claude.', provider: 'anthropic' }),
+    });
+    render(<Conversation bridge={cloud} />);
+    type('hello');
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+    expect(await screen.findByText('From Claude.')).toBeTruthy();
+    expect(screen.queryByText(/Local model|Mock provider/i)).toBeNull();
+  });
+
   it('drives the orb through thinking → idle on a send', async () => {
     const states: string[] = [];
     render(

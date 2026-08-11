@@ -306,6 +306,15 @@ verify Phase 1. Adding a model must mean adding a config entry and a provider ad
 never editing call sites across the codebase. Any real key must never enter the renderer
 and must never be logged.
 
+That abstraction now has **three** adapters, chosen in this precedence (ADR 0015):
+**`local`** (a model on the user's own machine over an OpenAI-compatible endpoint — free,
+offline, private, and **loopback-only**, enforced by a startup crash rather than a silent
+downgrade) → **`anthropic`** (a real key, usage-billed) → **`mock`** (the $0 default).
+Replies from `mock` and `local` are chipped in the UI; an unchipped reply means the
+frontier model answered. `local` is `IMPLEMENTED, NOT YET VERIFIED` — no real Ollama or
+LM Studio has ever answered, and a model that fits on a laptop is meaningfully weaker than
+Claude. Do not describe local hosting as making Jarvis free; it makes the *model* free.
+
 ---
 
 ## 6. Visual Language
