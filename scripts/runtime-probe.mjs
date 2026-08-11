@@ -892,9 +892,10 @@ async function probeLocalModelRefusal() {
  * Window position survives a restart (ADR 0017), proven against the real app.
  *
  * Two launches sharing one userData directory. The first is killed with SIGKILL
- * so `close` never fires — that deliberately exercises the *debounced* save
- * rather than the one on quit — and must leave a row behind. Then a distinctive
- * size is written into that row, and the second launch must come up at it.
+ * so `close` never fires — the row must exist anyway, which is what the
+ * write-on-open added after this check failed on macOS guarantees. Then a
+ * distinctive size is written into that row, and the second launch must come up
+ * at it.
  *
  * WHY THE WRITE, rather than just comparing the two launches: the first version
  * of this check did exactly that and passed **with window restore disabled**.

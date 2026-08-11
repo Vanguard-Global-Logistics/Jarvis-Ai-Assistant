@@ -18,7 +18,7 @@ round-trip once already, which is why it is Step 0.
 Two ways to avoid it:
 
 ```bash
-caffeinate -dimsu &     # note the ampersand — runs in the background
+caffeinate -dimsu &
 ```
 
 or give it something to babysit, so it exits when that does:
@@ -30,10 +30,20 @@ caffeinate -dimsu npm run dev:desktop
 If your prompt is currently stuck, press **Control-C** first — and re-paste the
 commands, because the ones you typed while it was running are gone.
 
+**Related, and it already bit us: never paste a `# comment` on the end of a
+command line.** Your zsh does not have `interactive_comments` enabled, so `#` is
+not treated as a comment — it is passed through as an argument. `npm run verify
+
+# expect 377 tests`became`vitest run # expect 377 tests`, vitest read those
+
+words as a test-name filter, matched nothing, and exited 1 with **"No test files
+found"**. It looked like it ran. It did not. Every command block in this
+document has had its trailing comments removed for exactly that reason.
+
 ## Step 1 — Get the latest code (2 min)
 
 ```bash
-cd ~/Jarvis-Ai-Assistant          # wherever you cloned it
+cd ~/Jarvis-Ai-Assistant
 git checkout claude/jarvis-migration-chatgpt-19f128
 git pull origin claude/jarvis-migration-chatgpt-19f128
 npm install
@@ -91,8 +101,8 @@ runs free-and-weaker or paid-and-better.
 
 ```bash
 brew install ollama
-ollama serve &                    # leave running
-ollama pull llama3.1:8b           # ~4.7 GB, one time
+ollama serve &
+ollama pull llama3.1:8b
 curl http://127.0.0.1:11434/v1/models
 ```
 
@@ -104,7 +114,7 @@ JARVIS_LOCAL_MODEL=llama3.1:8b
 ```
 
 ```bash
-npm run diagnostics               # should now say provider: local
+npm run diagnostics
 npm run dev:desktop
 ```
 

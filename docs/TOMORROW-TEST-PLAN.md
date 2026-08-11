@@ -12,13 +12,13 @@ exact wording of the error; the errors were written to be actionable.
 ## 0. Setup (once)
 
 ```bash
-cd ~/Jarvis-Ai-Assistant          # wherever you cloned it
+cd ~/Jarvis-Ai-Assistant
 git checkout claude/jarvis-migration-chatgpt-19f128
 git pull origin claude/jarvis-migration-chatgpt-19f128
 npm install
-npm run verify                    # ~1 min. Expect: 377 tests passed
+npm run verify
 npm run build
-npm run probe:runtime             # launches the real app and asserts ~30 facts
+npm run probe:runtime
 ```
 
 `npm run probe:runtime` passing is the strongest single signal that nothing is
@@ -114,8 +114,8 @@ Full instructions: `docs/LOCAL-MODEL-SETUP.md`. Short version:
 
 ```bash
 brew install ollama
-ollama pull llama3.1:8b          # ~4.7 GB, one time
-curl http://127.0.0.1:11434/v1/models    # should answer
+ollama pull llama3.1:8b
+curl http://127.0.0.1:11434/v1/models
 ```
 
 Then put in `.env` at the repo root:
@@ -150,7 +150,7 @@ and 4.3 on that basis, and tell me whether the quality is usable for the family.
 ## 5. Jarvis as an app you double-click (ADR 0016) — **UNVERIFIED on macOS**
 
 ```bash
-npm run package:mac      # produces apps/desktop/release/*.dmg
+npm run package:mac
 ```
 
 | #   | Do                                                            | Expect                                                |

@@ -52,15 +52,28 @@ if (env.JARVIS_USER_DATA_DIR !== undefined && !app.isPackaged) {
 // A misconfigured LOCAL model (ADR 0015) throws here by design — a "local"
 // provider pointed off the machine would carry every conversation to a stranger
 // while the UI labeled it local, so it must not degrade quietly to another
-// provider. The catch exists only to turn a stack trace nobody launching from
-// the Dock would ever see into a sentence, then still refuse to run.
+// provider.
+//
+// THE DIALOG IS PACKAGED-ONLY, and that is a bug fix, not a preference. On Linux
+// `dialog.showErrorBox` before `ready` writes to stderr and returns; on **macOS
+// it opens a real modal and blocks until someone clicks it**, so `app.exit(1)`
+// on the next line never ran. Found on William's MacBook: the refusal check
+// reported `exit = still running` while the stderr message was correct — the app
+// had refused to start and then sat there instead of quitting.
+//
+// So: stderr always, because that is where a terminal is watching, and it never
+// blocks. The modal only when packaged, where the app was launched from the Dock
+// and stderr goes nowhere a human will look — and there, blocking until
+// acknowledged is the right behaviour rather than a flash of nothing.
 function buildProvider(): ReturnType<typeof createProvider> {
   try {
     return createProvider(env);
   } catch (cause) {
     const message = cause instanceof Error ? cause.message : String(cause);
     log.error('model provider configuration rejected', { message });
-    dialog.showErrorBox('Jarvis cannot start', message);
+    if (app.isPackaged) {
+      dialog.showErrorBox('Jarvis cannot start', message);
+    }
     app.exit(1);
     throw cause;
   }
@@ -161,6 +174,17 @@ function rememberWindowPosition(window: BrowserWindow, db: SqliteDatabase): void
     clearTimeout(timer);
     persist();
   });
+
+  // Record where the window opened, immediately.
+  //
+  // Without this, a window that is never moved and never cleanly quit is never
+  // recorded at all: `resize`/`move` do not fire on their own, and `close` does
+  // not fire on a force-quit or a crash. That is not hypothetical — under Xvfb
+  // the WM-less environment happens to fire a resize on launch, so this looked
+  // fine on Linux and on William's Mac the row was simply absent. Writing the
+  // opening placement makes the behaviour identical on both, and means the very
+  // first launch already has something to restore.
+  persist();
 }
 
 function createWindow(db: SqliteDatabase): BrowserWindow {
