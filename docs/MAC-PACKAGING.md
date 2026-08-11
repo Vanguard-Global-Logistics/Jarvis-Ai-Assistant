@@ -91,9 +91,24 @@ capability it belongs to.
 
 ## Known rough edges
 
-- **No app icon.** `packaging/icon.icns` does not exist, so the app shows the
-  default Electron icon. Cosmetic, and worth fixing from the approved orb
-  artwork before anyone else in the family sees it.
+- **The app icon is a generated placeholder, and its pickup is unverified.**
+  `apps/desktop/packaging/icon.png` now exists — the Jarvis orb (dark navy
+  squircle, blue concentric rings, hot core) computed from the approved colour
+  tokens by `scripts/generate-app-icon.mjs`, at 1024×1024, which is the size
+  electron-builder needs to derive `.icns` and `.ico`.
+
+  Two honest caveats. First, **nothing here has confirmed electron-builder
+  actually consumes it**: Linux `--dir` does not resolve icons at all, so the
+  local packaging run proves only that the file is in the right place with the
+  right dimensions. You will see it — or the default Electron icon — the first
+  time you run `npm run package:mac`. Second, it is a **placeholder faithful to
+  the design language, not the approved artwork**. It invents no colour, but it
+  is not the orb from the Orb Family sheet. When
+  `reference/visual-targets/jarvis-orb-family.png` is finally committed, replace
+  it and update this line.
+
+  Regenerate with `node scripts/generate-app-icon.mjs`.
+
 - **Two architectures, not universal.** The config builds arm64 and x64
   separately. A universal binary doubles the download for everyone to spare one
   person a choice; pick the one matching the Mac (Apple silicon → arm64).

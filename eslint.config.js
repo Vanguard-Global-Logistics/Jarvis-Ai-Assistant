@@ -184,9 +184,20 @@ export default tseslint.config(
   // type-aware rules can only see `any` here and report noise rather than defects.
   // (`scripts/*.mjs` carry `// @ts-check` + JSDoc instead, which is checked by the
   // editor and by `tsc` if they are ever added to a project.)
+  // `*.d.mts` is here for the same reason: it hand-declares the types for a
+  // `.mjs` build script, so it belongs to no tsconfig project and type-aware
+  // rules cannot resolve it. It contains declarations only — no logic to lint.
   {
-    files: ['**/*.js', '**/*.mjs', '**/*.cjs'],
+    files: ['**/*.js', '**/*.mjs', '**/*.cjs', '**/*.d.mts'],
     extends: [tseslint.configs.disableTypeChecked],
+    rules: {
+      // This rule wants TS annotations and cannot read JSDoc, so in a
+      // `// @ts-check`'d script it reports every export as untyped when the
+      // types are right there in the JSDoc — and, where a script is imported by
+      // typed code, in a hand-written `.d.mts` beside it. The boundary is
+      // explicitly typed; the rule just cannot see how.
+      '@typescript-eslint/explicit-module-boundary-types': 'off',
+    },
   },
 
   {

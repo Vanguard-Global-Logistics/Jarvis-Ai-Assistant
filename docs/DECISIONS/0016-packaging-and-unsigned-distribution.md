@@ -81,8 +81,18 @@ overreach this project's boundary rules exist to prevent.
   way until someone runs `npm run package:mac` followed by `npm run probe:packaged`
   on a Mac. The Linux result is real evidence about the _configuration_, and no
   evidence at all about macOS.
-- **No app icon.** `packaging/icon.icns` does not exist; the app wears the default
-  Electron icon. Cosmetic, and listed as a rough edge rather than quietly left.
+- **The app icon is generated, not drawn** (added after this ADR was first
+  written). `scripts/generate-app-icon.mjs` computes the orb from the approved
+  colour tokens and encodes the PNG directly — no image library is added to the
+  toolchain to draw four circles. It exists as code because the approved orb
+  artwork was supplied in a chat window and never committed, which is exactly
+  how three earlier mockups were lost (CLAUDE.md §6); a computed icon cannot be
+  lost and reviews as a diff. It is a **placeholder faithful to the design
+  language**, and whether electron-builder consumes it is **not verified** —
+  Linux `--dir` does not resolve icons, so that is a macOS-side check.
+  A test in `packages/ui` asserts every colour against `colors.ts`, so the
+  duplicated palette fails a test rather than drifting off-brand (verified
+  red-green).
 - **No auto-update.** A new version means building and installing a new `.dmg` by
   hand. Auto-update needs hosted signed releases, which circles back to signing.
 - **`npm audit` now reports findings** from electron-builder's transitive build
