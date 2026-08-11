@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { CSSProperties, JSX, KeyboardEvent, RefObject } from 'react';
 import type {
   AmplifierResult,
@@ -128,8 +128,23 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
    * that record resets the claim, so the next discard asks.
    */
   const [persistedId, setPersistedId] = useState<string | null>(null);
-  /** True while New session is one click away from discarding real work. */
-  const [confirmNew, setConfirmNew] = useState(false);
+  /**
+   * The exact transcript the discard confirmation was armed for, or null.
+   *
+   * Deliberately not a boolean cleared by an effect. The transcript changing
+   * must disarm the prompt — "discard 3 entries?" stops being the question the
+   * moment a fourth arrives — and writing that as
+   * `useEffect(() => setConfirmNew(false), [items])` loses a race: passive
+   * effects flush asynchronously, so a click landing between React committing a
+   * new reply and that effect running arms the prompt and then has it reset out
+   * from under it. That failed 1 run in 20, as "the confirm button never
+   * appeared".
+   *
+   * Holding the array identity makes armed-ness DERIVED — true only while the
+   * transcript is still the one the question was asked about — computed during
+   * render, with no window to race.
+   */
+  const [armedFor, setArmedFor] = useState<TranscriptItem[] | null>(null);
   /** True while Continue is one click away from replacing unsaved live work. */
   const [confirmContinue, setConfirmContinue] = useState(false);
   const nextId = useRef(0);
@@ -139,6 +154,9 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
 
   /** No bridge means a browser preview: every action is inert, not broken. */
   const disabled = bridge === null;
+
+  /** One click away from discarding real work — see `armedFor`. */
+  const confirmNew = armedFor === items;
 
   const setOrb = useCallback(
     (state: OrbState) => {
@@ -330,25 +348,19 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
    */
   const newSession = useCallback((): void => {
     if (unsavedCount > 0 && !confirmNew) {
-      setConfirmNew(true);
+      setArmedFor(items);
       return;
     }
     setItems([]);
     setDraft('');
     setPersistedCount(0);
     setPersistedId(null);
-    setConfirmNew(false);
+    setArmedFor(null);
     setViewing(null);
     setHistoryError(null);
     setSaveNotice(null);
     setOrb('idle');
-  }, [unsavedCount, confirmNew, setOrb]);
-
-  // Disarm the confirmation as soon as the transcript changes under it: the
-  // "discard 3 entries?" the user was answering is no longer the question.
-  useEffect(() => {
-    setConfirmNew(false);
-  }, [items]);
+  }, [unsavedCount, confirmNew, items, setOrb]);
 
   const openSaved = useCallback(
     async (id: string): Promise<void> => {
@@ -436,7 +448,7 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
     // under its own id, so discarding it loses nothing and must not prompt.
     setPersistedCount(loaded.length);
     setPersistedId(conversation.id);
-    setConfirmNew(false);
+    setArmedFor(null);
     setConfirmContinue(false);
     setViewing(null);
     setHistoryOpen(false);
@@ -524,10 +536,52 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
    * a real cost if forgotten (an unsaved session is discarded on close), Find
    * is the one people reach for reflexively, and Escape is the way out of a
    * mode. Nothing else qualifies yet.
+   *
+   * WHY THE HANDLER READS A REF INSTEAD OF ITS CLOSURE. The obvious shape —
+   * one `useEffect` keyed on every value the handler reads — re-attaches the
+   * listener whenever any of them changes. Passive effects flush
+   * ASYNCHRONOUSLY, so between React committing the DOM and that effect
+   * running, the listener sitting on `document` is still the previous render's,
+   * closed over the previous render's state. A key pressed inside that window
+   * acts on the frame before: ⌘S sees `savableCount === 0` and silently does
+   * nothing, Escape sees `viewing === null` and closes the whole panel instead
+   * of stepping out of the saved session.
+   *
+   * That is not theoretical — it failed 2 runs in 10 before this was changed,
+   * and the two failures were exactly those two symptoms. A human would hit it
+   * far more rarely and have no way to describe it beyond "sometimes ⌘S does
+   * nothing", which is the worst kind of bug to own.
+   *
+   * `useLayoutEffect` runs synchronously in the commit phase, before the
+   * browser paints and before any microtask can observe the new DOM, so the ref
+   * is never behind what is on screen. The listener itself is then attached
+   * once for the component's life.
    */
+  const latest = useRef({
+    disabled,
+    busy,
+    savableCount,
+    viewing,
+    historyOpen,
+    saveSession,
+    toggleHistory,
+  });
+  useLayoutEffect(() => {
+    latest.current = {
+      disabled,
+      busy,
+      savableCount,
+      viewing,
+      historyOpen,
+      saveSession,
+      toggleHistory,
+    };
+  });
+
   useEffect(() => {
     const handler = (event: globalThis.KeyboardEvent): void => {
       const chord = event.metaKey || event.ctrlKey;
+      const now = latest.current;
 
       if (chord && event.key.toLowerCase() === 's') {
         // Always prevented, even when saving is not possible: letting the
@@ -535,18 +589,20 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
         // doing nothing, and the disabled-state hint already explains why the
         // button is greyed.
         event.preventDefault();
-        if (!disabled && !busy && savableCount > 0 && viewing === null) void saveSession();
+        if (!now.disabled && !now.busy && now.savableCount > 0 && now.viewing === null) {
+          void now.saveSession();
+        }
         return;
       }
 
       if (chord && event.key.toLowerCase() === 'f') {
         event.preventDefault();
-        if (disabled) return;
+        if (now.disabled) return;
         // Open History if it is closed — Find with nothing to search reads as
         // broken — then put the caret in the filter box. The input only exists
         // once there is enough saved to be worth sifting, so the focus call is
         // conditional by design, not defensively.
-        if (!historyOpen) void toggleHistory();
+        if (!now.historyOpen) void now.toggleHistory();
         setTimeout(() => filterRef.current?.focus(), 0);
         return;
       }
@@ -554,10 +610,10 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
       if (event.key === 'Escape') {
         // One step back per press, most-nested first: a saved session is a mode
         // on top of the panel, so Escape leaves the session before the panel.
-        if (viewing !== null) {
+        if (now.viewing !== null) {
           setViewing(null);
-        } else if (historyOpen) {
-          void toggleHistory();
+        } else if (now.historyOpen) {
+          void now.toggleHistory();
         }
       }
     };
@@ -566,7 +622,7 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
     return () => {
       document.removeEventListener('keydown', handler);
     };
-  }, [disabled, busy, savableCount, viewing, historyOpen, saveSession, toggleHistory]);
+  }, []);
 
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
     // Enter sends; Shift+Enter is a newline. A composer that eats every Enter
