@@ -160,12 +160,26 @@ The earlier statement that the app had never been launched and observed renderin
 
 ### What is now actually observed
 
-`npm run probe:runtime` launches the real app — both the packaged path (`file://`, strict
-CSP) and the real `npm run dev:desktop` (Vite, dev CSP) — and asserts the same functional checks on Linux. On the Windows laptop, the development runtime passed the manual acceptance gate. The probe continues to be the cheaper automated check for Linux; it does not replace the Windows gate for packaged installer verification.
+`npm run probe:runtime` launches the real app — both the built-HTML path (`file://`, strict
+CSP) and the real `npm run dev:desktop` (Vite, dev CSP) — and asserts the same functional checks on Linux. On the Windows laptop, the development runtime passed the manual acceptance gate. The probe continues to be the cheaper automated check for Linux; it does not replace the Windows gate.
+
+**New: a genuinely packaged app is now exercised, on Linux.** `npm run package:dir`
+produces a real electron-builder artifact — asar archive, collected `node_modules`,
+`isPackaged: true` — and `npm run probe:packaged` drives _that_ app through the same
+assertions. It passes. This closes a distinct failure class the earlier "packaged path"
+wording glossed over: `electron .` reads loose files from the working tree, whereas a
+shipped app reads them from an asar with only the dependencies electron-builder decided to
+collect. A dependency it missed is invisible to `verify`, invisible to `build`, and fatal
+on first double-click — the packaging analogue of the two defects below.
 
 ### What is still NOT verified
 
-- **The packaged installer / production build.** The Windows development runtime passed, but a packaged installer or production artifact has not been exercised on Windows.
+- **Any macOS or Windows installer.** The `.dmg` and NSIS targets are **configured, not
+  built** (`docs/MAC-PACKAGING.md`); installers can only be produced on their own
+  platform. The packaged-app assertions above hold on Linux only.
+- **Code signing and notarization on macOS.** Deliberately absent — see
+  `docs/MAC-PACKAGING.md`. macOS Gatekeeper will block the app on first open until it is
+  explicitly allowed, and that is expected behaviour, not a defect.
 - **The hardening flags as enforced.** The probe and the live window show the renderer has no Node globals, which is strong evidence the isolation flags are working, but this is not a sandbox-escape proof.
 - **Permissions and navigation locking.** Steps 5 and 6 of the acceptance test are not automated; nothing has confirmed a permission prompt is denied at runtime.
 

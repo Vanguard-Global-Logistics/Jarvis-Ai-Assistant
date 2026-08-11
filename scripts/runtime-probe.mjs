@@ -26,18 +26,30 @@ import { fileURLToPath } from 'node:url';
  * Windows. This closes the cheap gap, not the real one.
  *
  * Usage:
- *   node scripts/runtime-probe.mjs            # both modes
- *   node scripts/runtime-probe.mjs --prod     # built HTML (file://), production CSP
- *   node scripts/runtime-probe.mjs --dev      # real `dev:desktop`, Vite + dev CSP
+ *   node scripts/runtime-probe.mjs             # prod + dev
+ *   node scripts/runtime-probe.mjs --prod      # built HTML (file://), production CSP
+ *   node scripts/runtime-probe.mjs --dev       # real `dev:desktop`, Vite + dev CSP
+ *   node scripts/runtime-probe.mjs --packaged  # the INSTALLED app from electron-builder
  *
- * Both modes matter. The module-resolution bug only appeared in a real launch; the CSP bug
- * only appeared in dev. A probe that ran one mode would have missed one of them.
+ * All three modes matter, and each exists because of a different failure. The
+ * module-resolution bug only appeared in a real launch; the CSP bug only appeared in dev.
+ * `--packaged` covers the third: `electron .` reads loose files from the working tree,
+ * while a shipped app reads them out of an asar archive with only the node_modules
+ * electron-builder decided to include. A dependency it failed to collect is invisible
+ * until someone double-clicks the installed app — the packaged analogue of the very
+ * defect that reached William twice.
+ *
+ * `--packaged` is opt-in because it needs `npm run package:dir` to have run first; the
+ * default two modes need only `npm run build`, which is what CI does.
  */
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
-const wantProd = args.includes('--prod') || !args.includes('--dev');
-const wantDev = args.includes('--dev') || !args.includes('--prod');
+const wantPackaged = args.includes('--packaged');
+// An explicit mode flag selects only that mode; bare invocation runs prod + dev.
+const explicit = args.some((a) => ['--prod', '--dev', '--packaged'].includes(a));
+const wantProd = args.includes('--prod') || !explicit;
+const wantDev = args.includes('--dev') || !explicit;
 
 /**
  * Electron needs a display. Codespaces has none, so borrow one.
@@ -342,11 +354,12 @@ async function runChecks(page, mode) {
   // impossible; this is the assertion that says so out loud.
   const href = await page.evaluate('location.href');
   const url = String(href.value ?? '');
-  const urlOk = mode === 'prod' ? url.startsWith('file://') : url.startsWith('http://');
+  // Only dev serves over http; prod and packaged both load built HTML from disk.
+  const urlOk = mode === 'dev' ? url.startsWith('http://') : url.startsWith('file://');
   add(
     `Correct page for ${mode} mode`,
     urlOk,
-    url || '(no url)' + (urlOk ? '' : ` — expected ${mode === 'prod' ? 'file://' : 'http://'}`),
+    url || '(no url)' + (urlOk ? '' : ` — expected ${mode === 'dev' ? 'http://' : 'file://'}`),
   );
 
   // Printed as evidence rather than asserted: the strict-production assertions
@@ -696,11 +709,44 @@ async function runChecks(page, mode) {
  * @param {'prod' | 'dev'} mode
  * @returns {Promise<Check[]>}
  */
+/**
+ * Where electron-builder puts the runnable app for `--dir` on this platform.
+ *
+ * Only the host platform's output can be launched — a macOS `.app` cannot run on
+ * Linux — so this resolves for the current platform and the caller reports
+ * honestly when it is absent.
+ *
+ * @returns {string | null}
+ */
+function packagedBinary() {
+  const rel = join(root, 'apps/desktop/release');
+  const candidates = IS_WINDOWS
+    ? ['win-unpacked/Jarvis.exe']
+    : process.platform === 'darwin'
+      ? [
+          'mac-arm64/Jarvis.app/Contents/MacOS/Jarvis',
+          'mac/Jarvis.app/Contents/MacOS/Jarvis',
+          'mac-x64/Jarvis.app/Contents/MacOS/Jarvis',
+        ]
+      : ['linux-unpacked/jarvis'];
+
+  for (const c of candidates) {
+    if (existsSync(join(rel, c))) return join(rel, c);
+  }
+  return null;
+}
+
 async function probe(mode) {
-  const port = mode === 'prod' ? 9222 : 9223;
+  const port = mode === 'prod' ? 9222 : mode === 'dev' ? 9223 : 9224;
 
   if (mode === 'prod' && !existsSync(join(root, 'apps/desktop/out/main/index.js'))) {
     fail('No build output. Run `npm run build` first.');
+  }
+  if (mode === 'packaged' && packagedBinary() === null) {
+    fail(
+      'No packaged app for this platform. Run `npm run package:dir` first.\n' +
+        '      (A macOS .app can only be built and probed on a Mac.)',
+    );
   }
 
   await assertPortFree(port, mode);
@@ -711,21 +757,46 @@ async function probe(mode) {
   // override only when unpackaged (main/index.ts guards on !app.isPackaged).
   const userDataDir = mkdtempSync(join(tmpdir(), `jarvis-probe-${mode}-`));
 
+  const packagedBin = mode === 'packaged' ? packagedBinary() : null;
+
   const child =
-    mode === 'prod'
-      ? // Built HTML over file://, production CSP, no dev server.
-        launch(electronPath, ['apps/desktop', `--remote-debugging-port=${port}`, '--no-sandbox'], {
-          JARVIS_USER_DATA_DIR: userDataDir,
-        })
-      : // The REAL `npm run dev:desktop`. electron-vite forwards
-        // REMOTE_DEBUGGING_PORT and NO_SANDBOX to Electron itself, so this
-        // exercises the actual dev path — including the CSP nonce travelling
-        // through electron-vite's spawn — rather than a reconstruction of it.
-        launch('npm', ['run', 'dev:desktop'], {
-          REMOTE_DEBUGGING_PORT: String(port),
-          NO_SANDBOX: '1',
-          JARVIS_USER_DATA_DIR: userDataDir,
-        });
+    packagedBin !== null
+      ? // The INSTALLED app: its own Electron, its own asar, its own collected
+        // node_modules. `JARVIS_USER_DATA_DIR` is deliberately ignored by a
+        // packaged build (main/index.ts guards on !app.isPackaged), so
+        // hermeticity comes from Electron's own `--user-data-dir` switch —
+        // which is exactly the point: the guard is being exercised, not
+        // bypassed.
+        launch(
+          packagedBin,
+          [
+            `--remote-debugging-port=${port}`,
+            '--no-sandbox',
+            `--user-data-dir=${userDataDir}`,
+            // A packaged build carries no swiftshader flag (it must not ship
+            // one), so a GPU-less probe host needs it passed from outside.
+            '--enable-unsafe-swiftshader',
+          ],
+          { JARVIS_USER_DATA_DIR: userDataDir },
+        )
+      : mode === 'prod'
+        ? // Built HTML over file://, production CSP, no dev server.
+          launch(
+            electronPath,
+            ['apps/desktop', `--remote-debugging-port=${port}`, '--no-sandbox'],
+            {
+              JARVIS_USER_DATA_DIR: userDataDir,
+            },
+          )
+        : // The REAL `npm run dev:desktop`. electron-vite forwards
+          // REMOTE_DEBUGGING_PORT and NO_SANDBOX to Electron itself, so this
+          // exercises the actual dev path — including the CSP nonce travelling
+          // through electron-vite's spawn — rather than a reconstruction of it.
+          launch('npm', ['run', 'dev:desktop'], {
+            REMOTE_DEBUGGING_PORT: String(port),
+            NO_SANDBOX: '1',
+            JARVIS_USER_DATA_DIR: userDataDir,
+          });
 
   /** @type {string[]} */
   const output = [];
@@ -820,11 +891,18 @@ async function probeLocalModelRefusal() {
 
 let failed = 0;
 
-for (const mode of /** @type {const} */ (['prod', 'dev'])) {
+const MODE_LABELS = {
+  prod: 'PRODUCTION (built HTML, file://)',
+  dev: 'DEVELOPMENT (dev:desktop)',
+  packaged: 'PACKAGED (the installed app, from asar)',
+};
+
+for (const mode of /** @type {const} */ (['prod', 'dev', 'packaged'])) {
   if (mode === 'prod' && !wantProd) continue;
   if (mode === 'dev' && !wantDev) continue;
+  if (mode === 'packaged' && !wantPackaged) continue;
 
-  const label = mode === 'prod' ? 'PRODUCTION (built HTML, file://)' : 'DEVELOPMENT (dev:desktop)';
+  const label = MODE_LABELS[mode];
   console.log(`\n──────── ${label} ────────\n`);
 
   const checks = await probe(mode);

@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Jarvis Electron desktop shell (Windows target). Foundation only — no features.",
+  "description": "Jarvis Electron desktop shell. Foundation plus the Stage 1A conversation and persistence slices.",
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
@@ -11,8 +11,12 @@
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json"
   },
+  "//dependencies": "RUNTIME deps only — electron-builder ships exactly what is listed here, so anything bundled into out/ must NOT be here or it is shipped twice. scripts/assert-electron-bundle.mjs pins the true runtime set: electron (provided by the runtime), zod, and @anthropic-ai/sdk. The @jarvis/* workspaces, React, and the fonts are all bundled by electron-vite and are therefore build-time only.",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.112.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
     "@fontsource/ibm-plex-mono": "^5.2.7",
     "@fontsource/inter": "^5.2.8",
     "@fontsource/space-grotesk": "^5.2.10",
@@ -21,17 +25,19 @@
     "@jarvis/database": "*",
     "@jarvis/jarvis-core": "*",
     "@jarvis/ui": "*",
-    "zod": "^4.4.3"
-  },
-  "devDependencies": {
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.2.0",
-    "electron": "^43.1.1",
+    "electron": "43.1.1",
     "electron-vite": "^5.0.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "typescript": "^5.9.3",
     "vite": "^7.3.6"
+  },
+  "author": "William Lavold <management@vanguardgloballogisticsllc.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Vanguard-Global-Logistics/Jarvis-Ai-Assistant.git"
   }
 }

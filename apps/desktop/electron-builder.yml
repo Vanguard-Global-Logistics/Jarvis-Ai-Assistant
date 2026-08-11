@@ -1,0 +1,92 @@
+# Packaging for Jarvis — how the app becomes something you double-click.
+#
+# STATUS: the macOS targets are CONFIGURED, NOT VERIFIED. This repository's CI
+# and development environment are Linux; a .dmg can only be produced on a Mac.
+# What IS verified here is that the file set is complete and the packaged app
+# launches — `npm run package:dir` builds an unpacked app and the runtime probe
+# drives it. That catches the class of defect that has already reached William
+# twice (a build that passes every check and cannot launch), just not on macOS.
+#
+# See docs/MAC-PACKAGING.md before running this.
+
+appId: com.vanguardgloballogistics.jarvis
+productName: Jarvis
+copyright: Copyright © 2026 William Lavold
+
+directories:
+  output: release
+  # NOT the electron-builder default of `build/` — the repo's .gitignore ignores
+  # `build/` wholesale, so an app icon put there would be silently uncommitted.
+  #
+  # NO ICON EXISTS YET. Until `packaging/icon.icns` is added, the app ships with
+  # the default Electron icon. The orb artwork approved for the Orb Family sheet
+  # is the obvious source; see docs/design/ORB-FAMILY.md.
+  buildResources: packaging
+
+# The whole app is bundled into out/ by electron-vite. The only runtime
+# dependencies are `zod` and `@anthropic-ai/sdk` (see the note in package.json);
+# electron-builder collects those from `dependencies` automatically.
+files:
+  - out/**
+  - package.json
+
+# There is no native module to rebuild — the SQLite driver is Node's builtin
+# `node:sqlite` (ADR 0008). Saying so explicitly stops electron-builder spending
+# time on, and occasionally failing at, a step this app does not need.
+npmRebuild: false
+
+asar: true
+
+mac:
+  category: public.app-category.productivity
+  target:
+    # Two architectures rather than a universal binary: universal doubles the
+    # download for everyone to spare one person a choice. William's MacBook is
+    # one machine; he needs one of these.
+    - target: dmg
+      arch:
+        - arm64
+        - x64
+  # NOT SIGNED AND NOT NOTARIZED. This requires a paid Apple Developer account
+  # and Jarvis is a private, single-family app — paying Apple to bless it is a
+  # real decision, not an oversight, and it has not been made. The consequence
+  # is that macOS Gatekeeper will refuse the app on first open until it is
+  # explicitly allowed; docs/MAC-PACKAGING.md says exactly how.
+  #
+  # `identity: null` makes that refusal honest: electron-builder skips signing
+  # rather than half-signing with an ad-hoc identity that looks like a signature
+  # and satisfies nothing.
+  identity: null
+  # Hardened runtime without notarization produces an app that is MORE likely to
+  # be blocked, not less. Turn it on in the same change that adds notarization.
+  hardenedRuntime: false
+  # Deliberately NO NSMicrophoneUsageDescription, NSCameraUsageDescription, or
+  # screen-recording entitlement. Jarvis has no voice and no vision (CLAUDE.md
+  # §7 — both are NOT IMPLEMENTED). An app that asks for the microphone it never
+  # uses is exactly the kind of quiet overreach this project's boundary rules
+  # exist to prevent. Add each string in the change that ships the capability.
+
+dmg:
+  # The plain drag-to-Applications window. Nothing custom to go wrong.
+  title: ${productName}
+
+# Windows and Linux are configured because the codebase targets them too
+# (docs/WINDOWS-ACCEPTANCE-TEST.md), not because either has been produced.
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+
+linux:
+  target:
+    - AppImage
+  category: Utility
+  # Without this the binary is named from the npm package (`@jarvisdesktop`),
+  # not the product. The unpacked Linux build is what `npm run package:dir`
+  # produces and what the packaged-app probe launches, so the name matters.
+  executableName: jarvis

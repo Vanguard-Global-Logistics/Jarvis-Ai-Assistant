@@ -217,6 +217,9 @@ npm run verify       # format + lint + typecheck + test — run before every com
 npm run build        # build every workspace, and assert the Electron artifacts
 npm run probe:runtime  # launch the real app and assert what it actually does
 npm run dev:desktop  # launch the Electron shell
+npm run package:dir  # build a REAL packaged app (electron-builder, unpacked)
+npm run probe:packaged  # drive that packaged app — needs package:dir first
+npm run package:mac  # build the .dmg — only works on a Mac (ADR 0016)
 ```
 
 **`npm run verify` cannot tell you whether the app runs, and twice it did not.** It was

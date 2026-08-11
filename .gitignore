@@ -20,6 +20,9 @@ vendor/
 dist/
 build/
 out/
+# Installers and unpacked apps from electron-builder. Hundreds of megabytes,
+# and rebuilt from source on demand — never committed.
+release/
 .next/
 .nuxt/
 .output/
