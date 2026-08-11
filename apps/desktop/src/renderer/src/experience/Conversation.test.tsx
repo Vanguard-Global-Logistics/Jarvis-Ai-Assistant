@@ -651,6 +651,42 @@ describe('Conversation', () => {
       expect(JSON.stringify(entries)).not.toContain('topic A');
     });
 
+    it('asks again if the record backing the live work is deleted', async () => {
+      // Continue a session, then delete it: the live transcript is suddenly
+      // backed by nothing, even though it did not change. Without tracking
+      // WHICH record the "already saved" claim refers to, New session would
+      // clear it in one click and the work would be gone for good.
+      const saved = {
+        ...SAVED_META,
+        entries: [
+          { kind: 'message' as const, role: 'user' as const, content: 'archived question' },
+          { kind: 'message' as const, role: 'assistant' as const, content: 'archived answer' },
+        ],
+      };
+      const bridge = fakeBridge({
+        listConversations: vi.fn().mockResolvedValue({ conversations: [SAVED_META] }),
+        getConversation: vi.fn().mockResolvedValue({ conversation: saved }),
+      });
+      render(<Conversation bridge={bridge} />);
+
+      fireEvent.click(screen.getByRole('button', { name: /history/i }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Open' }));
+      fireEvent.click(await screen.findByRole('button', { name: /continue this session/i }));
+      await screen.findByText('archived question');
+
+      // Delete it — two clicks, matching the confirm pattern.
+      fireEvent.click(screen.getByRole('button', { name: /history/i }));
+      const del = await screen.findByRole('button', { name: /^delete$/i });
+      fireEvent.click(del);
+      fireEvent.click(screen.getByRole('button', { name: /confirm|delete\?/i }));
+      await waitFor(() => {
+        expect(bridge.deleteConversation).toHaveBeenCalledWith(SAVED_META.id);
+      });
+
+      // Nothing on disk holds this transcript any more, so it must ask.
+      fireEvent.click(screen.getByRole('button', { name: /new session/i }));
+      expect(screen.getByRole('button', { name: /discard 2 unsaved/i })).toBeTruthy();
+    });
     it('does not ask after Continue — the loaded work is already on disk', async () => {
       const saved = {
         ...SAVED_META,

@@ -117,6 +117,15 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
    * continued from) and there is genuinely something to lose.
    */
   const [persistedCount, setPersistedCount] = useState(0);
+  /**
+   * The saved conversation `persistedCount` is a claim about — or null.
+   *
+   * Needed because that claim can stop being true without the transcript
+   * changing: continue a session, delete it from History, and the live work is
+   * suddenly backed by nothing while the count still says it is safe. Deleting
+   * that record resets the claim, so the next discard asks.
+   */
+  const [persistedId, setPersistedId] = useState<string | null>(null);
   /** True while New session is one click away from discarding real work. */
   const [confirmNew, setConfirmNew] = useState(false);
   /** True while Continue is one click away from replacing unsaved live work. */
@@ -281,6 +290,7 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
       // Record how much of the transcript is now safely on disk, so New session
       // can tell "nothing would be lost" from "you are about to throw work away".
       setPersistedCount(savableCount);
+      setPersistedId(meta.id);
       setSaveNotice(`Saved “${meta.title}”`);
       window.setTimeout(() => {
         setSaveNotice(null);
@@ -324,6 +334,7 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
     setItems([]);
     setDraft('');
     setPersistedCount(0);
+    setPersistedId(null);
     setConfirmNew(false);
     setViewing(null);
     setHistoryError(null);
@@ -373,6 +384,11 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
       try {
         const { deleted } = await bridge.deleteConversation(id);
         if (viewing?.id === id) setViewing(null);
+        // The live transcript was only "safe" because this record held it.
+        if (persistedId === id) {
+          setPersistedCount(0);
+          setPersistedId(null);
+        }
         // Refresh before reporting: a successful refresh clears the error
         // field, so a "was already gone" message must land after it.
         await refreshHistory();
@@ -382,7 +398,7 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
         setHistoryError('Could not delete the saved session. See the console for details.');
       }
     },
-    [bridge, confirmDeleteId, viewing, refreshHistory],
+    [bridge, confirmDeleteId, viewing, persistedId, refreshHistory],
   );
 
   /**
@@ -417,6 +433,7 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
     // Continuing forks a stored record: everything loaded still exists on disk
     // under its own id, so discarding it loses nothing and must not prompt.
     setPersistedCount(loaded.length);
+    setPersistedId(conversation.id);
     setConfirmNew(false);
     setConfirmContinue(false);
     setViewing(null);
