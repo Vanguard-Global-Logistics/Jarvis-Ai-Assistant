@@ -39,9 +39,11 @@ import { transcriptToMarkdown } from './transcript-markdown.js';
  *      and anything other than the frontier model wears a chip: `mock` (canned,
  *      not thinking) and `local` (a smaller model on this machine, ADR 0015).
  *      They differ in capability, so nothing may look more real than it is.
- *   2. **Unsaved means unsaved.** The banner states that closing discards the
- *      session unless Save Session is pressed. No autosave exists, so none is
- *      implied.
+ *   2. **Unsaved means unsaved, and the banner says so only when it is true.**
+ *      No autosave exists, so none is implied — but the warning is shown with a
+ *      count exactly when there is work to lose, and the banner merely
+ *      describes the mode when there is not. A caution that is always on stops
+ *      being read on the one occasion it matters.
  *   3. **A failed call is stated, not hidden.** The error is a plain line in
  *      the transcript and a console diagnostic; the boundary already collapsed
  *      it to a message with no internals in it.
@@ -592,18 +594,33 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
         flex: 1,
       }}
     >
+      {/*
+        The banner reports REAL state rather than repeating a warning.
+
+        It used to say "unsaved sessions are discarded on close" at all times,
+        including on an empty session with nothing to lose — which is how a
+        warning becomes wallpaper and stops being read on the one occasion it
+        matters. Same reasoning as the New-session confirmation (ADR 0019): a
+        caution that is always on is not a caution.
+
+        So it is quiet when nothing is at risk, and amber with a count when
+        there is. Closing still discards — nothing about the contract changed,
+        only whether the sentence is true right now.
+      */}
       <p
+        role={unsavedCount > 0 ? 'status' : undefined}
         style={{
           margin: 0,
           fontFamily: fontFamily.mono,
           fontSize: 10,
           letterSpacing: letterSpacing.label,
-          color: text.faint,
+          color: unsavedCount > 0 ? accent.warning : text.faint,
           textAlign: 'center',
         }}
       >
-        STAGE 1A · CONVERSATION + THOUGHT AMPLIFIER · UNSAVED SESSIONS ARE DISCARDED ON CLOSE — SAVE
-        SESSION STORES THIS ONE ON THIS PC
+        {unsavedCount > 0
+          ? `${String(unsavedCount)} UNSAVED ${unsavedCount === 1 ? 'ENTRY' : 'ENTRIES'} · CLOSING NOW DISCARDS ${unsavedCount === 1 ? 'IT' : 'THEM'} — SAVE SESSION (${MOD}S) KEEPS ${unsavedCount === 1 ? 'IT' : 'THEM'} ON THIS MACHINE`
+          : 'STAGE 1A · CONVERSATION + THOUGHT AMPLIFIER · SAVE SESSION STORES A CONVERSATION ON THIS MACHINE'}
       </p>
 
       <div

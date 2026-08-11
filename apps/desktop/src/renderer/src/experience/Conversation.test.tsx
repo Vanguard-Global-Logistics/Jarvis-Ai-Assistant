@@ -43,12 +43,33 @@ function type(value: string): void {
 }
 
 describe('Conversation', () => {
-  it('shows the empty-state hint and the unsaved-sessions banner', () => {
+  it('shows the empty-state hint, and a banner that is quiet with nothing at risk', () => {
     render(<Conversation bridge={fakeBridge()} />);
     expect(screen.getByText(/Ask Jarvis anything/)).toBeTruthy();
-    // The banner must state the real persistence contract (ADR 0008): unsaved
-    // is discarded; saving is explicit.
-    expect(screen.getByText(/UNSAVED SESSIONS ARE DISCARDED ON CLOSE/)).toBeTruthy();
+    // The banner describes the mode; it does not warn about discarding a
+    // conversation that does not exist. A caution that is always on is not a
+    // caution (ADR 0019's reasoning, applied to the banner).
+    expect(screen.getByText(/SAVE SESSION STORES A CONVERSATION/)).toBeTruthy();
+    expect(screen.queryByText(/CLOSING NOW DISCARDS/)).toBeNull();
+  });
+
+  it('warns, with a count, exactly when there is unsaved work to lose', async () => {
+    const bridge = fakeBridge();
+    render(<Conversation bridge={bridge} />);
+
+    type('at risk');
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+    await screen.findByText('Hello from the mock.');
+
+    // Two entries at risk, named as such — and singular/plural is not fudged.
+    expect(screen.getByText(/2 UNSAVED ENTRIES · CLOSING NOW DISCARDS THEM/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: /save session/i }));
+    await screen.findByText(/Saved/);
+
+    // Saved: the warning goes away, because it is no longer true.
+    expect(screen.queryByText(/CLOSING NOW DISCARDS/)).toBeNull();
+    expect(screen.getByText(/SAVE SESSION STORES A CONVERSATION/)).toBeTruthy();
   });
 
   it('round-trips a chat turn and labels a mock reply as mock', async () => {

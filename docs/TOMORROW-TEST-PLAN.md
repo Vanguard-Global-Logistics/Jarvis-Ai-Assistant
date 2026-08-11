@@ -16,7 +16,7 @@ cd ~/Jarvis-Ai-Assistant          # wherever you cloned it
 git checkout claude/jarvis-migration-chatgpt-19f128
 git pull origin claude/jarvis-migration-chatgpt-19f128
 npm install
-npm run verify                    # ~1 min. Expect: 366 tests passed
+npm run verify                    # ~1 min. Expect: 367 tests passed
 npm run build
 npm run probe:runtime             # launches the real app and asserts ~30 facts
 ```
@@ -31,16 +31,17 @@ passed.
 
 `npm run dev:desktop`, then:
 
-| #   | Do                                                    | Expect                                                                                                                                             |
-| --- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1.1 | Send a chat message                                   | A reply with an amber **Mock provider** chip                                                                                                       |
-| 1.2 | Run an Amplify on a rough idea                        | The five-field card                                                                                                                                |
-| 1.3 | Click **Save Session**                                | It saves; the button was disabled only when there is nothing to save                                                                               |
-| 1.4 | Open **History**                                      | Your session is listed                                                                                                                             |
-| 1.5 | Quit with Cmd+Q, relaunch, open History               | Still there                                                                                                                                        |
-| 1.6 | Start a chat, do NOT save, quit, relaunch             | It is **gone**. That is correct — there is no autosave, and the banner says so                                                                     |
-| 1.7 | Open a saved session, click **Continue this session** | It loads into the live composer with the notice "Continued from a saved session"; saving again makes a **new** entry and the original is untouched |
-| 1.8 | Delete a session                                      | Asks first, then goes                                                                                                                              |
+| #   | Do                                                        | Expect                                                                                                                                                                  |
+| --- | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.1 | Send a chat message                                       | A reply with an amber **Mock provider** chip                                                                                                                            |
+| 1.2 | Run an Amplify on a rough idea                            | The five-field card                                                                                                                                                     |
+| 1.3 | Click **Save Session**                                    | It saves; the button was disabled only when there is nothing to save                                                                                                    |
+| 1.4 | Open **History**                                          | Your session is listed                                                                                                                                                  |
+| 1.5 | Quit with Cmd+Q, relaunch, open History                   | Still there                                                                                                                                                             |
+| 1.6 | Start a chat, do NOT save, quit, relaunch                 | It is **gone**. That is correct — there is no autosave, and the banner says so                                                                                          |
+| 1.7 | Open a saved session, click **Continue this session**     | It loads into the live composer with the notice "Continued from a saved session"; saving again makes a **new** entry and the original is untouched                      |
+| 1.8 | Delete a session                                          | Asks first, then goes                                                                                                                                                   |
+| 1.9 | Watch the banner above the composer as you chat then save | It is grey and descriptive with nothing at risk; amber with a count (`2 UNSAVED ENTRIES · CLOSING NOW DISCARDS THEM`) once you have unsaved work; grey again after Save |
 
 ## 1b. New session (ADR 0019) — NEW, and it fixes a real bug
 
