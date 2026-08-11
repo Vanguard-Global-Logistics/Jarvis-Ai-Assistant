@@ -111,18 +111,37 @@ tell me.
 This is the one I most want an answer on, because it decides whether the family
 runs free-and-weaker or paid-and-better.
 
+**Run `npm run diagnostics` first and look at the memory line.** Unified memory is
+shared with the GPU, so the number decides which model can run at all: 8 GB is
+tight for anything above ~4B, 16 GB comfortably runs a 9B at Q4, 24 GB+ opens up
+14B. Do not pull a model bigger than the machine — macOS will swap and it will
+feel broken rather than slow.
+
 ```bash
 brew install ollama
 ollama serve &
-ollama pull llama3.1:8b
+ollama pull qwen3:8b
 curl http://127.0.0.1:11434/v1/models
 ```
 
-Then create `.env` in the repo root with exactly these two lines:
+**On the model choice.** `qwen3` is the recommendation over Llama for two
+reasons: it benchmarks at or above Llama in this size class, and it is
+**Apache-2.0**, where Meta's Llama weights carry a community licence with an
+acceptable-use policy. For family use either is fine — but Sophisticated Sips,
+Peptastic, and Vanguard Performance Labs are businesses, and if a local model
+ever answers for one of them, Apache-2.0 is the licence that does not require a
+lawyer. Picking it now costs nothing.
+
+**Tag names move.** If `ollama pull qwen3:8b` 404s, the exact current tag is on
+`ollama.com/library/qwen3` — take the newest instruct tag near 8B and use that
+name in both the pull and the `.env` below. Send me whichever you actually used.
+
+Then create `.env` in the repo root with exactly these two lines (second line
+must match the tag you pulled):
 
 ```
 JARVIS_LOCAL_MODEL_URL=http://127.0.0.1:11434
-JARVIS_LOCAL_MODEL=llama3.1:8b
+JARVIS_LOCAL_MODEL=qwen3:8b
 ```
 
 ```bash

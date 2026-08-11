@@ -1,7 +1,7 @@
 // @ts-check
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
-import { homedir } from 'node:os';
+import { cpus, homedir, totalmem } from 'node:os';
 import { DatabaseSync } from 'node:sqlite';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -275,6 +275,11 @@ const lines = [
   '### Machine',
   '',
   `- platform: ${process.platform} (${process.arch})`,
+  `- cpu: ${cpus()[0]?.model ?? '(unknown)'} × ${String(cpus().length)}`,
+  // RAM decides which local model can run at all: unified memory is shared with
+  // the GPU, so a 9B model at Q4 needs ~7GB free before macOS starts swapping.
+  // Recommending a model without knowing this number is guessing.
+  `- memory: ${String(Math.round(totalmem() / 1024 ** 3))} GB`,
   `- node: ${process.version}`,
   `- npm: ${cmd('npm', ['--version'])}`,
   `- electron (installed): ${(() => {
