@@ -464,4 +464,104 @@ describe('Conversation', () => {
     expect(within(convo).getByText('first')).toBeTruthy();
     expect(within(convo).getByText('second')).toBeTruthy();
   });
+  describe('keyboard shortcuts (ADR 0018)', () => {
+    const chord = (key: string): void => {
+      // metaKey covers the Mac; the handler accepts ctrlKey too, and one of the
+      // cases below asserts that so Windows is not silently unshortcutted.
+      fireEvent.keyDown(document, { key, metaKey: true });
+    };
+
+    it('⌘S saves, and does nothing when there is nothing to save', async () => {
+      const bridge = fakeBridge();
+      render(<Conversation bridge={bridge} />);
+
+      // Nothing typed yet: the chord must be inert rather than saving an empty
+      // session, exactly like the greyed button it mirrors.
+      chord('s');
+      expect(bridge.saveConversation).not.toHaveBeenCalled();
+
+      type('worth keeping');
+      fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+      await screen.findByText('Hello from the mock.');
+
+      chord('s');
+      expect(bridge.saveConversation).toHaveBeenCalledWith({
+        entries: [
+          { kind: 'message', role: 'user', content: 'worth keeping' },
+          { kind: 'message', role: 'assistant', content: 'Hello from the mock.' },
+        ],
+      });
+    });
+
+    it('works with Ctrl as well as Cmd, so Windows is not left out', async () => {
+      const bridge = fakeBridge();
+      render(<Conversation bridge={bridge} />);
+      type('from a Dell');
+      fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+      await screen.findByText('Hello from the mock.');
+
+      fireEvent.keyDown(document, { key: 's', ctrlKey: true });
+      expect(bridge.saveConversation).toHaveBeenCalledTimes(1);
+    });
+
+    it('⌘S is swallowed even when saving is impossible', () => {
+      // Otherwise the browser's own Save dialog opens inside Jarvis, which is
+      // worse than the chord doing nothing.
+      render(<Conversation bridge={fakeBridge()} />);
+      const event = new KeyboardEvent('keydown', {
+        key: 's',
+        metaKey: true,
+        cancelable: true,
+        bubbles: true,
+      });
+      document.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(true);
+    });
+
+    it('⌘F opens History and puts the caret in the filter', async () => {
+      // Four saved sessions: the filter box only renders once there is enough
+      // to sift through, so fewer would test nothing.
+      const conversations = ['a', 'b', 'c', 'd'].map((k, i) => ({
+        ...SAVED_META,
+        id: `${SAVED_META.id.slice(0, -1)}${String(i)}`,
+        title: `session ${k}`,
+      }));
+      const bridge = fakeBridge({
+        listConversations: vi.fn().mockResolvedValue({ conversations }),
+      });
+      render(<Conversation bridge={bridge} />);
+
+      chord('f');
+      const filter = await screen.findByRole('searchbox', { name: /filter saved sessions/i });
+      expect(document.activeElement).toBe(filter);
+    });
+
+    it('Escape leaves a saved session first, then closes the panel', async () => {
+      const bridge = fakeBridge({
+        listConversations: vi.fn().mockResolvedValue({ conversations: [SAVED_META] }),
+        getConversation: vi.fn().mockResolvedValue({
+          conversation: {
+            ...SAVED_META,
+            entries: [
+              { kind: 'message' as const, role: 'user' as const, content: 'archived question' },
+              { kind: 'message' as const, role: 'assistant' as const, content: 'archived answer' },
+            ],
+          },
+        }),
+      });
+      render(<Conversation bridge={bridge} />);
+
+      fireEvent.click(screen.getByRole('button', { name: /history/i }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Open' }));
+      await screen.findByRole('region', { name: /saved session \(read-only\)/i });
+
+      // One step back per press, most-nested first.
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(screen.queryByRole('region', { name: /saved session \(read-only\)/i })).toBeNull();
+      expect(screen.getByRole('region', { name: /saved sessions/i })).toBeTruthy();
+
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(screen.queryByRole('region', { name: /saved sessions/i })).toBeNull();
+    });
+  });
 });

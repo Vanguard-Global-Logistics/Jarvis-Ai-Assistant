@@ -1,6 +1,6 @@
 # Test day — everything to check on the MacBook, in order
 
-Written 2026-08-11 for the overnight batch (ADRs 0013–0017). Work top to bottom;
+Written 2026-08-11 for the overnight batch (ADRs 0013–0018). Work top to bottom;
 each section says what to do, what should happen, and what it means if it does
 not. Anything marked **UNVERIFIED** has never run on real hardware — you are the
 first person to run it, and finding it broken is the expected outcome of a test,
@@ -16,7 +16,7 @@ cd ~/Jarvis-Ai-Assistant          # wherever you cloned it
 git checkout claude/jarvis-migration-chatgpt-19f128
 git pull origin claude/jarvis-migration-chatgpt-19f128
 npm install
-npm run verify                    # ~1 min. Expect: 352 tests passed
+npm run verify                    # ~1 min. Expect: 357 tests passed
 npm run build
 npm run probe:runtime             # launches the real app and asserts ~30 facts
 ```
@@ -161,6 +161,20 @@ Also new: the app now has an **icon** — the orb, dark navy with blue rings. It
 a placeholder generated from the approved colour tokens, not the Orb Family
 artwork. Whether macOS actually picks it up is unverified; you will find out at
 step 5.1. If you see the default Electron icon instead, that is the finding.
+
+## 5c. Keyboard shortcuts (ADR 0018) — NEW
+
+Three, and only three. On the Mac they are ⌘; the tooltips say so.
+
+| #    | Do                                                      | Expect                                                              |
+| ---- | ------------------------------------------------------- | ------------------------------------------------------------------- |
+| 5c.1 | Chat, then press **⌘S**                                 | It saves — same as clicking Save Session                            |
+| 5c.2 | On a fresh session with nothing typed, press **⌘S**     | Nothing happens, and **no browser Save dialog appears**             |
+| 5c.3 | Press **⌘F**                                            | History opens; with >3 saved sessions the caret lands in the filter |
+| 5c.4 | Open a saved session, press **Esc**, then **Esc** again | First returns to live, second closes History                        |
+
+**5c.2 is the one to check.** If a macOS save-file sheet appears over Jarvis,
+the chord is not being swallowed and that is a bug.
 
 ## 6. The orb states (ADR: ORB-FAMILY)
 

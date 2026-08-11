@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { CSSProperties, JSX, KeyboardEvent } from 'react';
+import type { CSSProperties, JSX, KeyboardEvent, RefObject } from 'react';
 import type {
   AmplifierResult,
   ChatMessage,
@@ -51,6 +51,17 @@ import { transcriptToMarkdown } from './transcript-markdown.js';
  * database. All of that lives in the main process (SECURITY-BOUNDARIES.md).
  */
 
+/**
+ * How to write a modifier chord for the platform this is running on.
+ *
+ * Shown in tooltips rather than assumed: William's daily machine is a Mac, but
+ * the same build runs on Windows, and a tooltip promising ⌘S on a Dell is worse
+ * than no tooltip. Feature-detected from the user agent because
+ * `navigator.platform` is deprecated, and defaulting to `Ctrl` is the safe way
+ * round — an unfamiliar symbol is harder to recover from than a familiar word.
+ */
+const MOD = typeof navigator !== 'undefined' && /Mac/i.test(navigator.userAgent) ? '⌘' : 'Ctrl+';
+
 /** What the renderer needs from the preload bridge. Kept minimal on purpose. */
 export interface ConversationBridge {
   sendChat: (request: { messages: ChatMessage[] }) => Promise<{
@@ -99,6 +110,11 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const nextId = useRef(0);
   const scrollRef = useRef<HTMLDivElement>(null);
+  /** The History filter box, so ⌘F can put the caret in it. */
+  const filterRef = useRef<HTMLInputElement>(null);
+
+  /** No bridge means a browser preview: every action is inert, not broken. */
+  const disabled = bridge === null;
 
   const setOrb = useCallback(
     (state: OrbState) => {
@@ -406,6 +422,61 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
     }
   }, [bridge, refreshHistory]);
 
+  /**
+   * Whole-window shortcuts (ADR 0018).
+   *
+   * On `document`, not on a focused element, because these have to work while
+   * the caret is in the composer — which is where it is essentially always.
+   *
+   * Deliberately few. Every shortcut is a key the app takes away from the user
+   * and from the platform, so each one has to earn it: Save is the action with
+   * a real cost if forgotten (an unsaved session is discarded on close), Find
+   * is the one people reach for reflexively, and Escape is the way out of a
+   * mode. Nothing else qualifies yet.
+   */
+  useEffect(() => {
+    const handler = (event: globalThis.KeyboardEvent): void => {
+      const chord = event.metaKey || event.ctrlKey;
+
+      if (chord && event.key.toLowerCase() === 's') {
+        // Always prevented, even when saving is not possible: letting the
+        // browser's own Save dialog appear inside Jarvis would be worse than
+        // doing nothing, and the disabled-state hint already explains why the
+        // button is greyed.
+        event.preventDefault();
+        if (!disabled && !busy && savableCount > 0 && viewing === null) void saveSession();
+        return;
+      }
+
+      if (chord && event.key.toLowerCase() === 'f') {
+        event.preventDefault();
+        if (disabled) return;
+        // Open History if it is closed — Find with nothing to search reads as
+        // broken — then put the caret in the filter box. The input only exists
+        // once there is enough saved to be worth sifting, so the focus call is
+        // conditional by design, not defensively.
+        if (!historyOpen) void toggleHistory();
+        setTimeout(() => filterRef.current?.focus(), 0);
+        return;
+      }
+
+      if (event.key === 'Escape') {
+        // One step back per press, most-nested first: a saved session is a mode
+        // on top of the panel, so Escape leaves the session before the panel.
+        if (viewing !== null) {
+          setViewing(null);
+        } else if (historyOpen) {
+          void toggleHistory();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handler);
+    return () => {
+      document.removeEventListener('keydown', handler);
+    };
+  }, [disabled, busy, savableCount, viewing, historyOpen, saveSession, toggleHistory]);
+
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
     // Enter sends; Shift+Enter is a newline. A composer that eats every Enter
     // is a worse text box than the one it replaces.
@@ -414,8 +485,6 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
       void send();
     }
   };
-
-  const disabled = bridge === null;
 
   return (
     <section
@@ -468,14 +537,14 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
               ? 'Return to the live session to save'
               : savableCount === 0
                 ? 'Send a message or amplify an idea first, then Save'
-                : 'Store this conversation on this PC (history:save)'
+                : `Store this conversation on this machine (${MOD}S)`
           }
         />
         <ToolbarButton
           label={historyOpen ? 'History ▾' : 'History ▸'}
           onClick={() => void toggleHistory()}
           enabled={!disabled}
-          title="Saved sessions on this PC"
+          title={`Saved sessions on this machine (${MOD}F to search, Esc to close)`}
         />
         {saveNotice !== null && (
           <span role="status" style={{ ...MONO_LABEL, color: accent.success }}>
@@ -496,7 +565,7 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
             color: text.faint,
           }}
         >
-          Send a message or amplify an idea, then Save Session stores it on this PC
+          Send a message or amplify an idea, then Save Session ({MOD}S) stores it on this machine
         </p>
       )}
 
@@ -509,6 +578,7 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
           onDelete={(id) => void deleteSaved(id)}
           onBackup={() => void backupHistory()}
           onRestore={() => void restoreHistory()}
+          filterRef={filterRef}
         />
       )}
 
@@ -649,6 +719,7 @@ function HistoryPanel({
   onDelete,
   onBackup,
   onRestore,
+  filterRef,
 }: {
   conversations: SavedConversationMeta[];
   error: string | null;
@@ -657,6 +728,7 @@ function HistoryPanel({
   onDelete: (id: string) => void;
   onBackup: () => void;
   onRestore: () => void;
+  filterRef: RefObject<HTMLInputElement | null>;
 }): JSX.Element {
   // Filtering happens over metadata the renderer already holds — no query
   // crosses the boundary, so search adds no channel and no authority. Titles
@@ -739,6 +811,7 @@ function HistoryPanel({
       {/* Only worth the space once there is enough to sift through. */}
       {conversations.length > 3 && (
         <input
+          ref={filterRef}
           type="search"
           value={filter}
           onChange={(e) => {
