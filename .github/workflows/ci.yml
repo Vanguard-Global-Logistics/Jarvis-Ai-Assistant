@@ -63,10 +63,13 @@ jobs:
     # React Refresh preamble) were both fully green here. Both reached a human on
     # Windows before anyone noticed.
     #
-    # This job launches the real Electron app — packaged path and `dev:desktop` — and
-    # asserts React mounts, the bridge exposes exactly `getAppInfo`, the renderer has
-    # no Node globals, and the console is clean. It is verified red-green against the
-    # CSP defect specifically.
+    # This job launches the real Electron app — built HTML and `dev:desktop` — and
+    # asserts React mounts, the bridge exposes exactly the eleven allowlisted
+    # functions, chat and amplify round-trip, the whole history loop works against a
+    # real SQLite, the profile round-trips, a non-loopback local model URL refuses to
+    # start the app (ADR 0015), the window position survives a restart (ADR 0017), the
+    # renderer has no Node globals, and the console is clean. It is verified red-green
+    # against the CSP defect specifically.
     #
     # It runs on Linux, so it is NOT the Windows acceptance gate
     # (docs/WINDOWS-ACCEPTANCE-TEST.md, ADR 0004). It closes the cheap gap — the one
@@ -109,6 +112,49 @@ jobs:
       # — that is the renderer/preload sandbox and it stays on.
       - name: Probe the running app
         run: npm run probe:runtime
+
+  packaged:
+    name: Packaged app probe
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    # `runtime` launches Electron against loose files in the working tree. A SHIPPED
+    # app reads its code from an asar archive containing only the dependencies
+    # electron-builder decided to collect — so a dependency it missed is invisible to
+    # `verify`, invisible to `build`, invisible to `runtime`, and fatal the first time
+    # someone double-clicks the installed app. That is the packaging analogue of the
+    # two defects that already reached a human (docs/KNOWN-LIMITATIONS.md §7), and
+    # this job is what catches it.
+    #
+    # Linux only, like everything else here: the .dmg and the NSIS installer can only
+    # be built on their own platforms (ADR 0016), so this proves the CONFIGURATION,
+    # not the macOS artifact. docs/MAC-PACKAGING.md is explicit about that gap.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Download the Electron binary
+        run: node node_modules/electron/install.js
+
+      - name: Install Electron's runtime libraries and Xvfb
+        run: bash scripts/install-electron-runtime-deps.sh
+
+      # Uses the locally downloaded Electron rather than letting electron-builder
+      # fetch its own copy — same binary, one download instead of two.
+      - name: Package the app
+        run: npm run package:dir
+
+      - name: Probe the packaged app
+        run: npm run probe:packaged
 
   handoff-integrity:
     name: Archived handoff integrity

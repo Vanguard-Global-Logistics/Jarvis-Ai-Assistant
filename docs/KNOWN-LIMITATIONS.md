@@ -230,7 +230,7 @@ installer is verified.
 
 **Status: PARTIAL.**
 
-Two jobs, and the distinction matters:
+Four jobs, and the distinctions matter:
 
 - **`verify`** — format, lint, typecheck, test, build. Proves the code is well-formed.
   It **cannot** see whether the application runs, and twice it was green on a build that
@@ -241,15 +241,23 @@ Two jobs, and the distinction matters:
   chat/amplify round-trip works, the full history save/list/get/delete loop works against
   a real SQLite (including that an unsaved chat never persists), the renderer has no Node
   globals, and the console is clean. It is verified red-green against the CSP defect.
+- **`packaged`** — builds a real electron-builder artifact and runs
+  `npm run probe:packaged` against it (ADR 0016). `runtime` launches Electron against
+  loose files in the working tree; a shipped app reads an asar containing only the
+  dependencies the packager collected, so a missed one is invisible to all three jobs
+  above and fatal on first double-click.
+- **`handoff-integrity`** — fails the build if `reference/design-handoff/` changed.
 
 A red `verify` means the code is wrong. A red `runtime` means the code is fine and the app
-is broken. Both of the defects in §7 would now be caught here rather than by a human.
+is broken. A red `packaged` means both are fine and the _installer_ is broken. All three of
+the defect classes in §7 would now be caught here rather than by a human.
 
 **What CI still does not do:**
 
 - **No Windows runner.** Everything runs on `ubuntu-latest`, so `platform` reports `linux`.
-  Windows path handling, `loadFile` on a drive letter, and the packaged installer are
-  never exercised. `docs/WINDOWS-ACCEPTANCE-TEST.md` remains the gate and still requires a
+  Windows path handling, `loadFile` on a drive letter, and the Windows/macOS installers
+  are never exercised — `packaged` proves the electron-builder _configuration_ on Linux,
+  and nothing more. `docs/WINDOWS-ACCEPTANCE-TEST.md` remains the gate and still requires a
   human (ADR 0004).
 - **No permission or navigation checks** (acceptance test Steps 5–6) — not automated.
 - **No sandbox-escape attempt.** The probe shows the renderer has no Node globals, which
