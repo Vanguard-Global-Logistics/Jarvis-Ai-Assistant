@@ -34,8 +34,26 @@ const EnvSchema = z.object({
    * carrying every conversation off the machine.
    */
   JARVIS_LOCAL_MODEL_URL: z.url().optional(),
-  /** Which local model to ask for, e.g. `llama3.1:8b`. */
+  /** Which local model to ask for, e.g. `qwen3:8b`. */
   JARVIS_LOCAL_MODEL: z.string().min(1).optional(),
+
+  /**
+   * xAI / Grok (ADR 0020). A remote, paid, OpenAI-compatible service: setting
+   * this means conversations leave the machine, exactly as with Anthropic.
+   */
+  XAI_API_KEY: z.string().min(1).optional(),
+  /** Which Grok model to ask for. Defaults to `grok-4` in the provider. */
+  JARVIS_XAI_MODEL: z.string().min(1).optional(),
+
+  /**
+   * Name the provider explicitly instead of relying on precedence.
+   *
+   * With four providers configurable at once, "why did it use that one?"
+   * stops being obvious, and a wrong guess means either an unexpected bill or a
+   * conversation leaving the machine. This makes the choice statable. Unset,
+   * `createProvider` falls back to its documented precedence.
+   */
+  JARVIS_MODEL_PROVIDER: z.enum(['local', 'anthropic', 'grok', 'mock']).optional(),
 
   // --- Data / storage ---
   /**
@@ -67,6 +85,7 @@ export type Env = z.infer<typeof EnvSchema>;
 const SECRET_KEYS = [
   'OPENAI_API_KEY',
   'ANTHROPIC_API_KEY',
+  'XAI_API_KEY',
   'SUPABASE_SERVICE_ROLE_KEY',
   'PLAID_CLIENT_ID',
   'PLAID_SECRET',

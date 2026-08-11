@@ -1284,6 +1284,12 @@ const PROVIDER_CHIPS: Partial<Record<ProviderId, { label: string; color: string;
         'Answered by a model running on this machine — free, offline, private, ' +
         'and less capable than Claude.',
     },
+    grok: {
+      label: 'Grok',
+      color: accent.claudePurple,
+      title:
+        'Answered by xAI’s Grok — a remote, paid service. This conversation left ' + 'the machine.',
+    },
   };
 
 function ProviderChip({ provider }: { provider: ProviderId }): JSX.Element | null {

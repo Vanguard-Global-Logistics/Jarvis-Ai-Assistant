@@ -28,6 +28,9 @@ const PLANTED = {
   VERCEL_TOKEN: 'PLANTED-SECRET-must-not-appear-0004',
   DATABASE_URL: 'postgres://user:PLANTED-SECRET-must-not-appear-0005@db.example.com/x',
   PLAID_SECRET: 'PLANTED-SECRET-must-not-appear-0006',
+  // Grok (ADR 0020) gets the same promise as every other key, asserted before
+  // there is ever a real one to leak.
+  XAI_API_KEY: 'xai-PLANTED-SECRET-must-not-appear-0007',
 };
 
 let output = '';
@@ -98,12 +101,33 @@ describe('npm run diagnostics never prints a secret', () => {
 });
 
 describe('the script itself', () => {
-  it('does not read .env values except for the two local-model keys', () => {
-    // A structural guard: `envFileValue` is the only value-reading path, and it
-    // must stay confined to the local-model keys. If a future edit widens it,
-    // this fails and the widening has to be argued for.
+  it('reads .env VALUES only for keys that are configuration, never credentials', () => {
+    // A structural guard: `envFileValue` is the only value-reading path in the
+    // script, so this test is what stops it drifting onto a secret. Widening the
+    // set is allowed — it just has to be argued for here, in the open, rather
+    // than happening as a side effect of adding a feature.
+    //
+    // Every name below is configuration a human would read aloud: an endpoint,
+    // a model name, a provider name. No API key is on this list and none may be
+    // added — a diagnostic that leaks a key into a chat window is worse than no
+    // diagnostic (CLAUDE.md §3).
+    const permitted = new Set([
+      'JARVIS_LOCAL_MODEL_URL',
+      'JARVIS_LOCAL_MODEL',
+      'JARVIS_MODEL_PROVIDER',
+    ]);
     const source = readFileSync(join(root, 'scripts', 'collect-diagnostics.mjs'), 'utf8');
     const callSites = [...source.matchAll(/envFileValue\('([^']+)'\)/g)].map((m) => m[1]);
-    expect(new Set(callSites)).toEqual(new Set(['JARVIS_LOCAL_MODEL_URL', 'JARVIS_LOCAL_MODEL']));
+    expect(new Set(callSites)).toEqual(permitted);
+    expect([...permitted].filter((k) => /KEY|SECRET|TOKEN|PASSWORD/i.test(k))).toEqual([]);
+  });
+
+  it('names the Grok key without printing it', () => {
+    // Both halves matter: the value must be absent, and the NAME must be
+    // present — a report that hid which keys are configured would be safe and
+    // useless.
+    expect(output).toContain('XAI_API_KEY');
+    expect(output).not.toContain(PLANTED.XAI_API_KEY);
+    expect(output).not.toContain('xai-PLANTED');
   });
 });

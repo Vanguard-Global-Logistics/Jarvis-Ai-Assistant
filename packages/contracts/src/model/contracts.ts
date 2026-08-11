@@ -11,12 +11,13 @@ import { z } from 'zod';
 /**
  * The providers that exist. A closed set — adding one is a deliberate act.
  *
- * `local` is a model running on the user's own hardware (ADR 0015). It is
- * labeled distinctly in the UI for the same reason `mock` is: the user is
- * entitled to know which brain answered, because they differ in capability and
- * in cost.
+ * `local` is a model running on the user's own hardware (ADR 0015). `grok` is
+ * xAI's hosted model (ADR 0020). Both are labeled distinctly in the UI for the
+ * same reason `mock` is: the user is entitled to know which brain answered,
+ * because they differ in capability, in cost, and in whether the conversation
+ * left the machine at all.
  */
-export const PROVIDER_IDS = ['mock', 'anthropic', 'local'] as const;
+export const PROVIDER_IDS = ['mock', 'anthropic', 'local', 'grok'] as const;
 export type ProviderId = (typeof PROVIDER_IDS)[number];
 
 export const ChatMessageSchema = z

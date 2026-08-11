@@ -21,10 +21,12 @@ import { fileURLToPath } from 'node:url';
  * planted fake key never appears in the output. Per CLAUDE.md §3, a diagnostic
  * that leaks a key into a chat window is worse than no diagnostic.
  *
- * The one exception is the LOCAL MODEL URL, and only its host and port. That is
- * configuration rather than a credential, it is the single most common thing to
- * get wrong, and whether it is loopback is the whole security question (ADR
- * 0015) — so it is reported, deliberately and narrowly.
+ * The exceptions are all CONFIGURATION rather than credentials: the local model
+ * URL (host and port only), the model names, and the chosen provider. The local
+ * endpoint earns its place because whether it is loopback is the whole security
+ * question (ADR 0015) and it is the single most common thing to get wrong; the
+ * provider earns its because with four of them (ADR 0020), "which brain
+ * answered?" is no longer obvious from the keys alone.
  *
  * Usage: npm run diagnostics
  */
@@ -63,7 +65,16 @@ function envFileKeys() {
     });
 }
 
-/** Read one key's value from `.env` — used ONLY for the local model URL. */
+/**
+ * Read one key's value from `.env`.
+ *
+ * The ONLY value-reading path in this script, and deliberately confined to
+ * configuration a human would read aloud — the local endpoint, the model names,
+ * the chosen provider. Never a credential.
+ * `packages/config/src/diagnostics-redaction.test.ts` asserts the exact set of
+ * keys this is called with, so widening it has to be argued for rather than
+ * happening as a side effect.
+ */
 function envFileValue(/** @type {string} */ key) {
   const path = join(root, '.env');
   if (!existsSync(path)) return undefined;
@@ -261,11 +272,26 @@ const local = describeLocalModel();
 const keys = envFileKeys();
 const databases = findDatabases();
 
-// Which provider main WOULD pick, by the same precedence as create-provider.ts.
-const hasAnthropic =
-  keys.some((k) => k.name === 'ANTHROPIC_API_KEY' && k.set) ||
-  (process.env.ANTHROPIC_API_KEY ?? '') !== '';
-const provider = local.configured ? 'local' : hasAnthropic ? 'anthropic' : 'mock';
+/** Whether a named key is set, from `.env` or the ambient environment. */
+function hasKey(/** @type {string} */ name) {
+  return keys.some((k) => k.name === name && k.set) || (process.env[name] ?? '') !== '';
+}
+
+// Which provider main WOULD pick, by the same precedence as create-provider.ts:
+// an explicit JARVIS_MODEL_PROVIDER wins, then local, anthropic, grok, mock.
+// Kept in step by hand — a wrong answer here is a misleading diagnostic, not a
+// weakened control, since the real selection still happens at startup.
+const explicit = envFileValue('JARVIS_MODEL_PROVIDER') ?? process.env.JARVIS_MODEL_PROVIDER;
+const provider =
+  explicit !== undefined && explicit !== ''
+    ? `${explicit} (named explicitly)`
+    : local.configured
+      ? 'local'
+      : hasKey('ANTHROPIC_API_KEY')
+        ? 'anthropic'
+        : hasKey('XAI_API_KEY')
+          ? 'grok'
+          : 'mock';
 
 const lines = [
   '## Jarvis diagnostics',

@@ -129,20 +129,25 @@ This section closed with ADR 0008 — migration 1 exists and is applied at start
 header remains so cross-references to later section numbers stay valid. The part that
 is still true lives in §4: only the conversation-history schema exists, nothing else.
 
-## 6. Three model providers exist; only two have ever answered
+## 6. Four model providers exist; only one has ever answered
 
 **Status: PARTIAL. `mock` IMPLEMENTED AND VERIFIED · `anthropic` IMPLEMENTED, NOT YET
-VERIFIED · `local` IMPLEMENTED, NOT YET VERIFIED.**
+VERIFIED · `local` IMPLEMENTED, NOT YET VERIFIED · `grok` IMPLEMENTED, NOT YET VERIFIED.**
 
 The provider-neutral abstraction named in `CURRENT-STATE-AUDIT.md` §20 exists and **is**
 wired to the desktop app (ADR 0007 — the earlier "not wired" statement was true at
 Checkpoint 1 and is superseded). `createProvider(env)` runs once in main and picks:
 
-| Provider    | Selected when                                                  | Cost         | Verified?                 |
-| ----------- | -------------------------------------------------------------- | ------------ | ------------------------- |
-| `local`     | `JARVIS_LOCAL_MODEL_URL` + `JARVIS_LOCAL_MODEL` set (ADR 0015) | $0           | **No — see below**        |
-| `anthropic` | `ANTHROPIC_API_KEY` set                                        | usage-billed | Not against the live API  |
-| `mock`      | neither — the default                                          | $0           | Yes, on the runtime probe |
+`JARVIS_MODEL_PROVIDER` names one outright and beats the precedence below; if the named
+provider cannot be built the app **fails** rather than quietly using a different brain
+(ADR 0020). Unset, precedence applies top to bottom:
+
+| Provider    | Selected when                                                  | Cost         | Leaves the machine? | Verified?                         |
+| ----------- | -------------------------------------------------------------- | ------------ | ------------------- | --------------------------------- |
+| `local`     | `JARVIS_LOCAL_MODEL_URL` + `JARVIS_LOCAL_MODEL` set (ADR 0015) | $0           | No                  | **No — see below**                |
+| `anthropic` | `ANTHROPIC_API_KEY` set                                        | usage-billed | Yes                 | Not against the live API          |
+| `grok`      | `XAI_API_KEY` set (ADR 0020)                                   | usage-billed | Yes                 | **No — no key has ever answered** |
+| `mock`      | none of the above — the default                                | $0           | No                  | Yes, on the runtime probe         |
 
 **What is not verified about `local`, stated plainly: no real local runner has ever
 answered.** Every test injects a fake `fetch`. Nothing in this repository has spoken to
@@ -161,6 +166,19 @@ Two further honest caveats on `local`:
   refused with a native error box and `exit(1)`, never a silent downgrade to another
   provider — a "local" model on a remote host would carry every family conversation off
   the machine while the UI called it local.
+
+**`grok` is unverified on the same terms as `local`, and for the same reason: no real key
+has ever answered.** Its tests inject `fetch` and prove the request shape, the bearer
+header, the 401/404/429 error wording and the contract validation — none of which is
+evidence that xAI accepts the request. It shares its transport with `local`
+(`OpenAiCompatibleClient`), so the dialect is the one already covered; the endpoint, the
+credential, and the bill are not.
+
+**Adding Grok did not reduce any dependency.** It is a remote, metered API owned by a
+company, exactly like Anthropic — adding it adds a vendor. The only thing here that
+reduces dependence on paid services is `local`, and the only thing that makes vendors
+interchangeable is the abstraction. Nothing in this repository may describe Grok, or any
+hosted provider, as making Jarvis independent.
 
 No API key and no local runner are required to run or verify the foundation; the mock
 default is why the app costs $0.
