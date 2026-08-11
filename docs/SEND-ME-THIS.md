@@ -8,6 +8,28 @@ Total: about 45 minutes of your time, most of it waiting on downloads.
 
 ---
 
+## Step 0 — If you use `caffeinate`, background it (10 sec)
+
+**`caffeinate -dimsu` on its own never returns your prompt.** It holds the
+terminal open until you Control-C it, and anything you paste after it is
+swallowed — the commands look like they ran and produce no output. This cost a
+round-trip once already, which is why it is Step 0.
+
+Two ways to avoid it:
+
+```bash
+caffeinate -dimsu &     # note the ampersand — runs in the background
+```
+
+or give it something to babysit, so it exits when that does:
+
+```bash
+caffeinate -dimsu npm run dev:desktop
+```
+
+If your prompt is currently stuck, press **Control-C** first — and re-paste the
+commands, because the ones you typed while it was running are gone.
+
 ## Step 1 — Get the latest code (2 min)
 
 ```bash
@@ -16,6 +38,20 @@ git checkout claude/jarvis-migration-chatgpt-19f128
 git pull origin claude/jarvis-migration-chatgpt-19f128
 npm install
 ```
+
+**If `cd` says "no such file or directory"**, the repo is not on this machine
+yet — clone it first:
+
+```bash
+git clone https://github.com/Vanguard-Global-Logistics/Jarvis-Ai-Assistant.git ~/Jarvis-Ai-Assistant
+cd ~/Jarvis-Ai-Assistant
+```
+
+**A note on which Mac and which login.** Jarvis separates data by **macOS user
+account** (ADR 0012/0013) — the database lives under whichever account is logged
+in. If you test signed in as one person and use it daily as another, the saved
+sessions will not follow you. Worth knowing before you save anything you want to
+keep.
 
 ## Step 2 — One command that answers most of my questions (10 sec)
 
