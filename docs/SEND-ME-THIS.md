@@ -30,24 +30,36 @@ caffeinate -dimsu npm run dev:desktop
 If your prompt is currently stuck, press **Control-C** first — and re-paste the
 commands, because the ones you typed while it was running are gone.
 
-**Related, and it already bit us: never paste a `# comment` on the end of a
+**Related, and it already bit us: never paste a trailing `#` comment on a
 command line.** Your zsh does not have `interactive_comments` enabled, so `#` is
-not treated as a comment — it is passed through as an argument. `npm run verify
-
-# expect 377 tests`became`vitest run # expect 377 tests`, vitest read those
-
-words as a test-name filter, matched nothing, and exited 1 with **"No test files
-found"**. It looked like it ran. It did not. Every command block in this
-document has had its trailing comments removed for exactly that reason.
+not a comment — it is passed through as an argument. That turned
+`npm run verify` into `vitest run # expect 377 tests`; vitest read those words as
+a test-name filter, matched nothing, and exited 1 with **"No test files found"**.
+It looked like it ran. It did not. Every command block in this document has had
+its trailing comments removed for exactly that reason.
 
 ## Step 1 — Get the latest code (2 min)
 
 ```bash
 cd ~/Jarvis-Ai-Assistant
-git checkout claude/jarvis-migration-chatgpt-19f128
-git pull origin claude/jarvis-migration-chatgpt-19f128
+git remote set-branches origin '*'
+git fetch origin
+git checkout -B claude/jarvis-migration-chatgpt-19f128 origin/claude/jarvis-migration-chatgpt-19f128
+git log --oneline -1
 npm install
 ```
+
+**Why `git remote set-branches` is in there.** A `--single-branch` clone limits
+`remote.origin.fetch` to one branch, so `git fetch origin` never creates
+`origin/<any-other-branch>` and `git checkout` fails with "did not match any
+file(s) known to git" — while `git pull origin <branch>` still appears to work,
+because that writes `FETCH_HEAD` directly. The code arrives; the branch never
+does, and you end up testing old commits on a differently-named branch. That
+happened twice here. `npm run diagnostics` now detects and reports it.
+
+**`git log --oneline -1` is the check that matters.** It must show the commit I
+last told you about. If it shows an older one, you are testing old code and any
+failure you send me is about a build I have already fixed.
 
 **If `cd` says "no such file or directory"**, the repo is not on this machine
 yet — clone it first:

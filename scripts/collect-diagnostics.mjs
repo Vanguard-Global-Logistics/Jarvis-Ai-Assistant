@@ -210,6 +210,26 @@ function describeWorkingTree() {
   ];
 }
 
+/**
+ * Whether this clone can even see the project's other branches.
+ *
+ * A `--single-branch` clone rewrites `remote.origin.fetch` to one branch, so
+ * `git fetch origin` never creates `origin/<anything-else>` and
+ * `git checkout <branch>` fails with "did not match any file(s) known to git" —
+ * while `git pull origin <branch>` still works, because that writes FETCH_HEAD
+ * directly. That combination is genuinely confusing: the code arrives, the
+ * branch never does. It cost two round-trips before this line existed.
+ */
+function describeRemoteRefspec() {
+  const refspec = cmd('git', ['config', '--get', 'remote.origin.fetch']);
+  if (refspec.includes('*')) return [`- remote refspec: ${refspec} (all branches visible)`];
+  return [
+    `- remote refspec: ${refspec}`,
+    '  - **SINGLE-BRANCH CLONE** — `git checkout <other-branch>` will fail here.',
+    "  - Fix: `git remote set-branches origin '*' && git fetch origin`",
+  ];
+}
+
 const local = describeLocalModel();
 const keys = envFileKeys();
 const databases = findDatabases();
@@ -242,6 +262,7 @@ const lines = [
   `- tracking: ${cmd('git', ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}'])}`,
   `- HEAD: ${cmd('git', ['rev-parse', '--short', 'HEAD'])}`,
   `- commits ahead of main: ${aheadOfMain()}`,
+  ...describeRemoteRefspec(),
   ...describeWorkingTree(),
   '',
   '### Model configuration',
