@@ -468,6 +468,16 @@ These are accuracy rules. Violating them is worse than shipping nothing.
 5. **Never overstate.** When something is done and verified, state it plainly without
    hedging. When it is not, do not imply that it is.
 6. **Do not rebuild or repeat completed work.** Verify current state before acting.
+7. **Test the path the documentation tells William to take**, not the path that is
+   convenient to test. `.env` was documented in four places and loaded by nothing for a
+   full day (ADR 0021): every unit test injected the environment directly, skipping the
+   exact step that was missing, and `npm run diagnostics` read the file with its own
+   parser so it reported `local` while the app ran `mock`. Any instruction in this repo
+   that tells William to do something is a claim about behaviour, and belongs in
+   `npm run probe:runtime`.
+8. **Never pipe a command you are checking through `tail` or `head`.** The pipe's exit
+   status is the pipe's, not the command's, so a red suite reads as green — that shipped
+   a commit over a failing test in this repo. Redirect to a file, capture `$?`, then grep.
 
 ---
 

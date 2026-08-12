@@ -4,6 +4,7 @@ import { createLogger, describeEnv, parseEnv } from '@jarvis/config';
 import { migrate, migrations, openDatabase } from '@jarvis/database';
 import type { SqliteDatabase } from '@jarvis/database';
 import { createProvider } from '@jarvis/jarvis-core';
+import { loadEnvFile } from './env-file.js';
 import { registerAmplifyHandler } from './handlers/amplify.js';
 import { registerAppInfoHandler } from './handlers/app-info.js';
 import { registerChatHandler } from './handlers/chat.js';
@@ -29,6 +30,29 @@ import {
  */
 
 const log = createLogger({ scope: 'desktop:main' });
+
+/**
+ * Where a `.env` may live, in priority order (ADR 0021).
+ *
+ * The repo root first, because that is what every document in this project told
+ * people to edit. `userData` second, because a packaged app has no repo — it is
+ * the one directory a real user can reliably find and write to, and the same
+ * place their database already lives.
+ *
+ * Order matters and stops at the first hit: a config assembled from several
+ * files in an order nobody remembers is how you end up pointing at the wrong
+ * model and not knowing why.
+ */
+const envFileCandidates = [join(process.cwd(), '.env'), join(app.getPath('userData'), '.env')];
+
+// MUST run before parseEnv: it reads `process.env` and nothing else. Until this
+// existed, a `.env` file was never loaded by anything, so the documented way to
+// configure a local model silently did nothing and the app fell through to the
+// mock provider. Logs the file and the KEY NAMES applied — never a value.
+const loadedEnvFile = loadEnvFile(envFileCandidates);
+if (loadedEnvFile.path !== null) {
+  log.info('env file loaded', { path: loadedEnvFile.path, keys: loadedEnvFile.applied });
+}
 
 // Fail fast on invalid configuration rather than surfacing it later as an
 // unexplained fault. Throws naming offending keys only, never values.

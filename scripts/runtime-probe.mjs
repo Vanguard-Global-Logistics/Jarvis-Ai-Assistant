@@ -1,7 +1,7 @@
 // @ts-check
 import { spawn, spawnSync } from 'node:child_process';
 import { DatabaseSync } from 'node:sqlite';
-import { existsSync, mkdtempSync } from 'node:fs';
+import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -130,11 +130,26 @@ if (NEEDS_XVFB) {
 // --- process helpers -------------------------------------------------------
 
 /**
+ * Pin these sections to the mock provider.
+ *
+ * Since ADR 0021 the app actually loads a `.env` from its working directory, so
+ * a developer with a real local model configured would otherwise have the chat
+ * and amplify assertions answered by that model — slowly, non-deterministically,
+ * and failing the `[MOCK PROVIDER]` check for a reason that is not a defect.
+ * The ambient environment beats the file by design, which is exactly what makes
+ * this pin work.
+ */
+const PINNED_MOCK = { JARVIS_MODEL_PROVIDER: 'mock' };
+
+/**
  * @param {string} command
  * @param {string[]} cmdArgs
  * @param {Record<string, string>} env
+ * @param {{cwd?: string}} [options] `cwd` overrides the repo root — needed to
+ *   prove the app reads a `.env` from its working directory (ADR 0021) without
+ *   writing one into the repo.
  */
-function launch(command, cmdArgs, env) {
+function launch(command, cmdArgs, env, options = {}) {
   // On Windows `npm` is a batch script, not an executable. Node 22+ refuses to
   // spawn a `.cmd` without a shell (the BatBadBut mitigation, CVE-2024-27980), so
   // this one launch needs `shell: true` and there is no argv-preserving
@@ -150,7 +165,7 @@ function launch(command, cmdArgs, env) {
     : [resolved, cmdArgs];
 
   return spawn(bin, binArgs, {
-    cwd: root,
+    cwd: options.cwd ?? root,
     env: { ...process.env, ...env },
     // Own process group, so the whole tree dies on teardown. `dev:desktop` is
     // npm -> electron-vite -> electron; killing only the parent orphans Electron
@@ -778,7 +793,7 @@ async function probe(mode) {
             // one), so a GPU-less probe host needs it passed from outside.
             '--enable-unsafe-swiftshader',
           ],
-          { JARVIS_USER_DATA_DIR: userDataDir },
+          { JARVIS_USER_DATA_DIR: userDataDir, ...PINNED_MOCK },
         )
       : mode === 'prod'
         ? // Built HTML over file://, production CSP, no dev server.
@@ -787,6 +802,7 @@ async function probe(mode) {
             ['apps/desktop', `--remote-debugging-port=${port}`, '--no-sandbox'],
             {
               JARVIS_USER_DATA_DIR: userDataDir,
+              ...PINNED_MOCK,
             },
           )
         : // The REAL `npm run dev:desktop`. electron-vite forwards
@@ -797,6 +813,7 @@ async function probe(mode) {
             REMOTE_DEBUGGING_PORT: String(port),
             NO_SANDBOX: '1',
             JARVIS_USER_DATA_DIR: userDataDir,
+            ...PINNED_MOCK,
           });
 
   /** @type {string[]} */
@@ -842,6 +859,88 @@ async function probe(mode) {
  * `dialog.showErrorBox` before `ready` writes to stderr on Linux (documented
  * Electron behaviour), so the message is observable headlessly.
  */
+/**
+ * Prove the app actually READS a `.env` file (ADR 0021).
+ *
+ * This check exists because its absence hid a shipped bug for a full day.
+ * Nothing loaded `.env` into `process.env`, so the setup every document in this
+ * project prescribes — write JARVIS_LOCAL_MODEL_URL into `.env` — did nothing,
+ * the app fell through to the mock provider, and the only symptom was a reply
+ * prefixed `[MOCK]` that read like the local model answering badly.
+ *
+ * The unit tests could not have caught it: they inject an env object directly,
+ * which is precisely the step the real app was missing. So this drives the whole
+ * path a human would take, and asserts it by REUSING the loopback refusal — a
+ * non-loopback URL that reaches `createProvider` crashes the app, so `exit 1`
+ * proves the file was read, parsed, and applied before the provider was built.
+ * A quieter assertion would not have distinguished "loaded" from "ignored",
+ * which is the exact confusion that cost the day.
+ *
+ * The file goes in a temporary working directory, never the repo, so running the
+ * probe cannot disturb a real `.env`.
+ */
+async function probeEnvFileIsRead() {
+  if (!existsSync(join(root, 'apps/desktop/out/main/index.js'))) {
+    fail('No build output. Run `npm run build` first.');
+  }
+
+  const cwd = mkdtempSync(join(tmpdir(), 'jarvis-probe-envfile-'));
+  writeFileSync(
+    join(cwd, '.env'),
+    [
+      '# written by scripts/runtime-probe.mjs',
+      'JARVIS_LOCAL_MODEL_URL=https://someone-elses-server.example.com',
+      'JARVIS_LOCAL_MODEL=qwen3.5:4b',
+      '',
+    ].join('\n'),
+    'utf8',
+  );
+
+  const child = launch(
+    electronPath,
+    // Absolute, because the working directory is no longer the repo root.
+    [join(root, 'apps/desktop'), '--no-sandbox'],
+    { JARVIS_USER_DATA_DIR: mkdtempSync(join(tmpdir(), 'jarvis-probe-envfile-data-')) },
+    { cwd },
+  );
+
+  /** @type {string[]} */
+  const output = [];
+  child.stdout?.on('data', (d) => output.push(String(d)));
+  child.stderr?.on('data', (d) => output.push(String(d)));
+
+  const exitCode = await new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      kill(child);
+      resolve('still running');
+    }, 30_000);
+    child.on('exit', (code) => {
+      clearTimeout(timer);
+      resolve(code);
+    });
+  });
+
+  const text = output.join('');
+  const refused = exitCode !== 0 && exitCode !== 'still running';
+  return [
+    {
+      name: '.env in the working directory reaches the provider',
+      ok: refused,
+      detail: refused
+        ? `exit = ${String(exitCode)} — the file was read, parsed and applied`
+        : `exit = ${String(exitCode)} — the .env was IGNORED, so a local model configured ` +
+          'the documented way would silently fall through to the mock provider',
+    },
+    {
+      name: '.env is logged by path and key NAMES, never values',
+      ok:
+        /env file loaded/.test(text) &&
+        !/someone-elses-server/.test(text.replace(/must point at this machine[^\n]*/g, '')),
+      detail: /env file loaded/.test(text) ? 'load logged without values' : 'no load line found',
+    },
+  ];
+}
+
 async function probeLocalModelRefusal() {
   if (!existsSync(join(root, 'apps/desktop/out/main/index.js'))) {
     fail('No build output. Run `npm run build` first.');
@@ -1034,6 +1133,12 @@ for (const mode of /** @type {const} */ (['prod', 'dev', 'packaged'])) {
 }
 
 if (wantProd) {
+  console.log(`\n──────── .env IS ACTUALLY READ (ADR 0021) ────────\n`);
+  for (const c of await probeEnvFileIsRead()) {
+    console.log(`  ${c.ok ? '✓' : '✗'} ${c.name.padEnd(38)} ${c.detail}`);
+    if (!c.ok) failed++;
+  }
+
   console.log(`\n──────── LOCAL MODEL CONFIG REFUSAL (ADR 0015) ────────\n`);
   for (const c of await probeLocalModelRefusal()) {
     console.log(`  ${c.ok ? '✓' : '✗'} ${c.name.padEnd(38)} ${c.detail}`);
