@@ -190,3 +190,75 @@ describe('swarm prep — refuses to assemble a leaky packet', () => {
     expect(result.stderr).not.toMatch(/at \w+ \(/); // no raw stack
   });
 });
+
+/**
+ * The three fields are the LOOP, not decoration.
+ *
+ * William's Gauntlet framing makes it explicit: when a piece fails, the critic's
+ * REMEDY goes verbatim into the next round's builder prompt. The parser used to
+ * keep the headline and discard root cause, remediation and golden reference —
+ * required output that nothing consumed, which two critics named independently.
+ * A finding you cannot feed back is a complaint.
+ */
+describe('swarm verdict — the remedy is captured and carried', () => {
+  const withRemedy = [
+    'VERDICT: FIX',
+    'FINDINGS:',
+    '  - [blocking] a.ts:1 — the guard fails open',
+    '    root cause: the check runs after the write',
+    '    remediation: move the check above mkdirSync and assert nothing was written',
+    '    golden reference: swarm.mjs refuses before it writes',
+  ].join('\n');
+
+  it('prints the remediation so it can be pasted into the next builder', () => {
+    const result = runVerdict([withRemedy]);
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain('move the check above mkdirSync');
+    expect(result.stdout).toContain('the check runs after the write');
+  });
+
+  it('reports a MAJOR with no remedy but does not stop the run', () => {
+    // Scoped on purpose: a guard that refuses more than it must gets routed
+    // around. Only blocking findings gate.
+    const result = runVerdict([review('SHIP', '  - [major] a.ts:1 — smells — sometimes')]);
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('MAJOR');
+  });
+
+  it('refuses a blocking finding that arrives with NO remediation', () => {
+    const result = runVerdict([
+      ['VERDICT: FIX', 'FINDINGS:', '  - [blocking] a.ts:1 — this is bad'].join('\n'),
+    ]);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toMatch(/no `remediation:` line/i);
+  });
+
+  it('does not bleed one finding’s remedy into the next', () => {
+    // Two findings, two different remedies. A greedy match would attach the
+    // first remedy to both and the loop would feed a builder the wrong fix.
+    const result = runVerdict([
+      [
+        'VERDICT: FIX',
+        'FINDINGS:',
+        '  - [blocking] a.ts:1 — first defect',
+        '    root cause: one',
+        '    remediation: FIRST-REMEDY do the first thing',
+        '    golden reference: x',
+        '  - [major] b.ts:2 — second defect',
+        '    root cause: two',
+        '    remediation: SECOND-REMEDY do the second thing',
+        '    golden reference: y',
+      ].join('\n'),
+    ]);
+    // Assert the CAPTURED LINES exactly. An earlier version of this test compared
+    // substring positions and passed vacuously when the remedy bled: red-green
+    // caught it — making the match greedy left the suite green.
+    const remedies = [...String(result.stdout).matchAll(/REMEDIATION : (.+)$/gm)].map((m) =>
+      String(m[1]).trim(),
+    );
+    expect(remedies).toEqual([
+      'FIRST-REMEDY do the first thing',
+      'SECOND-REMEDY do the second thing',
+    ]);
+  });
+});

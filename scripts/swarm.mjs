@@ -362,7 +362,7 @@ function parseReview(text, label) {
   // emits: `1. [blocking] …`, `* [blocking] …` and `**[blocking]** …` all
   // yielded an empty list, which was indistinguishable from "found nothing".
   // Over-counting is noise; under-counting loses a real defect.
-  /** @type {{severity: string, line: string}[]} */
+  /** @type {{severity: string, line: string, rootCause: string, remediation: string, golden: string}[]} */
   const findings = [];
   const seen = new Set();
   for (const m of text.matchAll(/\[(blocking|major|minor)\][:\s]\s*(.+)$/gim)) {
@@ -372,7 +372,36 @@ function parseReview(text, label) {
     const fingerprint = `${/** @type {string} */ (m[1])}::${line.slice(0, 80)}`;
     if (seen.has(fingerprint)) continue;
     seen.add(fingerprint);
-    findings.push({ severity: /** @type {string} */ (m[1]).toLowerCase(), line });
+
+    // CAPTURE THE REMEDY.
+    //
+    // The prompt demands root cause / remediation / golden reference for every
+    // finding, and the parser used to keep the headline and discard all three —
+    // required output that nothing consumed, which two critics named as an
+    // option nothing passes.
+    //
+    // They matter because they ARE the loop: the next builder's prompt is the
+    // critic's remediation carried forward verbatim. A finding you cannot feed
+    // back is a complaint.
+    const start = /** @type {number} */ (m.index) + m[0].length;
+    const after = text.slice(start, start + 4000);
+    /** @param {string} name */
+    const field = (name) =>
+      new RegExp(
+        `^[ \\t]*(?:[-*]\\s*)?\\**${name}\\**\\s*:\\s*([\\s\\S]*?)(?=\\n[ \\t]*(?:[-*]\\s*)?\\**(?:root cause|remediation|golden reference)\\**\\s*:|\\n[ \\t]*[-*]?\\s*\\[(?:blocking|major|minor)\\]|\\n\\s*\\n|$)`,
+        'im',
+      )
+        .exec(after)?.[1]
+        ?.trim()
+        .replace(/\s+/g, ' ') ?? '';
+
+    findings.push({
+      severity: /** @type {string} */ (m[1]).toLowerCase(),
+      line,
+      rootCause: field('root cause'),
+      remediation: field('remediation'),
+      golden: field('golden reference'),
+    });
   }
 
   // A reviewer that said FIX and whose findings did not parse is a PARSE
@@ -430,7 +459,12 @@ function verdict() {
   ])) {
     if (list.length === 0) continue;
     console.log(`\n${name} (${String(list.length)}):`);
-    for (const f of list) console.log(`  - ${f.line}`);
+    for (const f of list) {
+      console.log(`  - ${f.line}`);
+      if (f.rootCause !== '') console.log(`      root cause  : ${f.rootCause}`);
+      if (f.remediation !== '') console.log(`      REMEDIATION : ${f.remediation}`);
+      if (f.golden !== '') console.log(`      golden ref  : ${f.golden}`);
+    }
   }
 
   // WORST-CASE. One reviewer saying SHIP does not outvote another holding a
@@ -441,6 +475,25 @@ function verdict() {
   // an explicit FIX became "✓ SHIP, exit 0" whenever the findings did not parse.
   // The comment claimed worst-case aggregation while the code did not do it.
   const dissenters = all.filter((r) => r.verdict === 'FIX').map((r) => r.label);
+  // A BLOCKING finding with no remediation cannot be fed into the next round,
+  // which makes it a complaint rather than a finding. The prompt asks for the
+  // remedy on every finding; this is the half that makes the ask real.
+  //
+  // Scoped to BLOCKING deliberately. The first version also hard-failed majors,
+  // which broke the intended "exit 0 but report the majors" path — and a guard
+  // that refuses more than it must is one people route around. A major with no
+  // remedy is still printed; it just does not stop the run.
+  const unremediated = blocking.filter((f) => f.remediation === '');
+  if (unremediated.length > 0) {
+    console.error(
+      `\n✗ ${String(unremediated.length)} finding(s) arrived with no \`remediation:\` line:\n` +
+        unremediated.map((f) => `    - ${f.line.slice(0, 100)}`).join('\n') +
+        `\n  A finding you cannot feed back into the next round is a complaint.` +
+        `\n  Re-run those critics and require the block verbatim.`,
+    );
+    process.exit(1);
+  }
+
   if (blocking.length > 0 || dissenters.length > 0) {
     const reason =
       blocking.length > 0

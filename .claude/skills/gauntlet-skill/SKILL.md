@@ -298,6 +298,9 @@ project requires an independent review before shipping, this does not satisfy it
 - Dispatch in parallel; each gets its own generated prompt, verbatim.
 - Never pass a critic another critic's output.
 
+→ `references/lead.md` for the LEAD prompt — the role a fresh agent needs to run
+this at all, and the loop rule that carries a critic's remedy verbatim into the
+next builder's round
 → `references/prompts.md` for the builder and harmoniser prompts
 → `references/worked-example.md` for one complete run, start to finish
 
