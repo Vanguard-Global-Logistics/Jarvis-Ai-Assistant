@@ -233,6 +233,7 @@ npm run probe:runtime  # launch the real app and assert what it actually does
 npm run dev:desktop  # launch the Electron shell
 npm run package:dir  # build a REAL packaged app (electron-builder, unpacked)
 npm run probe:packaged  # drive that packaged app — needs package:dir first
+npm run check:model  # ask the configured provider, for real, what is wrong
 npm run package:mac  # build the .dmg — only works on a Mac (ADR 0016)
 ```
 
@@ -499,7 +500,15 @@ These are accuracy rules. Violating them is worse than shipping nothing.
    `npm run probe:runtime`.
 8. **Never pipe a command you are checking through `tail` or `head`.** The pipe's exit
    status is the pipe's, not the command's, so a red suite reads as green — that shipped
-   a commit over a failing test in this repo. Redirect to a file, capture `$?`, then grep.
+   a commit over a failing test in this repo.
+9. **Never discard a vendor's error body.** Two failures in one day cost a round-trip
+   each because the code kept the status and threw away the sentence: a 404 that was a
+   malformed URL, and a 400 that could equally have been a bad key or a retired model.
+   The answer was in the body both times. Surface it — redacted, capped, main-side only.
+10. **Learn a vendor's failure shape by calling it, not by reasoning about it.** Google
+    wraps its error in an ARRAY (`[{"error":{…}}]`). No amount of thinking about the
+    OpenAI dialect would have produced that; one call with a deliberately bad key did.
+    The same applies to any test asserting how an external service behaves. Redirect to a file, capture `$?`, then grep.
 
 ---
 

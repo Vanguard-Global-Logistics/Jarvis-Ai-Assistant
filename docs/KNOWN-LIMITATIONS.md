@@ -171,6 +171,12 @@ switch providers live, and the switch is not persisted — a restart returns to 
 answered.** Nothing in this repository has spoken to an actual Ollama, LM Studio, or
 `llama.cpp` server.
 
+When a provider fails, the failure now carries the **service's own sentence**, not just a
+status code. `"Gemini answered 400."` is true and useless — a 400 from Google is equally
+"your key is invalid" and "that model is retired". The body always said which; the client
+discarded it. It no longer does, and `npm run check:model` makes one real request and
+prints the same answer without needing the app to start at all. Neither prints the key.
+
 One thing did get stronger and should be described exactly, not generously: since the
 brain-picker probe work (ADR 0022), the `local` adapter completes a **real HTTP
 round-trip over a real socket** against a minimal OpenAI-compatible server the probe

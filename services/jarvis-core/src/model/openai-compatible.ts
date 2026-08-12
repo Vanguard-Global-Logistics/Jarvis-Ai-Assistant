@@ -39,7 +39,19 @@ export type FetchLike = (
     body: string;
     signal: AbortSignal;
   },
-) => Promise<{ ok: boolean; status: number; json: () => Promise<unknown> }>;
+) => Promise<{
+  ok: boolean;
+  status: number;
+  json: () => Promise<unknown>;
+  /**
+   * The raw body, read only when the request FAILED.
+   *
+   * Optional because a stub that never fails has no reason to provide it — and
+   * because the success path must keep using `json()`, since a body can only be
+   * consumed once.
+   */
+  text?: () => Promise<string>;
+}>;
 
 /**
  * How this particular service is described to a human when something fails.
@@ -123,6 +135,75 @@ interface ChatCompletionResponse {
 /** True when the model was cut off by the token budget rather than finishing. */
 export function wasTruncated(payload: unknown): boolean {
   return (payload as ChatCompletionResponse).choices?.[0]?.finish_reason === 'length';
+}
+
+/** How much of a service's own error text is worth keeping. */
+const ERROR_DETAIL_LIMIT = 300;
+
+/**
+ * Pull the human-readable sentence out of an error body.
+ *
+ * WHY THIS EXISTS. `"Gemini answered 400."` is a true statement and a useless
+ * one. Google, xAI and OpenAI all return a body saying exactly what they
+ * rejected — "API key not valid", "model not found", "unsupported field" — and
+ * throwing it away turns a thirty-second fix into a guessing game. It did:
+ * a 400 from Google could equally have been a bad key or a retired model, and
+ * the status code alone could not separate them.
+ *
+ * Both shapes seen in the wild are handled: `{ error: { message } }` (Google,
+ * OpenAI, xAI) and a bare `{ message }`. Anything else falls back to the raw
+ * text, trimmed — a plain-text 502 from a proxy is still worth reading.
+ *
+ * Deliberately NOT the whole body: one sentence, one line, capped. A wall of
+ * JSON in a terminal is a different kind of unreadable.
+ */
+export function extractErrorDetail(body: string): string | undefined {
+  const trimmed = body.trim();
+  if (trimmed === '') return undefined;
+
+  let message: unknown;
+  try {
+    const parsed: unknown = JSON.parse(trimmed);
+    // Google's OpenAI-compatible endpoint wraps its error in an ARRAY —
+    // `[{ "error": { … } }]` — which is not something the OpenAI shape suggests
+    // and not something worth guessing at. It was found by pointing this code at
+    // the real API with a deliberately bad key and reading what came back, which
+    // is the only reliable way to learn a vendor's actual failure shape.
+    const root: unknown = Array.isArray(parsed) ? parsed[0] : parsed;
+    if (typeof root === 'object' && root !== null) {
+      const asRecord = root as { error?: unknown; message?: unknown };
+      const nested = asRecord.error;
+      message =
+        typeof nested === 'object' && nested !== null
+          ? (nested as { message?: unknown }).message
+          : typeof nested === 'string'
+            ? nested
+            : asRecord.message;
+    }
+  } catch {
+    // Not JSON. The raw text is still the best thing available.
+  }
+
+  const detail = typeof message === 'string' && message.trim() !== '' ? message : trimmed;
+  // One line: a multi-line body breaks the shape of a log entry, and the first
+  // sentence is the part that identifies the problem.
+  const flattened = detail.replace(/\s+/g, ' ').trim();
+  return flattened.length > ERROR_DETAIL_LIMIT
+    ? `${flattened.slice(0, ERROR_DETAIL_LIMIT)}…`
+    : flattened;
+}
+
+/**
+ * Remove the API key from text before it is allowed anywhere near a log.
+ *
+ * A service should never echo the credential back, and in practice they do not.
+ * "In practice they do not" is not a control. This costs one string replace and
+ * removes the whole class — including the case that matters most, where someone
+ * pastes a terminal error into a chat to ask for help (CLAUDE.md §3).
+ */
+export function redactSecret(text: string, secret: string | undefined): string {
+  if (secret === undefined || secret.length < 8) return text;
+  return text.split(secret).join('<redacted>');
 }
 
 /**
@@ -302,6 +383,41 @@ export class OpenAiCompatibleClient {
     throw new Error(`${this.voice.subject} returned malformed JSON for the amplifier.`);
   }
 
+  /**
+   * Our sentence about the failure, plus the service's own — when it sent one.
+   *
+   * The voice's hint stays FIRST because it is the actionable half: it names the
+   * environment variable to change, or the page to get a key from. The service's
+   * text follows as evidence, so a wrong hint is visibly wrong rather than
+   * quietly authoritative.
+   *
+   * This text stays on the MAIN side. `toSafeModelError` collapses every provider
+   * failure to a fixed category before it reaches the IPC boundary, so the
+   * renderer sees `"jarvis:chat failed"` and nothing more — the detail is for the
+   * terminal the app was started from, which is exactly where this project's
+   * documentation already sends people to look.
+   */
+  private async describeFailure(response: {
+    status: number;
+    text?: () => Promise<string>;
+  }): Promise<string> {
+    const hint = this.voice.httpHint(response.status, this.model);
+    if (response.text === undefined) return hint;
+
+    let detail: string | undefined;
+    try {
+      detail = extractErrorDetail(await response.text());
+    } catch {
+      // A body that cannot be read must not replace the failure we already know
+      // about — that would report a plumbing problem instead of the real one.
+      return hint;
+    }
+
+    return detail === undefined
+      ? hint
+      : `${hint} ${this.voice.subject} said: ${redactSecret(detail, this.apiKey)}`;
+  }
+
   public async complete(
     messages: readonly { role: string; content: string }[],
     options: { jsonMode: boolean; maxTokens?: number },
@@ -338,7 +454,7 @@ export class OpenAiCompatibleClient {
       });
 
       if (!response.ok) {
-        throw new Error(this.voice.httpHint(response.status, this.model));
+        throw new Error(await this.describeFailure(response));
       }
 
       return this.extractText(await response.json());
