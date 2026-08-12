@@ -32,7 +32,8 @@
     "package:mac": "npm run build && electron-builder --mac --project apps/desktop",
     "probe:packaged": "node scripts/runtime-probe.mjs --packaged",
     "diagnostics": "node scripts/collect-diagnostics.mjs",
-    "check:model": "node scripts/check-model.mjs"
+    "check:model": "node scripts/check-model.mjs",
+    "review": "node scripts/review-packet.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

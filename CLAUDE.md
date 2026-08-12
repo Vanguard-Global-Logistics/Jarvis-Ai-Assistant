@@ -247,6 +247,7 @@ npm run dev:awake    # same, with the Mac kept awake (caffeinate) for as long as
 npm run package:dir  # build a REAL packaged app (electron-builder, unpacked)
 npm run probe:packaged  # drive that packaged app — needs package:dir first
 npm run check:model  # ask the configured provider, for real, what is wrong
+npm run review       # build a paste-ready packet for ChatGPT/Gemini/Grok to review
 npm run package:mac  # build the .dmg — only works on a Mac (ADR 0016)
 ```
 
@@ -324,7 +325,15 @@ model names change and a stale ID in a permanent file is worse than no ID):
 > **A builder model is never the sole approver of its own work.**
 
 Security-, architecture-, finance-, permission-, and release-critical work requires an
-**independent review in a fresh context**. No model silently approves its own security
+**independent review in a fresh context**.
+
+**Run `npm run review` and hand William the packet BEFORE calling such work done.** This
+rule was recorded three times in a row (ADRs 0025, 0026 and their predecessors) as
+"outstanding" while the work shipped anyway, because assembling the context by hand lost
+to friction every time. The command removes the excuse: it writes the real diff, the rules
+quoted from this repo, and subsystem-specific questions into one file, refuses to write at
+all if anything credential-shaped is in it, and costs one paste. A review that is required
+but never obtained is a control this project does not actually have. No model silently approves its own security
 controls. This comes from `JARVIS-MASTER-SPEC.md` §Model separation and is not optional.
 
 ### A noted reconciliation

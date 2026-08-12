@@ -86,6 +86,22 @@ Two further reasons the method does not fit this class of work:
   method. Grading the artifact against a reference does not surface what is
   missing on purpose; a test that probes for the absence does.
 
+### 3b. But "another model checks it" is NOT the thing being refused
+
+Worth separating, because conflating them was an error in the first draft of this
+ADR and William called it out: _"what's wrong with a team helping the final
+outcome?"_
+
+Nothing. What §3 refuses is the Gauntlet's **grading instrument** — a blind A/B
+against a reference — for boundary properties, because a vote cannot replace a
+failing test. It does **not** refuse a second model reading the work. That is
+§5's independent review, it has been mandatory here since the foundation, and the
+honest problem was never that it was unwanted: **it was never actually done**,
+because getting one meant assembling context by hand.
+
+`npm run review` (ADR 0027) removes that friction. Security-critical work is now
+not offered as done until the packet exists.
+
 ### 4. It does NOT replace §5's independent review
 
 Two different things that are easy to conflate:
