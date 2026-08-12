@@ -159,3 +159,60 @@ describe('LocalProvider.amplify', () => {
     expect(ampBody.response_format).toEqual({ type: 'json_object' });
   });
 });
+
+describe('amplifier extraction against real reasoning-model output', () => {
+  // Qwen3 emits <think> blocks by default. The first time a local Qwen3 was
+  // asked to amplify, the UI said "The amplifier could not run" — because the
+  // old extractor took first-{ to last-}, and the reasoning contained a brace.
+  // These are the shapes that broke it.
+  const five = {
+    clarifiedIntent: 'ship the thing',
+    missingQuestions: ['who for?'],
+    improvedConcept: 'a better thing',
+    recommendedNextStep: 'write it down',
+    buildReadyPrompt: 'build the thing',
+  };
+  const json = JSON.stringify(five);
+
+  const shapes: Record<string, string> = {
+    'plain json': json,
+    'code fence': `\`\`\`json\n${json}\n\`\`\``,
+    'reasoning with no braces': `<think>\nFive fields are needed.\n</think>\n${json}`,
+    'reasoning MENTIONING braces': `<think>\nI should return {clarifiedIntent, missingQuestions, ...}.\n</think>\n${json}`,
+    'reasoning containing a sample object': `<think>\nShape: {"a": 1}\n</think>\n${json}`,
+    'trailing prose after the object': `${json}\n\nHope that helps! {done}`,
+    'reasoning AND trailing prose': `<think>\nDraft: {x}\n</think>\n${json}\nLet me know! {ok}`,
+  };
+
+  for (const [name, content] of Object.entries(shapes)) {
+    it(`recovers the five fields from: ${name}`, async () => {
+      const provider = new LocalProvider({
+        baseUrl: 'http://127.0.0.1:11434',
+        model: 'qwen3.5:4b',
+        fetch: fetchReturning(completion(content)),
+      });
+      await expect(provider.amplify('an idea')).resolves.toEqual(five);
+    });
+  }
+
+  it('still refuses when the model only ever reasoned and never answered', async () => {
+    // An unclosed <think> means there is no answer. Inventing one from half a
+    // thought would be worse than saying so.
+    const provider = new LocalProvider({
+      baseUrl: 'http://127.0.0.1:11434',
+      model: 'qwen3.5:4b',
+      fetch: fetchReturning(completion('<think>\nHmm, {maybe} this shape...')),
+    });
+    await expect(provider.amplify('an idea')).rejects.toThrow(/did not return JSON/i);
+  });
+
+  it('is not confused by a brace inside a quoted value', async () => {
+    const withBrace = { ...five, improvedConcept: 'use a { in the copy' };
+    const provider = new LocalProvider({
+      baseUrl: 'http://127.0.0.1:11434',
+      model: 'qwen3.5:4b',
+      fetch: fetchReturning(completion(JSON.stringify(withBrace))),
+    });
+    await expect(provider.amplify('an idea')).resolves.toEqual(withBrace);
+  });
+});

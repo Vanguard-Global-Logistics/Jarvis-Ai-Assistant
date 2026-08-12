@@ -80,6 +80,61 @@ export function chatCompletionsUrl(baseUrl: string): string {
   return root.endsWith('/v1') ? `${root}/chat/completions` : `${root}/v1/chat/completions`;
 }
 
+/**
+ * Remove reasoning blocks a model emitted before its answer.
+ *
+ * Qwen3 and other reasoning-tuned models wrap their working in `<think>` tags by
+ * default. It is not part of the reply and must not be searched for JSON. An
+ * UNCLOSED `<think>` means the model never got to an answer, so everything from
+ * the tag onward is dropped too — leaving nothing, which the caller reports
+ * honestly rather than parsing half a thought.
+ */
+export function stripReasoning(text: string): string {
+  return text
+    .replace(/<think>[\s\S]*?<\/think>/gi, ' ')
+    .replace(/<think>[\s\S]*$/i, ' ')
+    .trim();
+}
+
+/**
+ * Every syntactically balanced top-level `{...}` span, in order.
+ *
+ * String- and escape-aware: a brace inside a quoted value must not change the
+ * depth, or a perfectly good object containing `"{"` would be cut in half.
+ * Returns spans rather than parsed values so the caller decides which to trust.
+ */
+export function balancedObjects(text: string): string[] {
+  const spans: string[] = [];
+  let depth = 0;
+  let start = -1;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text.charAt(i);
+
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === '\\') escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+
+    if (ch === '"') inString = true;
+    else if (ch === '{') {
+      if (depth === 0) start = i;
+      depth += 1;
+    } else if (ch === '}' && depth > 0) {
+      depth -= 1;
+      if (depth === 0 && start !== -1) {
+        spans.push(text.slice(start, i + 1));
+        start = -1;
+      }
+    }
+  }
+  return spans;
+}
+
 export class OpenAiCompatibleClient {
   private readonly url: string;
   private readonly model: string;
@@ -121,23 +176,43 @@ export class OpenAiCompatibleClient {
   /**
    * Find the JSON object in a model's reply.
    *
-   * Smaller models are far less reliable at "reply with only JSON" than frontier
-   * models are — they add a preamble, or wrap the object in a code fence. Rather
-   * than fail an otherwise-good amplification on formatting, this takes the
-   * outermost braces. If what is between them is not the five fields, the schema
-   * rejects it and the caller is told honestly.
+   * Smaller and reasoning-tuned models are far less reliable at "reply with only
+   * JSON" than frontier models are. Rather than fail an otherwise-good
+   * amplification on formatting, this digs the object out. If what it finds is
+   * not the five fields, the schema rejects it and the caller is told honestly.
+   *
+   * WHY NOT first-`{`-to-last-`}`. That is what this did, and it broke on real
+   * output the first time a local Qwen3 model was asked to amplify. Reasoning
+   * models emit a `<think>` block before the answer, and the moment that
+   * reasoning contains a brace — "I should return {clarifiedIntent, ...}" — the
+   * span starts inside the thinking and the parse fails. Trailing prose after
+   * the object breaks it the same way. Both are ordinary model behaviour, not
+   * malformed output, and both produced "the amplifier could not run".
+   *
+   * So: drop `<think>` blocks, then take the LAST syntactically balanced object.
+   * Last, because a model that reasons and then answers puts the answer at the
+   * end; balanced, because scanning with string- and escape-awareness is the
+   * only way a brace inside a quoted value cannot throw off the count.
    */
   private extractJsonObject(text: string): unknown {
-    const start = text.indexOf('{');
-    const end = text.lastIndexOf('}');
-    if (start === -1 || end === -1 || end <= start) {
+    const withoutThinking = stripReasoning(text);
+    const candidates = balancedObjects(withoutThinking);
+    if (candidates.length === 0) {
       throw new Error(`${this.voice.subject} did not return JSON for the amplifier.`);
     }
-    try {
-      return JSON.parse(text.slice(start, end + 1));
-    } catch {
-      throw new Error(`${this.voice.subject} returned malformed JSON for the amplifier.`);
+
+    // Last first: the answer follows the reasoning.
+    for (let i = candidates.length - 1; i >= 0; i -= 1) {
+      const candidate = candidates[i];
+      if (candidate === undefined) continue;
+      try {
+        const parsed: unknown = JSON.parse(candidate);
+        if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) return parsed;
+      } catch {
+        // Try the next candidate: an earlier object may still be the answer.
+      }
     }
+    throw new Error(`${this.voice.subject} returned malformed JSON for the amplifier.`);
   }
 
   public async complete(

@@ -412,6 +412,9 @@ async function runChecks(page, mode) {
     'getAppInfo',
     'sendChat',
     'amplify',
+    // ADR 0022 — provider identifiers only, never configuration.
+    'describeModels',
+    'selectModel',
     'saveConversation',
     'listConversations',
     'getConversation',
@@ -426,6 +429,53 @@ async function runChecks(page, mode) {
     `Object.keys is exactly ${JSON.stringify(EXPECTED_KEYS)}`,
     keysOk,
     JSON.stringify(keys.value),
+  );
+
+  // --- model:describe / model:select (ADR 0022) ------------------------------
+  // These sections run with JARVIS_MODEL_PROVIDER pinned to mock, so `mock` is
+  // active and every other provider is unconfigured — which makes this the exact
+  // case that matters: does a refusal leave the previous brain in place, and does
+  // it explain itself without naming a value?
+  const described = await page.evaluate('await window.jarvis.describeModels()');
+  const d = described.value;
+  add(
+    'model:describe names the active provider and offers all four',
+    d?.active === 'mock' && Array.isArray(d.providers) && d.providers.length === 4,
+    JSON.stringify(d),
+  );
+  add(
+    'model:describe explains an unavailable provider without leaking a value',
+    d?.providers?.some(
+      (p) =>
+        p.id === 'anthropic' &&
+        p.available === false &&
+        /ANTHROPIC_API_KEY/.test(p.unavailableReason ?? ''),
+    ) === true,
+    JSON.stringify(d?.providers?.find((p) => p.id === 'anthropic')),
+  );
+
+  const refused = await page.evaluate("await window.jarvis.selectModel('anthropic')");
+  const r = refused.value;
+  add(
+    'model:select REFUSES an unconfigured provider and keeps the current one',
+    r?.selected === false && r.active === 'mock' && typeof r.reason === 'string',
+    JSON.stringify(r),
+  );
+
+  const stillMock = await page.evaluate(
+    'await window.jarvis.sendChat({ messages: [{ role: "user", content: "after a refused switch" }] })',
+  );
+  add(
+    'a refused switch really did leave the brain alone',
+    stillMock.value?.provider === 'mock',
+    JSON.stringify(stillMock.value?.provider),
+  );
+
+  const reselect = await page.evaluate("await window.jarvis.selectModel('mock')");
+  add(
+    'model:select accepts the provider that is already active',
+    reselect.value?.selected === true && reselect.value.active === 'mock',
+    JSON.stringify(reselect.value),
   );
 
   const info = await page.evaluate('window.jarvis ? await window.jarvis.getAppInfo() : null');
