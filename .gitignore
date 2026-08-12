@@ -67,3 +67,9 @@ docs/review/
 
 # Critic-swarm review prompts — generated, contain a full diff, regenerable
 docs/swarm/
+
+# Gauntlet round artifacts — copies of the graded work. The LEDGER is the audit
+# trail and stays tracked; the A/B copies and prompts are regenerable.
+docs/gauntlet/**
+!docs/gauntlet/*/
+!docs/gauntlet/*/ledger.md

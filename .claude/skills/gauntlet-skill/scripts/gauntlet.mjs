@@ -44,6 +44,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { randomInt } from 'node:crypto';
+import { findSecret } from './secret-scan.mjs';
 
 const ROOT = process.env.GAUNTLET_ROOT ?? process.cwd();
 const HOME = join(ROOT, 'docs', 'gauntlet');
@@ -272,6 +273,24 @@ function pair() {
   // brand name walked straight into the "blind" comparison.
   const terms = [...state.redact, ...csv(flag('redact') ?? '')];
   const ours = anonymise(oursText, terms);
+
+  /**
+   * REFUSE to stage anything credential-shaped.
+   *
+   * `--ours` and `--ref` are arbitrary paths — `--ours .env.local` or a `../`
+   * escape is one typo away — and their contents are copied VERBATIM into
+   * `docs/gauntlet/…` and into a prompt bound for an agent. `npm run swarm`
+   * hard-refuses on exactly this class of output; Gauntlet did not, while
+   * CLAUDE.md was busy making it a mandatory gate on credential work.
+   */
+  const staged =
+    findSecret(oursText) ??
+    (refFlag === undefined ? null : findSecret(readFileSync(resolve(ROOT, refFlag), 'utf8')));
+  if (staged !== null)
+    die(
+      `refusing to stage this round: an input contains something credential-shaped (${staged.slice(0, 8)}…).\n` +
+        `  These files are copied into docs/gauntlet/ and into a prompt sent to an agent.`,
+    );
   const reference =
     refFlag === undefined ? null : anonymise(readFileSync(resolve(ROOT, refFlag), 'utf8'), terms);
 
@@ -372,6 +391,19 @@ function criticPrompt(state, lens, instruction, mode, dir) {
     '',
     ...state.criteria.map((c) => `- **${c}**`),
     '',
+    `## The standard is BINARY`,
+    '',
+    `PASS means you were **utterly wowed** — this is at or above the bar, and you would be`,
+    `glad to see it shipped by an elite team. Anything less is FAIL. "Good", "solid",`,
+    `"nearly there" and "better than the other one" are all FAIL. Do not compromise and do`,
+    `not be lenient; a generous PASS costs the author the only thing this process gives them.`,
+    '',
+    `## For EVERY defect, three things — a complaint alone is not a finding`,
+    '',
+    `1. **Root cause** — why it fails, or why it keeps breaking down. Not the symptom.`,
+    `2. **Remediation** — exact steps: what to add, remove, or change. Specific enough to act on without asking you a question.`,
+    `3. **Golden reference** — a concrete example of what excellence looks like for that fix.`,
+    '',
     `## Required output — EXACTLY this block, first thing in your reply`,
     '',
     '```',
@@ -380,7 +412,10 @@ function criticPrompt(state, lens, instruction, mode, dir) {
     'SCORES:',
     ...state.criteria.map((c) => `  ${c}: n/5`),
     'DEFECTS:',
-    '  - [blocking|major|minor] <specific, actionable, names the exact place>',
+    '  - [blocking|major|minor] <what is wrong, and exactly where>',
+    '    root cause: <why it fails / why it keeps recurring>',
+    '    remediation: <exact steps to reach PASS>',
+    '    golden reference: <what excellence looks like here>',
     '```',
     '',
     `Rules for that block:`,
