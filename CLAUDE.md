@@ -27,8 +27,9 @@ Repository: `github.com/Vanguard-Global-Logistics/Jarvis-Ai-Assistant`.
   no vision. Do not describe any part of Jarvis as protected, or as remembering
   anything. **`docs/KNOWN-LIMITATIONS.md` is the authoritative list of what does not
   exist — read it before claiming anything works.**
-- **Eleven IPC channels exist: `app:get-info`, `jarvis:chat`, `jarvis:amplify`,
-  `history:save`/`list`/`get`/`delete`, `history:export`, `history:import`, and
+- **Thirteen IPC channels exist: `app:get-info`, `jarvis:chat`, `jarvis:amplify`,
+  `history:save`/`list`/`get`/`delete`, `history:export`, `history:import`,
+  `model:describe`/`model:select`, and
   `profile:get`/`profile:set`.** `app:get-info` returns static host facts.
   `jarvis:chat` and `jarvis:amplify` (ADR 0007) are narrow model calls: a transcript or
   an idea in, a reply or the five amplifier fields out. The `history:*` four (ADR 0008)
@@ -40,7 +41,11 @@ Repository: `github.com/Vanguard-Global-Logistics/Jarvis-Ai-Assistant`.
   authority beyond the model provider, the conversation store, and that one user-aimed
   write — no shell, env, arbitrary paths, or AEGIS, and the API key never leaves main.
   `history:import` (ADR 0014) reads one user-chosen backup and merges it by id, never
-  overwriting. These eleven are the whole of what `window.jarvis` exposes. `docs/IPC-SURFACE.md` is the
+  overwriting. `model:*` (ADR 0022) lets the renderer see which brain is answering and
+  switch it live — by **identifier** from a closed enum, never by URL, model name, or
+  key. It **picks among providers main already built; it never configures one**, because
+  a renderer that could name a URL could name a remote one and have it labeled `local`
+  (ADR 0015). These thirteen are the whole of what `window.jarvis` exposes. `docs/IPC-SURFACE.md` is the
   authoritative inventory; adding a channel is a boundary change (ADR 0002), not a
   routine edit.
 - **Authoritative documents**, in precedence order:
@@ -202,15 +207,15 @@ The directories exist and the toolchain runs. **Most of them are empty**, and th
 column is the part that matters:
 
 ```
-apps/desktop           Electron shell (main / preload / renderer)  PARTIAL — hardened, 11 IPC channels, conversation + history + profile UI, owns SQLite
+apps/desktop           Electron shell (main / preload / renderer)  PARTIAL — hardened, 13 IPC channels, conversation + history + profile + brain-picker UI, owns SQLite
 apps/pwa               PWA shell                                   NOT IMPLEMENTED — empty, out of scope
-services/jarvis-core   Orchestration, isolated from renderer       PARTIAL — model provider + amplifier, wired to the app via chat/amplify (ADR 0007)
+services/jarvis-core   Orchestration, isolated from renderer       PARTIAL — 5 model providers + amplifier, wired via chat/amplify/model (ADR 0007, 0022)
 services/aegis         AEGIS engine — independent, no GenAI        NOT IMPLEMENTED — empty
-packages/contracts     Zod schemas + shared types                  PARTIAL — IPC (11 channels), model, history, profile, experience
+packages/contracts     Zod schemas + shared types                  PARTIAL — IPC (13 channels), model, history, profile, experience
 packages/ui            Design-system components                    PARTIAL — tokens, motion, Orb + glass primitives
 packages/config        Env validation + structured logging         IMPLEMENTED, unit-tested
 packages/database      SQLite (node:sqlite) + migration runner     PARTIAL — wired to Electron main, 4 migrations: history, amplifications, profile, window-state (ADR 0008, 0009, 0013, 0017)
-docs/DECISIONS/        ADRs                                        0001–0014
+docs/DECISIONS/        ADRs                                        0001–0023
 docs/foundation/       Layer 2 foundation documents (ADR 0005)     PARTIAL — 01 APPROVED; 02, 07, 09 DRAFT; rest CONCEPTUAL
 ```
 
@@ -238,11 +243,14 @@ React Refresh preamble). Both reached William before anyone noticed.
 
 **`npm run probe:runtime` is the check that catches those.** It launches the real app —
 built HTML and `dev:desktop` — drives it over the DevTools protocol, and asserts React
-mounts, `window.jarvis` exposes exactly the eleven allowlisted functions, a chat/amplify
+mounts, `window.jarvis` exposes exactly the thirteen allowlisted functions, a chat/amplify
 round-trip answers, the full history save/list/get/delete loop works against a real
 SQLite (including that an unsaved chat never persists), the profile round-trips and
-rejects an invalid accent, a non-loopback local model URL refuses to start the app
-(ADR 0015), the renderer has no Node globals, and the console is clean. **Run it before
+rejects an invalid accent, the brain picker lists every provider and refuses an
+unconfigured one with a reason (ADR 0022), a repo-root `.env` actually reaches the
+provider (ADR 0021), a non-loopback local model URL refuses to start the app
+(ADR 0015), the window reopens at its stored size (ADR 0017), the renderer has no Node
+globals, and the console is clean. **Run it before
 claiming any runtime behaviour.** On Linux it needs Electron's GUI libraries once:
 `bash scripts/install-electron-runtime-deps.sh`.
 
@@ -325,14 +333,26 @@ verify Phase 1. Adding a model must mean adding a config entry and a provider ad
 never editing call sites across the codebase. Any real key must never enter the renderer
 and must never be logged.
 
-That abstraction now has **three** adapters, chosen in this precedence (ADR 0015):
-**`local`** (a model on the user's own machine over an OpenAI-compatible endpoint — free,
-offline, private, and **loopback-only**, enforced by a startup crash rather than a silent
-downgrade) → **`anthropic`** (a real key, usage-billed) → **`mock`** (the $0 default).
-Replies from `mock` and `local` are chipped in the UI; an unchipped reply means the
-frontier model answered. `local` is `IMPLEMENTED, NOT YET VERIFIED` — no real Ollama or
-LM Studio has ever answered, and a model that fits on a laptop is meaningfully weaker than
-Claude. Do not describe local hosting as making Jarvis free; it makes the *model* free.
+That abstraction now has **five** adapters, chosen in this startup precedence:
+**`local`** (ADR 0015 — a model on the user's own machine over an OpenAI-compatible
+endpoint: free, offline, private, and **loopback-only**, enforced by a startup crash
+rather than a silent downgrade) → **`anthropic`** (a real key, usage-billed) →
+**`gemini`** (ADR 0023 — a free daily allowance, no card) → **`grok`** (ADR 0020 — a real
+key, usage-billed) → **`mock`** (the $0 default). `JARVIS_MODEL_PROVIDER` names one
+outright and beats precedence; a named provider that cannot be built **fails the app**
+rather than quietly substituting another brain (ADR 0020). Since ADR 0022 the running app
+can also switch live from the brain picker, and that choice is **not** persisted.
+
+Every reply is chipped with the brain that produced it and what that cost — `mock` and
+`local` stayed on the machine; `anthropic`, `gemini`, and `grok` did not. Four of the five
+are `IMPLEMENTED, NOT YET VERIFIED`: no real Ollama, Claude key, Google key, or xAI key
+has ever answered in this repo, and every test injects `fetch`.
+
+Three things must never be softened. A model that fits on a laptop is meaningfully weaker
+than Claude — local hosting makes the *model* free, not Jarvis. Gemini's free tier is free
+in **money only**: free-tier traffic to consumer AI APIs is commonly used to improve the
+provider's products, so **nothing here may describe Gemini as private**. And none of these
+providers searches the web — no answer from any of them is grounded in a live source.
 
 ---
 

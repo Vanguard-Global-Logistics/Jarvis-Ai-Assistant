@@ -10,16 +10,18 @@ Personal AI assistant and orchestrator for William Lavold. Private, single-user.
 > (ADR 0007, 0008, 0010). Unsaved conversations are discarded on close, by design. It can
 > back up every saved session to a file and restore one without ever overwriting
 > (ADR 0011, 0014), wear a per-person orb identity (ADR 0013), answer from a model running
-> on your own machine (ADR 0015), and be packaged as an installable app (ADR 0016).
+> on your own machine (ADR 0015), switch between five brains without restarting
+> (ADR 0022 — mock, local, Claude, Gemini, Grok), and be packaged as an installable app
+> (ADR 0016).
 >
 > There is still no AEGIS, no orchestrator beyond a single stateless model call, no
 > Forge, no Ledger, no memory (a saved transcript is a record, not recall), no voice,
 > and no vision. Nothing here is protected by AEGIS — AEGIS does not exist.
 >
-> Eleven typed IPC channels exist (`app:get-info`, `jarvis:chat`, `jarvis:amplify`,
-> `history:save/list/get/delete`, `history:export`, `history:import`, and
-> `profile:get/set`). They are the whole of what `window.jarvis` exposes —
-> see `docs/IPC-SURFACE.md`.
+> Thirteen typed IPC channels exist (`app:get-info`, `jarvis:chat`, `jarvis:amplify`,
+> `history:save/list/get/delete`, `history:export`, `history:import`,
+> `model:describe/select`, and `profile:get/set`). They are the whole of what
+> `window.jarvis` exposes — see `docs/IPC-SURFACE.md`.
 >
 > `docs/KNOWN-LIMITATIONS.md` is the authoritative list of what is missing. Read it before
 > concluding anything works. In particular: the local model, the backup/restore dialogs,

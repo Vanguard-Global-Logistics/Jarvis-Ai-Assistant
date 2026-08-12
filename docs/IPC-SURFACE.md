@@ -1,7 +1,10 @@
 # The IPC Surface
 
-Date: 2026-08-10
-Status: **ELEVEN channels.** `profile:get`/`profile:set` (ADR 0013) are IMPLEMENTED AND
+Date: 2026-08-12
+Status: **THIRTEEN channels.** `model:describe`/`model:select` (ADR 0022) are PARTIAL —
+both are driven against the real app on the Linux runtime probe, including a refused
+selection proven not to change which brain answers, but an **accepted** switch is not yet
+proven to re-route messages (ADR 0022 §Decision.6). `profile:get`/`profile:set` (ADR 0013) are IMPLEMENTED AND
 VERIFIED on the Linux runtime probe. `history:export` (ADR 0011) is `IMPLEMENTED, NOT YET
 VERIFIED` — the probe asserts it is exposed but deliberately does not invoke it (a
 native modal dialog would hang a headless run), so the dialog-and-write path awaits
@@ -222,6 +225,35 @@ schema the rest of the system trusts — because this is the only input read fro
 the application. A non-JSON file and a non-backup file each produce a message a human can
 act on, and nothing partial enters the store (ADR 0014).
 
+### `model:describe` / `model:select`
+
+|                       |                                                                                                                                                                                                                                                                                                                                                            |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Status**            | PARTIAL. Verified on the Linux runtime probe: describe returns the active provider and the full list, and a selection of an unconfigured provider is refused with a reason and proven — by a real message afterwards — to leave the active one in place. An **accepted** switch is not yet proven to re-route messages (ADR 0022 §Decision.6), 2026-08-11. |
+| **Renderer call**     | `window.jarvis.describeModels(): Promise<ModelDescription>` · `window.jarvis.selectModel(id: ProviderId): Promise<ModelSelection>`                                                                                                                                                                                                                         |
+| **Request**           | describe: `z.undefined()`. select: `{ id }`, `.strict()`, `id` a **closed enum** (`mock`/`local`/`anthropic`/`grok`/`gemini`)                                                                                                                                                                                                                              |
+| **Response**          | `{ active, providers[] }` / `{ selected, active, reason?, providers[] }`, both `.strict()`. Each provider is `{ id, available, unavailableReason? }` — **identifiers only**                                                                                                                                                                                |
+| **Handler**           | `registerModelHandlers(env, holder)` in `apps/desktop/src/main/handlers/model.ts`                                                                                                                                                                                                                                                                          |
+| **Contract**          | `modelDescribeContract` / `modelSelectContract`                                                                                                                                                                                                                                                                                                            |
+| **Side effects**      | select: replaces the provider in the holder that `jarvis:chat` and `jarvis:amplify` read on every turn. Nothing is written to disk; a restart returns to `.env`.                                                                                                                                                                                           |
+| **Authority granted** | Choose among providers **main already built**. Not configuration: no endpoint, model name, or credential crosses in either direction.                                                                                                                                                                                                                      |
+
+The response carries **no endpoint, no model name, and no key — not even a redacted one**.
+Picking a brain needs none of that, and this is the channel where "not needed" wins.
+`unavailableReason` is written by main from its own fixed sentences and never forwards an
+error from a provider, an SDK, or the network: provider errors routinely carry URLs,
+header fragments, and occasionally the tail of a credential, so a field that forwarded
+them would be an exfiltration channel wearing a helpful label. Main slices it to the
+schema's 200-character cap so a long sentence degrades rather than failing validation.
+
+Selection routes through `buildProviderById` — the **same** construction path startup
+uses — so ADR 0015's loopback rule is inherited rather than re-implemented. A renderer
+that could name a URL could name a remote one and have it labeled `local`; it cannot name
+one. A refusal is a described outcome, not a thrown error, because a human is standing at
+the picker; at startup the same unhonourable choice kills the app (ADR 0020) because there
+is nobody to tell. One rule — never substitute silently — in the form each moment can act
+on.
+
 ### `profile:get` / `profile:set`
 
 |                       |                                                                                                                                                         |
@@ -328,7 +360,7 @@ JavaScript. SQLite needs no external at all — the driver is Node's builtin
   (`packages/contracts/src/ipc/contracts.test.ts`).
 - The `AppInfo` schema rejects unknown platforms, missing fields, empty strings, and
   extra keys; the request schema rejects any payload.
-- The bridge exposes exactly one namespace (`jarvis`) and exactly the eleven allowlisted
+- The bridge exposes exactly one namespace (`jarvis`) and exactly the thirteen allowlisted
   functions, all values are functions, and no generic passthrough exists
   (`apps/desktop/src/preload/index.test.ts`). This test was verified red-green: it fails
   when a generic `invoke` is added to the bridge.

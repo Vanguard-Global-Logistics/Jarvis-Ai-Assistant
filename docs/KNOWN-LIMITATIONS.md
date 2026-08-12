@@ -79,18 +79,31 @@ storage, separate credentials. Phase 1 will not deliver OS-level enforcement. Wh
 state engine ships, this gap must be restated wherever AEGIS is described — not quietly
 dropped once the UI looks convincing.
 
-## 3. The IPC bridge exposes exactly eleven narrow channels
+## 3. The IPC bridge exposes exactly thirteen narrow channels
 
 **Status: PARTIAL — intended for this stage.**
 
-`window.jarvis` exposes exactly eleven purpose-named functions: `getAppInfo` (host
+`window.jarvis` exposes exactly thirteen purpose-named functions: `getAppInfo` (host
 facts), `sendChat` and `amplify` (model calls, ADR 0007), the four history
-operations (ADR 0008), `exportHistory` (ADR 0011), `importHistory` (ADR 0014), and `getProfile`/`setProfile`
+operations (ADR 0008), `exportHistory` (ADR 0011), `importHistory` (ADR 0014),
+`describeModels`/`selectModel` (ADR 0022 — which brain is answering, and switching it
+without a restart), and `getProfile`/`setProfile`
 (ADR 0013 — the orb's name and colour, which grant nothing). The authority envelope remains
 deliberately small: a model call, a conversation store, and one backup write whose
 destination the renderer can neither name nor learn — main opens the native save
 dialog, so only a human picks the path. No shell, no arbitrary filesystem paths, no
-SQL, no env, no AEGIS. The audit names an over-exposed preload as the single highest-risk failure in
+SQL, no env, no AEGIS.
+
+The two `model:*` channels are the narrowest widening yet and the easiest to widen
+wrongly: they carry provider **identifiers** from a closed enum and one main-authored
+sentence explaining any refusal — never an endpoint, a model name, or a key, not even a
+redacted one. The renderer picks among providers main already built; it cannot configure
+one. That line is load-bearing, because a renderer that could name a URL could name a
+remote one and have it labeled `local`, which is the exact thing ADR 0015 exists to
+prevent. Selection routes through the same construction path startup uses, so the
+loopback rule is inherited rather than re-implemented.
+
+The audit names an over-exposed preload as the single highest-risk failure in
 Phase 1, so every further channel must still be argued for individually (ADR 0002) and
 recorded in `docs/IPC-SURFACE.md`.
 
@@ -119,8 +132,7 @@ exists as a step at all: there is no native module. The remaining honest caveats
   the window was). No tables exist for memory, projects, tasks, or the audit log — those
   are feature design work and are not approved.
 - `window_state` is **not** reached over IPC. Main owns both the window and the database,
-  so the whole feature lives on the trusted side and the bridge stays at eleven
-  functions. It is verified by the runtime probe, which forces a distinctive size onto
+  so the whole feature lives on the trusted side and adds nothing to the bridge. It is verified by the runtime probe, which forces a distinctive size onto
   disk between two launches and asserts the second comes up at it.
 
 ## 5. (Retired) There are zero migrations
@@ -129,10 +141,11 @@ This section closed with ADR 0008 — migration 1 exists and is applied at start
 header remains so cross-references to later section numbers stay valid. The part that
 is still true lives in §4: only the conversation-history schema exists, nothing else.
 
-## 6. Four model providers exist; only one has ever answered
+## 6. Five model providers exist; only one has ever answered
 
 **Status: PARTIAL. `mock` IMPLEMENTED AND VERIFIED · `anthropic` IMPLEMENTED, NOT YET
-VERIFIED · `local` IMPLEMENTED, NOT YET VERIFIED · `grok` IMPLEMENTED, NOT YET VERIFIED.**
+VERIFIED · `local` IMPLEMENTED, NOT YET VERIFIED · `grok` IMPLEMENTED, NOT YET VERIFIED ·
+`gemini` IMPLEMENTED, NOT YET VERIFIED.**
 
 The provider-neutral abstraction named in `CURRENT-STATE-AUDIT.md` §20 exists and **is**
 wired to the desktop app (ADR 0007 — the earlier "not wired" statement was true at
@@ -142,12 +155,17 @@ Checkpoint 1 and is superseded). `createProvider(env)` runs once in main and pic
 provider cannot be built the app **fails** rather than quietly using a different brain
 (ADR 0020). Unset, precedence applies top to bottom:
 
-| Provider    | Selected when                                                  | Cost         | Leaves the machine? | Verified?                         |
-| ----------- | -------------------------------------------------------------- | ------------ | ------------------- | --------------------------------- |
-| `local`     | `JARVIS_LOCAL_MODEL_URL` + `JARVIS_LOCAL_MODEL` set (ADR 0015) | $0           | No                  | **No — see below**                |
-| `anthropic` | `ANTHROPIC_API_KEY` set                                        | usage-billed | Yes                 | Not against the live API          |
-| `grok`      | `XAI_API_KEY` set (ADR 0020)                                   | usage-billed | Yes                 | **No — no key has ever answered** |
-| `mock`      | none of the above — the default                                | $0           | No                  | Yes, on the runtime probe         |
+| Provider    | Selected when                                                  | Cost               | Leaves the machine? | Verified?                         |
+| ----------- | -------------------------------------------------------------- | ------------------ | ------------------- | --------------------------------- |
+| `local`     | `JARVIS_LOCAL_MODEL_URL` + `JARVIS_LOCAL_MODEL` set (ADR 0015) | $0                 | No                  | **No — see below**                |
+| `anthropic` | `ANTHROPIC_API_KEY` set                                        | usage-billed       | Yes                 | Not against the live API          |
+| `gemini`    | `GEMINI_API_KEY` set (ADR 0023)                                | $0 daily allowance | Yes                 | **No — no key has ever answered** |
+| `grok`      | `XAI_API_KEY` set (ADR 0020)                                   | usage-billed       | Yes                 | **No — no key has ever answered** |
+| `mock`      | none of the above — the default                                | $0                 | No                  | Yes, on the runtime probe         |
+
+Since ADR 0022 that precedence is only the **startup default**. The brain picker can
+switch providers live, and the switch is not persisted — a restart returns to whatever
+`.env` and this table say.
 
 **What is not verified about `local`, stated plainly: no real local runner has ever
 answered.** Every test injects a fake `fetch`. Nothing in this repository has spoken to
@@ -179,6 +197,30 @@ company, exactly like Anthropic — adding it adds a vendor. The only thing here
 reduces dependence on paid services is `local`, and the only thing that makes vendors
 interchangeable is the abstraction. Nothing in this repository may describe Grok, or any
 hosted provider, as making Jarvis independent.
+
+**`gemini` is unverified on the same terms, and carries a cost that is not money
+(ADR 0023).** No real Google key has ever answered; its tests inject `fetch` and prove the
+posted URL, the bearer header, the 401/404/429 wording and the contract validation. Two
+things must never be softened when it is described:
+
+- **Free is not private.** Free-tier traffic to consumer AI APIs is commonly used to
+  improve the provider's products; paid tiers usually are not. For an assistant that will
+  eventually hold family details, that is a real cost paid in something other than money.
+  **Nothing in this repository may describe Gemini as private**, and a Gemini reply is
+  chipped in the UI saying the conversation left the machine.
+- **Free does not mean independent.** Google can change the free tier tomorrow. Gemini
+  removes the bill, not the vendor.
+- **It gives Jarvis no web search.** The free Gemini in a search box and the Gemini API
+  are different products; the API is a model and does not browse. Retrieval is a separate,
+  unbuilt capability, and no answer from any provider here is grounded in a live source.
+
+One bug worth remembering rather than burying: Gemini's first implementation built its URL
+by inferring the completions path from the base URL, and Google's published root
+(`/v1beta/openai`) broke the pattern the other vendors follow. Every request 404'd, which
+reads as "the service is down" or "the key is wrong" — both wrong, both send you looking
+in the wrong place. The path is now stated by the provider rather than inferred, and the
+tests name the three shapes vendors actually publish. Inference is fine where it can be
+right; where it cannot, state it.
 
 No API key and no local runner are required to run or verify the foundation; the mock
 default is why the app costs $0.
@@ -255,7 +297,7 @@ Four jobs, and the distinctions matter:
   did not.
 - **`runtime`** — installs Electron's GUI libraries and Xvfb, builds, then runs
   `npm run probe:runtime`: launches the real app (packaged path **and** `dev:desktop`) and
-  asserts React mounts, the bridge exposes exactly the eleven allowlisted functions, a
+  asserts React mounts, the bridge exposes exactly the thirteen allowlisted functions, a
   chat/amplify round-trip works, the full history save/list/get/delete loop works against
   a real SQLite (including that an unsaved chat never persists), the renderer has no Node
   globals, and the console is clean. It is verified red-green against the CSP defect.
