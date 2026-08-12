@@ -188,6 +188,16 @@ The engine — not the handler — decides whether a request is stricter, so the
 exactly one implementation. For AEGIS, a rule living in two files is a security failure
 waiting on drift (CLAUDE.md §3).
 
+**Blackout requires the typed word, enforced by the SCHEMA.** A dialog is UI a caller
+can skip; a request that does not validate never reaches the engine. The probe asserts a
+missing word and a wrong-case word are both rejected in the running app, and that the
+level is untouched afterwards.
+
+**Lowering is not on this boundary and never will be.** It lives on the native
+application menu — built in main, clicked in main, with no IPC behind it — so a
+compromised renderer cannot reach it while a human with the app focused can (ADR 0025
+§5b). Without that path the raise-only panic button would be a one-way door.
+
 **This channel reports a level; it does not protect anything.** No Jarvis capability
 consults AEGIS before acting, because none of the governed capabilities exists yet
 (ADR 0025).

@@ -620,6 +620,34 @@ async function runChecks(page, mode, stub = null) {
     JSON.stringify(afterRaise.value?.status?.level ?? null),
   );
 
+  // Blackout must carry the typed word, and the CONTRACT is what enforces it —
+  // not a dialog, which is UI a caller can skip. A rejected request never
+  // reaches the engine, so the level must be untouched afterwards.
+  const blackoutNoWord = await page.evaluate(
+    'await window.jarvis.aegisRequestRestriction("BLACK", "probe: no confirmation").then(() => "ACCEPTED").catch(() => "REJECTED")',
+  );
+  add(
+    'blackout WITHOUT the typed word is rejected at the boundary',
+    blackoutNoWord.value === 'REJECTED',
+    String(blackoutNoWord.value),
+  );
+
+  const blackoutWrongWord = await page.evaluate(
+    'await window.jarvis.aegisRequestRestriction("BLACK", "probe", "blackout").then(() => "ACCEPTED").catch(() => "REJECTED")',
+  );
+  add(
+    'blackout with the WRONG CASE is rejected too',
+    blackoutWrongWord.value === 'REJECTED',
+    String(blackoutWrongWord.value),
+  );
+
+  const stillYellow = await page.evaluate('(await window.jarvis.aegisStatus()).level');
+  add(
+    'and the level is untouched by both rejected attempts',
+    stillYellow.value === 'YELLOW',
+    String(stillYellow.value),
+  );
+
   add(
     'the bridge exposes NO way to lower a level',
     (

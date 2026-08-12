@@ -111,6 +111,45 @@ worst a hostile caller achieves is locking Jarvis down. Lowering is the dangerou
 direction, so it is not expressible from the renderer at all. The admin surface
 lives in main and no channel reaches it.
 
+### 5b. Lowering exists — on the NATIVE MENU, which the renderer cannot click
+
+Raise-only left a real problem, and it was worth catching before William hit it:
+with no lowering path anywhere, pressing **Restrict** would be a one-way door.
+The level survives restarts by design, so quitting and reopening is not an escape
+either. A safety control you cannot undo is a control people learn not to touch,
+which makes it useless exactly when it matters.
+
+The answer is the **native application menu**, and it works because it is
+genuinely a different surface rather than a differently-styled one: it is
+constructed in main, its click handlers run in main, and there is no IPC channel
+behind it. A compromised renderer — injected script, hostile page, model output
+that reached the DOM — has nothing to invoke.
+
+| Surface           | Can do                                            | Cannot do                    |
+| ----------------- | ------------------------------------------------- | ---------------------------- |
+| Renderer window   | Restrict, Isolate, Blackout (with the typed word) | lower, recover, read the log |
+| Native AEGIS menu | lower, dev-only recovery, view the audit log      | —                            |
+
+The menu is rebuilt after every accepted transition, so it never offers a
+lowering option that no longer applies or shows a stale level. It carries **no
+keyboard accelerators**: every item changes a security posture, and accelerators
+are what a stray key-repeat hits.
+
+Blackout is deliberately absent from the menu's lowering list — it does not lift
+through the ordinary path — so while blacked out the dev-only item is the only
+way back, and the window says so rather than pretending it can help.
+
+### 5c. The typed confirmation lives in the SCHEMA
+
+`aegis:request-restriction` takes an optional `confirmation`, and the request
+schema refuses `BLACK` unless it is exactly `BLACKOUT` — and refuses a
+confirmation attached to any other level, because a caller sending one has
+misunderstood which rule applies.
+
+A dialog is UI a caller can skip. A request that does not validate never reaches
+the engine at all. The probe asserts both the missing word and the wrong case are
+rejected in the running app, and that the level is untouched afterwards.
+
 ### 6. The status UI is the one thing that must be real
 
 CLAUDE.md §6 makes every live-looking metric in this app mocked and labeled, with

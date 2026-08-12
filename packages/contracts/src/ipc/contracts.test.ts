@@ -3,6 +3,7 @@ import { ALL_CHANNELS, CHANNELS } from './channels.js';
 import {
   AppInfoSchema,
   IPC_CONTRACTS,
+  aegisRequestRestrictionContract,
   appGetInfoContract,
   historyDeleteContract,
   historyExportContract,
@@ -306,5 +307,41 @@ describe('jarvisAmplifyContract', () => {
     expect(jarvisAmplifyContract.response.safeParse(valid).success).toBe(true);
     const { buildReadyPrompt: _omitted, ...missing } = valid;
     expect(jarvisAmplifyContract.response.safeParse(missing).success).toBe(false);
+  });
+});
+
+describe('aegis:request-restriction — blackout needs the typed word (ADR 0025)', () => {
+  const parse = (value: unknown) => aegisRequestRestrictionContract.request.safeParse(value);
+
+  it('accepts a plain raise with no confirmation', () => {
+    expect(parse({ level: 'YELLOW', reason: 'incident' }).success).toBe(true);
+  });
+
+  it('REJECTS blackout without the confirmation', () => {
+    // The rule lives in the schema rather than in a dialog on purpose: a dialog
+    // is UI a caller can skip, while a request that does not validate never
+    // reaches the engine at all.
+    expect(parse({ level: 'BLACK', reason: 'incident' }).success).toBe(false);
+  });
+
+  it('REJECTS blackout with the wrong word, including the wrong case', () => {
+    expect(parse({ level: 'BLACK', reason: 'x', confirmation: 'blackout' }).success).toBe(false);
+    expect(parse({ level: 'BLACK', reason: 'x', confirmation: 'yes' }).success).toBe(false);
+    expect(parse({ level: 'BLACK', reason: 'x', confirmation: '' }).success).toBe(false);
+  });
+
+  it('accepts blackout with exactly BLACKOUT', () => {
+    expect(parse({ level: 'BLACK', reason: 'x', confirmation: 'BLACKOUT' }).success).toBe(true);
+  });
+
+  it('rejects a confirmation attached to a NON-blackout request', () => {
+    // A caller that sends one has misunderstood which rule applies, and
+    // ignoring that quietly lets the misunderstanding reach blackout one day.
+    expect(parse({ level: 'RED', reason: 'x', confirmation: 'BLACKOUT' }).success).toBe(false);
+  });
+
+  it('rejects an unknown level and an empty reason', () => {
+    expect(parse({ level: 'PUCE', reason: 'x' }).success).toBe(false);
+    expect(parse({ level: 'RED', reason: '' }).success).toBe(false);
   });
 });

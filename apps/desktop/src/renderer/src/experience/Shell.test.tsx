@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AppInfo } from '@jarvis/contracts';
 import { AEGIS_CAPABILITIES, DEFAULT_PROFILE, ORB_STATES } from '@jarvis/contracts';
@@ -246,5 +246,106 @@ describe('the AEGIS strip (ADR 0025)', () => {
     expect(await screen.findByText(/AEGIS · READING…/)).toBeTruthy();
     expect(screen.queryByText(/AEGIS · GREEN/)).toBeNull();
     consoleError.mockRestore();
+  });
+});
+
+describe('the AEGIS console controls (ADR 0025)', () => {
+  const withAegis = (status: unknown, request = vi.fn()) => {
+    stubMatchMedia();
+    vi.stubGlobal('jarvis', {
+      getAppInfo: vi.fn().mockResolvedValue(APP_INFO),
+      getProfile: vi.fn().mockResolvedValue(DEFAULT_PROFILE),
+      aegisStatus: vi.fn().mockResolvedValue(status),
+      aegisRequestRestriction: request,
+    });
+    return request;
+  };
+
+  it('offers only levels STRICTER than the current one', async () => {
+    // Raise-only is the rule; offering a control AEGIS would refuse teaches
+    // people to distrust the whole surface.
+    withAegis({ ...AEGIS_GREEN, level: 'YELLOW' });
+    render(<Shell devStateSwitcher={false} />);
+    await screen.findByText(/AEGIS · YELLOW/);
+
+    expect(screen.queryByRole('button', { name: 'Restrict' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Isolate' })).toBeTruthy();
+  });
+
+  it('raises, and adopts the level AEGIS reports rather than the one clicked', async () => {
+    const request = withAegis(
+      AEGIS_GREEN,
+      vi.fn().mockResolvedValue({
+        accepted: true,
+        status: { ...AEGIS_GREEN, level: 'YELLOW' },
+      }),
+    );
+    render(<Shell devStateSwitcher={false} />);
+    await screen.findByText(/AEGIS · GREEN/);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Restrict' }));
+
+    expect(await screen.findByText(/AEGIS · YELLOW/)).toBeTruthy();
+    expect(request).toHaveBeenCalledWith('YELLOW', expect.stringContaining('YELLOW'), undefined);
+  });
+
+  it('keeps showing the REAL level when a request is refused', async () => {
+    const request = withAegis(
+      AEGIS_GREEN,
+      vi.fn().mockResolvedValue({
+        accepted: false,
+        status: AEGIS_GREEN,
+        refusedBecause: 'not stricter',
+      }),
+    );
+    render(<Shell devStateSwitcher={false} />);
+    await screen.findByText(/AEGIS · GREEN/);
+    fireEvent.click(screen.getByRole('button', { name: 'Restrict' }));
+
+    await waitFor(() => {
+      expect(request).toHaveBeenCalled();
+    });
+    // The UI never computes the level itself, so a refusal leaves it truthful.
+    expect(screen.getByText(/AEGIS · GREEN/)).toBeTruthy();
+  });
+
+  it('will not send a blackout until BLACKOUT is typed exactly', async () => {
+    // A resolved promise even though the first half asserts it is NOT called:
+    // the real bridge always returns one, and a bare vi.fn() returning undefined
+    // throws inside the click handler and poisons the whole file's run.
+    const request = withAegis(
+      AEGIS_GREEN,
+      vi.fn().mockResolvedValue({
+        accepted: true,
+        status: { ...AEGIS_GREEN, level: 'BLACK' },
+      }),
+    );
+    render(<Shell devStateSwitcher={false} />);
+    await screen.findByText(/AEGIS · GREEN/);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Blackout…' }));
+    const field = screen.getByLabelText(/type BLACKOUT to confirm/i);
+
+    fireEvent.change(field, { target: { value: 'blackout' } });
+    fireEvent.click(screen.getByRole('button', { name: /confirm blackout/i }));
+    expect(request).not.toHaveBeenCalled();
+
+    fireEvent.change(field, { target: { value: 'BLACKOUT' } });
+    fireEvent.click(screen.getByRole('button', { name: /confirm blackout/i }));
+    expect(request).toHaveBeenCalledWith('BLACK', expect.any(String), 'BLACKOUT');
+  });
+
+  it('says recovery is not available from this window while blacked out', async () => {
+    // Raise-only means the window cannot undo a blackout, and pretending
+    // otherwise would be worse than saying where the control actually is.
+    withAegis({
+      ...AEGIS_GREEN,
+      level: 'BLACK',
+      capabilities: Object.fromEntries(AEGIS_CAPABILITIES.map((c) => [c, false])),
+    });
+    render(<Shell devStateSwitcher={false} />);
+
+    expect(await screen.findByText(/recovery is not available from this window/i)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Blackout…' })).toBeNull();
   });
 });

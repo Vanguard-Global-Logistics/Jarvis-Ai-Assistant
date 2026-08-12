@@ -172,8 +172,38 @@ export const aegisRequestRestrictionContract = defineContract({
     .object({
       level: AegisLevelSchema,
       reason: z.string().min(1).max(200),
+      /**
+       * The literal word `BLACKOUT`. **Required when — and only when — `level`
+       * is BLACK**, enforced by the refinement below.
+       *
+       * `SECURITY-BOUNDARIES.md` requires blackout entry to carry a typed
+       * confirmation. Putting that rule in the SCHEMA rather than in a dialog is
+       * the difference between a control and a convention: a dialog is UI a
+       * caller can skip, while a request without the word does not validate and
+       * never reaches the engine.
+       */
+      confirmation: z.string().max(32).optional(),
     })
-    .strict(),
+    .strict()
+    .superRefine((value, ctx) => {
+      if (value.level === 'BLACK' && value.confirmation !== 'BLACKOUT') {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['confirmation'],
+          message: 'Blackout requires the typed confirmation BLACKOUT.',
+        });
+      }
+      if (value.level !== 'BLACK' && value.confirmation !== undefined) {
+        // Not pedantry: a confirmation attached to a non-blackout request is a
+        // caller that has misunderstood which rule applies, and silently
+        // ignoring it would let that misunderstanding reach blackout one day.
+        ctx.addIssue({
+          code: 'custom',
+          path: ['confirmation'],
+          message: 'A confirmation is only meaningful when entering blackout.',
+        });
+      }
+    }),
   response: AegisRestrictionResultSchema,
 });
 

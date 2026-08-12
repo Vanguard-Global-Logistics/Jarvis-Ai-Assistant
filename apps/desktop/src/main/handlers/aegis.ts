@@ -69,20 +69,33 @@ export function createAegisForApp(userDataDir: string): AegisAdmin {
   return aegis;
 }
 
-export function registerAegisHandlers(aegis: AegisAdmin): void {
+export function registerAegisHandlers(aegis: AegisAdmin, onChange?: () => void): void {
   handleContract(aegisStatusContract, (): AegisStatus => aegis.status());
 
-  handleContract(aegisRequestRestrictionContract, ({ level, reason }) => {
+  handleContract(aegisRequestRestrictionContract, ({ level, reason, confirmation }) => {
     // The renderer is untrusted, and this is the one AEGIS verb it may use. The
     // engine — not this handler — decides whether the request is stricter, so
     // there is exactly one implementation of the rule (CLAUDE.md §3: a rule in
     // two files will drift, and for AEGIS drift is a security failure).
-    const result = aegis.requestRestriction(level, reason);
+    //
+    // Blackout routes through `enterBlackout` rather than `requestRestriction`,
+    // because the spec requires a typed confirmation for entering it and that
+    // method is where the requirement lives. The contract has already refused
+    // any BLACK request without the word, so this is belt and braces on the same
+    // rule rather than a second copy of it — `enterBlackout` re-checks.
+    const result =
+      level === 'BLACK'
+        ? aegis.enterBlackout(confirmation ?? '', reason)
+        : aegis.requestRestriction(level, reason);
     log.info('aegis restriction requested', {
       requested: level,
       accepted: result.accepted,
       active: result.status.level,
     });
+    // The native menu shows the current level and offers only the lowering
+    // options below it, so it has to be rebuilt after anything moves. Without
+    // this the panic button works and the menu quietly lies about where AEGIS is.
+    if (result.accepted) onChange?.();
     return result;
   });
 }

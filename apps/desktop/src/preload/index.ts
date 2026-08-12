@@ -101,10 +101,17 @@ const api = {
   aegisStatus: (): Promise<AegisStatus> =>
     ipcRenderer.invoke(CHANNELS.aegisStatus) as Promise<AegisStatus>,
 
-  aegisRequestRestriction: (level: AegisLevel, reason: string): Promise<AegisRestrictionResult> =>
+  aegisRequestRestriction: (
+    level: AegisLevel,
+    reason: string,
+    confirmation?: string,
+  ): Promise<AegisRestrictionResult> =>
     ipcRenderer.invoke(CHANNELS.aegisRequestRestriction, {
       level,
       reason,
+      // Omitted rather than sent as undefined: the request is `.strict()` and
+      // refuses a confirmation on a non-blackout request.
+      ...(confirmation === undefined ? {} : { confirmation }),
     }) as Promise<AegisRestrictionResult>,
 
   /**

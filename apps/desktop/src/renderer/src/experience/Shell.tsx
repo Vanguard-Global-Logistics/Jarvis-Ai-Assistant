@@ -1,9 +1,18 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { JSX } from 'react';
-import type { AegisStatus, AppInfo, OrbState, Profile, ProfileAccentId } from '@jarvis/contracts';
+import type { CSSProperties } from 'react';
+import type {
+  AegisLevel,
+  AegisStatus,
+  AppInfo,
+  OrbState,
+  Profile,
+  ProfileAccentId,
+} from '@jarvis/contracts';
 import {
   DEFAULT_PROFILE,
   ORB_STATES,
+  levelRank,
   PROFILE_ACCENTS,
   profileAccentColor,
 } from '@jarvis/contracts';
@@ -119,6 +128,29 @@ export function Shell({ devStateSwitcher = import.meta.env.DEV }: ShellProps): J
    */
   const [aegis, setAegis] = useState<AegisStatus | null>(null);
   const [rendererV2, setRendererV2] = useState(false);
+
+  /**
+   * Ask AEGIS for a stricter level, and adopt whatever it says came back.
+   *
+   * The response carries the authoritative status, so the UI never computes the
+   * new level itself — a refused request leaves the strip showing the level that
+   * is genuinely active rather than the one that was clicked.
+   */
+  const requestAegis = useCallback(
+    (level: AegisLevel, reason: string, confirmation?: string): void => {
+      const bridge = window.jarvis;
+      if (bridge === undefined) return;
+      bridge
+        .aegisRequestRestriction(level, reason, confirmation)
+        .then((result) => {
+          setAegis(result.status);
+        })
+        .catch((cause: unknown) => {
+          console.error('[shell] aegis:request-restriction failed:', cause);
+        });
+    },
+    [],
+  );
   const [studyPhase, setStudyPhase] = useState<'dormant' | 'gathering' | 'ignition' | null>(null);
   // The renderer ACTUALLY live, reported by the V2 component itself — the
   // inspector must never show "V2" while the honest fallback is rendering.
@@ -544,7 +576,7 @@ export function Shell({ devStateSwitcher = import.meta.env.DEV }: ShellProps): J
             PHASE 1 FOUNDATION · NO APPLICATION FEATURES · AEGIS STATE ENGINE REAL, BUT NOTHING
             CONSULTS IT YET — NO CAPABILITY IS ENFORCED BY IT
           </span>
-          <AegisStrip status={aegis} />
+          <AegisStrip status={aegis} onRequest={requestAegis} />
           {host.kind === 'loading' && <span>Reading host info…</span>}
           {host.kind === 'real' && (
             <span>
@@ -703,7 +735,16 @@ function ProfilePicker({
  *      capabilities exists. Saying "AEGIS: GREEN" without that would imply
  *      protection that does not exist — the cardinal sin (CLAUDE.md §8 rule 1).
  */
-function AegisStrip({ status }: { status: AegisStatus | null }): JSX.Element {
+function AegisStrip({
+  status,
+  onRequest,
+}: {
+  status: AegisStatus | null;
+  onRequest: (level: AegisLevel, reason: string, confirmation?: string) => void;
+}): JSX.Element {
+  const [arming, setArming] = useState<AegisLevel | null>(null);
+  const [typed, setTyped] = useState('');
+
   if (status === null) {
     return <span>AEGIS · READING…</span>;
   }
@@ -733,6 +774,109 @@ function AegisStrip({ status }: { status: AegisStatus | null }): JSX.Element {
           ⚠ AUDIT CHAIN FAILED VERIFICATION — HOLDING AT LEAST RED
         </span>
       )}
+
+      {/*
+        RAISE ONLY. Every control here increases severity, because that is the
+        only direction this surface can express (ADR 0025). Lowering is on the
+        native AEGIS menu — a surface main builds and main handles, which a
+        compromised renderer cannot click.
+      */}
+      {status.level !== 'BLACK' && (
+        <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+          {(['YELLOW', 'RED'] as const)
+            .filter((level) => levelRank(level) > levelRank(status.level))
+            .map((level) => (
+              <button
+                key={level}
+                type="button"
+                onClick={() => {
+                  onRequest(level, `Raised by a human to ${level}.`);
+                }}
+                style={aegisButton(level === 'YELLOW' ? accent.warning : accent.danger)}
+              >
+                {level === 'YELLOW' ? 'Restrict' : 'Isolate'}
+              </button>
+            ))}
+
+          {arming === 'BLACK' ? (
+            <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+              <input
+                autoFocus
+                value={typed}
+                onChange={(e) => {
+                  setTyped(e.target.value);
+                }}
+                placeholder="type BLACKOUT"
+                aria-label="Type BLACKOUT to confirm"
+                style={{
+                  background: 'transparent',
+                  border: `1px solid ${accent.danger}`,
+                  borderRadius: 6,
+                  color: text.body,
+                  fontFamily: fontFamily.mono,
+                  fontSize: 10,
+                  letterSpacing: letterSpacing.label,
+                  padding: '3px 6px',
+                  width: 120,
+                }}
+              />
+              <button
+                type="button"
+                disabled={typed !== 'BLACKOUT'}
+                onClick={() => {
+                  onRequest('BLACK', 'Blackout entered by a human.', typed);
+                  setArming(null);
+                  setTyped('');
+                }}
+                style={aegisButton(typed === 'BLACKOUT' ? accent.danger : text.faint)}
+              >
+                Confirm blackout
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setArming(null);
+                  setTyped('');
+                }}
+                style={aegisButton(text.faint)}
+              >
+                Cancel
+              </button>
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setArming('BLACK');
+              }}
+              style={aegisButton(accent.danger)}
+            >
+              Blackout…
+            </button>
+          )}
+        </span>
+      )}
+
+      {status.level === 'BLACK' && (
+        <span style={{ color: accent.danger }}>
+          BLACKOUT — recovery is not available from this window (AEGIS menu)
+        </span>
+      )}
     </span>
   );
+}
+
+/** One small mono control, coloured by severity. */
+function aegisButton(colour: string): CSSProperties {
+  return {
+    fontFamily: fontFamily.mono,
+    fontSize: 10,
+    letterSpacing: letterSpacing.label,
+    color: colour,
+    background: 'transparent',
+    border: `1px solid ${colour}`,
+    borderRadius: 6,
+    padding: '3px 8px',
+    cursor: 'pointer',
+  };
 }

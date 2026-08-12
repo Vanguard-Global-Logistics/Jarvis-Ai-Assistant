@@ -8,6 +8,7 @@ import { loadEnvFile, upwardCandidates } from './env-file.js';
 import { registerAmplifyHandler } from './handlers/amplify.js';
 import { registerPlanAutomationHandler } from './handlers/plan-automation.js';
 import { createAegisForApp, registerAegisHandlers } from './handlers/aegis.js';
+import { installAegisMenu } from './aegis-menu.js';
 import { createProviderHolder, registerModelHandlers } from './handlers/model.js';
 import { registerAppInfoHandler } from './handlers/app-info.js';
 import { registerChatHandler } from './handlers/chat.js';
@@ -352,7 +353,14 @@ void app
     // this scope. The two channels registered below expose reading the status
     // and asking for a STRICTER level — nothing that lowers one (ADR 0025).
     const aegis = createAegisForApp(app.getPath('userData'));
-    registerAegisHandlers(aegis);
+
+    // Lowering a level lives on the NATIVE MENU, never on an IPC channel. It is
+    // built in main and clicked in main, so a compromised renderer cannot reach
+    // it — while a human with the app focused can. Without a lowering path at
+    // all, the renderer's raise-only panic button would be a one-way door
+    // (ADR 0025).
+    const aegisMenu = installAegisMenu(aegis, () => BrowserWindow.getAllWindows()[0] ?? null);
+    registerAegisHandlers(aegis, aegisMenu.refresh);
 
     createWindow(db);
 
