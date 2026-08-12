@@ -9,7 +9,14 @@
  * (CLAUDE.md §3). That restriction is enforced in eslint.config.js.
  */
 
-export { EnvValidationError, SECRET_KEYS, describeEnv, parseEnv, requireEnv } from './env.js';
+export {
+  ENV_KEYS,
+  EnvValidationError,
+  SECRET_KEYS,
+  describeEnv,
+  parseEnv,
+  requireEnv,
+} from './env.js';
 export type { Env } from './env.js';
 
 export { createLogger } from './logger.js';

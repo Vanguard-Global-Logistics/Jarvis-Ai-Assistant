@@ -1,4 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { ENV_KEYS } from '@jarvis/config';
 
 /**
  * Load a `.env` file into `process.env`, in the main process only.
@@ -68,20 +70,50 @@ export function parseEnvFile(text: string): EnvEntry[] {
 }
 
 /**
+ * The only variable names a `.env` may set: the ones this app's schema declares.
+ *
+ * NOT a hardening nicety — without it a config file can set variables that
+ * change the trust model. `ELECTRON_RENDERER_URL` is read by `main/index.ts`
+ * *after* this loader runs, and setting it makes the app load a REMOTE page into
+ * the BrowserWindow that has the preload bridge attached, with the development
+ * CSP (where `'self'` is then the remote origin) and that origin allowlisted for
+ * navigation. `window.jarvis` — all eleven channels, including the whole
+ * conversation history — would be handed to a page nobody in this project wrote.
+ * `NODE_OPTIONS` and `ELECTRON_RUN_AS_NODE` are the same class of problem.
+ *
+ * This is credible rather than theoretical for this project specifically: the
+ * documented support flow is "paste this into your terminal", and every `.env`
+ * in the setup guides arrives as a `cat > .env` block. One extra line in such a
+ * block reads exactly like ordinary setup.
+ *
+ * Sourced from `ENV_KEYS` so the allowlist cannot drift from the schema.
+ */
+const ALLOWED_KEYS: ReadonlySet<string> = new Set<string>(ENV_KEYS);
+
+/**
  * Apply parsed entries to an environment, without clobbering what is set.
  *
  * Returns the keys actually applied — names only, for a log line that says how
- * much was loaded without saying what any of it was.
+ * much was loaded without saying what any of it was — plus the names it refused,
+ * because a key silently doing nothing is its own kind of confusing.
  */
-export function applyEnvEntries(entries: readonly EnvEntry[], target: NodeJS.ProcessEnv): string[] {
+export function applyEnvEntries(
+  entries: readonly EnvEntry[],
+  target: NodeJS.ProcessEnv,
+): { applied: string[]; rejected: string[] } {
   const applied: string[] = [];
+  const rejected: string[] = [];
   for (const { key, value } of entries) {
+    if (!ALLOWED_KEYS.has(key)) {
+      rejected.push(key);
+      continue;
+    }
     const current = target[key];
     if (current !== undefined && current !== '') continue;
     target[key] = value;
     applied.push(key);
   }
-  return applied;
+  return { applied, rejected };
 }
 
 export interface LoadedEnvFile {
@@ -89,6 +121,32 @@ export interface LoadedEnvFile {
   readonly path: string | null;
   /** Names of the variables applied. Never their values. */
   readonly applied: readonly string[];
+  /** Names present in the file but not in this app's schema, so ignored. */
+  readonly rejected: readonly string[];
+}
+
+/**
+ * Directories to look in, walking up from a starting point.
+ *
+ * Needed because `process.cwd()` is NOT where anyone thinks it is:
+ * `npm run dev:desktop` runs the script in the workspace, so cwd is
+ * `apps/desktop` while every setup guide tells William to put `.env` in the repo
+ * root. Checking only cwd meant the documented file was still not found — the
+ * same bug this module was written to fix, one directory up.
+ *
+ * Bounded to a few levels and never used in a packaged build, so this cannot
+ * wander into a home directory and pick up an unrelated `.env`.
+ */
+export function upwardCandidates(from: string, levels = 3): string[] {
+  const out: string[] = [];
+  let dir = from;
+  for (let i = 0; i <= levels; i += 1) {
+    out.push(join(dir, '.env'));
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return out;
 }
 
 /**
@@ -104,8 +162,8 @@ export function loadEnvFile(
 ): LoadedEnvFile {
   for (const path of candidates) {
     if (!existsSync(path)) continue;
-    const applied = applyEnvEntries(parseEnvFile(readFileSync(path, 'utf8')), target);
-    return { path, applied };
+    const { applied, rejected } = applyEnvEntries(parseEnvFile(readFileSync(path, 'utf8')), target);
+    return { path, applied, rejected };
   }
-  return { path: null, applied: [] };
+  return { path: null, applied: [], rejected: [] };
 }

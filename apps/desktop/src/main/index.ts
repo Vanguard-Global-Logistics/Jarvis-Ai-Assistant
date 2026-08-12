@@ -4,7 +4,7 @@ import { createLogger, describeEnv, parseEnv } from '@jarvis/config';
 import { migrate, migrations, openDatabase } from '@jarvis/database';
 import type { SqliteDatabase } from '@jarvis/database';
 import { createProvider } from '@jarvis/jarvis-core';
-import { loadEnvFile } from './env-file.js';
+import { loadEnvFile, upwardCandidates } from './env-file.js';
 import { registerAmplifyHandler } from './handlers/amplify.js';
 import { registerAppInfoHandler } from './handlers/app-info.js';
 import { registerChatHandler } from './handlers/chat.js';
@@ -34,16 +34,26 @@ const log = createLogger({ scope: 'desktop:main' });
 /**
  * Where a `.env` may live, in priority order (ADR 0021).
  *
- * The repo root first, because that is what every document in this project told
- * people to edit. `userData` second, because a packaged app has no repo — it is
- * the one directory a real user can reliably find and write to, and the same
- * place their database already lives.
+ * Unpackaged: walking UP from the working directory, then `userData`. The walk
+ * is not defensive vagueness — `process.cwd()` is genuinely not where anyone
+ * assumes. `npm run dev:desktop` runs the script inside the workspace, so cwd is
+ * `apps/desktop`, while every setup guide in this repo says to put `.env` in the
+ * repo ROOT. Checking cwd alone reproduced the exact bug this loader exists to
+ * fix, one directory higher up, and the probe missed it because it launched
+ * Electron directly instead of through the documented npm script.
+ *
+ * Packaged: `userData` only. A shipped app has no repo, and its working
+ * directory is whatever Finder, the Dock or a shell happened to give it — not
+ * something to read configuration out of. `userData` is the one directory a real
+ * user can find, and their database is already there.
  *
  * Order matters and stops at the first hit: a config assembled from several
  * files in an order nobody remembers is how you end up pointing at the wrong
  * model and not knowing why.
  */
-const envFileCandidates = [join(process.cwd(), '.env'), join(app.getPath('userData'), '.env')];
+const envFileCandidates = app.isPackaged
+  ? [join(app.getPath('userData'), '.env')]
+  : [...upwardCandidates(process.cwd()), join(app.getPath('userData'), '.env')];
 
 // MUST run before parseEnv: it reads `process.env` and nothing else. Until this
 // existed, a `.env` file was never loaded by anything, so the documented way to
@@ -52,6 +62,14 @@ const envFileCandidates = [join(process.cwd(), '.env'), join(app.getPath('userDa
 const loadedEnvFile = loadEnvFile(envFileCandidates);
 if (loadedEnvFile.path !== null) {
   log.info('env file loaded', { path: loadedEnvFile.path, keys: loadedEnvFile.applied });
+  if (loadedEnvFile.rejected.length > 0) {
+    // Named rather than dropped silently. A key that does nothing is its own
+    // confusion, and seeing ELECTRON_RENDERER_URL in this list is worth
+    // noticing: the allowlist just refused to widen the renderer's trust.
+    log.warn('env file keys ignored — not this application’s configuration', {
+      keys: loadedEnvFile.rejected,
+    });
+  }
 }
 
 // Fail fast on invalid configuration rather than surfacing it later as an

@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { applyEnvEntries, loadEnvFile, parseEnvFile } from './env-file.js';
+import { applyEnvEntries, loadEnvFile, parseEnvFile, upwardCandidates } from './env-file.js';
 
 /**
  * `.env` loading (ADR 0021).
@@ -69,27 +69,27 @@ describe('applyEnvEntries', () => {
   it('never overwrites a value already in the environment', () => {
     // `XAI_API_KEY=… npm run dev:desktop` must beat a stale file on disk, and CI
     // must never be surprised by a developer's local .env.
-    const target: NodeJS.ProcessEnv = { ALREADY: 'from-the-shell' };
-    const applied = applyEnvEntries(
+    const target: NodeJS.ProcessEnv = { XAI_API_KEY: 'from-the-shell' };
+    const { applied } = applyEnvEntries(
       [
-        { key: 'ALREADY', value: 'from-the-file' },
-        { key: 'FRESH', value: 'from-the-file' },
+        { key: 'XAI_API_KEY', value: 'from-the-file' },
+        { key: 'JARVIS_LOCAL_MODEL', value: 'from-the-file' },
       ],
       target,
     );
-    expect(target.ALREADY).toBe('from-the-shell');
-    expect(target.FRESH).toBe('from-the-file');
-    expect(applied).toEqual(['FRESH']);
+    expect(target.XAI_API_KEY).toBe('from-the-shell');
+    expect(target.JARVIS_LOCAL_MODEL).toBe('from-the-file');
+    expect(applied).toEqual(['JARVIS_LOCAL_MODEL']);
   });
 
   it('treats an empty ambient value as unset, so a blank export does not win', () => {
-    const target: NodeJS.ProcessEnv = { BLANK: '' };
-    applyEnvEntries([{ key: 'BLANK', value: 'real' }], target);
-    expect(target.BLANK).toBe('real');
+    const target: NodeJS.ProcessEnv = { JARVIS_LOCAL_MODEL: '' };
+    applyEnvEntries([{ key: 'JARVIS_LOCAL_MODEL', value: 'real' }], target);
+    expect(target.JARVIS_LOCAL_MODEL).toBe('real');
   });
 
   it('reports key NAMES only, so a caller cannot log a secret by accident', () => {
-    const applied = applyEnvEntries([{ key: 'XAI_API_KEY', value: 'xai-secret-value' }], {});
+    const { applied } = applyEnvEntries([{ key: 'XAI_API_KEY', value: 'xai-secret-value' }], {});
     expect(applied).toEqual(['XAI_API_KEY']);
     expect(JSON.stringify(applied)).not.toContain('xai-secret-value');
   });
@@ -99,13 +99,13 @@ describe('loadEnvFile', () => {
   it('loads the first candidate that exists and reports which', () => {
     const first = tempDir();
     const second = tempDir();
-    writeFileSync(join(second, '.env'), 'FROM=second\n');
+    writeFileSync(join(second, '.env'), 'JARVIS_LOCAL_MODEL=second\n');
 
     const target: NodeJS.ProcessEnv = {};
     const result = loadEnvFile([join(first, '.env'), join(second, '.env')], target);
 
     expect(result.path).toBe(join(second, '.env'));
-    expect(target.FROM).toBe('second');
+    expect(target.JARVIS_LOCAL_MODEL).toBe('second');
   });
 
   it('stops at the first hit instead of merging several files', () => {
@@ -113,20 +113,20 @@ describe('loadEnvFile', () => {
     // wrong model and not knowing why.
     const first = tempDir();
     const second = tempDir();
-    writeFileSync(join(first, '.env'), 'WHICH=first\n');
-    writeFileSync(join(second, '.env'), 'WHICH=second\nONLY_IN_SECOND=yes\n');
+    writeFileSync(join(first, '.env'), 'JARVIS_LOCAL_MODEL=first\n');
+    writeFileSync(join(second, '.env'), 'JARVIS_LOCAL_MODEL=second\nJARVIS_XAI_MODEL=grok-4\n');
 
     const target: NodeJS.ProcessEnv = {};
     loadEnvFile([join(first, '.env'), join(second, '.env')], target);
 
-    expect(target.WHICH).toBe('first');
-    expect(target.ONLY_IN_SECOND).toBeUndefined();
+    expect(target.JARVIS_LOCAL_MODEL).toBe('first');
+    expect(target.JARVIS_XAI_MODEL).toBeUndefined();
   });
 
   it('is a no-op when no candidate exists', () => {
     const target: NodeJS.ProcessEnv = {};
     const result = loadEnvFile([join(tempDir(), '.env')], target);
-    expect(result).toEqual({ path: null, applied: [] });
+    expect(result).toEqual({ path: null, applied: [], rejected: [] });
     expect(Object.keys(target)).toEqual([]);
   });
 
@@ -147,5 +147,81 @@ describe('loadEnvFile', () => {
 
     expect(target.JARVIS_LOCAL_MODEL_URL).toBe('http://127.0.0.1:11434');
     expect(target.JARVIS_LOCAL_MODEL).toBe('qwen3.5:4b');
+  });
+});
+
+describe('the allowlist (security)', () => {
+  it('REFUSES to set ELECTRON_RENDERER_URL from a config file', () => {
+    // The whole reason the allowlist exists. Setting this makes the app load a
+    // REMOTE page into the window that has the preload bridge attached, with the
+    // development CSP (where 'self' becomes the remote origin) and that origin
+    // allowlisted for navigation — handing window.jarvis, and every saved
+    // conversation, to a page nobody here wrote.
+    const target: NodeJS.ProcessEnv = {};
+    const { applied, rejected } = applyEnvEntries(
+      [
+        { key: 'ELECTRON_RENDERER_URL', value: 'https://not-ours.example/' },
+        { key: 'JARVIS_DEV_CSP_NONCE', value: 'aaaa' },
+        { key: 'JARVIS_LOCAL_MODEL', value: 'qwen3.5:4b' },
+      ],
+      target,
+    );
+
+    expect(target.ELECTRON_RENDERER_URL).toBeUndefined();
+    expect(target.JARVIS_DEV_CSP_NONCE).toBeUndefined();
+    expect(target.JARVIS_LOCAL_MODEL).toBe('qwen3.5:4b');
+    expect(applied).toEqual(['JARVIS_LOCAL_MODEL']);
+    expect(rejected).toEqual(['ELECTRON_RENDERER_URL', 'JARVIS_DEV_CSP_NONCE']);
+  });
+
+  it('refuses the other runtime-controlling variables too', () => {
+    const target: NodeJS.ProcessEnv = {};
+    applyEnvEntries(
+      [
+        { key: 'NODE_OPTIONS', value: '--require /tmp/evil.js' },
+        { key: 'ELECTRON_RUN_AS_NODE', value: '1' },
+        { key: 'PATH', value: '/tmp/evil' },
+      ],
+      target,
+    );
+    expect(Object.keys(target)).toEqual([]);
+  });
+
+  it('permits every key the schema declares, so config is not silently dropped', () => {
+    // The allowlist must not be so tight that it breaks the thing it protects.
+    const target: NodeJS.ProcessEnv = {};
+    const { applied } = applyEnvEntries(
+      [
+        { key: 'JARVIS_LOCAL_MODEL_URL', value: 'http://127.0.0.1:11434' },
+        { key: 'JARVIS_LOCAL_MODEL', value: 'qwen3.5:4b' },
+        { key: 'JARVIS_MODEL_PROVIDER', value: 'local' },
+        { key: 'XAI_API_KEY', value: 'x' },
+        { key: 'ANTHROPIC_API_KEY', value: 'y' },
+      ],
+      target,
+    );
+    expect(applied).toHaveLength(5);
+  });
+});
+
+describe('upwardCandidates', () => {
+  it('finds the repo root when cwd is the workspace, which is what npm actually does', () => {
+    // `npm run dev:desktop` runs the script inside apps/desktop. Checking cwd
+    // alone left the documented repo-root .env unread — the same defect this
+    // module fixes, one directory up.
+    const candidates = upwardCandidates(join('/repo', 'apps', 'desktop'));
+    expect(candidates).toContain(join('/repo', 'apps', 'desktop', '.env'));
+    expect(candidates).toContain(join('/repo', '.env'));
+    expect(candidates.indexOf(join('/repo', 'apps', 'desktop', '.env'))).toBeLessThan(
+      candidates.indexOf(join('/repo', '.env')),
+    );
+  });
+
+  it('is bounded, so it cannot wander up into a home directory', () => {
+    expect(upwardCandidates('/a/b/c/d/e/f/g', 3)).toHaveLength(4);
+  });
+
+  it('stops at the filesystem root without looping', () => {
+    expect(upwardCandidates('/', 3)).toEqual([join('/', '.env')]);
   });
 });

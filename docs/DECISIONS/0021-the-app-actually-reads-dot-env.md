@@ -41,14 +41,49 @@ A small parser in `apps/desktop/src/main/env-file.ts`. No dependency added:
 the format is `KEY=value`, and a config language with interpolation is a config
 language that can surprise you.
 
-**2. Candidates, in order, first hit wins:** the process working directory
-(`.env` in the repo root — what every document told people to edit), then
-`app.getPath('userData')` (a packaged app has no repo; this is the one directory
-a real user can find, and their database is already there).
+**2. Candidates, first hit wins.** Unpackaged: walking **up** from the working
+directory (bounded to three levels), then `app.getPath('userData')`. Packaged:
+`userData` only.
+
+The upward walk is not defensive vagueness. The first version of this fix checked
+`process.cwd()` alone, and **that was still wrong**: `npm run dev:desktop` runs
+the script inside the workspace, so cwd is `apps/desktop`, while every setup
+guide in this repo says to put `.env` in the repo **root**. The documented file
+would still not have been found. The probe missed it because it launched Electron
+directly rather than through the npm script William is actually told to run —
+the same lesson as the original bug, one directory higher up, discovered within
+the hour.
+
+A packaged build gets `userData` only: it has no repo, and its working directory
+is whatever Finder, the Dock or a shell happened to give it. Not somewhere to
+read configuration from.
 
 First hit rather than a merge: a config assembled from several files in an order
 nobody remembers is how you end up pointing at the wrong model and not knowing
 why.
+
+**2a. Only keys this application's schema declares may be set — `ENV_KEYS`,
+derived from the Zod schema so it cannot drift.** Found by an independent
+security review of this very change (CLAUDE.md §5), and it is the most important
+line in the module.
+
+Without it, a `.env` could set **`ELECTRON_RENDERER_URL`**, which `main/index.ts`
+reads _after_ this loader runs. That flips the app into dev-renderer mode for
+every downstream decision: it `loadURL`s a **remote page into the BrowserWindow
+that has the preload attached**, emits the development CSP (where `'self'` is now
+that remote origin, and `connect-src` permits it), and allowlists that origin for
+navigation. `window.jarvis` — all eleven channels, including every saved
+conversation and a billed API key behind `sendChat` — would be handed to a page
+nobody in this project wrote. `contextIsolation`, `sandbox` and
+`nodeIntegration: false` all still hold, so it is not code execution; it is
+total loss of the guarantee that the renderer is our own HTML. `NODE_OPTIONS`
+and `ELECTRON_RUN_AS_NODE` are the same class.
+
+Rated credible rather than theoretical **for this project specifically**: the
+documented support flow is "paste this into your terminal", and every `.env` in
+these guides arrives as a `cat > .env <<'EOF'` block. One extra line in such a
+block reads exactly like ordinary setup. Rejected keys are logged by name, so
+`ELECTRON_RENDERER_URL` appearing in that list is visible rather than silent.
 
 **3. The ambient environment always wins.** A value already present in
 `process.env` is never overwritten, so `XAI_API_KEY=… npm run dev:desktop` beats
@@ -83,6 +118,11 @@ Verified red-green: with the loader reverted the new check reports
   exercised the code path that was convenient to test, not the path the
   documentation tells a human to take. Any instruction in this repo that tells
   William to do something is a claim about behaviour, and belongs in the probe.
+  This ADR proves the point twice — the cwd mistake was the same error, made
+  again, while writing the fix for the first one.
+- **A builder is not a fit reviewer of their own security control.** The
+  allowlist in 2a exists because an independent review read this change cold and
+  found what its author did not. CLAUDE.md §5 is not ceremony.
 
 ## Alternatives considered
 

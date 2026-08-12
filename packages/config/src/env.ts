@@ -144,11 +144,22 @@ export function requireEnv<K extends keyof Env>(env: Env, key: K): NonNullable<E
  * marker, never truncated or partially shown. A prefix of a key is still a leak.
  */
 /**
- * Every declared key, sourced from the schema itself. Iterating the parsed object
- * instead would silently omit unset optional keys — Zod does not materialise them —
- * so an absent secret would vanish from the report rather than read `<unset>`.
+ * Every variable name this application owns, sourced from the schema itself.
+ *
+ * Two callers, both of which need the DECLARED keys rather than the set keys.
+ * `describeEnv` iterates these instead of the parsed object because Zod does not
+ * materialise unset optionals, so an absent secret would vanish from the report
+ * rather than read `<unset>`.
+ *
+ * And it is the ALLOWLIST for `.env` loading (ADR 0021): a config file may set
+ * this application's own configuration and nothing else. Without that bound a
+ * `.env` could set `ELECTRON_RENDERER_URL` and point the renderer at a remote
+ * origin with the preload bridge attached — `parseEnv` would never object,
+ * because it only validates the keys it knows about.
+ *
+ * Derived rather than written out, so the allowlist and the schema cannot drift.
  */
-const ENV_KEYS = Object.keys(EnvSchema.shape) as (keyof Env)[];
+export const ENV_KEYS = Object.keys(EnvSchema.shape) as (keyof Env)[];
 
 export function describeEnv(env: Env): Record<string, string> {
   const out: Record<string, string> = {};
