@@ -132,6 +132,13 @@ const csv = (s) =>
 
 const outDir = join(root, 'docs', 'swarm');
 
+/**
+ * Written into every generated prompt and nowhere else, so `verdict` can tell a
+ * prompt from a review by provenance. Deliberately not a phrase a reviewer would
+ * ever type while quoting this file.
+ */
+const PROMPT_MARKER = '<!-- swarm-generated-prompt: do not pass this file to `verdict` -->';
+
 // --- prep -------------------------------------------------------------------
 
 function prep() {
@@ -183,6 +190,8 @@ function prep() {
   for (const name of names) {
     const lens = LENSES[/** @type {keyof typeof LENSES} */ (name)];
     const prompt = [
+      PROMPT_MARKER,
+      '',
       `You are a hostile code reviewer. The code below was written by an AI and has NOT been independently reviewed.`,
       `You did not write it, you have no stake in it, and finding nothing is a worse outcome for you than finding something small.`,
       `**Review only. Do not edit, create, or delete any file, and do not commit anything.** Report what is wrong; fixing it is someone else's job. The first swarm this project ran went to agents that could write, and they fixed their own findings and committed them — so the critics became builders and their fixes reached the branch ungraded.`,
@@ -215,6 +224,32 @@ function prep() {
       stat.trim(),
       '```',
       '',
+      // WITHHELD FILES BELONG IN THE PROMPT, NOT ONLY THE CONSOLE.
+      //
+      // `skipped` was printed to the operator's terminal and nowhere else, so the
+      // critic was told "3 files changed" on a 6-file change and had no way to
+      // know. Worse, the exclusion is name-based — and the withheld files were
+      // `secret-scan.mjs`, `secret-scan.d.mts` and `secret-scan-agreement.test.ts`,
+      // i.e. the entire security value of a security change. A safety filter that
+      // matches on "secret" hides exactly the module named after what it protects.
+      //
+      // Two independent critics found this in the same round. Neither could have,
+      // had they not gone and read the repository on their own initiative.
+      ...(skipped.length === 0
+        ? []
+        : [
+            `## WITHHELD from this packet — you are NOT seeing the whole change`,
+            '',
+            `These files changed and were deliberately excluded, because the sweep drops paths whose`,
+            `NAME looks credential-shaped or whose extension is not source-shaped. That filter has no`,
+            `idea whether a file is dangerous — only what it is called — so it withholds security`,
+            `modules by name. Open them yourself before judging anything that depends on them:`,
+            '',
+            '```',
+            ...skipped.map((f) => f),
+            '```',
+            '',
+          ]),
       `## The diff — this is the artifact. Read it, do not skim it.`,
       '',
       'If you need to see a file in full to answer your question, open it. The diff is the change, not the whole system.',
@@ -305,10 +340,14 @@ function parseReview(text, label) {
   // pointing this command at the run directory (whose files are named after
   // exactly the lenses the closing hint prints) returned a clean pass on a file
   // nobody had reviewed. The likely wrong-file path failed green.
-  if (
-    /VERDICT:\s*SHIP\s+or\s+FIX/i.test(text) ||
-    /Required output — EXACTLY this block/i.test(text)
-  )
+  // Identify a prompt by PROVENANCE, not by content.
+  //
+  // Content-sniffing was self-defeating on this repository: the artifact under
+  // review IS the prompt generator, so a genuine review that QUOTES the code it
+  // is reviewing contains the template strings and was rejected as a prompt. A
+  // critic hit exactly that while reviewing this file. The marker below is
+  // written only by `prep`, so nothing a reviewer quotes can forge it.
+  if (text.includes(PROMPT_MARKER))
     die(
       `[${label}] that is a generated PROMPT, not a review. Send it to an agent first, then pass the agent's reply here.`,
     );

@@ -1,9 +1,9 @@
-import { readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { findSecret as repoFindSecret } from '../../../scripts/lib/secret-scan.mjs';
-import { findSecret as skillFindSecret } from '../../../.claude/skills/gauntlet-skill/scripts/secret-scan.mjs';
+import * as repo from '../../../scripts/lib/secret-scan.mjs';
+import * as skill from '../../../.claude/skills/gauntlet-skill/scripts/secret-scan.mjs';
+
+const repoFindSecret = repo.findSecret;
+const skillFindSecret = skill.findSecret;
 
 /**
  * There are now TWO copies of the credential scanner, and that is a deliberate
@@ -20,8 +20,6 @@ import { findSecret as skillFindSecret } from '../../../.claude/skills/gauntlet-
  * exists in this file: a marker-free literal in a tracked file is exactly what
  * `npm run review` and `npm run swarm` refuse to put in a packet.
  */
-
-const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
 const BODY = 'Qx7Lm2Rt9Zv4Bn8Kc1Wd6Hs3Yf5Jg0Ap';
 const key = (...parts: string[]): string => parts.join('');
@@ -44,6 +42,13 @@ const CORPUS: readonly (readonly [string, string])[] = [
     `-----BEGIN RSA PRIVATE KEY-----\n${PEM_BODY}\n-----END RSA PRIVATE KEY-----`,
   ],
   ['a PEM on diff DELETION lines', `-----BEGIN RSA PRIVATE KEY-----\n-${PEM_BODY}`],
+  ['a PEM whose header carries EXAMPLE', `-----BEGIN RSA PRIVATE KEY-----(EXAMPLE)\n${PEM_BODY}`],
+  [
+    'a passphrase-encrypted PEM',
+    `-----BEGIN RSA PRIVATE KEY-----\nProc-Type: 4,ENCRYPTED\nDEK-Info: AES-128-CBC,A1B2\n\n${PEM_BODY}`,
+  ],
+  ['a PEM on diff ADDITION lines', `+-----BEGIN RSA PRIVATE KEY-----\n+${PEM_BODY}`],
+  ['a google fixture', key('AIza', 'Sy', 'BogusKeyForTesting-not-real-000')],
   [
     'a fixture beside a real key',
     `const fake = "${key('sk-', 'ant', '-PLANTED-0001')}";\nconst real = "${key('AIza', 'Sy', BODY)}";`,
@@ -63,16 +68,38 @@ describe('the two copies of the credential scanner agree', () => {
     expect(verdicts).toContain(false);
   });
 
-  it('the patterns themselves are identical, not merely equivalent on this corpus', () => {
-    // The corpus can only ever prove agreement on what it contains. Comparing the
-    // pattern sources catches a divergence the corpus has no case for — which is
-    // precisely the one that will matter.
-    const patternsOf = (path: string): string =>
-      /export const SECRET_PATTERNS = \[([\s\S]*?)\];/.exec(readFileSync(path, 'utf8'))?.[1] ??
-      'NOT FOUND';
+  it('compares the LIVE rule sets, not scraped source text', () => {
+    // The first version regex-scraped `SECRET_PATTERNS` out of both files and
+    // compared the strings. A critic showed it failed open two ways: the `??`
+    // fallback made `expect('NOT FOUND').toBe('NOT FOUND')` pass while comparing
+    // nothing, and a comment typo in one copy turned the suite red with a
+    // security-flavoured failure that had no security meaning.
+    //
+    // Comparing the imported objects structurally fixes both: it cannot pass
+    // vacuously, and it ignores prose.
+    const shape = (mod: typeof repo): unknown =>
+      mod.SECRET_PATTERNS.map(({ re, exemptible }) => [re.source, re.flags, exemptible]);
 
-    expect(
-      patternsOf(join(root, '.claude', 'skills', 'gauntlet-skill', 'scripts', 'secret-scan.mjs')),
-    ).toBe(patternsOf(join(root, 'scripts', 'lib', 'secret-scan.mjs')));
+    expect(shape(skill)).toEqual(shape(repo));
+    expect(repo.SECRET_PATTERNS.length).toBeGreaterThan(3);
+  });
+
+  it('compares the EXEMPTION list too — it decides when the guard stands down', () => {
+    // `FIXTURE_MARKERS` was unguarded: appending `|SAMPLE` to the skill copy
+    // widened its bypass, no corpus case contained "SAMPLE", and the suite
+    // stayed green. The part that disarms a guard needs the same protection as
+    // the guard.
+    expect(skill.FIXTURE_MARKERS.source).toBe(repo.FIXTURE_MARKERS.source);
+    expect(skill.FIXTURE_MARKERS.flags).toBe(repo.FIXTURE_MARKERS.flags);
+    expect(skill.SUSPICIOUS_NAME.source).toBe(repo.SUSPICIOUS_NAME.source);
+    expect(skill.REVIEWABLE.source).toBe(repo.REVIEWABLE.source);
+  });
+
+  it('compares the function BODIES, because logic drifts too', () => {
+    // A critic RAN this mutation: dropping `exemptible &&` from the skill copy's
+    // loop gave an identical verdict on all 14 corpus cases while reopening the
+    // PEM bypass. A corpus can only ever prove agreement on what it contains.
+    expect(skill.findSecret.toString()).toBe(repo.findSecret.toString());
+    expect(skill.whyNotReviewable.toString()).toBe(repo.whyNotReviewable.toString());
   });
 });

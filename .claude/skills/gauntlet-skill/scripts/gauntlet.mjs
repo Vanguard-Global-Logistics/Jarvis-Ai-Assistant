@@ -42,9 +42,9 @@
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join, resolve, sep } from 'node:path';
 import { randomInt } from 'node:crypto';
-import { findSecret } from './secret-scan.mjs';
+import { findSecret, whyNotReviewable } from './secret-scan.mjs';
 
 const ROOT = process.env.GAUNTLET_ROOT ?? process.cwd();
 const HOME = join(ROOT, 'docs', 'gauntlet');
@@ -76,7 +76,12 @@ function flag(name) {
   const i = argv.indexOf(`--${name}`);
   if (i === -1) return undefined;
   const value = argv[i + 1];
-  return value === undefined || value.startsWith('--') ? undefined : value;
+  // A flag present with no value is an ERROR, not an absence. Returning
+  // undefined meant `--ref --redact Acme` silently dropped to solo mode: an
+  // UNBLINDED single-artifact grade, recorded in the ledger as a blind A/B.
+  // swarm.mjs already fixed this; the rule existed in two files and drifted.
+  if (value === undefined || value.startsWith('--')) die(`--${name} needs a value`);
+  return value;
 }
 
 /** @param {string} name @returns {string} */
@@ -165,7 +170,11 @@ function init() {
 
   if (criteria.length < 2)
     die('--criteria needs at least 2 named criteria; 3–6 is the useful range');
-  if (existsSync(stateFile(slug))) die(`loop "${slug}" already exists at ${dirFor(slug)}`);
+  // Guard on EITHER file. `state.json` can be absent on a fresh clone while the
+  // ledger is tracked — and then `init` sailed past this check and overwrote the
+  // audit trail with an empty rounds table.
+  if (existsSync(stateFile(slug)) || existsSync(ledgerFile(slug)))
+    die(`loop "${slug}" already exists at ${dirFor(slug)} — refusing to overwrite its ledger`);
 
   /** @type {Record<string, string>} */
   let lenses = DEFAULT_LENSES;
@@ -265,34 +274,51 @@ function pair() {
   if (pending !== undefined && pending.verdict === undefined)
     die(`part "${part}" round ${String(pending.n)} has no verdict yet — record it first`);
 
-  const oursText = readFileSync(resolve(ROOT, need('ours')), 'utf8');
+  /**
+   * GATE THE FILE CHOICE, not only the file contents.
+   *
+   * `findSecret` knows six credential FORMATS. It does not know a Postgres URL
+   * with a password, an AWS key pair, a Slack token or a JWT — so `--ours
+   * .env.local`, the exact threat the first version of this comment named, sailed
+   * straight through the content scan and was staged verbatim. A critic put it
+   * precisely: the threat is a FILE CHOICE, and this repo already had the answer
+   * in `diff-scope.mjs` — the staging path took the scanner and left the belt and
+   * braces behind.
+   *
+   * Containment first: a path that escapes ROOT can read anything on the machine.
+   *
+   * @param {string} label @param {string} raw
+   */
+  const readGated = (label, raw) => {
+    const path = resolve(ROOT, raw);
+    if (path !== ROOT && !path.startsWith(ROOT + sep))
+      die(`${label} escapes the project (${path}). Gauntlet only stages files inside it.`);
+    const why = whyNotReviewable(path);
+    if (why !== null)
+      die(
+        `refusing to stage ${label} — ${why}.\n` +
+          `  Its contents would be copied into docs/gauntlet/ and into a prompt sent to an agent.`,
+      );
+    // ONE read. Scanning one read and staging another is check-then-use: a
+    // symlink swap, a fifo, or a file still being written stages bytes that were
+    // never scanned.
+    const text = readFileSync(path, 'utf8');
+    const found = findSecret(text);
+    if (found !== null)
+      die(
+        `refusing to stage ${label} (${path}) — it contains something credential-shaped.\n` +
+          `  The value is not printed here, deliberately. Search that file for the credential.`,
+      );
+    return text;
+  };
+
+  const oursText = readGated('--ours', need('ours'));
   const refFlag = flag('ref');
   const mode = refFlag === undefined ? 'solo' : 'ab';
-  // Redaction terms live in state, set once at `init`. They were a per-round
-  // flag until the first end-to-end test forgot to pass it on round 2 and the
-  // brand name walked straight into the "blind" comparison.
+  const refText = refFlag === undefined ? null : readGated('--ref', refFlag);
   const terms = [...state.redact, ...csv(flag('redact') ?? '')];
   const ours = anonymise(oursText, terms);
-
-  /**
-   * REFUSE to stage anything credential-shaped.
-   *
-   * `--ours` and `--ref` are arbitrary paths — `--ours .env.local` or a `../`
-   * escape is one typo away — and their contents are copied VERBATIM into
-   * `docs/gauntlet/…` and into a prompt bound for an agent. `npm run swarm`
-   * hard-refuses on exactly this class of output; Gauntlet did not, while
-   * CLAUDE.md was busy making it a mandatory gate on credential work.
-   */
-  const staged =
-    findSecret(oursText) ??
-    (refFlag === undefined ? null : findSecret(readFileSync(resolve(ROOT, refFlag), 'utf8')));
-  if (staged !== null)
-    die(
-      `refusing to stage this round: an input contains something credential-shaped (${staged.slice(0, 8)}…).\n` +
-        `  These files are copied into docs/gauntlet/ and into a prompt sent to an agent.`,
-    );
-  const reference =
-    refFlag === undefined ? null : anonymise(readFileSync(resolve(ROOT, refFlag), 'utf8'), terms);
+  const reference = refText === null ? null : anonymise(refText, terms);
 
   const n = record.rounds.length + 1;
   if (n > state.maxRounds)
@@ -323,7 +349,18 @@ function pair() {
     }
 
     const promptPath = join(criticDir, 'prompt.md');
-    writeFileSync(promptPath, criticPrompt(state, lens, instruction, mode, criticDir), 'utf8');
+    // Scan the ASSEMBLED prompt, not just the inputs. The prompt embeds the bar,
+    // the criteria and the lens instructions — all read back from state.json and
+    // none of them gated — so guarding only the two input files leaves every
+    // field added later unguarded by default. `npm run swarm` scans the composed
+    // string immediately before writing it; this is that, not a claim about it.
+    const composed = criticPrompt(state, lens, instruction, mode, criticDir);
+    const inPrompt = findSecret(composed);
+    if (inPrompt !== null)
+      die(
+        `refusing to write ${promptPath} — the composed prompt contains something credential-shaped.`,
+      );
+    writeFileSync(promptPath, composed, 'utf8');
     critics.push({ lens, assignment });
     prompts.push(promptPath);
   }

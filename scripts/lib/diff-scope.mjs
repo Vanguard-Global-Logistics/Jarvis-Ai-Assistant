@@ -29,7 +29,7 @@ import { execFileSync } from 'node:child_process';
  * sweep is an allowlist of source-shaped extensions, minus anything whose name
  * suggests it holds a secret — belt and braces, on the safe side.
  */
-const REVIEWABLE = /\.(ts|tsx|js|jsx|mjs|cjs|json|md|ya?ml|css|html|sh|sql|toml)$/i;
+const REVIEWABLE = /\.(ts|tsx|d\.[cm]?ts|js|jsx|mjs|cjs|json|md|ya?ml|css|html|sh|sql|toml)$/i;
 const SUSPICIOUS_NAME =
   /(^|[./_-])(env|secret|secrets|credential|credentials|token|key|keys|password|private|local)([./_-]|$)/i;
 

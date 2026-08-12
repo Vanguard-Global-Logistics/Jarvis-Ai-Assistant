@@ -12,3 +12,6 @@ export declare const SECRET_PATTERNS: readonly {
 }[];
 export declare const FIXTURE_MARKERS: RegExp;
 export declare function findSecret(text: string): string | null;
+export declare const REVIEWABLE: RegExp;
+export declare const SUSPICIOUS_NAME: RegExp;
+export declare function whyNotReviewable(path: string): string | null;

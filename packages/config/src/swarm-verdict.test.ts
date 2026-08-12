@@ -104,17 +104,45 @@ describe('swarm verdict — the exit code is the product', () => {
     expect(result.stderr).toMatch(/malformed review, not a pass/i);
   });
 
-  it('refuses a generated PROMPT passed in place of a review', () => {
-    // Every prompt embeds the template line `VERDICT: SHIP or FIX`, which the
-    // verdict regex read as SHIP — so pointing the command at the run directory
-    // returned a clean pass on a file nobody had reviewed. The run directory's
-    // files are named after exactly the lenses the closing hint prints, which
-    // makes that the LIKELY wrong-file path, not an exotic one.
-    const result = runVerdict([
-      '## Required output — EXACTLY this block, first thing in your reply\n\nVERDICT: SHIP or FIX\nFINDINGS:\n',
-    ]);
+  it('refuses a REAL generated prompt passed in place of a review', () => {
+    // Pointing the command at the run directory returned a clean pass on a file
+    // nobody had reviewed — and the run directory's files are named after exactly
+    // the lenses the closing hint prints, so it is the LIKELY wrong-file path.
+    //
+    // This test used to hand-write a two-line facsimile of a prompt, which a
+    // critic correctly called re-implementing the artifact under test: it passed
+    // against a detector that no longer matched real prompts at all. It now runs
+    // `prep` for real and feeds it the file that `prep` actually wrote.
+    const prep = spawnSync('node', [script, '--lenses', 'correctness'], {
+      cwd: root,
+      encoding: 'utf8',
+    });
+    expect(prep.status).toBe(0);
+    const promptPath = /(\S*docs\/swarm\/\S+correctness\.md)/.exec(prep.stdout)?.[1];
+    expect(promptPath).toBeDefined();
+
+    const result = spawnSync('node', [script, 'verdict', '--files', String(promptPath)], {
+      cwd: root,
+      encoding: 'utf8',
+    });
     expect(result.status).toBe(1);
     expect(result.stderr).toMatch(/generated PROMPT, not a review/i);
+  });
+
+  it('ACCEPTS a genuine review that quotes the prompt template', () => {
+    // The mirror of the case above, and the reason detection is by provenance
+    // rather than content: a reviewer of this repository has every reason to
+    // quote `VERDICT: SHIP or FIX` while reviewing the generator, and doing so
+    // used to get their review rejected as a prompt.
+    const result = runVerdict([
+      review(
+        'FIX',
+        '  - [major] swarm.mjs:1 — it emits `VERDICT: SHIP or FIX` under `## Required output — EXACTLY this block`',
+      ),
+    ]);
+    expect(result.status).toBe(1);
+    expect(result.stdout).toMatch(/said FIX/i);
+    expect(result.stderr).not.toMatch(/generated PROMPT/i);
   });
 
   it('refuses a review with no VERDICT line', () => {

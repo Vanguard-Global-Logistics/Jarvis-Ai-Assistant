@@ -102,3 +102,35 @@ export function findSecret(text) {
   }
   return null;
 }
+
+/**
+ * Belt and braces for CHOOSING A FILE, as opposed to scanning its contents.
+ *
+ * `findSecret` knows six credential FORMATS. It does not know a Postgres URL
+ * with a password in it, an AWS key pair, a Slack token, a JWT, or a personal
+ * note — so a `.env.local` sails straight through a content scan. The threat is
+ * a FILE CHOICE, and the answer is an allowlist of source-shaped extensions
+ * minus anything whose NAME suggests it holds a secret.
+ *
+ * Lives here so the content gate and the name gate are one rule in one place;
+ * `scripts/lib/diff-scope.mjs` had these inline and the Gauntlet staging path
+ * took the scanner without them, which is how `--ours .env.local` stayed open in
+ * a commit whose comment claimed it was closed.
+ */
+export const REVIEWABLE =
+  /\.(ts|tsx|d\.[cm]?ts|js|jsx|mjs|cjs|json|md|ya?ml|css|html|sh|sql|toml)$/i;
+export const SUSPICIOUS_NAME =
+  /(^|[./_-])(env|secret|secrets|credential|credentials|token|key|keys|password|private|local)([./_-]|$)/i;
+
+/**
+ * Why a file may not be handed to a reviewer, or `null` if it may.
+ *
+ * @param {string} path
+ * @returns {string | null}
+ */
+export function whyNotReviewable(path) {
+  const name = path.replace(/^.*[\\/]/, '');
+  if (SUSPICIOUS_NAME.test(name)) return `its name looks credential-shaped ("${name}")`;
+  if (!REVIEWABLE.test(name)) return `it is not a source-shaped file ("${name}")`;
+  return null;
+}

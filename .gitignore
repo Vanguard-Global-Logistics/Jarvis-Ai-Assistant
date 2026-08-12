@@ -68,8 +68,11 @@ docs/review/
 # Critic-swarm review prompts — generated, contain a full diff, regenerable
 docs/swarm/
 
-# Gauntlet round artifacts — copies of the graded work. The LEDGER is the audit
-# trail and stays tracked; the A/B copies and prompts are regenerable.
+# Gauntlet round artifacts — copies of the graded work. The LEDGER and its machine
+# half (state.json) are the audit trail and stay tracked; the A/B copies and the
+# generated prompts are regenerable. state.json is NOT regenerable: without it
+# `verdict` and `status` die, and `init` would truncate the tracked ledger.
 docs/gauntlet/**
 !docs/gauntlet/*/
 !docs/gauntlet/*/ledger.md
+!docs/gauntlet/*/state.json

@@ -1,7 +1,7 @@
 ---
 name: gauntlet-skill
 description: Run Gauntlet — split the work, build each part, then send a SWARM of blind critics at it against a real bar, and repeat until it wins. Use for taste-shaped work (UI, prompts, copy, docs, design) where the question is "is this good?". Do NOT use for correctness or security work; use red-green plus an independent review instead.
-version: 2.0.0
+version: 2.1.0
 license: MIT
 metadata:
   team: Gauntlet — the critic swarm
@@ -110,7 +110,9 @@ it verbatim.
 
 ## 4. One critic contract
 
-Every critic returns exactly this, first thing in its reply:
+The contract is whatever `pair` writes into `prompt.md` — that file is the single
+authority, and it is generated, so it cannot drift from what critics are actually
+asked for. It currently requires, first thing in the reply:
 
 ```
 VERDICT: PASS or FAIL
@@ -118,7 +120,10 @@ WINNER: A or B or TIE          (blind A/B rounds only)
 SCORES:
   <criterion>: n/5             (every criterion, always)
 DEFECTS:
-  - [blocking|major|minor] <specific, actionable, names the place>
+  - [blocking|major|minor] <what is wrong, and exactly where>
+    root cause: <why it fails / why it keeps recurring>
+    remediation: <exact steps to reach PASS>
+    golden reference: <what excellence looks like here>
 ```
 
 **The conversion rule** — because "is it good?" and "which is better?" are
