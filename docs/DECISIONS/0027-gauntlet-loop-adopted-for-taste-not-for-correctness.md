@@ -141,6 +141,74 @@ fail-closed defect.
 - **It does not settle the outstanding AEGIS review.** Nothing in this ADR
   substitutes for it.
 
+## Addendum, 2026-08-12 — the team is named **Gauntlet**, and it is a swarm
+
+William: _"Call the Jarvis Gauntlet team to be called Gauntlet and it has a swarm
+of AI team members that become critics to make whatever Jarvis works on close to
+perfect on first try."_
+
+Two separable things, and they land in different places.
+
+### What was built: Gauntlet, the build-process critic swarm — IMPLEMENTED
+
+The skill was 283 lines of prose whose every guarantee — blindness, critic
+freshness, randomised order, per-round logging, plateau detection — was enforced
+by an agent remembering it. A hostile review of it landed the finding cleanly:
+nothing was left afterwards that distinguished a real ten-round blind loop from a
+single pass with a confident report attached. In a repository whose stated
+cardinal sin is claiming work that was not performed, that is not a small gap.
+
+`.claude/skills/gauntlet-loop/scripts/gauntlet.mjs` makes it a mechanism. It
+dispatches **several critics per round with different lenses**, flips a **real
+coin per critic** for A/B order, **generates** each critic prompt so the
+orchestrator cannot tip it off, **refuses** a verdict that does not match the
+contract, aggregates **worst-case** so one enthusiastic critic cannot carry a
+part, and writes a ledger to `docs/gauntlet/<slug>/`.
+
+"Close to perfect on first try" is what the swarm buys: the cost goes into round
+one going wide rather than into ten serial rounds.
+
+### What was NOT built: a Gauntlet swarm inside Jarvis at runtime — NOT IMPLEMENTED
+
+Jarvis cannot host this today, and saying otherwise would be the exact failure
+this ADR exists to prevent. It has **one stateless model call** and no
+orchestrator — no agent spawning, no parallel dispatch, no place for a swarm to
+live. `jarvis:chat` sends a transcript and returns a reply; that is the whole of
+it.
+
+Beyond the missing plumbing, three constraints already apply and are not
+inferrable from this ADR:
+
+- Under ADR 0005 the **Executive Council** — the closest named concept — is
+  CONCEPTUAL, and an APPROVED library document is explicitly never authorization
+  to build the subsystem.
+- A runtime critic swarm means **many model calls per user action**. On a metered
+  provider that is a cost decision, and on a remote provider it is an AEGIS
+  `sending` decision (ADR 0026), not a UI feature.
+- The critics would need to see the artifact, which for anything Jarvis
+  automates means screen or file access — governed by capabilities AEGIS revokes
+  at YELLOW and which are not enforceable yet.
+
+So: **Gauntlet is real and it works on Jarvis, not inside it.** Every session
+that builds Jarvis can run the swarm today. Putting the swarm inside the product
+is a separate milestone needing its own scope from William, and this addendum is
+what stops a later session reading "Gauntlet team" as authorization.
+
+### Corrections to the record
+
+Two claims in the first version of the skill did not survive checking, and are
+recorded because an uncorroborated war story in a governance file is exactly the
+kind of thing that gets repeated:
+
+- It cited a leak test "that passed against an injected leak because it never
+  executed the code holding the credential." That happened in the session that
+  built `npm run check:model`, but it was never written into any ADR, so it was
+  presented as repository evidence while being unfindable in the repository. It
+  is now recorded here, and removed from the portable file.
+- It said `npm run verify` had been green on "three real defects". The record
+  shows **two** builds that passed `verify` and could not launch, plus **three**
+  where `verify` _and_ `probe` were green — five, in two distinct categories.
+
 ## Alternatives considered
 
 - **Adopt it everywhere, including security.** Rejected — §3. The method's own

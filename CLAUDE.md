@@ -372,9 +372,27 @@ And the part with no caveat: **run longer than feels necessary.** The habit here
 "verify green, probe green, push" — a floor. Both were green on the `.env` bug, the missing
 `max_tokens`, and the AEGIS fail-closed defect.
 
-The runnable version lives at `.claude/skills/gauntlet-loop/SKILL.md` — the bar, the
-split, the three roles, blind A/B, the stopping conditions, the budget shape, and the
-red-green alternative for correctness work. Invoke it when starting taste-shaped work.
+### Gauntlet — the critic swarm, and it is a mechanism, not a habit
+
+**The team is named Gauntlet.** Invoke it with `/gauntlet-loop`;
+`.claude/skills/gauntlet-loop/` is the whole thing.
+
+It is enforced by `scripts/gauntlet.mjs` rather than by a session remembering the
+rules — because the first version was 283 lines of prose whose every guarantee was
+honour-system, which is what the method exists to abolish. The script dispatches
+**several critics per round with different lenses** (first-impression, craft, skeptic),
+flips a **real coin per critic** for blind A/B order, **generates** each critic prompt so
+the orchestrator cannot tip it off, **refuses** a malformed verdict, aggregates
+**worst-case** so one enthusiastic critic cannot carry a part, detects plateau from
+scores rather than from feel, and writes a ledger to `docs/gauntlet/<slug>/`.
+
+A part that never clears the bar is marked `stalled` and reported as a finding — the
+ledger is what makes "all parts passed" checkable by someone other than the author.
+
+**Gauntlet works on Jarvis, not inside it.** A runtime critic swarm inside the product is
+NOT IMPLEMENTED and not authorized: there is no orchestrator, only a single stateless
+model call. See ADR 0027's addendum before reading "Gauntlet team" as permission to build
+one.
 
 This is a **build-process governance rule**, not a runtime software requirement. It has no
 direct code representation in Phase 1 beyond Forge's `reviewer` / `approvalStatus` fields,

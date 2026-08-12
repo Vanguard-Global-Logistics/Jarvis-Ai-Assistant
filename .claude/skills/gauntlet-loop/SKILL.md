@@ -1,282 +1,291 @@
 ---
 name: gauntlet-loop
-description: Run a Gauntlet Loop — split the goal, build each part, grade it with a blind critic against a real bar, repeat until it wins. Use for taste-shaped work (UI, prompts, copy, docs, design) where the question is "is this good?". Do NOT use for correctness or security work; use red-green plus an independent review instead.
-version: 1.0.0
+description: Run Gauntlet — split the work, build each part, then send a SWARM of blind critics at it against a real bar, and repeat until it wins. Use for taste-shaped work (UI, prompts, copy, docs, design) where the question is "is this good?". Do NOT use for correctness or security work; use red-green plus an independent review instead.
+version: 2.0.0
 license: MIT
-platforms: [macos, linux, windows]
 metadata:
-  origin: Matt Shumer's Gauntlet Loop, adapted for this repository (ADR 0027)
-  scope: build-process governance — adds no runtime code
-  related: [ADR-0027, CLAUDE.md §5]
+  team: Gauntlet — the critic swarm
+  origin: Matt Shumer's Gauntlet Loop. Community implementations consulted — github.com/NicholasSpisak/gauntlet-loop, github.com/duolahypercho/gauntlet-loop
+  scope: build-process governance — adds no runtime code to any product
 ---
 
-# The Gauntlet Loop
+# Gauntlet
 
-**split → build → blind-critic → repeat, against a bar the agent cannot argue its way around.**
+**split → build → swarm of blind critics → repeat, against a bar nobody can argue their way around.**
 
-The builder never grades itself. The critic inspects the **real output** — running
-code, the rendered page, actual test results — never a summary of it. The loop
-runs until every part clears the bar, not until the builder feels finished.
+The builder never grades itself. Critics inspect the **real output** — running code,
+the rendered page, actual results — never a summary of it. They arrive in a
+**swarm**, several per round with different lenses, because the point is to be
+close to right on round one rather than to grind through ten rounds.
 
----
-
-## 0. Before anything: is this the right instrument?
-
-Answer this first. Using the loop on the wrong class of work is how a good method
-does damage.
-
-| The question you are actually asking                                           | Instrument                         | Why                                                        |
-| ------------------------------------------------------------------------------ | ---------------------------------- | ---------------------------------------------------------- |
-| "Is this **good**?" — UI, prompts, copy, docs, naming, design                  | **Gauntlet Loop**                  | Quality is a judgement, and a judgement needs a comparison |
-| "Is this **correct**?" — security, boundaries, credentials, persistence, money | **Red-green + independent review** | A property holds or it does not                            |
-
-**Why not the loop for correctness.** A critic can be persuaded; a failing test
-cannot. A critic given the AEGIS engine produces an _opinion_; a test that
-deliberately breaks the rule produces a _fact_. And a critic that only sees the
-artifact cannot see an **absence** — the strongest property in that engine is
-that a type has _no_ lowering method, which no amount of "is this better than the
-reference?" would surface.
-
-If the work is mixed — a security feature with a UI — split it. Loop the surface,
-red-green the boundary.
-
-**Stop here if the answer was "correct".** Go run red-green (§9) and
-`npm run review`.
+**Everything below is enforced by `scripts/gauntlet.mjs`, not by you remembering it.**
+That is the whole difference between this and a nice idea: the loop leaves a
+ledger on disk, and a loop that was never run has an empty ledger.
 
 ---
 
-## 1. Name the bar. Before you build anything.
+## 0. First: is this the right instrument?
 
-A loop without a real bar is a loop that terminates when the builder gets bored.
-The bar must be **external, specific, and reachable** — something the critic can
-open and compare against side by side.
+| The question you are actually asking                                    | Instrument                     | Why                                                        |
+| ----------------------------------------------------------------------- | ------------------------------ | ---------------------------------------------------------- |
+| "Is this **good**?" — UI, prompts, copy, docs, naming, design           | **Gauntlet**                   | Quality is a judgement, and a judgement needs a comparison |
+| "Is this **correct**?" — security, boundaries, credentials, money, data | **Red-green + a second model** | A property holds or it does not                            |
 
-**Good bars:**
+A critic can be persuaded; a failing test cannot. And a critic that only sees
+the artifact **cannot see an absence** — if the strongest property of a design is
+that some dangerous method does not exist at all, no amount of "which is better?"
+will surface it.
 
-- An existing artifact you admire: a competitor's page, a published essay, the
-  archived design prototype in `reference/design-handoff/`.
-- A named standard with numbers: "loads in under 1s on a cold cache", "every
-  interactive target ≥44px", "reads at grade 9 or below".
-- A person's actual output: "a plan a competent operations manager would write".
+Mixed work splits: run Gauntlet on the surface, red-green the boundary.
+→ `references/red-green.md`
 
-**Bars that are not bars:**
+---
 
-- "Make it good." "Production quality." "Best practices."
-- `npm run verify` passing. That says the thing _works_ — it is a floor, and this
-  project has shipped three real defects with it green.
-- The builder's own opinion, restated as a checklist.
+## 1. Name the bar, and the criteria, before building anything
 
-Write the bar down in one sentence before the first builder starts. If you cannot
-write it, you do not have one yet, and that is the finding.
+The bar is one sentence naming something **external and openable**. The criteria
+are 3–6 named qualities every critic scores 0–5.
+
+The criteria are not decoration. Fresh critics each round cannot be compared in
+prose — different critics, different words — but they _can_ be compared on a
+rubric frozen before round one. **Without fixed criteria, "no improvement" is
+unmeasurable and the loop has no honest stopping condition.**
+
+| Real bars                                                     | Not bars                                   |
+| ------------------------------------------------------------- | ------------------------------------------ |
+| An artifact you can open: a competitor's page, a design comp  | "Make it good", "production quality"       |
+| A standard with numbers: "≥44px targets", "grade 9 reading"   | The test suite passing — that is the floor |
+| A person's real output: "what a good ops manager would write" | The builder's own checklist                |
+
+```bash
+node .claude/skills/gauntlet-loop/scripts/gauntlet.mjs init \
+  --slug landing-hero \
+  --bar "Reads as confidently as the Stripe homepage hero" \
+  --parts hero,nav,footer \
+  --criteria "hierarchy,typography,spacing,restraint" \
+  --redact "Acme,acme-corp"
+```
+
+`--redact` matters: brand names and file paths are how a "blind" comparison stops
+being blind. Set it once; it applies to every round.
 
 ---
 
 ## 2. Split into independently gradeable parts
 
-Each part must be gradeable **on its own**, without opening the others. If
-grading part A requires reading part B, they are one part.
+A part must be gradeable **without opening the others**. If grading A requires
+reading B, they are one part.
 
-Split by what a critic could form an opinion about:
+Size a part as **one builder call producing one artifact one critic can judge in
+one pass.** A page → hero, nav, type scale, spacing, empty states, motion. A
+prompt → role framing, output contract, failure handling, examples, tone.
 
-- A landing page → hero, nav, typographic scale, spacing rhythm, empty states,
-  loading states, mobile breakpoints, motion.
-- A prompt → the role framing, the output contract, the failure instructions, the
-  examples, the tone.
-- A document → the argument, the opening, each section, the transitions.
-
-Aim for parts small enough that one build round is 5–20 minutes of work. Too
-coarse and the critic can only say "mixed"; too fine and you spend the budget on
-overhead.
+6–12 parts is the useful range.
 
 ---
 
-## 3. The three roles, in separate contexts
+## 3. The four roles
 
-**Separate contexts is the mechanism, not a formality.** A critic that watched
-the build is no longer blind — it knows what was intended, and it grades the
-intention.
+| Role           | Gets                                     | Never gets                                                             | Produces                                                    |
+| -------------- | ---------------------------------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------- |
+| **LEAD** (you) | Everything                               | —                                                                      | The bar, the split, dispatch, the report. **Never builds.** |
+| **BUILDER**    | One part, the bar, the last FAIL defects | Critic identities, other parts, earlier reasoning                      | The real artifact — not a plan for one                      |
+| **CRITIC**     | The generated prompt, verbatim           | The builder's message, which artifact is ours, what other critics said | One verdict block                                           |
+| **HARMONISER** | All passed parts at once                 | Authority to add anything new                                          | The same parts, made consistent                             |
 
-### LEAD (you, the orchestrator)
-
-Sets the bar. Splits the work. Dispatches builders and critics. Routes FAIL back
-with the critic's specifics attached. Merges. **Never builds** — an agent that
-built something is a compromised judge of it. Owns the budget and calls the stop.
-
-### BUILDER — one per part, clean context
-
-Gets: the part, the bar, and the current artifact if revising.
-Does **not** get: the previous critic's identity, or the reasoning behind earlier
-attempts beyond the specific FAIL notes.
-Produces: the real artifact. Not a plan for one, not a description of one.
-
-### CRITIC — one per part per round, fresh every round
-
-Gets: the artifact, the bar, and nothing else.
-Does **not** get: the builder's reasoning, the builder's summary, or a note
-saying which one is "ours".
-Does: **open the real thing.** Run the code. Render the page. Read the actual
-output. Compare against the bar side by side.
-Returns: `PASS` or `FAIL`, and for FAIL, **specific, actionable defects** — never
-"could be better".
-
-> **A critic that graded a previous round never grades the retry.** It has an
-> opinion to defend by then.
+LEAD writing the critic prompt by hand is the contamination channel nobody
+notices — you have just read the builder's output, and you will describe what to
+look for in its terms. **So LEAD does not write it. `pair` generates it.** Paste
+it verbatim.
 
 ---
 
-## 4. Blind A/B — the part most people skip
+## 4. One critic contract
 
-Where the bar is a real artifact, do not ask _"is ours good?"_ Ask:
-
-> Here are two artifacts, A and B. Judge them against these criteria. Which is
-> better, and why? Be specific.
-
-**Do not say which one is yours.** Randomise the order each round — a critic that
-learns "B is always ours" is no longer blind.
-
-This single change is why the method works. A critic told "review our page"
-produces encouragement. A critic shown two pages produces a verdict.
-
----
-
-## 5. The loop
+Every critic returns exactly this, first thing in its reply:
 
 ```
-  name the bar
-       │
-       ▼
-  split into parts ──────────────┐
-       │                         │
-       ▼                         │
-  for each part, in parallel:    │
-       builder (clean context)   │
-       ▼                         │
-       critic (blind, fresh)     │
-       ▼                         │
-    PASS ──────► done ───────────┤
-    FAIL ──► back to builder ────┘
-       with the specific defects
-       │
-       ▼
-  all parts PASS → smoothing pass → report
+VERDICT: PASS or FAIL
+WINNER: A or B or TIE          (blind A/B rounds only)
+SCORES:
+  <criterion>: n/5             (every criterion, always)
+DEFECTS:
+  - [blocking|major|minor] <specific, actionable, names the place>
 ```
 
-**The smoothing pass matters.** Parts improved separately drift apart —
-inconsistent spacing, three different words for one concept, four tones of voice.
-One final pass harmonises them, and then one final critic grades the _whole_
-against the bar.
+**The conversion rule** — because "is it good?" and "which is better?" are
+different questions and the loop needs one answer. A part passes a critic only
+when **all three** hold:
+
+1. the critic said `PASS`, **and**
+2. ours won or tied the blind comparison, **and**
+3. zero `[blocking]` defects.
+
+Conjunctive on purpose. Beating the artifact you were compared against is not
+clearing the bar — both can be bad. The first end-to-end test of this script
+promptly turned a critic's explicit FAIL into a PASS under the earlier, looser
+rule.
+
+**And the round passes only if every critic in the swarm passes.** Worst-case,
+never averaged: averaging lets two mild critics carry a part past the one that
+found something disqualifying, which is the exact failure a swarm exists to
+prevent. The script computes all of this — you do not adjudicate it.
 
 ---
 
-## 6. When to stop
+## 5. The swarm
 
-Stop when **any** of these is true:
+Three critics per round by default, each a **different question**, not three
+copies of the same one:
 
-1. Every part clears the bar.
-2. **Two consecutive rounds produce no improvement** — not "no change", no
-   _improvement_. The critic's FAIL notes are the evidence.
-3. The budget is spent (§8).
+| Lens                 | Asks                                                                |
+| -------------------- | ------------------------------------------------------------------- |
+| **first-impression** | Five seconds, like a real visitor. What lands? What is forgettable? |
+| **craft**            | Spacing rhythm, type scale, alignment, the small stuff              |
+| **skeptic**          | The single strongest reason to reject this outright                 |
 
-And the rule with no exception:
+Override with `--lenses "first-impression,craft,skeptic,accessibility,user"`. An
+unrecognised name gets a generic single-lens instruction, so any lens you can
+name works.
 
-> **Run longer than feels necessary. Most people stop several rounds too early.**
-
-The instinct to stop arrives at round two. The gains usually arrive at rounds
-three through five.
-
----
-
-## 7. Running it in Claude Code
-
-The roles map onto subagents. Each `Task` call is a fresh context, which is
-exactly the separation the method requires.
-
-```
-LEAD (main conversation)
- ├─ Task: "You are building the hero section. The bar is <X>. Produce the real
- │         HTML/CSS. Return only the artifact."
- ├─ Task: "You are a critic. Here are two hero sections, A and B. Judge against
- │         <criteria>. Which is better and why? Do not assume either is a
- │         reference."
- └─ ...repeat per part, fresh critic each round
-```
-
-**Rules that keep it honest:**
-
-- One part per builder. A builder handed three parts optimises the easy one.
-- The critic gets the artifact, never the builder's message.
-- Never reuse a critic across rounds for the same part.
-- Log each round's verdict. Two rounds of "no improvement" is a stop condition
-  you cannot detect from memory.
-
-**Cross-model critics are stronger than same-model critics.** A Claude critic
-reviewing Claude output shares its blind spots. Where a second vendor is
-available, use it — that is what `npm run review` assembles a packet for. Note
-that a subagent of the same model is _not_ an independent review under
-CLAUDE.md §5; it is a quality pass.
+Three identical critics mostly agree — same model, same prompt, same blind spot —
+and that agreement gets misread as confidence. **Disagreement is the useful
+signal.** When the script reports dissent, read the dissenter first.
 
 ---
 
-## 8. Budget — decide before you start
+## 6. Blind A/B
 
-The loop is unbounded by design, so bound it explicitly:
-
-- **Rounds:** 3 minimum, 5–8 typical, stop at 10 unless something is still
-  measurably improving.
-- **Parts:** more parts is more parallel builders and more critics. 6–12 parts is
-  usually the sweet spot; 30 parts is a budget bonfire.
-- **Cost shape:** each round is roughly `parts × (builder + critic)`. A 10-part,
-  5-round loop is ~100 agent calls. Know that number before you start.
-
-**Where the money actually goes.** Rework costs twice — once to write it wrong,
-once to fix it. A critic pass costs a fraction of one rework cycle, and catches
-it before it reaches a human. That is the whole economic argument for the method,
-and it only holds if you stop _before_ the loop stops improving things.
-
----
-
-## 9. The other instrument: red-green
-
-For correctness work, this replaces the loop entirely.
-
-```
-1. Write the guard.
-2. Write the test that asserts the guard holds.
-3. DELIBERATELY BREAK the guard.
-4. Run the suite. CONFIRM IT GOES RED. If it stays green, the test is decoration.
-5. Restore. Confirm green.
-6. Record in the commit which breaks were tried and how many checks each turned red.
+```bash
+node .claude/skills/gauntlet-loop/scripts/gauntlet.mjs pair \
+  --slug landing-hero --part hero --ours build/hero.html --ref refs/stripe-hero.html
 ```
 
-Step 3 is the whole method. In this repository it has caught: a leak test that
-passed against an injected leak because it never executed the code holding the
-credential, and a fail-closed rule that actually failed open.
+This writes `A.txt` and `B.txt` per critic, with **an independent real coin flip
+per critic** — `randomInt`, not an LLM asked to be random, and per-critic rather
+than per-round so that "everyone picked B" leaks nothing about which was ours.
+It redacts your identifying terms and generates each prompt.
+
+Omit `--ref` for solo grading when no reference exists. A/B is stronger: a critic
+asked "review our page" produces encouragement; a critic shown two produces a
+verdict.
 
 ---
 
-## 10. Report honestly
+## 7. The loop
 
-Every Gauntlet Loop ends with:
+```
+   name the bar + criteria ──► HUMAN CONFIRMS THE BAR
+                │
+                ▼
+        split into parts
+                │
+                ▼
+   ┌──► builder (fresh context, one part)
+   │            │
+   │            ▼
+   │    pair ──► swarm of N blind critics ──► verdict
+   │            │
+   │      FAIL ─┘  (defects only, never critic identity)
+   │            │
+   │      PASS  ▼
+   └────── all parts passed
+                │
+                ▼
+        HARMONISER (one pass, consistency only)
+                │
+                ▼
+        whole-artifact swarm ──FAIL──► back to HARMONISER (max 2)
+                │ PASS
+                ▼
+        HUMAN GATE ──► ship
+```
 
-- **The bar**, stated as it was written before starting.
-- **Rounds run**, and why it stopped — cleared, plateaued, or budget.
-- **What still fails**, if anything. A part that never cleared the bar is a
-  finding, not a thing to quietly drop.
-- **The evidence** — the critic's final verdicts, not your summary of them.
+**The harmoniser exists** because parts improved separately drift — three words
+for one concept, four spacings, two tones. It is a **fresh builder**, not LEAD
+(LEAD never builds) and not one of the part builders (they defend their part). It
+changes nothing but consistency.
 
-A loop that reports "all parts passed" without saying what the bar was has
-reported nothing.
+**The whole-artifact critics have a FAIL path** — back to the harmoniser, capped
+at two passes. If it still fails, that is the report, not a thing to bury.
+
+**The human gate is not optional.** Every stop condition below is judged by
+agents; the person who owns the outcome sees it before it ships.
 
 ---
 
-## Anti-patterns
+## 8. When to stop
 
-| Smell                                | Why it breaks the method                    |
-| ------------------------------------ | ------------------------------------------- |
-| The builder writes the critic prompt | It grades what it optimised for             |
-| The critic reads a summary           | It grades the description, not the artifact |
-| "Compare ours to the reference"      | Not blind. It knows which to flatter        |
-| One critic across all rounds         | It defends its earlier position             |
-| Bar named after the first build      | The bar becomes what was produced           |
-| Stopping at round 2                  | The gains are at 3–5                        |
-| Running it on a security boundary    | A vote where you needed a proof             |
+The script decides two of these three, from data:
+
+| Condition                                                          | Who decides   |
+| ------------------------------------------------------------------ | ------------- |
+| Every part passed its swarm                                        | script        |
+| **Plateau** — 3 rounds where the worst score gained < `--min-gain` | script        |
+| Round cap (`--max-rounds`, default 8)                              | script        |
+| "This is good enough for what it is"                               | **the human** |
+
+**Run longer than feels necessary.** The urge to stop arrives at round two; the
+gains usually arrive at three through five. The plateau rule exists so that
+instinct is overruled by a number.
+
+**Cost.** Worst case is `parts × rounds × (1 builder + N critics)`, plus a
+harmonise pass and a whole-artifact swarm. 8 parts × 3 rounds × (1+3) ≈ 96 calls,
++8. Parts drop out as they pass, so the real figure is well under the ceiling —
+but budget against the ceiling, and know the number before you start.
+
+---
+
+## 9. Report honestly
+
+```bash
+node .claude/skills/gauntlet-loop/scripts/gauntlet.mjs status --slug landing-hero
+```
+
+Every run ends with the ledger at `docs/gauntlet/<slug>/ledger.md`, which already
+contains the bar as written before round one, every round's verdict, the worst
+score, blocking counts, and where the critics disagreed.
+
+Report **what still fails**. A part the script marked `stalled` never cleared the
+bar; that is a finding. A report saying "all parts passed" without naming the bar
+has reported nothing — and now the ledger makes that checkable by someone else.
+
+---
+
+## 10. Anti-patterns
+
+| Smell                                | Why it breaks the method                             |
+| ------------------------------------ | ---------------------------------------------------- |
+| LEAD hand-writes the critic prompt   | It has read the build; it will describe what to like |
+| The critic reads a summary           | It grades the description, not the artifact          |
+| "Compare ours to the reference"      | Not blind — it knows which one to flatter            |
+| Averaging critic scores              | Two mild critics bury the one real objection         |
+| Reusing a critic across rounds       | It defends its earlier position                      |
+| Three critics, one lens              | Correlated blind spots read as confidence            |
+| Naming the bar after the first build | The bar becomes whatever was produced                |
+| Running it on a security boundary    | A vote where you needed a proof                      |
+
+---
+
+## 11. Running it with subagents
+
+Each subagent call is a fresh **context** — which is the separation the method
+needs. It is **not** an independent **judge**: same model, same weights, same
+blind spots. Where a second vendor is available, use it for the final say.
+
+Ten critic passes by one model is a quality process, not an approval. If your
+project requires an independent review before shipping, this does not satisfy it.
+
+- One part per builder — a builder handed three optimises the easiest.
+- Dispatch the swarm in parallel; each gets its own generated prompt, verbatim.
+- Never pass a critic another critic's output.
+
+→ `references/prompts.md` for the builder and harmoniser prompts
+→ `references/worked-example.md` for one complete run, start to finish
+
+**In this repository:** the bar for the visual surface is
+`docs/VISUAL-DESIGN-TARGET.md` plus the archived prototypes in
+`reference/design-handoff/` — a real reference that has never been used as one.
+`npm run review` assembles the cross-model packet for the independent review that
+this loop does not replace. See ADR 0027 for what Gauntlet is and is not
+authorised to do.
