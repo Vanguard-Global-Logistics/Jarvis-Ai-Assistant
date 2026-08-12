@@ -18,7 +18,7 @@ builder starts. Naming the bar after seeing a build is the oldest way to cheat
 this.
 
 ```bash
-G=".claude/skills/gauntlet-loop/scripts/gauntlet.mjs"
+G="<this skill's base directory>/scripts/gauntlet.mjs"   # printed when the skill loads
 
 node $G init \
   --slug pricing \

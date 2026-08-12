@@ -97,7 +97,7 @@ Read <path>/prompt.md and follow it exactly. Return only what it asks for.
 Collect each reply to its own file, then:
 
 ```bash
-node scripts/gauntlet.mjs verdict --slug <s> --part <p> --files c1.txt,c2.txt,c3.txt
+node "$G" verdict --slug <s> --part <p> --files c1.txt,c2.txt,c3.txt
 ```
 
 The script refuses if the count is short. A missing critic is a missing verdict,

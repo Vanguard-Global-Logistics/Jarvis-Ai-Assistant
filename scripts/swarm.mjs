@@ -18,7 +18,7 @@
  * What finds them is several readers, each asked a DIFFERENT hostile question,
  * none of whom wrote the code.
  *
- * ## How this differs from Gauntlet (`.claude/skills/gauntlet-loop/`)
+ * ## How this differs from Gauntlet (`.claude/skills/gauntlet-skill/`)
  *
  * Gauntlet grades TASTE — "is this good?" — by blind A/B against a reference.
  * This grades CORRECTNESS — "is this wrong?" — against the diff itself. Same
@@ -185,6 +185,7 @@ function prep() {
     const prompt = [
       `You are a hostile code reviewer. The code below was written by an AI and has NOT been independently reviewed.`,
       `You did not write it, you have no stake in it, and finding nothing is a worse outcome for you than finding something small.`,
+      `**Review only. Do not edit, create, or delete any file, and do not commit anything.** Report what is wrong; fixing it is someone else's job. The first swarm this project ran went to agents that could write, and they fixed their own findings and committed them — so the critics became builders and their fixes reached the branch ungraded.`,
       `Do not be encouraging. Do not summarise the change back. Do not compliment the structure.`,
       '',
       `## Your single question`,
@@ -270,7 +271,11 @@ function prep() {
     for (const f of skipped) console.log(`    · ${f}`);
     console.log(`  If one of those needs reviewing, rename it or review it by hand.`);
   }
-  console.log('\nSend each to its OWN fresh agent, in parallel, pasted verbatim.');
+  console.log('\nSend each to its OWN fresh READ-ONLY agent, in parallel, pasted verbatim.');
+  console.log('Read-only is not a nicety. The first real run of this swarm was dispatched to');
+  console.log('agents that could write, and they fixed what they found and committed it — so the');
+  console.log('critics became builders and their own fixes went unreviewed. In Claude Code that');
+  console.log('means the `Explore` agent type, which has no Edit/Write.');
   console.log('Never tell one reviewer what another said.');
   console.log(
     `\nThen: node scripts/swarm.mjs verdict --files ${names.map((n) => `<${n}>`).join(',')}`,

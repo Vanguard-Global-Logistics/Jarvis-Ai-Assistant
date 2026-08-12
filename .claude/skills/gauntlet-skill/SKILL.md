@@ -1,5 +1,5 @@
 ---
-name: gauntlet-loop
+name: gauntlet-skill
 description: Run Gauntlet — split the work, build each part, then send a SWARM of blind critics at it against a real bar, and repeat until it wins. Use for taste-shaped work (UI, prompts, copy, docs, design) where the question is "is this good?". Do NOT use for correctness or security work; use red-green plus an independent review instead.
 version: 2.0.0
 license: MIT
@@ -18,7 +18,15 @@ the rendered page, actual results — never a summary of it. They arrive in a
 **swarm**, several per round with different lenses, because the point is to be
 close to right on round one rather than to grind through ten rounds.
 
-**Everything below is enforced by `scripts/gauntlet.mjs`, not by you remembering it.**
+**Everything below is enforced by this skill's `scripts/gauntlet.mjs`, not by you
+remembering it.** Set `G` first — the loader tells you this skill's base directory,
+and the commands below use it so they work in ANY project, not only the one the
+skill was written in:
+
+```bash
+G="<this skill's base directory>/scripts/gauntlet.mjs"   # printed when the skill loads
+```
+
 That is the whole difference between this and a nice idea: the loop leaves a
 ledger on disk, and a loop that was never run has an empty ledger.
 
@@ -58,7 +66,7 @@ unmeasurable and the loop has no honest stopping condition.**
 | A person's real output: "what a good ops manager would write" | The builder's own checklist                |
 
 ```bash
-node .claude/skills/gauntlet-loop/scripts/gauntlet.mjs init \
+node "$G" init \
   --slug landing-hero \
   --bar "Reads as confidently as the Stripe homepage hero" \
   --parts hero,nav,footer \
@@ -157,7 +165,7 @@ signal.** When the script reports dissent, read the dissenter first.
 ## 6. Blind A/B
 
 ```bash
-node .claude/skills/gauntlet-loop/scripts/gauntlet.mjs pair \
+node "$G" pair \
   --slug landing-hero --part hero --ours build/hero.html --ref refs/stripe-hero.html
 ```
 
@@ -239,7 +247,7 @@ but budget against the ceiling, and know the number before you start.
 ## 9. Report honestly
 
 ```bash
-node .claude/skills/gauntlet-loop/scripts/gauntlet.mjs status --slug landing-hero
+node "$G" status --slug landing-hero
 ```
 
 Every run ends with the ledger at `docs/gauntlet/<slug>/ledger.md`, which already
@@ -277,7 +285,12 @@ Ten critic passes by one model is a quality process, not an approval. If your
 project requires an independent review before shipping, this does not satisfy it.
 
 - One part per builder — a builder handed three optimises the easiest.
-- Dispatch the swarm in parallel; each gets its own generated prompt, verbatim.
+- **Dispatch critics READ-ONLY.** In Claude Code that is the `Explore` agent type,
+  which has no Edit or Write. This is not hygiene: the first real swarm run in
+  this repository went to agents that could write, and they fixed what they found
+  and committed it. The critics became builders, and their own fixes reached the
+  branch ungraded. A critic that can edit the artifact is not a critic.
+- Dispatch in parallel; each gets its own generated prompt, verbatim.
 - Never pass a critic another critic's output.
 
 → `references/prompts.md` for the builder and harmoniser prompts

@@ -7,6 +7,14 @@
   **accepted**, the Chief Architect gate passed, and William's explicit approval.
   An item on this list is a preserved intent, not a commitment to build.
 
+- **The gate on every item below** (standing order, 2026-08-12, CLAUDE.md §5):
+  no item is offered as done until `npm run swarm` has read it and every blocking
+  finding is fixed or declined in writing; anything with a visual or written
+  surface also runs `/gauntlet-skill` against a named bar; security, boundary,
+  credential and money work additionally needs red-green plus `npm run review` to
+  a second vendor. Critics are dispatched **read-only**. `/gauntlet-skill` stays
+  enabled until William says otherwise.
+
 ---
 
 ## NOW — the single active milestone

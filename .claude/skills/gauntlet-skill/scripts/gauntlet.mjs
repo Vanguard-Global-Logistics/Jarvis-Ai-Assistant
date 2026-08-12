@@ -317,7 +317,14 @@ function pair() {
     `✓ ${part} round ${String(n)} — swarm of ${String(critics.length)} dispatched (${mode})`,
   );
   for (const p of prompts) console.log(`  ${p}`);
-  console.log('\nEach prompt goes to its OWN fresh agent, pasted VERBATIM. Do not add context.');
+  console.log(
+    '\nEach prompt goes to its OWN fresh READ-ONLY agent, pasted VERBATIM. No added context.',
+  );
+  console.log(
+    'Read-only is the rule: the first real swarm run in this project went to agents that',
+  );
+  console.log('could write, and they fixed what they found and committed it — critics became');
+  console.log('builders and their own fixes went ungraded. In Claude Code use the `Explore` type.');
   console.log('Do not tell any of them what the others said.');
   console.log(
     `\nThen: node gauntlet.mjs verdict --slug ${slug} --part ${part} --files ${critics
@@ -341,6 +348,8 @@ function pair() {
 function criticPrompt(state, lens, instruction, mode, dir) {
   return [
     `You are a hostile critic. You have no stake in this work and have not seen it before.`,
+    `**Review only. Do not edit, create, or delete any file, and do not commit.** A critic that`,
+    `changes the artifact has become its builder, and its own changes then reach the work ungraded.`,
     `Do not be encouraging. Praise costs the author nothing and teaches them nothing.`,
     '',
     `## Your lens: ${lens}`,

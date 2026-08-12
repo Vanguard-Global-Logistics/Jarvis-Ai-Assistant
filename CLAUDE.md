@@ -369,9 +369,51 @@ Three properties that are the whole point:
   skimming produces "looks reasonable" — the exact output this mechanism exists to
   prevent. Narrow the scope instead.
 
+**Dispatch critics READ-ONLY** — in Claude Code, the `Explore` agent type. The
+first real run of this swarm went to agents that could write; they fixed the six
+blocking defects they found and committed them, so the critics became builders
+and their own fixes reached the branch ungraded. The findings were right and the
+process was wrong. A critic that can edit the artifact is not a critic.
+
 **This is not the §5 independent review and does not replace it.** Same model,
 same weights, same blind spots; it is a quality gate, not approval authority.
 Security-critical work still needs `npm run review` and a second vendor.
+
+### STANDING ORDER — Gauntlet applies to the rest of the Jarvis build
+
+William, 2026-08-12: _"add this skill to the rest of the build of Jarvis… confirm
+`/gauntlet-skill` is enabled and never turns off unless I say so."_
+
+That is a standing instruction, not a preference for one task. For **every**
+remaining item in `docs/BACKLOG.md` and every future change to this repository:
+
+| Work                                        | Gate before it is offered as done                     |
+| ------------------------------------------- | ----------------------------------------------------- |
+| Any code change                             | `npm run swarm` — every blocking finding fixed, or declined in writing |
+| Anything with a visual or written surface   | `/gauntlet-skill` against a named bar                 |
+| Security, boundaries, credentials, money    | red-green **and** `npm run review` to a second vendor |
+
+**`/gauntlet-skill` is enabled and stays enabled.** It is enabled by the presence
+of `.claude/skills/gauntlet-skill/SKILL.md`, whose frontmatter `name:` is the
+slash command. Do not delete, rename, move, or narrow it. Do not "simplify" the
+swarm down to one critic. Only William revokes this, in his own words; no session
+may retire it because a task felt small or the budget felt tight.
+
+`packages/config/src/install-skill.test.ts` asserts the folder, the frontmatter
+name, and this file's promise of `/gauntlet-skill` all still agree, so deleting
+or renaming the skill turns CI red rather than merely contradicting a paragraph.
+
+Two honest corrections to an earlier draft of this section, both from the swarm
+reading it: this is **not** the only way it can be switched off — a
+`permissions.deny` entry naming `Skill(gauntlet-skill)` disables it with the
+folder fully intact, and `.claude/settings.local.json` is gitignored, so that
+would not show up in review. And a personal copy installed by
+`npm run skill:install` is a **second** enabling location that can shadow this
+one when it goes stale; the installer reports the version it replaced for exactly
+that reason.
+
+A change offered as done without saying which lenses ran is a change that skipped
+the gate — **a lens not run is not a lens that passed.**
 
 ### A noted reconciliation
 
@@ -411,10 +453,10 @@ And the part with no caveat: **run longer than feels necessary.** The habit here
 
 ### Gauntlet — the critic swarm, and it is a mechanism, not a habit
 
-**The team is named Gauntlet.** Invoke it with `/gauntlet-loop`;
-`.claude/skills/gauntlet-loop/` is the whole thing.
+**The team is named Gauntlet.** Invoke it with `/gauntlet-skill`;
+`.claude/skills/gauntlet-skill/` is the whole thing.
 
-It is enforced by `scripts/gauntlet.mjs` rather than by a session remembering the
+It is enforced by `.claude/skills/gauntlet-skill/scripts/gauntlet.mjs` rather than by a session remembering the
 rules — because the first version was 283 lines of prose whose every guarantee was
 honour-system, which is what the method exists to abolish. The script dispatches
 **several critics per round with different lenses** (first-impression, craft, skeptic),

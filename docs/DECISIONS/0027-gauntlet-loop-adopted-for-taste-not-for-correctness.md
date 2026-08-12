@@ -158,7 +158,7 @@ nothing was left afterwards that distinguished a real ten-round blind loop from 
 single pass with a confident report attached. In a repository whose stated
 cardinal sin is claiming work that was not performed, that is not a small gap.
 
-`.claude/skills/gauntlet-loop/scripts/gauntlet.mjs` makes it a mechanism. It
+`.claude/skills/gauntlet-skill/scripts/gauntlet.mjs` makes it a mechanism. It
 dispatches **several critics per round with different lenses**, flips a **real
 coin per critic** for A/B order, **generates** each critic prompt so the
 orchestrator cannot tip it off, **refuses** a verdict that does not match the
