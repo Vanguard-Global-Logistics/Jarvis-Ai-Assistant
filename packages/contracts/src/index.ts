@@ -50,6 +50,8 @@ export {
   profileSetContract,
   historyListContract,
   historySaveContract,
+  aegisRequestRestrictionContract,
+  aegisStatusContract,
   jarvisAmplifyContract,
   jarvisPlanAutomationContract,
   jarvisChatContract,

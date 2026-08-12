@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { JSX } from 'react';
-import type { AppInfo, OrbState, Profile, ProfileAccentId } from '@jarvis/contracts';
+import type { AegisStatus, AppInfo, OrbState, Profile, ProfileAccentId } from '@jarvis/contracts';
 import {
   DEFAULT_PROFILE,
   ORB_STATES,
@@ -108,6 +108,16 @@ export function Shell({ devStateSwitcher = import.meta.env.DEV }: ShellProps): J
   // study renders instead of the legacy Orb, and the frame goes cinematic
   // (wordmark/footer move into the dev diagnostics drawer). Unreachable in
   // production builds — it lives behind the dev switcher flag.
+  /**
+   * The REAL AEGIS level (ADR 0025).
+   *
+   * CLAUDE.md §6 draws one exception to the "everything live-looking is mocked
+   * and labeled" rule, and this is it: AEGIS status must reflect the enforced
+   * engine. `null` means not-yet-read or no bridge — rendered as unknown, never
+   * as GREEN, because a reassuring default is the single worst thing this
+   * particular indicator could do.
+   */
+  const [aegis, setAegis] = useState<AegisStatus | null>(null);
   const [rendererV2, setRendererV2] = useState(false);
   const [studyPhase, setStudyPhase] = useState<'dormant' | 'gathering' | 'ignition' | null>(null);
   // The renderer ACTUALLY live, reported by the V2 component itself — the
@@ -141,6 +151,27 @@ export function Shell({ devStateSwitcher = import.meta.env.DEV }: ShellProps): J
         // (compactly) and put the detail where a developer will read it.
         console.error('[shell] app:get-info failed across the IPC boundary:', cause);
         if (!cancelled) setHost({ kind: 'bridgeError' });
+      });
+
+    // Guarded: a bridge without this function is a browser preview or an older
+    // preload, and the honest response is "unavailable" rather than taking the
+    // whole shell down — or, worse, defaulting the indicator to GREEN.
+    if (typeof bridge.aegisStatus !== 'function') {
+      setAegis(null);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    bridge
+      .aegisStatus()
+      .then((status) => {
+        if (!cancelled) setAegis(status);
+      })
+      .catch((cause: unknown) => {
+        // Leave it unknown rather than guessing. An indicator that shows GREEN
+        // because the call failed is worse than one that admits it does not know.
+        console.error('[shell] aegis:status failed across the IPC boundary:', cause);
       });
 
     return () => {
@@ -510,9 +541,10 @@ export function Shell({ devStateSwitcher = import.meta.env.DEV }: ShellProps): J
           }}
         >
           <span>
-            PHASE 1 FOUNDATION · NO APPLICATION FEATURES · AEGIS NOT IMPLEMENTED — NOTHING HERE IS
-            PROTECTED BY IT
+            PHASE 1 FOUNDATION · NO APPLICATION FEATURES · AEGIS STATE ENGINE REAL, BUT NOTHING
+            CONSULTS IT YET — NO CAPABILITY IS ENFORCED BY IT
           </span>
+          <AegisStrip status={aegis} />
           {host.kind === 'loading' && <span>Reading host info…</span>}
           {host.kind === 'real' && (
             <span>
@@ -651,5 +683,56 @@ function ProfilePicker({
         ORB · {profile.displayName.toUpperCase()} {open ? '▾' : '▸'}
       </button>
     </section>
+  );
+}
+
+/**
+ * The AEGIS status strip (ADR 0025).
+ *
+ * The ONE indicator in this app that must be backed by a real engine rather than
+ * sample data (CLAUDE.md §6). Three rules shape how it renders:
+ *
+ *   1. **Unknown is shown as unknown.** A failed or pending `aegis:status` call
+ *      renders "READING…" or "UNAVAILABLE" — never GREEN. A security indicator
+ *      that defaults to reassuring is worse than none, because it is trusted.
+ *   2. **A broken audit chain is shouted, not footnoted.** If the chain did not
+ *      verify, the record of how the system reached this level cannot be
+ *      trusted, and the strip says so in the danger colour.
+ *   3. **It states that nothing enforces it yet.** The engine is real; no Jarvis
+ *      capability currently asks it for permission, because none of the governed
+ *      capabilities exists. Saying "AEGIS: GREEN" without that would imply
+ *      protection that does not exist — the cardinal sin (CLAUDE.md §8 rule 1).
+ */
+function AegisStrip({ status }: { status: AegisStatus | null }): JSX.Element {
+  if (status === null) {
+    return <span>AEGIS · READING…</span>;
+  }
+
+  // Straight from the design language: blue normal, amber restricted, red
+  // isolated, and blackout as the collapsed locked core.
+  const colour =
+    status.level === 'GREEN'
+      ? accent.success
+      : status.level === 'YELLOW'
+        ? accent.warning
+        : accent.danger;
+
+  const revoked = Object.values(status.capabilities).filter((allowed) => !allowed).length;
+  const total = Object.values(status.capabilities).length;
+
+  return (
+    <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+      <span style={{ color: colour }}>AEGIS · {status.level}</span>
+      <span>
+        {revoked === 0
+          ? `all ${String(total)} capabilities permitted`
+          : `${String(revoked)}/${String(total)} capabilities revoked`}
+      </span>
+      {!status.integrityVerified && (
+        <span style={{ color: accent.danger }}>
+          ⚠ AUDIT CHAIN FAILED VERIFICATION — HOLDING AT LEAST RED
+        </span>
+      )}
+    </span>
   );
 }

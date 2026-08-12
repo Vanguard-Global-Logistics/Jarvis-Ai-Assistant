@@ -63,6 +63,11 @@ const ALLOWED_API = [
   // does NOT capture a screen, drive an app, or touch a credential — those are
   // what AEGIS YELLOW exists to revoke, and AEGIS does not exist yet.
   'planAutomation',
+  // ADR 0025. Read the security level, or RAISE it. There is deliberately no
+  // lowering counterpart on this bridge, and adding one would be a far harder
+  // argument than either of these.
+  'aegisStatus',
+  'aegisRequestRestriction',
 ] as const;
 
 /** Load the bridge fresh and return what it handed to `exposeInMainWorld`. */

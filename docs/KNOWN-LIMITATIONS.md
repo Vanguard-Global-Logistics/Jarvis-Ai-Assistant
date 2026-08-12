@@ -54,21 +54,43 @@ With no model configured at all, replies come from the deterministic **mock** pr
 labeled "Mock provider" in the UI. A real key is opt-in and usage-billed; a local model
 (ADR 0015) is opt-in and free. The mock default is why the app costs $0 to run. See §6.
 
-## 1. Nothing in this repository is protected by AEGIS
+## 1. The AEGIS state engine exists. It enforces nothing yet.
 
-**Status: NOT IMPLEMENTED.**
+**Status: PARTIAL (ADR 0025). The engine is `IMPLEMENTED AND VERIFIED` on the Linux
+runtime probe. Enforcement of any Jarvis capability is `NOT IMPLEMENTED`.**
 
-`services/aegis` is an empty package. There is no state engine, no level, no capability
-grid, no audit log, and no software review. No code, comment, or UI may imply otherwise.
+This section used to say AEGIS did not exist at all. That changed, and the new claim is
+smaller than it sounds — read the second half before concluding anything is protected.
 
-The package is empty _by choice_. A stub returning `GREEN`, or an in-memory
-`currentLevel`, would be mock security — a control that appears to work is more dangerous
-than one that is visibly absent.
+**What is real.** A deterministic state engine with the four levels, a capability matrix
+taken from `SECURITY-BOUNDARIES.md`, and an append-only SHA-256 hash-chained audit log
+that the level is REPLAYED from, so a restart returns to the recorded level rather than
+GREEN. The surface the Jarvis runtime holds has **no lowering method at all** — not a
+guarded one, none — and `forJarvis()` builds a fresh object rather than narrowing a type,
+so a structural probe finds nothing to call. A tampered chain fails closed to at least
+RED. Blackout needs the typed word `BLACKOUT` as an argument and does not lift through the
+ordinary lowering path. Every rule here was verified red-green: each was deliberately
+removed and the suite re-run to confirm it went red.
 
-What **is** enforced today is narrower and worth stating precisely: ESLint blocks imports
-of AEGIS internals from `jarvis-core`, the apps, and the renderer, and blocks
-generative-AI imports inside `services/aegis`. That is an **authoring-time** control. It
-stops a developer writing the import; it stops nothing at runtime.
+**What is NOT real, and this is the part that matters: nothing consults it.** AEGIS knows
+the level and reports it. No Jarvis capability asks permission before acting, because none
+of the governed capabilities exists — there is no computer control, no screen vision, no
+voice, no scheduler, no connector to revoke. **Nothing in this repository is currently
+protected by AEGIS.** The app's own footer says so. When one of those capabilities is
+built it must call `allows()` before acting, and that is the moment AEGIS stops being
+advisory.
+
+Also absent: the software-review workflow (publisher, signature, hash, verdict), the voice
+trigger, any AEGIS console UI, and the separate-process architecture (§2).
+
+**The engine has not been independently reviewed.** CLAUDE.md §5 requires that a builder
+model never be the sole approver of its own security work. This engine was written by
+Claude and reviewed by nobody. That review is outstanding.
+
+ESLint still blocks imports of AEGIS internals from `jarvis-core`, the apps, and the
+renderer, and blocks generative-AI imports inside `services/aegis`. That is an
+**authoring-time** control: it stops a developer writing the import; it stops nothing at
+runtime.
 
 ## 2. The AEGIS boundary will be application-layer, not OS-layer
 
@@ -79,16 +101,17 @@ storage, separate credentials. Phase 1 will not deliver OS-level enforcement. Wh
 state engine ships, this gap must be restated wherever AEGIS is described — not quietly
 dropped once the UI looks convincing.
 
-## 3. The IPC bridge exposes exactly fourteen narrow channels
+## 3. The IPC bridge exposes exactly sixteen narrow channels
 
 **Status: PARTIAL — intended for this stage.**
 
-`window.jarvis` exposes exactly fourteen purpose-named functions: `getAppInfo` (host
+`window.jarvis` exposes exactly sixteen purpose-named functions: `getAppInfo` (host
 facts), `sendChat` and `amplify` (model calls, ADR 0007), the four history
 operations (ADR 0008), `exportHistory` (ADR 0011), `importHistory` (ADR 0014),
 `describeModels`/`selectModel` (ADR 0022 — which brain is answering, and switching it
-without a restart), `planAutomation` (ADR 0024 — writes a plan, performs nothing), and
-`getProfile`/`setProfile`
+without a restart), `planAutomation` (ADR 0024 — writes a plan, performs nothing),
+`aegisStatus`/`aegisRequestRestriction` (ADR 0025 — read the security level, or RAISE it;
+there is deliberately no way to lower one), and `getProfile`/`setProfile`
 (ADR 0013 — the orb's name and colour, which grant nothing). The authority envelope remains
 deliberately small: a model call, a conversation store, and one backup write whose
 destination the renderer can neither name nor learn — main opens the native save
@@ -314,7 +337,7 @@ Four jobs, and the distinctions matter:
   did not.
 - **`runtime`** — installs Electron's GUI libraries and Xvfb, builds, then runs
   `npm run probe:runtime`: launches the real app (packaged path **and** `dev:desktop`) and
-  asserts React mounts, the bridge exposes exactly the fourteen allowlisted functions, a
+  asserts React mounts, the bridge exposes exactly the sixteen allowlisted functions, a
   brain switch really re-routes messages in both directions (ADR 0022), a
   chat/amplify round-trip works, the full history save/list/get/delete loop works against
   a real SQLite (including that an unsaved chat never persists), the renderer has no Node

@@ -106,6 +106,28 @@ export const CHANNELS = {
   /** Switch the active provider. Refuses, with a reason, if not configured. */
   modelSelect: 'model:select',
 
+  /**
+   * AEGIS status — READ-ONLY (ADR 0025).
+   *
+   * The one surface in this app where the UI must reflect a REAL engine rather
+   * than sample data (CLAUDE.md §6). Returns the level, the capability map, and
+   * whether the audit chain verified. Carries no handle and no identifier that
+   * could be used to act on AEGIS: reading the status is never a step toward
+   * changing it.
+   */
+  aegisStatus: 'aegis:status',
+
+  /**
+   * Ask AEGIS for a STRICTER level — the panic button (ADR 0025).
+   *
+   * Raise-only, and that is the entire safety argument for exposing it to an
+   * untrusted renderer: increasing severity is always permitted, from Jarvis or
+   * from anyone. There is deliberately NO channel that lowers a level, enters
+   * blackout recovery, or edits the audit log. Those live on the admin surface
+   * in main, which the renderer cannot reach by any channel.
+   */
+  aegisRequestRestriction: 'aegis:request-restriction',
+
   profileGet: 'profile:get',
 
   /** Set the profile. The only write, and it changes nothing but presentation. */

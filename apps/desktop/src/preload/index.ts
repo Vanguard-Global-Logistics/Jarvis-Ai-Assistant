@@ -1,6 +1,9 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { CHANNELS } from '@jarvis/contracts/ipc/channels';
 import type {
+  AegisLevel,
+  AegisRestrictionResult,
+  AegisStatus,
   AmplifierResult,
   AmplifyRequest,
   AutomationPlan,
@@ -85,6 +88,24 @@ const api = {
     ipcRenderer.invoke(CHANNELS.jarvisPlanAutomation, {
       outcome,
     } satisfies AutomationPlanRequest) as Promise<AutomationPlan>,
+
+  /**
+   * AEGIS (ADR 0025). Read the real security level; ask to be restricted
+   * FURTHER.
+   *
+   * There is no lowering function here and there must never be one. Raising is
+   * always safe to expose — the worst a hostile caller achieves is locking
+   * Jarvis down. Lowering is the dangerous direction, so the renderer cannot
+   * express it: the admin surface lives in main and no channel reaches it.
+   */
+  aegisStatus: (): Promise<AegisStatus> =>
+    ipcRenderer.invoke(CHANNELS.aegisStatus) as Promise<AegisStatus>,
+
+  aegisRequestRestriction: (level: AegisLevel, reason: string): Promise<AegisRestrictionResult> =>
+    ipcRenderer.invoke(CHANNELS.aegisRequestRestriction, {
+      level,
+      reason,
+    }) as Promise<AegisRestrictionResult>,
 
   /**
    * Which brain is answering, and switch it (ADR 0022).

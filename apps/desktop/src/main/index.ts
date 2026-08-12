@@ -7,6 +7,7 @@ import { createProvider } from '@jarvis/jarvis-core';
 import { loadEnvFile, upwardCandidates } from './env-file.js';
 import { registerAmplifyHandler } from './handlers/amplify.js';
 import { registerPlanAutomationHandler } from './handlers/plan-automation.js';
+import { createAegisForApp, registerAegisHandlers } from './handlers/aegis.js';
 import { createProviderHolder, registerModelHandlers } from './handlers/model.js';
 import { registerAppInfoHandler } from './handlers/app-info.js';
 import { registerChatHandler } from './handlers/chat.js';
@@ -333,8 +334,9 @@ void app
     // invoke a channel that is not yet listening. Each one is a deliberate hole in
     // the trust boundary (ADR 0002): a read-only host-facts call, two calls that
     // reach only the model provider, and four history calls that reach only the
-    // main-owned conversation store — never the shell, env, arbitrary paths, or
-    // AEGIS.
+    // main-owned conversation store, and two AEGIS calls that can read the
+    // security level or RAISE it — never lower it, never the shell, env, or
+    // arbitrary paths.
     registerAppInfoHandler();
     // The holder, not the provider: ADR 0022 lets a human switch brains without
     // restarting, and a handler that captured the value would keep using the one
@@ -345,6 +347,12 @@ void app
     registerModelHandlers(env, providerHolder);
     registerHistoryHandlers(db);
     registerProfileHandlers(db);
+
+    // AEGIS is constructed HERE, in main, and the admin surface never leaves
+    // this scope. The two channels registered below expose reading the status
+    // and asking for a STRICTER level — nothing that lowers one (ADR 0025).
+    const aegis = createAegisForApp(app.getPath('userData'));
+    registerAegisHandlers(aegis);
 
     createWindow(db);
 

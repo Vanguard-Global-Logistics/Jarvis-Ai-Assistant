@@ -506,6 +506,9 @@ async function runChecks(page, mode, stub = null) {
     'amplify',
     // ADR 0024 — writes a plan, performs nothing.
     'planAutomation',
+    // ADR 0025 — read the level, or RAISE it. Never lower it.
+    'aegisStatus',
+    'aegisRequestRestriction',
     // ADR 0022 — provider identifiers only, never configuration.
     'describeModels',
     'selectModel',
@@ -564,6 +567,67 @@ async function runChecks(page, mode, stub = null) {
   );
   await page.evaluate(
     `await window.jarvis.deleteConversation(${JSON.stringify(planSaved.value?.id ?? '')})`,
+  );
+
+  // --- AEGIS (ADR 0025) ------------------------------------------------------
+  // The one indicator in this app that must be backed by a real engine. These
+  // assertions run against the actual state machine and the actual on-disk
+  // hash-chained log, in the real Electron process.
+  const aegis = await page.evaluate('await window.jarvis.aegisStatus()');
+  const aegisStatus = aegis.value;
+  add(
+    'aegis:status reports a real level with a full capability map',
+    aegisStatus?.level === 'GREEN' && Object.keys(aegisStatus.capabilities ?? {}).length === 11,
+    JSON.stringify({
+      level: aegisStatus?.level,
+      caps: Object.keys(aegisStatus?.capabilities ?? {}).length,
+    }),
+  );
+  add(
+    'the audit chain verifies on a fresh install',
+    aegisStatus?.integrityVerified === true,
+    JSON.stringify(aegisStatus?.integrityVerified),
+  );
+
+  // Jarvis may only ever ask for MORE restriction. The refusal is the rule.
+  const lowerAttempt = await page.evaluate(
+    'await window.jarvis.aegisRequestRestriction("GREEN", "probe: try to lower")',
+  );
+  add(
+    'AEGIS REFUSES a request that is not stricter',
+    lowerAttempt.value?.accepted === false,
+    JSON.stringify(lowerAttempt.value?.refusedBecause ?? null),
+  );
+
+  const raise = await page.evaluate(
+    'await window.jarvis.aegisRequestRestriction("YELLOW", "probe: raise")',
+  );
+  add(
+    'AEGIS accepts a stricter level and revokes the YELLOW capabilities',
+    raise.value?.accepted === true &&
+      raise.value.status.level === 'YELLOW' &&
+      raise.value.status.capabilities['screen-vision'] === false &&
+      raise.value.status.capabilities.voice === true,
+    JSON.stringify(raise.value?.status?.level ?? null),
+  );
+
+  const afterRaise = await page.evaluate(
+    'await window.jarvis.aegisRequestRestriction("GREEN", "probe: escape")',
+  );
+  add(
+    'and still refuses to come back down afterwards',
+    afterRaise.value?.accepted === false && afterRaise.value.status.level === 'YELLOW',
+    JSON.stringify(afterRaise.value?.status?.level ?? null),
+  );
+
+  add(
+    'the bridge exposes NO way to lower a level',
+    (
+      await page.evaluate(
+        'Object.keys(window.jarvis).filter((k) => /lower|blackout|recover|audit/i.test(k)).length',
+      )
+    ).value === 0,
+    'no lowering function on the bridge',
   );
 
   // --- model:describe / model:select (ADR 0022) ------------------------------

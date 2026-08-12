@@ -1,6 +1,11 @@
 import { z } from 'zod';
 import { CHANNELS } from './channels.js';
 import {
+  AegisLevelSchema,
+  AegisRestrictionResultSchema,
+  AegisStatusSchema,
+} from '../aegis/contracts.js';
+import {
   AmplifierResultSchema,
   AmplifyRequestSchema,
   AutomationPlanRequestSchema,
@@ -134,6 +139,42 @@ export const jarvisPlanAutomationContract = defineContract({
   channel: CHANNELS.jarvisPlanAutomation,
   request: AutomationPlanRequestSchema,
   response: AutomationPlanSchema,
+});
+
+// --- aegis:* (ADR 0025) -----------------------------------------------------
+
+/**
+ * `aegis:status` — read-only. No payload in, the real level out.
+ *
+ * This is the channel CLAUDE.md §6 singles out: every other live-looking metric
+ * in this app is mocked and labeled as such, and AEGIS status is the exception
+ * that must be backed by the enforced engine. A UI that showed a plausible GREEN
+ * while the engine said RED would be the worst failure available here.
+ */
+export const aegisStatusContract = defineContract({
+  channel: CHANNELS.aegisStatus,
+  request: z.undefined(),
+  response: AegisStatusSchema,
+});
+
+/**
+ * `aegis:request-restriction` — ask for a STRICTER level.
+ *
+ * Takes a level from the closed enum and a human-readable reason. The engine
+ * refuses anything that is not strictly stricter, and a refusal is a described
+ * outcome rather than a thrown error — the UI shows why in place.
+ *
+ * There is no lowering counterpart on this boundary, by design and permanently.
+ */
+export const aegisRequestRestrictionContract = defineContract({
+  channel: CHANNELS.aegisRequestRestriction,
+  request: z
+    .object({
+      level: AegisLevelSchema,
+      reason: z.string().min(1).max(200),
+    })
+    .strict(),
+  response: AegisRestrictionResultSchema,
 });
 
 // --- history:* (Stage 1A persistence, ADR 0008) -----------------------------
@@ -354,6 +395,8 @@ export const IPC_CONTRACTS = {
   [CHANNELS.jarvisChat]: jarvisChatContract,
   [CHANNELS.jarvisAmplify]: jarvisAmplifyContract,
   [CHANNELS.jarvisPlanAutomation]: jarvisPlanAutomationContract,
+  [CHANNELS.aegisStatus]: aegisStatusContract,
+  [CHANNELS.aegisRequestRestriction]: aegisRequestRestrictionContract,
   [CHANNELS.historySave]: historySaveContract,
   [CHANNELS.historyList]: historyListContract,
   [CHANNELS.historyGet]: historyGetContract,

@@ -2,7 +2,8 @@
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AppInfo } from '@jarvis/contracts';
-import { DEFAULT_PROFILE, ORB_STATES } from '@jarvis/contracts';
+import { AEGIS_CAPABILITIES, DEFAULT_PROFILE, ORB_STATES } from '@jarvis/contracts';
+
 import { orbTiming } from '@jarvis/ui';
 import { Shell } from './Shell.js';
 
@@ -17,6 +18,24 @@ const APP_INFO: AppInfo = {
   isPackaged: false,
 };
 
+/** A real-shaped AEGIS status: GREEN, everything permitted, chain verified. */
+const AEGIS_GREEN = {
+  level: 'GREEN' as const,
+  capabilities: Object.fromEntries(AEGIS_CAPABILITIES.map((c) => [c, true])),
+  since: '2026-08-12T00:00:00.000Z',
+  reason: 'AEGIS initialised.',
+  integrityVerified: true,
+};
+
+/** RED with a broken chain — the case the strip must shout about. */
+const AEGIS_TAMPERED = {
+  level: 'RED' as const,
+  capabilities: Object.fromEntries(AEGIS_CAPABILITIES.map((c) => [c, false])),
+  since: '2026-08-12T00:00:00.000Z',
+  reason: 'Audit chain failed verification.',
+  integrityVerified: false,
+};
+
 function stubBridge(): void {
   // The full bridge: host facts plus the two Stage 1A model calls. The
   // conversation surface reads sendChat/amplify from here; these Shell tests do
@@ -27,6 +46,7 @@ function stubBridge(): void {
     sendChat: vi.fn().mockResolvedValue({ text: 'hi', provider: 'mock' }),
     amplify: vi.fn(),
     getProfile: vi.fn().mockResolvedValue(DEFAULT_PROFILE),
+    aegisStatus: vi.fn().mockResolvedValue(AEGIS_GREEN),
   });
 }
 
@@ -77,7 +97,7 @@ describe('Shell', () => {
     stubMatchMedia();
     stubBridge();
     render(<Shell devStateSwitcher={false} />);
-    expect(screen.getByText(/AEGIS NOT IMPLEMENTED/)).toBeTruthy();
+    expect(screen.getByText(/NO CAPABILITY IS ENFORCED BY IT/)).toBeTruthy();
     expect(screen.getByText(/PHASE 1 FOUNDATION/)).toBeTruthy();
   });
 
@@ -102,6 +122,7 @@ describe('Shell', () => {
     vi.stubGlobal('jarvis', {
       getAppInfo: vi.fn().mockRejectedValue(new Error('ipc validation failed')),
       getProfile: vi.fn().mockResolvedValue(DEFAULT_PROFILE),
+      aegisStatus: vi.fn().mockResolvedValue(AEGIS_GREEN),
     });
     render(<Shell devStateSwitcher={false} />);
     expect(await screen.findByRole('alert')).toBeTruthy();
@@ -181,5 +202,49 @@ describe('Shell', () => {
         vi.useRealTimers();
       }
     });
+  });
+});
+
+describe('the AEGIS strip (ADR 0025)', () => {
+  it('shows the REAL level from the engine, not a hardcoded one', async () => {
+    stubMatchMedia();
+    vi.stubGlobal('jarvis', {
+      getAppInfo: vi.fn().mockResolvedValue(APP_INFO),
+      getProfile: vi.fn().mockResolvedValue(DEFAULT_PROFILE),
+      aegisStatus: vi.fn().mockResolvedValue(AEGIS_TAMPERED),
+    });
+    render(<Shell devStateSwitcher={false} />);
+
+    expect(await screen.findByText(/AEGIS · RED/)).toBeTruthy();
+    expect(screen.getByText(/11\/11 capabilities revoked/)).toBeTruthy();
+  });
+
+  it('shouts when the audit chain failed — it must not be a footnote', async () => {
+    stubMatchMedia();
+    vi.stubGlobal('jarvis', {
+      getAppInfo: vi.fn().mockResolvedValue(APP_INFO),
+      getProfile: vi.fn().mockResolvedValue(DEFAULT_PROFILE),
+      aegisStatus: vi.fn().mockResolvedValue(AEGIS_TAMPERED),
+    });
+    render(<Shell devStateSwitcher={false} />);
+
+    expect(await screen.findByText(/AUDIT CHAIN FAILED VERIFICATION/)).toBeTruthy();
+  });
+
+  it('NEVER shows GREEN when the status could not be read', async () => {
+    // The rule that matters most here. A security indicator that defaults to
+    // reassuring is worse than none, because it is believed.
+    stubMatchMedia();
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.stubGlobal('jarvis', {
+      getAppInfo: vi.fn().mockResolvedValue(APP_INFO),
+      getProfile: vi.fn().mockResolvedValue(DEFAULT_PROFILE),
+      aegisStatus: vi.fn().mockRejectedValue(new Error('ipc failed')),
+    });
+    render(<Shell devStateSwitcher={false} />);
+
+    expect(await screen.findByText(/AEGIS · READING…/)).toBeTruthy();
+    expect(screen.queryByText(/AEGIS · GREEN/)).toBeNull();
+    consoleError.mockRestore();
   });
 });

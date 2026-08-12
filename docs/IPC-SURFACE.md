@@ -1,7 +1,10 @@
 # The IPC Surface
 
 Date: 2026-08-12
-Status: **FOURTEEN channels.** `jarvis:plan-automation` (ADR 0024) is IMPLEMENTED AND
+Status: **SIXTEEN channels.** `aegis:status`/`aegis:request-restriction` (ADR 0025) are
+IMPLEMENTED AND VERIFIED on the Linux runtime probe — the real level is read, a
+non-stricter request is refused, an accepted raise revokes the right capabilities, and the
+bridge is asserted to expose no way to lower one. `jarvis:plan-automation` (ADR 0024) is IMPLEMENTED AND
 VERIFIED on the Linux runtime probe — it returns a contract-shaped plan, always states what
 Jarvis cannot do, and the plan survives a save and reopen. `model:describe`/`model:select` (ADR 0022) are IMPLEMENTED
 AND VERIFIED on the Linux runtime probe — both are driven against the real app, and both
@@ -162,6 +165,32 @@ revoke, and `services/aegis` is empty by choice — so this channel plans and st
 value. The contract forbids it, the prompt forbids it, and the UI has no field to type one
 into — a credential in a prompt is a credential sent to a vendor, and on a free tier that
 vendor may train on it (ADR 0023, ADR 0024 §5).
+
+### `aegis:status` / `aegis:request-restriction`
+
+|                       |                                                                                                                                                                      |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Status**            | IMPLEMENTED AND VERIFIED on the Linux runtime probe (real level and capability map; a non-stricter request refused; a raise applied and not reversible), 2026-08-12. |
+| **Renderer call**     | `window.jarvis.aegisStatus(): Promise<AegisStatus>` · `window.jarvis.aegisRequestRestriction(level, reason): Promise<AegisRestrictionResult>`                        |
+| **Request**           | status: `z.undefined()`. request-restriction: `{ level, reason }`, `.strict()`, `level` a **closed enum** (GREEN/YELLOW/RED/BLACK)                                   |
+| **Response**          | `AegisStatusSchema` / `AegisRestrictionResultSchema`, both `.strict()`                                                                                               |
+| **Handler**           | `registerAegisHandlers(aegis)` in `apps/desktop/src/main/handlers/aegis.ts`                                                                                          |
+| **Side effects**      | request-restriction: appends one entry to the AEGIS audit log — its own file, never `jarvis.db`. status: read-only.                                                  |
+| **Authority granted** | Read the security level; **RAISE** it. Nothing lowers a level, recovers from blackout, or edits the log across this boundary.                                        |
+
+**The asymmetry is the design.** Raising severity is always permitted — from Jarvis, from
+a click, from anyone — and the worst a hostile caller achieves is locking Jarvis down.
+Lowering is the dangerous direction, so it is not expressible from the renderer at all:
+the `AegisAdmin` surface lives in main and no channel reaches it. The probe asserts the
+bridge exposes no function matching `lower|blackout|recover|audit`.
+
+The engine — not the handler — decides whether a request is stricter, so the rule has
+exactly one implementation. For AEGIS, a rule living in two files is a security failure
+waiting on drift (CLAUDE.md §3).
+
+**This channel reports a level; it does not protect anything.** No Jarvis capability
+consults AEGIS before acting, because none of the governed capabilities exists yet
+(ADR 0025).
 
 ### `history:save`
 
@@ -386,7 +415,7 @@ JavaScript. SQLite needs no external at all — the driver is Node's builtin
   (`packages/contracts/src/ipc/contracts.test.ts`).
 - The `AppInfo` schema rejects unknown platforms, missing fields, empty strings, and
   extra keys; the request schema rejects any payload.
-- The bridge exposes exactly one namespace (`jarvis`) and exactly the fourteen allowlisted
+- The bridge exposes exactly one namespace (`jarvis`) and exactly the sixteen allowlisted
   functions, all values are functions, and no generic passthrough exists
   (`apps/desktop/src/preload/index.test.ts`). This test was verified red-green: it fails
   when a generic `invoke` is added to the bridge.

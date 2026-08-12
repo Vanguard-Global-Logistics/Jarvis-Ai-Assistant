@@ -21,16 +21,18 @@ Repository: `github.com/Vanguard-Global-Logistics/Jarvis-Ai-Assistant`.
   hardened Electron shell, the typed IPC boundary, a working conversation surface
   (chat + Thought Amplifier v1, mock-default), and **explicit-save conversation
   persistence** (Save Session / History / read-only reopen / Continue / confirmed delete;
-  unsaved conversations are discarded on close, and the runtime probe proves it). It still has
-  **no** AEGIS, no orchestrator beyond a single stateless model call, no Forge, no
-  Ledger, no memory (a saved transcript is a stored record, not recall), no voice, and
-  no vision. Do not describe any part of Jarvis as protected, or as remembering
-  anything. **`docs/KNOWN-LIMITATIONS.md` is the authoritative list of what does not
+  unsaved conversations are discarded on close, and the runtime probe proves it). As of ADR 0025 it also has a **real AEGIS state
+  engine** — four levels, a capability matrix, an append-only hash-chained audit log the
+  level is replayed from — that **enforces nothing yet, because no governed capability
+  exists to enforce against**. It still has no orchestrator beyond a single stateless
+  model call, no Forge, no Ledger, no memory (a saved transcript is a stored record, not
+  recall), no voice, and no vision. **Do not describe any part of Jarvis as protected by
+  AEGIS** — nothing calls `allows()` before acting — or as remembering anything. **`docs/KNOWN-LIMITATIONS.md` is the authoritative list of what does not
   exist — read it before claiming anything works.**
-- **Fourteen IPC channels exist: `app:get-info`, `jarvis:chat`, `jarvis:amplify`,
+- **Sixteen IPC channels exist: `app:get-info`, `jarvis:chat`, `jarvis:amplify`,
   `jarvis:plan-automation`,
   `history:save`/`list`/`get`/`delete`, `history:export`, `history:import`,
-  `model:describe`/`model:select`, and
+  `model:describe`/`model:select`, `aegis:status`/`aegis:request-restriction`, and
   `profile:get`/`profile:set`.** `app:get-info` returns static host facts.
   `jarvis:chat` and `jarvis:amplify` (ADR 0007) are narrow model calls: a transcript or
   an idea in, a reply or the five amplifier fields out. The `history:*` four (ADR 0008)
@@ -48,7 +50,8 @@ Repository: `github.com/Vanguard-Global-Logistics/Jarvis-Ai-Assistant`.
   a renderer that could name a URL could name a remote one and have it labeled `local`
   (ADR 0015). `jarvis:plan-automation` (ADR 0024) writes an automation PLAN and performs nothing — it
   neither sees a screen, drives an app, nor touches a credential, because those are what
-  AEGIS YELLOW exists to revoke and AEGIS does not exist. These fourteen are the whole of
+  AEGIS YELLOW exists to revoke and no capability is enforced by AEGIS yet (ADR 0025). `aegis:*` (ADR 0025) reads the REAL security level and lets anyone RAISE it; there is no
+  channel that lowers one, and there must never be one. These sixteen are the whole of
   what `window.jarvis` exposes. `docs/IPC-SURFACE.md` is the
   authoritative inventory; adding a channel is a boundary change (ADR 0002), not a
   routine edit.
@@ -214,18 +217,21 @@ column is the part that matters:
 apps/desktop           Electron shell (main / preload / renderer)  PARTIAL — hardened, 13 IPC channels, conversation + history + profile + brain-picker UI, owns SQLite
 apps/pwa               PWA shell                                   NOT IMPLEMENTED — empty, out of scope
 services/jarvis-core   Orchestration, isolated from renderer       PARTIAL — 5 model providers + amplifier, wired via chat/amplify/model (ADR 0007, 0022)
-services/aegis         AEGIS engine — independent, no GenAI        NOT IMPLEMENTED — empty
+services/aegis         AEGIS engine — independent, no GenAI        PARTIAL — real state engine + hash-chained audit log (ADR 0025); ENFORCES NOTHING yet
 packages/contracts     Zod schemas + shared types                  PARTIAL — IPC (14 channels), model, history, profile, automation, experience
 packages/ui            Design-system components                    PARTIAL — tokens, motion, Orb + glass primitives
 packages/config        Env validation + structured logging         IMPLEMENTED, unit-tested
 packages/database      SQLite (node:sqlite) + migration runner     PARTIAL — wired to Electron main, 5 migrations: history, amplifications, profile, window-state, plans (ADR 0008, 0009, 0013, 0017, 0024)
-docs/DECISIONS/        ADRs                                        0001–0024
+docs/DECISIONS/        ADRs                                        0001–0025
 docs/foundation/       Layer 2 foundation documents (ADR 0005)     PARTIAL — 01 APPROVED; 02, 07, 09 DRAFT; rest CONCEPTUAL
 ```
 
-An empty package is a deliberate state, not an unfinished one. `services/aegis` in
-particular is empty **by choice**: a stub returning GREEN would be mock security, and a
-security control that appears to work is more dangerous than one visibly absent (§8).
+An empty package is a deliberate state, not an unfinished one. `services/aegis` was empty
+**by choice** for exactly that reason — a stub returning GREEN would be mock security. As
+of ADR 0025 it holds a real deterministic engine, and the honesty rule now applies to a
+different sentence: the engine exists and **nothing consults it yet**, so no capability is
+protected by AEGIS. Never describe Jarvis as protected until a capability actually calls
+`allows()` before acting.
 
 ### Working on the foundation
 
@@ -248,7 +254,7 @@ React Refresh preamble). Both reached William before anyone noticed.
 
 **`npm run probe:runtime` is the check that catches those.** It launches the real app —
 built HTML and `dev:desktop` — drives it over the DevTools protocol, and asserts React
-mounts, `window.jarvis` exposes exactly the fourteen allowlisted functions, a chat/amplify
+mounts, `window.jarvis` exposes exactly the sixteen allowlisted functions, a chat/amplify
 round-trip answers, the full history save/list/get/delete loop works against a real
 SQLite (including that an unsaved chat never persists), the profile round-trips and
 rejects an invalid accent, the brain picker lists every provider, refuses an
