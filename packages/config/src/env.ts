@@ -46,6 +46,15 @@ const EnvSchema = z.object({
   JARVIS_XAI_MODEL: z.string().min(1).optional(),
 
   /**
+   * Google Gemini (ADR 0023). Remote, and the only capable option with a real
+   * free daily allowance — free in money, not in privacy: free-tier traffic to
+   * consumer AI APIs is commonly used to improve the provider's products.
+   */
+  GEMINI_API_KEY: z.string().min(1).optional(),
+  /** Which Gemini model to ask for. Defaults to `gemini-2.5-flash`. */
+  JARVIS_GEMINI_MODEL: z.string().min(1).optional(),
+
+  /**
    * Name the provider explicitly instead of relying on precedence.
    *
    * With four providers configurable at once, "why did it use that one?"
@@ -53,7 +62,7 @@ const EnvSchema = z.object({
    * conversation leaving the machine. This makes the choice statable. Unset,
    * `createProvider` falls back to its documented precedence.
    */
-  JARVIS_MODEL_PROVIDER: z.enum(['local', 'anthropic', 'grok', 'mock']).optional(),
+  JARVIS_MODEL_PROVIDER: z.enum(['local', 'anthropic', 'grok', 'gemini', 'mock']).optional(),
 
   // --- Data / storage ---
   /**
@@ -86,6 +95,7 @@ const SECRET_KEYS = [
   'OPENAI_API_KEY',
   'ANTHROPIC_API_KEY',
   'XAI_API_KEY',
+  'GEMINI_API_KEY',
   'SUPABASE_SERVICE_ROLE_KEY',
   'PLAID_CLIENT_ID',
   'PLAID_SECRET',

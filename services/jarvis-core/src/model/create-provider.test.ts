@@ -212,3 +212,41 @@ describe('describeProviders / buildProviderById (ADR 0022)', () => {
     if (!result.ok) expect(result.reason).toMatch(/ANTHROPIC_API_KEY/);
   });
 });
+
+describe('createProvider — Gemini (ADR 0023)', () => {
+  const base = parseEnv({ NODE_ENV: 'test' });
+
+  it('prefers the free allowance over a metered provider', () => {
+    // Reaching for a billed API while a free one sits unused would spend money
+    // the user never asked to spend.
+    expect(createProvider({ ...base, GEMINI_API_KEY: 'g', XAI_API_KEY: 'x' }).id).toBe('gemini');
+  });
+
+  it('still yields to Anthropic and to a local model, which come first for other reasons', () => {
+    expect(createProvider({ ...base, GEMINI_API_KEY: 'g', ANTHROPIC_API_KEY: 'a' }).id).toBe(
+      'anthropic',
+    );
+    expect(
+      createProvider({
+        ...base,
+        GEMINI_API_KEY: 'g',
+        JARVIS_LOCAL_MODEL_URL: 'http://127.0.0.1:11434',
+        JARVIS_LOCAL_MODEL: 'qwen3.5:4b',
+      }).id,
+    ).toBe('local');
+  });
+
+  it('points at the free key when it is missing, rather than saying "not configured"', () => {
+    const gemini = describeProviders(base).find((p) => p.id === 'gemini');
+    expect(gemini?.available).toBe(false);
+    expect(gemini?.unavailableReason).toMatch(/GEMINI_API_KEY/);
+    expect(gemini?.unavailableReason).toMatch(/aistudio\.google\.com/);
+  });
+
+  it('never puts the Gemini key in a reason a UI will render', () => {
+    const reasons = describeProviders({ ...base, GEMINI_API_KEY: 'AIza-SECRET-0009' })
+      .map((p) => p.unavailableReason ?? '')
+      .join(' ');
+    expect(reasons).not.toContain('SECRET');
+  });
+});

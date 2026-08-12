@@ -1401,6 +1401,7 @@ const PROVIDER_LABELS: Record<ProviderId, string> = {
   local: 'Local model',
   anthropic: 'Claude',
   grok: 'Grok',
+  gemini: 'Gemini',
 };
 
 /**
@@ -1414,6 +1415,7 @@ const PROVIDER_BLURBS: Record<ProviderId, string> = {
   local: 'On this machine. Free, private, slower and less capable.',
   anthropic: 'Claude. Billed per message; the conversation leaves this machine.',
   grok: 'Grok. Billed per message; the conversation leaves this machine.',
+  gemini: 'Gemini. Free daily allowance; the conversation leaves this machine.',
 };
 
 const PROVIDER_CHIPS: Partial<Record<ProviderId, { label: string; color: string; title: string }>> =
@@ -1429,6 +1431,14 @@ const PROVIDER_CHIPS: Partial<Record<ProviderId, { label: string; color: string;
       title:
         'Answered by a model running on this machine — free, offline, private, ' +
         'and less capable than Claude.',
+    },
+    gemini: {
+      label: 'Gemini',
+      color: accent.success,
+      title:
+        'Answered by Google’s Gemini — free within a daily allowance. This ' +
+        'conversation left the machine, and free-tier traffic may be used to ' +
+        'improve Google’s products.',
     },
     grok: {
       label: 'Grok',

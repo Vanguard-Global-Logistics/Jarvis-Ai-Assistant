@@ -439,8 +439,8 @@ async function runChecks(page, mode) {
   const described = await page.evaluate('await window.jarvis.describeModels()');
   const d = described.value;
   add(
-    'model:describe names the active provider and offers all four',
-    d?.active === 'mock' && Array.isArray(d.providers) && d.providers.length === 4,
+    'model:describe names the active provider and offers every one',
+    d?.active === 'mock' && Array.isArray(d.providers) && d.providers.length === 5,
     JSON.stringify(d),
   );
   add(

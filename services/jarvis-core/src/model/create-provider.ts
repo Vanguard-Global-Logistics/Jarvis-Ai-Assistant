@@ -1,6 +1,7 @@
 import type { Env } from '@jarvis/config';
 import { createLogger } from '@jarvis/config';
 import { AnthropicProvider } from './anthropic-provider.js';
+import { GeminiProvider } from './gemini-provider.js';
 import { GrokProvider } from './grok-provider.js';
 import { LocalProvider } from './local-provider.js';
 import { MockProvider } from './mock-provider.js';
@@ -80,6 +81,21 @@ function buildGrok(env: Env): JarvisModelProvider {
   });
 }
 
+/** Construct the Gemini provider (ADR 0023) — remote, free tier, key required. */
+function buildGemini(env: Env): JarvisModelProvider {
+  const apiKey = env.GEMINI_API_KEY;
+  if (apiKey === undefined || apiKey === '') {
+    throw new ModelProviderConfigError(
+      'The gemini provider was selected but GEMINI_API_KEY is not set. ' +
+        'A free key is available at aistudio.google.com.',
+    );
+  }
+  return new GeminiProvider({
+    apiKey,
+    ...(env.JARVIS_GEMINI_MODEL === undefined ? {} : { model: env.JARVIS_GEMINI_MODEL }),
+  });
+}
+
 /**
  * Choose the model provider.
  *
@@ -113,9 +129,11 @@ export function createProvider(env: Env): JarvisModelProvider {
         ? buildLocal(env)
         : chosen === 'grok'
           ? buildGrok(env)
-          : chosen === 'anthropic'
-            ? buildAnthropic(env)
-            : new MockProvider();
+          : chosen === 'gemini'
+            ? buildGemini(env)
+            : chosen === 'anthropic'
+              ? buildAnthropic(env)
+              : new MockProvider();
     log.info('model provider selected', { provider: chosen, explicit: true });
     return provider;
   }
@@ -129,6 +147,14 @@ export function createProvider(env: Env): JarvisModelProvider {
   if (env.ANTHROPIC_API_KEY !== undefined && env.ANTHROPIC_API_KEY !== '') {
     log.info('model provider selected', { provider: 'anthropic' });
     return new AnthropicProvider({ apiKey: env.ANTHROPIC_API_KEY });
+  }
+
+  // Gemini before the paid remotes: it is the only one that can answer for free,
+  // so reaching for a metered provider while a free allowance sits unused would
+  // be spending money the user never asked to spend.
+  if (env.GEMINI_API_KEY !== undefined && env.GEMINI_API_KEY !== '') {
+    log.info('model provider selected', { provider: 'gemini' });
+    return buildGemini(env);
   }
 
   if (env.XAI_API_KEY !== undefined && env.XAI_API_KEY !== '') {
@@ -184,6 +210,8 @@ function tryBuild(
         return { ok: true, provider: buildAnthropic(env) };
       case 'grok':
         return { ok: true, provider: buildGrok(env) };
+      case 'gemini':
+        return { ok: true, provider: buildGemini(env) };
       case 'mock':
         return { ok: true, provider: new MockProvider() };
     }

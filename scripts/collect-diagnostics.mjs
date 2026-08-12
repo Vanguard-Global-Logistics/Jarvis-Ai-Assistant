@@ -289,9 +289,11 @@ const provider =
       ? 'local'
       : hasKey('ANTHROPIC_API_KEY')
         ? 'anthropic'
-        : hasKey('XAI_API_KEY')
-          ? 'grok'
-          : 'mock';
+        : hasKey('GEMINI_API_KEY')
+          ? 'gemini'
+          : hasKey('XAI_API_KEY')
+            ? 'grok'
+            : 'mock';
 
 const lines = [
   '## Jarvis diagnostics',
