@@ -44,7 +44,12 @@ describe('LocalProvider.chat', () => {
     const body = JSON.parse(init.body) as { model: string; messages: unknown[]; stream: boolean };
     expect(body.model).toBe('llama3.1:8b');
     expect(body.stream).toBe(false);
-    expect(body.messages).toEqual([{ role: 'user', content: 'status?' }]);
+    // The user's turn is passed through unchanged, behind the reasoning switch
+    // the local provider always prepends (see the /no_think tests below).
+    expect(body.messages).toEqual([
+      { role: 'system', content: '/no_think' },
+      { role: 'user', content: 'status?' },
+    ]);
   });
 
   it('normalises a trailing slash rather than producing a confusing 404', async () => {
@@ -237,6 +242,7 @@ describe('reasoning suppression (why a real amplify timed out)', () => {
       messages: { role: string; content: string }[];
     };
     expect(body.think).toBe(false);
+    expect(body.messages[0]?.role).toBe('system');
     expect(body.messages[0]?.content).toContain('/no_think');
   });
 
@@ -261,5 +267,49 @@ describe('reasoning suppression (why a real amplify timed out)', () => {
     await expect(provider.chat({ messages: [{ role: 'user', content: 'x' }] })).rejects.toThrow(
       /did not answer in time/,
     );
+  });
+});
+
+describe('/no_think reaches plain chat, not only the amplifier', () => {
+  // The gap that cost three minutes per reply. `think: false` in the body is
+  // ignored by some Qwen3 builds on the OpenAI-compatible endpoint, and the
+  // in-prompt switch was only ever added to the amplifier — so ordinary
+  // conversation kept reasoning at length before answering.
+  it('prepends a system message when the caller sent none', async () => {
+    const fetchImpl = fetchReturning(completion('short answer'));
+    await new LocalProvider({
+      baseUrl: 'http://127.0.0.1:11434',
+      model: 'qwen3.5:4b',
+      fetch: fetchImpl,
+    }).chat({ messages: [{ role: 'user', content: 'hello' }] });
+
+    const init = (fetchImpl as unknown as { mock: { calls: [string, { body: string }][] } }).mock
+      .calls[0]?.[1];
+    const body = JSON.parse(init?.body ?? '{}') as {
+      messages: { role: string; content: string }[];
+    };
+    expect(body.messages[0]).toEqual({ role: 'system', content: '/no_think' });
+    // The user's own turn survives intact and is not rewritten.
+    expect(body.messages[1]).toEqual({ role: 'user', content: 'hello' });
+  });
+
+  it('does not put the switch in a message the user appears to have typed', async () => {
+    // A stray "/no_think" in the transcript would be saved to history and read
+    // back later as something William wrote.
+    const fetchImpl = fetchReturning(completion('short answer'));
+    await new LocalProvider({
+      baseUrl: 'http://127.0.0.1:11434',
+      model: 'qwen3.5:4b',
+      fetch: fetchImpl,
+    }).chat({ messages: [{ role: 'user', content: 'hello' }] });
+
+    const init = (fetchImpl as unknown as { mock: { calls: [string, { body: string }][] } }).mock
+      .calls[0]?.[1];
+    const body = JSON.parse(init?.body ?? '{}') as {
+      messages: { role: string; content: string }[];
+    };
+    for (const m of body.messages.filter((x) => x.role === 'user')) {
+      expect(m.content).not.toContain('/no_think');
+    }
   });
 });

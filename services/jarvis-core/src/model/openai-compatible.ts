@@ -154,6 +154,29 @@ export function balancedObjects(text: string): string[] {
   return spans;
 }
 
+/**
+ * Put Qwen3's `/no_think` switch where the model will actually see it.
+ *
+ * The body flag `think: false` is honoured by Ollama's native endpoint but
+ * IGNORED by some Qwen3 builds on the OpenAI-compatible one, so the in-prompt
+ * switch is the reliable half. It was originally only added to the amplifier
+ * prompt — which left plain chat thinking, and a two-sentence answer took three
+ * minutes on an 8GB MacBook Air. The tokens were nearly all reasoning nobody
+ * asked for and nobody sees.
+ *
+ * Added as a leading system message when there is none, or appended to the
+ * existing one, so it is never mistaken for something the user typed.
+ */
+export function withNoThink(
+  messages: readonly { role: string; content: string }[],
+): { role: string; content: string }[] {
+  const first = messages[0];
+  if (first?.role === 'system') {
+    return [{ role: 'system', content: `${first.content}\n\n/no_think` }, ...messages.slice(1)];
+  }
+  return [{ role: 'system', content: '/no_think' }, ...messages];
+}
+
 export class OpenAiCompatibleClient {
   private readonly url: string;
   private readonly model: string;
@@ -240,6 +263,7 @@ export class OpenAiCompatibleClient {
     messages: readonly { role: string; content: string }[],
     options: { jsonMode: boolean },
   ): Promise<string> {
+    const sent = this.suppressReasoning ? withNoThink(messages) : messages;
     const controller = new AbortController();
     const timer = setTimeout(() => {
       controller.abort();
@@ -256,7 +280,7 @@ export class OpenAiCompatibleClient {
         },
         body: JSON.stringify({
           model: this.model,
-          messages,
+          messages: sent,
           stream: false,
           // Ollama honours this; servers that do not know it ignore an unknown
           // body field rather than failing, which is why it is safe to send.
@@ -300,12 +324,10 @@ export class OpenAiCompatibleClient {
       [
         {
           role: 'system',
-          content:
-            `${AMPLIFIER_SYSTEM_PROMPT}\n\nRespond with ONLY a JSON object containing exactly these keys: clarifiedIntent (string), missingQuestions (array of strings), improvedConcept (string), recommendedNextStep (string), buildReadyPrompt (string).` +
-            // Qwen3's documented soft switch. Harmless to a model that has never
-            // heard of it; the difference between an answer and a timeout to one
-            // that has.
-            (this.suppressReasoning ? '\n\n/no_think' : ''),
+          content: `${AMPLIFIER_SYSTEM_PROMPT}\n\nRespond with ONLY a JSON object containing exactly these keys: clarifiedIntent (string), missingQuestions (array of strings), improvedConcept (string), recommendedNextStep (string), buildReadyPrompt (string).`,
+          // Qwen3's documented soft switch. Harmless to a model that has never
+          // heard of it; the difference between an answer and a timeout to one
+          // that has.
         },
         { role: 'user', content: buildAmplifierUserMessage(idea) },
       ],
