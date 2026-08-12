@@ -104,6 +104,24 @@ If it says `mock`, the `.env` did not land. If it says anything other than `YES`
 for loopback, stop and send me the output — the app will refuse to start, on
 purpose.
 
+## Getting a newer build: one command, after Ctrl-C
+
+```bash
+npm run refresh
+```
+
+Pulls, installs anything new, and starts the app — one line instead of four.
+
+**Press Control-C first, every time.** While Jarvis is running it owns the
+terminal, and anything you paste goes into ITS input rather than the shell. The
+commands scroll past looking like they ran; nothing happens. That has cost three
+round-trips on this project, which is why this is one command instead of a block
+you might paste halfway.
+
+`--ff-only` is deliberate: if your branch has diverged it stops with a plain
+message instead of the "divergent branches" hint wall, and nothing is merged
+behind your back.
+
 ## Step 5 — Talk to it
 
 ```bash

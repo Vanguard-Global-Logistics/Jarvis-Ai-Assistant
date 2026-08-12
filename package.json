@@ -2,7 +2,7 @@
   "name": "jarvis-ai-assistant",
   "version": "0.0.0",
   "private": true,
-  "description": "Jarvis AI Assistant — production foundation (Phase 1). No application features implemented.",
+  "description": "Jarvis AI Assistant \u2014 production foundation (Phase 1). No application features implemented.",
   "license": "UNLICENSED",
   "type": "module",
   "engines": {
@@ -24,6 +24,7 @@
     "build": "npm run build --workspaces --if-present && npm run assert:bundle",
     "assert:bundle": "node scripts/assert-electron-bundle.mjs",
     "dev:desktop": "npm run dev --workspace @jarvis/desktop",
+    "refresh": "git pull --ff-only && npm install --no-audit --no-fund && npm run dev:desktop",
     "verify": "npm run format:check && npm run lint && npm run typecheck && npm run test",
     "probe:runtime": "node scripts/runtime-probe.mjs",
     "package:dir": "npm run build && electron-builder --dir --project apps/desktop --config.electronDist=../../node_modules/electron/dist",
