@@ -29,6 +29,17 @@ const AMP = {
   buildReadyPrompt: 'You are building a permit tracker...',
 };
 
+/** A plan with a deliberately EMPTY list, because empty is a real answer. */
+const PLAN = {
+  outcome: 'Invoices land in one folder every Monday.',
+  steps: ['Create a Shortcuts automation', 'Point it at ~/Invoices'],
+  needs: ['macOS Shortcuts'],
+  credentialsNeeded: [],
+  risks: ['A misfiled invoice is easy to miss'],
+  cannotDoYet: 'Jarvis cannot run this itself; the steps are for a person.',
+  doThisNow: 'Make the folder and move this week\u2019s invoices into it.',
+};
+
 const TRANSCRIPT: TranscriptEntry[] = [
   { kind: 'message', role: 'user', content: 'What is the status of the Henderson job?' },
   { kind: 'message', role: 'assistant', content: 'Two punch-list items remain.' },
@@ -423,5 +434,70 @@ describe('backup → file → restore, on a different machine', () => {
       content: 'written after the crash',
     });
     expect(getConversation(other, backedUp.id)?.entries).toEqual(TRANSCRIPT);
+  });
+});
+
+describe('automation plans survive a save and reopen (ADR 0024)', () => {
+  // The feature exists to be used constantly, so its output has to persist.
+  // Rendering a plan and losing it on save would be the exact pain it was
+  // built to remove.
+  it('round-trips a plan, including an EMPTY list', () => {
+    const meta = saveConversation(db, [{ kind: 'plan', outcome: 'weekly invoices', result: PLAN }]);
+    const loaded = getConversation(db, meta.id);
+
+    expect(loaded?.entries).toEqual([{ kind: 'plan', outcome: 'weekly invoices', result: PLAN }]);
+    // credentialsNeeded is [] — an automation touching no login says so with an
+    // empty list rather than an invented placeholder, and that must survive.
+    expect(loaded?.entries[0]).toMatchObject({ result: { credentialsNeeded: [] } });
+    // And the reloaded shape is what the boundary would actually accept.
+    expect(SavedConversationSchema.safeParse(loaded).success).toBe(true);
+  });
+
+  it('keeps transcript ORDER across all three entry kinds', () => {
+    // Each seq lands in exactly one of three tables; reading merges by seq.
+    // A plan sandwiched between other kinds is the case that catches a merge bug.
+    const mixed: TranscriptEntry[] = [
+      { kind: 'message', role: 'user', content: 'first' },
+      { kind: 'plan', outcome: 'second', result: PLAN },
+      { kind: 'amplification', idea: 'third', result: AMP },
+      { kind: 'message', role: 'assistant', content: 'fourth' },
+    ];
+    const meta = saveConversation(db, mixed);
+    expect(getConversation(db, meta.id)?.entries).toEqual(mixed);
+    expect(meta.entryCount).toBe(4);
+  });
+
+  it('counts plans in entryCount, so the list does not under-report', () => {
+    saveConversation(db, [{ kind: 'plan', outcome: 'only a plan', result: PLAN }]);
+    expect(listConversations(db)[0]?.entryCount).toBe(1);
+  });
+
+  it('titles a plan-only session from the outcome that was asked for', () => {
+    expect(deriveTitle([{ kind: 'plan', outcome: 'weekly invoice filing', result: PLAN }])).toBe(
+      'weekly invoice filing',
+    );
+  });
+
+  it('carries plans through backup and restore', () => {
+    const meta = saveConversation(db, [{ kind: 'plan', outcome: 'weekly invoices', result: PLAN }]);
+    const document = parseBackupDocument(
+      JSON.stringify(buildBackupDocument(exportAllConversations(db))),
+    );
+
+    const fresh = openDatabase({ location: ':memory:' });
+    migrate(fresh, migrations);
+    expect(importConversations(fresh, document.conversations)).toEqual({ added: 1, skipped: 0 });
+    expect(getConversation(fresh, meta.id)?.entries).toEqual([
+      { kind: 'plan', outcome: 'weekly invoices', result: PLAN },
+    ]);
+  });
+
+  it('deletes plans with their conversation, via cascade', () => {
+    const meta = saveConversation(db, [{ kind: 'plan', outcome: 'gone soon', result: PLAN }]);
+    expect(deleteConversation(db, meta.id)).toBe(true);
+    const orphans = db.prepare('SELECT COUNT(*) AS n FROM conversation_plans').get() as unknown as {
+      n: number;
+    };
+    expect(orphans.n).toBe(0);
   });
 });

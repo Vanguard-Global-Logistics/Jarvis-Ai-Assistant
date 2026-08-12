@@ -1,6 +1,7 @@
-import type { AmplifierResult } from '@jarvis/contracts';
-import { AmplifierResultSchema } from '@jarvis/contracts';
+import type { AmplifierResult, AutomationPlan } from '@jarvis/contracts';
+import { AmplifierResultSchema, AutomationPlanSchema } from '@jarvis/contracts';
 import { AMPLIFIER_SYSTEM_PROMPT, buildAmplifierUserMessage } from '../amplifier/prompt.js';
+import { AUTOMATION_SYSTEM_PROMPT, buildAutomationUserMessage } from '../automation/prompt.js';
 
 /**
  * A client for the OpenAI-compatible `/chat/completions` dialect.
@@ -26,6 +27,16 @@ import { AMPLIFIER_SYSTEM_PROMPT, buildAmplifierUserMessage } from '../amplifier
  * seconds while the model wrote an essay nobody would read.
  */
 const AMPLIFIER_TOKEN_BUDGET = 900;
+
+/**
+ * Room for a plan: seven fields, several of them lists.
+ *
+ * Larger than the amplifier's because a plan with three steps is not a plan.
+ * Still bounded, for the same reason — an 8GB laptop model given no ceiling
+ * writes until it hits the context wall, which cost three minutes for one
+ * answer before `max_tokens` existed here at all.
+ */
+const AUTOMATION_TOKEN_BUDGET = 1400;
 
 /** How long to wait before concluding the service is not going to answer. */
 const REQUEST_TIMEOUT_MS = 120_000;
@@ -499,6 +510,37 @@ export class OpenAiCompatibleClient {
     if (!result.success) {
       throw new Error(
         `${this.voice.subject}’s amplifier response did not match its contract. ` +
+          this.voice.contractHint,
+      );
+    }
+    return result.data;
+  }
+
+  /**
+   * Automation planning v1 (ADR 0024) — an outcome in, a plan out.
+   *
+   * Shares every property that matters with `amplify`: a system prompt, JSON
+   * mode, a token budget, tolerant extraction, and a schema that decides whether
+   * the answer is usable. The schema is doing security work here, not just type
+   * work — `cannotDoYet` is required, so a model that writes a confident plan
+   * implying Jarvis will carry it out is rejected rather than displayed.
+   */
+  public async planAutomation(outcome: string): Promise<AutomationPlan> {
+    const text = await this.complete(
+      [
+        {
+          role: 'system',
+          content: `${AUTOMATION_SYSTEM_PROMPT}\n\nRespond with ONLY a JSON object containing exactly these keys: outcome (string), steps (array of strings), needs (array of strings), credentialsNeeded (array of strings), risks (array of strings), cannotDoYet (string), doThisNow (string).`,
+        },
+        { role: 'user', content: buildAutomationUserMessage(outcome) },
+      ],
+      { jsonMode: true, maxTokens: AUTOMATION_TOKEN_BUDGET },
+    );
+
+    const result = AutomationPlanSchema.safeParse(this.extractJsonObject(text));
+    if (!result.success) {
+      throw new Error(
+        `${this.voice.subject}’s automation plan did not match its contract. ` +
           this.voice.contractHint,
       );
     }

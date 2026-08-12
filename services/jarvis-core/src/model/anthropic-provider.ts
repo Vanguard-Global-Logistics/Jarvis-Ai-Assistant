@@ -1,8 +1,9 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
-import type { AmplifierResult, ChatReply, ChatRequest } from '@jarvis/contracts';
-import { AmplifierResultSchema } from '@jarvis/contracts';
+import type { AmplifierResult, AutomationPlan, ChatReply, ChatRequest } from '@jarvis/contracts';
+import { AmplifierResultSchema, AutomationPlanSchema } from '@jarvis/contracts';
 import { AMPLIFIER_SYSTEM_PROMPT, buildAmplifierUserMessage } from '../amplifier/prompt.js';
+import { AUTOMATION_SYSTEM_PROMPT, buildAutomationUserMessage } from '../automation/prompt.js';
 import type { JarvisModelProvider } from './provider.js';
 
 /** Verified against the claude-api skill, 2026-07-17 (CLAUDE.md §5). */
@@ -91,6 +92,34 @@ export class AnthropicProvider implements JarvisModelProvider {
     const result = AmplifierResultSchema.safeParse(response.parsed_output);
     if (!result.success) {
       throw new Error('The amplifier response did not match its contract.');
+    }
+    return result.data;
+  }
+
+  /**
+   * Automation planning v1 (ADR 0024). A plan, never an action.
+   *
+   * The frontier model gets no exemption from the contract: `cannotDoYet` is
+   * required, so even a very confident plan that reads as though Jarvis is about
+   * to execute it is rejected here rather than rendered.
+   */
+  public async planAutomation(outcome: string): Promise<AutomationPlan> {
+    const response = await this.client.messages.parse({
+      model: this.model,
+      max_tokens: MAX_TOKENS,
+      thinking: { type: 'adaptive' },
+      system: AUTOMATION_SYSTEM_PROMPT,
+      output_config: { format: zodOutputFormat(AutomationPlanSchema) },
+      messages: [{ role: 'user', content: buildAutomationUserMessage(outcome) }],
+    });
+
+    if (response.stop_reason === 'refusal') {
+      throw new ModelRefusalError();
+    }
+
+    const result = AutomationPlanSchema.safeParse(response.parsed_output);
+    if (!result.success) {
+      throw new Error('The automation plan did not match its contract.');
     }
     return result.data;
   }

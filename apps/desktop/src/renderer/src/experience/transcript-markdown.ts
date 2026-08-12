@@ -1,4 +1,4 @@
-import type { AmplifierResult, TranscriptEntry } from '@jarvis/contracts';
+import type { AmplifierResult, AutomationPlan, TranscriptEntry } from '@jarvis/contracts';
 
 /**
  * Render a transcript as Markdown, for copying out of Jarvis.
@@ -15,6 +15,47 @@ import type { AmplifierResult, TranscriptEntry } from '@jarvis/contracts';
  *   - Nothing is invented. A field that was stored empty is impossible (the
  *     schemas forbid it), so there are no placeholder strings in this file.
  */
+
+/**
+ * An automation plan (ADR 0024).
+ *
+ * `cannotDoYet` is rendered as a blockquote rather than a plain paragraph, so
+ * that when this Markdown is pasted somewhere else — a note, an email, a chat —
+ * the limitation still reads as a caveat rather than dissolving into the steps
+ * around it. A plan that travels without its caveat becomes a promise.
+ *
+ * Empty lists are omitted rather than printed as an empty heading: "Risks" with
+ * nothing under it reads like something went wrong, when it means there are
+ * none.
+ */
+function planMarkdown(outcome: string, plan: AutomationPlan): string {
+  const section = (label: string, values: readonly string[], ordered: boolean): string[] =>
+    values.length === 0
+      ? []
+      : [
+          `**${label}**`,
+          values.map((v, i) => (ordered ? `${String(i + 1)}. ${v}` : `- ${v}`)).join('\n'),
+          '',
+        ];
+
+  return [
+    `### Automation plan — ${outcome}`,
+    '',
+    '**Outcome**',
+    plan.outcome,
+    '',
+    ...section('Steps', plan.steps, true),
+    ...section('What it needs', plan.needs, false),
+    ...section('Logins it would touch', plan.credentialsNeeded, false),
+    ...section('Risks', plan.risks, false),
+    '**Jarvis cannot do this part**',
+    '',
+    `> ${plan.cannotDoYet}`,
+    '',
+    '**Do this now**',
+    plan.doThisNow,
+  ].join('\n');
+}
 
 /** Escape nothing, wrap nothing: content is copied verbatim inside blocks. */
 function amplifierMarkdown(idea: string, result: AmplifierResult): string {
@@ -71,6 +112,7 @@ export function transcriptToMarkdown(
       const who = entry.role === 'user' ? 'William' : 'Jarvis';
       return `**${who}:** ${entry.content}`;
     }
+    if (entry.kind === 'plan') return planMarkdown(entry.outcome, entry.result);
     return amplifierMarkdown(entry.idea, entry.result);
   });
 

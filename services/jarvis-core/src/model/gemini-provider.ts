@@ -1,4 +1,4 @@
-import type { AmplifierResult, ChatReply, ChatRequest } from '@jarvis/contracts';
+import type { AmplifierResult, AutomationPlan, ChatReply, ChatRequest } from '@jarvis/contracts';
 import type { FetchLike, ServiceVoice } from './openai-compatible.js';
 import { OpenAiCompatibleClient } from './openai-compatible.js';
 import type { JarvisModelProvider } from './provider.js';
@@ -97,5 +97,10 @@ export class GeminiProvider implements JarvisModelProvider {
 
   public async amplify(idea: string): Promise<AmplifierResult> {
     return this.client.amplify(idea);
+  }
+
+  /** Automation planning v1 (ADR 0024). A plan, never an action. */
+  public async planAutomation(outcome: string): Promise<AutomationPlan> {
+    return this.client.planAutomation(outcome);
   }
 }

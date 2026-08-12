@@ -58,6 +58,11 @@ const ALLOWED_API = [
   // only what it can choose among.
   'describeModels',
   'selectModel',
+  // ADR 0024. Named `planAutomation`, not `automate`, because it writes a plan
+  // and performs nothing: one model call, the same authority as `sendChat`. It
+  // does NOT capture a screen, drive an app, or touch a credential — those are
+  // what AEGIS YELLOW exists to revoke, and AEGIS does not exist yet.
+  'planAutomation',
 ] as const;
 
 /** Load the bridge fresh and return what it handed to `exposeInMainWorld`. */

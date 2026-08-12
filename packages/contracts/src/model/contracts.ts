@@ -80,3 +80,63 @@ export const AmplifierResultSchema = z
   .strict();
 
 export type AmplifierResult = z.infer<typeof AmplifierResultSchema>;
+
+// --- automation planning (ADR 0024) ----------------------------------------
+
+/**
+ * "Automate this for me" — the outcome, in William's words.
+ *
+ * One field, `.strict()`, same reasoning as `AmplifyRequestSchema`: room to grow
+ * without changing the channel's shape.
+ */
+export const AutomationPlanRequestSchema = z
+  .object({
+    /** What "done" looks like. Not the steps — the outcome. */
+    outcome: z.string().min(1),
+  })
+  .strict();
+
+export type AutomationPlanRequest = z.infer<typeof AutomationPlanRequestSchema>;
+
+/**
+ * A plan for an automation. **A document, not an action.**
+ *
+ * Jarvis cannot see a screen and cannot drive a mouse — Vision and computer
+ * control are exactly what AEGIS YELLOW exists to switch off, and AEGIS does not
+ * exist yet (`services/aegis` is empty by choice). So this channel plans and
+ * nothing else, and the schema is built so it cannot quietly grow into more.
+ *
+ * Two fields are REQUIRED and carry the honesty:
+ *
+ *   - `cannotDoYet` — the part Jarvis cannot perform itself, and why. A required
+ *     non-empty string, so a model that produces a confident plan implying it
+ *     will execute fails validation at the boundary instead of reaching the UI.
+ *     Today it is always true: nothing here executes anything.
+ *   - `doThisNow` — how to get the outcome by hand today. A plan for a thing
+ *     that cannot run yet is worth much less than a plan plus a way through.
+ *
+ * `credentialsNeeded` NAMES logins the automation would touch — "your Chase
+ * login", "the BCI VPN". It must never carry a value, and nothing in this
+ * system asks for one: credentials belong in the OS keychain, referenced and
+ * never read into a prompt (ADR 0024). The renderer renders these as labels.
+ */
+export const AutomationPlanSchema = z
+  .object({
+    /** The outcome restated precisely, so a misunderstanding is visible early. */
+    outcome: z.string().min(1),
+    /** Concrete, ordered, each one a thing a person could actually do. */
+    steps: z.array(z.string().min(1)).min(1).max(20),
+    /** Apps, accounts, files, or access the automation would require. */
+    needs: z.array(z.string().min(1)).max(20),
+    /** Logins it would touch, BY NAME. Never a value. */
+    credentialsNeeded: z.array(z.string().min(1)).max(20),
+    /** What could go wrong — especially anything touching money or data. */
+    risks: z.array(z.string().min(1)).max(20),
+    /** The part Jarvis cannot do itself, and why. Required. */
+    cannotDoYet: z.string().min(1),
+    /** How to reach the outcome by hand today. Required. */
+    doThisNow: z.string().min(1),
+  })
+  .strict();
+
+export type AutomationPlan = z.infer<typeof AutomationPlanSchema>;

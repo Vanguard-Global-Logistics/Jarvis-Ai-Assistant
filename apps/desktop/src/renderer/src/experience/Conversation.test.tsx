@@ -41,10 +41,22 @@ const MODELS = {
   ],
 };
 
+/** A well-formed plan, matching AutomationPlanSchema exactly (ADR 0024). */
+const PLAN = {
+  outcome: 'Every Monday, the week\u2019s invoices land in one folder.',
+  steps: ['Create a Shortcuts automation', 'Point it at the Invoices folder'],
+  needs: ['macOS Shortcuts'],
+  credentialsNeeded: ['your accounting portal login'],
+  risks: ['A misfiled invoice is easy to miss'],
+  cannotDoYet: 'Jarvis cannot run this itself \u2014 the steps are for a person.',
+  doThisNow: 'Make the folder and move this week\u2019s invoices into it.',
+};
+
 function fakeBridge(overrides: Partial<ConversationBridge> = {}): ConversationBridge {
   return {
     sendChat: vi.fn().mockResolvedValue({ text: 'Hello from the mock.', provider: 'mock' }),
     amplify: vi.fn().mockResolvedValue(AMP),
+    planAutomation: vi.fn().mockResolvedValue(PLAN),
     saveConversation: vi.fn().mockResolvedValue(SAVED_META),
     listConversations: vi.fn().mockResolvedValue({ conversations: [] }),
     getConversation: vi.fn().mockResolvedValue({ conversation: null }),
@@ -155,6 +167,86 @@ describe('Conversation', () => {
     expect(states).toContain('thinking');
     await screen.findByText('Hello from the mock.');
     expect(states).toContain('speaking');
+  });
+
+  it('plans an automation in ONE step — no interview, no follow-up questions', async () => {
+    // The point of the feature is that it costs one gesture. An earlier design
+    // asked clarifying questions first; William said plainly he would use this
+    // constantly and did not want it to be a pain, so the model states its
+    // assumptions in `outcome` instead of asking about them.
+    const bridge = fakeBridge();
+    render(<Conversation bridge={bridge} />);
+
+    type('get my invoices into one folder every Monday');
+    fireEvent.click(screen.getByRole('button', { name: 'Automate' }));
+
+    expect(await screen.findByText(/Automation plan/i)).toBeTruthy();
+    expect(bridge.planAutomation).toHaveBeenCalledWith(
+      'get my invoices into one folder every Monday',
+    );
+    // One call, one card. Nothing asked the user anything in between.
+    expect(bridge.planAutomation).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(PLAN.steps[0] ?? '')).toBeTruthy();
+  });
+
+  it('shows what Jarvis CANNOT do, prominently, on every plan', async () => {
+    // The contract requires `cannotDoYet`; this asserts the UI actually shows
+    // it. A required field rendered nowhere would satisfy the schema and defeat
+    // its entire purpose (CLAUDE.md §8 rule 1).
+    render(<Conversation bridge={fakeBridge()} />);
+    type('do the thing');
+    fireEvent.click(screen.getByRole('button', { name: 'Automate' }));
+
+    expect(await screen.findByText(/Jarvis cannot do this part/i)).toBeTruthy();
+    expect(screen.getByText(PLAN.cannotDoYet)).toBeTruthy();
+    expect(screen.getByText(PLAN.doThisNow)).toBeTruthy();
+  });
+
+  it('names logins but offers nowhere to type one', async () => {
+    // A credential must never enter a model prompt, and a prompt goes to a
+    // vendor. The card lists what an automation would touch; it must not grow a
+    // password field, so this asserts the absence directly.
+    render(<Conversation bridge={fakeBridge()} />);
+    type('log into the portal for me');
+    fireEvent.click(screen.getByRole('button', { name: 'Automate' }));
+
+    expect(await screen.findByText(/Logins it would touch/i)).toBeTruthy();
+    expect(screen.getByText('your accounting portal login')).toBeTruthy();
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
+
+  it('keeps a plan when the session is saved — it is not a throwaway view', async () => {
+    // "Copy it or lose it" is the pain this feature exists to avoid.
+    const bridge = fakeBridge();
+    render(<Conversation bridge={bridge} />);
+    type('weekly invoice filing');
+    fireEvent.click(screen.getByRole('button', { name: 'Automate' }));
+    await screen.findByText(/Automation plan/i);
+
+    fireEvent.click(screen.getByRole('button', { name: /save session/i }));
+    await screen.findByText(/Saved/);
+
+    expect(bridge.saveConversation).toHaveBeenCalledWith({
+      entries: [{ kind: 'plan', outcome: 'weekly invoice filing', result: PLAN }],
+    });
+  });
+
+  it('surfaces a failed plan without inventing a reason', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    render(
+      <Conversation
+        bridge={fakeBridge({
+          planAutomation: vi.fn().mockRejectedValue(new Error('jarvis:plan-automation failed')),
+        })}
+      />,
+    );
+    type('something');
+    fireEvent.click(screen.getByRole('button', { name: 'Automate' }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toContain('automation plan could not be written');
+    expect(alert.textContent).toContain('npm run check:model');
+    consoleError.mockRestore();
   });
 
   it('renders all five amplifier fields with a copyable build-ready prompt', async () => {

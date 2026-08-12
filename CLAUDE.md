@@ -27,7 +27,8 @@ Repository: `github.com/Vanguard-Global-Logistics/Jarvis-Ai-Assistant`.
   no vision. Do not describe any part of Jarvis as protected, or as remembering
   anything. **`docs/KNOWN-LIMITATIONS.md` is the authoritative list of what does not
   exist — read it before claiming anything works.**
-- **Thirteen IPC channels exist: `app:get-info`, `jarvis:chat`, `jarvis:amplify`,
+- **Fourteen IPC channels exist: `app:get-info`, `jarvis:chat`, `jarvis:amplify`,
+  `jarvis:plan-automation`,
   `history:save`/`list`/`get`/`delete`, `history:export`, `history:import`,
   `model:describe`/`model:select`, and
   `profile:get`/`profile:set`.** `app:get-info` returns static host facts.
@@ -45,7 +46,10 @@ Repository: `github.com/Vanguard-Global-Logistics/Jarvis-Ai-Assistant`.
   switch it live — by **identifier** from a closed enum, never by URL, model name, or
   key. It **picks among providers main already built; it never configures one**, because
   a renderer that could name a URL could name a remote one and have it labeled `local`
-  (ADR 0015). These thirteen are the whole of what `window.jarvis` exposes. `docs/IPC-SURFACE.md` is the
+  (ADR 0015). `jarvis:plan-automation` (ADR 0024) writes an automation PLAN and performs nothing — it
+  neither sees a screen, drives an app, nor touches a credential, because those are what
+  AEGIS YELLOW exists to revoke and AEGIS does not exist. These fourteen are the whole of
+  what `window.jarvis` exposes. `docs/IPC-SURFACE.md` is the
   authoritative inventory; adding a channel is a boundary change (ADR 0002), not a
   routine edit.
 - **Authoritative documents**, in precedence order:
@@ -211,11 +215,11 @@ apps/desktop           Electron shell (main / preload / renderer)  PARTIAL — h
 apps/pwa               PWA shell                                   NOT IMPLEMENTED — empty, out of scope
 services/jarvis-core   Orchestration, isolated from renderer       PARTIAL — 5 model providers + amplifier, wired via chat/amplify/model (ADR 0007, 0022)
 services/aegis         AEGIS engine — independent, no GenAI        NOT IMPLEMENTED — empty
-packages/contracts     Zod schemas + shared types                  PARTIAL — IPC (13 channels), model, history, profile, experience
+packages/contracts     Zod schemas + shared types                  PARTIAL — IPC (14 channels), model, history, profile, automation, experience
 packages/ui            Design-system components                    PARTIAL — tokens, motion, Orb + glass primitives
 packages/config        Env validation + structured logging         IMPLEMENTED, unit-tested
-packages/database      SQLite (node:sqlite) + migration runner     PARTIAL — wired to Electron main, 4 migrations: history, amplifications, profile, window-state (ADR 0008, 0009, 0013, 0017)
-docs/DECISIONS/        ADRs                                        0001–0023
+packages/database      SQLite (node:sqlite) + migration runner     PARTIAL — wired to Electron main, 5 migrations: history, amplifications, profile, window-state, plans (ADR 0008, 0009, 0013, 0017, 0024)
+docs/DECISIONS/        ADRs                                        0001–0024
 docs/foundation/       Layer 2 foundation documents (ADR 0005)     PARTIAL — 01 APPROVED; 02, 07, 09 DRAFT; rest CONCEPTUAL
 ```
 
@@ -244,7 +248,7 @@ React Refresh preamble). Both reached William before anyone noticed.
 
 **`npm run probe:runtime` is the check that catches those.** It launches the real app —
 built HTML and `dev:desktop` — drives it over the DevTools protocol, and asserts React
-mounts, `window.jarvis` exposes exactly the thirteen allowlisted functions, a chat/amplify
+mounts, `window.jarvis` exposes exactly the fourteen allowlisted functions, a chat/amplify
 round-trip answers, the full history save/list/get/delete loop works against a real
 SQLite (including that an unsaved chat never persists), the profile round-trips and
 rejects an invalid accent, the brain picker lists every provider, refuses an

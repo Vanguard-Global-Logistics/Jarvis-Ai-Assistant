@@ -504,6 +504,8 @@ async function runChecks(page, mode, stub = null) {
     'getAppInfo',
     'sendChat',
     'amplify',
+    // ADR 0024 — writes a plan, performs nothing.
+    'planAutomation',
     // ADR 0022 — provider identifiers only, never configuration.
     'describeModels',
     'selectModel',
@@ -521,6 +523,47 @@ async function runChecks(page, mode, stub = null) {
     `Object.keys is exactly ${JSON.stringify(EXPECTED_KEYS)}`,
     keysOk,
     JSON.stringify(keys.value),
+  );
+
+  // --- jarvis:plan-automation (ADR 0024) -------------------------------------
+  // The Automate button's whole promise is that its output is real and survives.
+  // Both halves are checked here against the running app: the plan comes back
+  // contract-shaped, and it is still there after a save and reopen.
+  const planned = await page.evaluate(
+    'await window.jarvis.planAutomation("file my invoices every Monday")',
+  );
+  const plan = planned.value;
+  add(
+    'jarvis:plan-automation returns a contract-shaped plan',
+    typeof plan?.outcome === 'string' &&
+      Array.isArray(plan.steps) &&
+      plan.steps.length > 0 &&
+      Array.isArray(plan.credentialsNeeded) &&
+      typeof plan.doThisNow === 'string',
+    JSON.stringify(plan?.outcome ?? null),
+  );
+  add(
+    'every plan states what Jarvis CANNOT do — the honesty field is required',
+    typeof plan?.cannotDoYet === 'string' && plan.cannotDoYet.length > 0,
+    JSON.stringify(plan?.cannotDoYet ?? null),
+  );
+
+  const planSaved = await page.evaluate(
+    'await window.jarvis.saveConversation({ entries: [{ kind: "plan", outcome: "file my invoices every Monday", result: (await window.jarvis.planAutomation("file my invoices every Monday")) }] })',
+  );
+  const planReopened = await page.evaluate(
+    `await window.jarvis.getConversation(${JSON.stringify(planSaved.value?.id ?? '')})`,
+  );
+  const reopenedEntry = planReopened.value?.conversation?.entries?.[0];
+  add(
+    'a plan SURVIVES save and reopen — not a throwaway view',
+    reopenedEntry?.kind === 'plan' &&
+      typeof reopenedEntry.result?.cannotDoYet === 'string' &&
+      Array.isArray(reopenedEntry.result.steps),
+    JSON.stringify(reopenedEntry?.kind ?? null),
+  );
+  await page.evaluate(
+    `await window.jarvis.deleteConversation(${JSON.stringify(planSaved.value?.id ?? '')})`,
   );
 
   // --- model:describe / model:select (ADR 0022) ------------------------------

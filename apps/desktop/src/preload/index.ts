@@ -3,6 +3,8 @@ import { CHANNELS } from '@jarvis/contracts/ipc/channels';
 import type {
   AmplifierResult,
   AmplifyRequest,
+  AutomationPlan,
+  AutomationPlanRequest,
   AppInfo,
   ChatReply,
   ChatRequest,
@@ -70,6 +72,19 @@ const api = {
     ipcRenderer.invoke(CHANNELS.jarvisAmplify, {
       idea,
     } satisfies AmplifyRequest) as Promise<AmplifierResult>,
+
+  /**
+   * Automation planning v1 (ADR 0024): an outcome in, a written PLAN out.
+   *
+   * The name is `planAutomation`, not `automate`, and the difference is the
+   * whole feature. Nothing behind this function performs an automation — it is
+   * one model call, the same authority as `sendChat`. A bridge function named
+   * for what it wishes it did is how a UI ends up lying (CLAUDE.md §8 rule 1).
+   */
+  planAutomation: (outcome: string): Promise<AutomationPlan> =>
+    ipcRenderer.invoke(CHANNELS.jarvisPlanAutomation, {
+      outcome,
+    } satisfies AutomationPlanRequest) as Promise<AutomationPlan>,
 
   /**
    * Which brain is answering, and switch it (ADR 0022).

@@ -1,4 +1,4 @@
-import type { AmplifierResult, ChatReply, ChatRequest } from '@jarvis/contracts';
+import type { AmplifierResult, AutomationPlan, ChatReply, ChatRequest } from '@jarvis/contracts';
 import type { JarvisModelProvider } from './provider.js';
 
 /**
@@ -31,6 +31,36 @@ export class MockProvider implements JarvisModelProvider {
       improvedConcept: `[MOCK] A sharper framing of "${idea}" would appear here.`,
       recommendedNextStep: '[MOCK] Write the one-paragraph problem statement.',
       buildReadyPrompt: `[MOCK] Build the smallest useful version of: ${idea}. (Deterministic placeholder — configure a key for a real prompt.)`,
+    });
+  }
+
+  /**
+   * A deterministic automation plan (ADR 0024).
+   *
+   * Every field is prefixed `[MOCK]` for the same reason the chat reply is: a
+   * placeholder that reads like real output is the cardinal sin (CLAUDE.md §8).
+   *
+   * `cannotDoYet` is truthful even here — arguably *especially* here. The mock
+   * provider genuinely cannot do any of it, and neither can the real ones.
+   */
+  public planAutomation(outcome: string): Promise<AutomationPlan> {
+    return Promise.resolve({
+      outcome: `[MOCK] You want this to happen without you: ${outcome}`,
+      steps: [
+        '[MOCK] A real model would list the concrete steps here.',
+        '[MOCK] Each one naming the app or command that performs it.',
+      ],
+      needs: ['[MOCK] The apps and accounts the plan would touch.'],
+      // Empty rather than a plausible-looking placeholder: a fake credential
+      // name in this field is the one placeholder that could send someone to a
+      // login screen for no reason.
+      credentialsNeeded: [],
+      risks: ['[MOCK] A real model would name what could go wrong.'],
+      cannotDoYet:
+        'Jarvis cannot see your screen, control other apps, or run anything on a schedule. ' +
+        'These steps are for a person to carry out. That is true of every provider today, ' +
+        'not just this offline one.',
+      doThisNow: '[MOCK] Configure a real model provider to get an actual plan.',
     });
   }
 }

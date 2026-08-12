@@ -30,6 +30,21 @@ export const CHANNELS = {
   jarvisAmplify: 'jarvis:amplify',
 
   /**
+   * "Automate this for me" (ADR 0024): an outcome in, a written PLAN out.
+   *
+   * Same authority envelope as `jarvis:chat` — one model call, nothing more. It
+   * does NOT see a screen, drive a mouse, open an app, or touch a credential,
+   * and it cannot grow into those without a new channel and a new argument.
+   * Screen Vision and computer control are precisely what AEGIS YELLOW exists to
+   * revoke, and AEGIS does not exist yet.
+   *
+   * The response schema REQUIRES `cannotDoYet`, so a plan that implies Jarvis
+   * will carry it out fails validation at the boundary rather than misleading
+   * someone in the UI.
+   */
+  jarvisPlanAutomation: 'jarvis:plan-automation',
+
+  /**
    * Stage 1A persistence (ADR 0006, ADR 0008). Four narrow operations against
    * the main-process-owned SQLite database. Saving is EXPLICIT: nothing writes
    * without the renderer invoking `history:save`, and the renderer never names

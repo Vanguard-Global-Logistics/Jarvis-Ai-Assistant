@@ -6,6 +6,7 @@ import type { SqliteDatabase } from '@jarvis/database';
 import { createProvider } from '@jarvis/jarvis-core';
 import { loadEnvFile, upwardCandidates } from './env-file.js';
 import { registerAmplifyHandler } from './handlers/amplify.js';
+import { registerPlanAutomationHandler } from './handlers/plan-automation.js';
 import { createProviderHolder, registerModelHandlers } from './handlers/model.js';
 import { registerAppInfoHandler } from './handlers/app-info.js';
 import { registerChatHandler } from './handlers/chat.js';
@@ -340,6 +341,7 @@ void app
     // that existed at boot while the UI happily reported the change.
     registerChatHandler(providerHolder.current);
     registerAmplifyHandler(providerHolder.current);
+    registerPlanAutomationHandler(providerHolder.current);
     registerModelHandlers(env, providerHolder);
     registerHistoryHandlers(db);
     registerProfileHandlers(db);

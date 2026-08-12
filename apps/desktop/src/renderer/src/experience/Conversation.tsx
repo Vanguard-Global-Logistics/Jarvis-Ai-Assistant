@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import type { CSSProperties, JSX, KeyboardEvent, RefObject } from 'react';
 import type {
   AmplifierResult,
+  AutomationPlan,
   ChatMessage,
   ModelDescription,
   ModelSelection,
@@ -91,6 +92,7 @@ export interface ConversationBridge {
     provider: ProviderId;
   }>;
   amplify: (idea: string) => Promise<AmplifierResult>;
+  planAutomation: (outcome: string) => Promise<AutomationPlan>;
   saveConversation: (request: { entries: TranscriptEntry[] }) => Promise<SavedConversationMeta>;
   listConversations: () => Promise<{ conversations: SavedConversationMeta[] }>;
   getConversation: (id: string) => Promise<{ conversation: SavedConversation | null }>;
@@ -117,6 +119,7 @@ type TranscriptItem =
       provider?: ProviderId;
     }
   | { kind: 'amplify'; id: number; idea: string; result: AmplifierResult }
+  | { kind: 'plan'; id: number; outcome: string; result: AutomationPlan }
   | { kind: 'error'; id: number; text: string };
 
 export function Conversation({ bridge, onOrbStateChange }: ConversationProps): JSX.Element {
@@ -299,6 +302,56 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
     }
   }, [draft, busy, bridge, setOrb]);
 
+  /**
+   * Automate (ADR 0024) — type the outcome, press once, read the plan.
+   *
+   * DELIBERATELY NOT AN INTERVIEW. The first design asked clarifying questions
+   * before planning, which is the obvious shape and the wrong one: William said
+   * he intends to use this constantly and does not want it to be a pain, and a
+   * question round-trip doubles the wait on every single use.
+   *
+   * So the model is told to STATE its assumptions in the plan's `outcome` field
+   * instead of asking about them. A wrong assumption is then visible in the
+   * first paragraph and fixed by editing one line and pressing again — one
+   * round-trip in the bad case, zero in the good one, versus always one.
+   *
+   * The orb goes to `executing` rather than `reasoning` so a plan in flight is
+   * distinguishable from a chat reply at a glance.
+   */
+  const automate = useCallback(async () => {
+    const outcome = draft.trim();
+    if (outcome === '' || busy || bridge === null) return;
+
+    setDraft('');
+    setBusy(true);
+    setOrb('executing');
+
+    try {
+      const result = await bridge.planAutomation(outcome);
+      setItems((prev) => [...prev, { kind: 'plan', id: allocId(), outcome, result }]);
+      setOrb('success');
+      window.setTimeout(() => {
+        setOrb('idle');
+      }, 900);
+    } catch (cause) {
+      console.error('[conversation] jarvis:plan-automation failed:', cause);
+      setItems((prev) => [
+        ...prev,
+        {
+          kind: 'error',
+          id: allocId(),
+          text: MODEL_FAILURE_HINT('The automation plan could not be written.'),
+        },
+      ]);
+      setOrb('warning');
+      window.setTimeout(() => {
+        setOrb('idle');
+      }, 1400);
+    } finally {
+      setBusy(false);
+    }
+  }, [draft, busy, bridge, setOrb]);
+
   // --- persistence actions (ADR 0008) ----------------------------------------
 
   const refreshHistory = useCallback(async (): Promise<void> => {
@@ -331,10 +384,11 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
       if (it.kind === 'message') return [{ kind: 'message', role: it.role, content: it.content }];
       if (it.kind === 'amplify')
         return [{ kind: 'amplification', idea: it.idea, result: it.result }];
+      if (it.kind === 'plan') return [{ kind: 'plan', outcome: it.outcome, result: it.result }];
       return [];
     });
 
-  const savableCount = items.filter((it) => it.kind === 'message' || it.kind === 'amplify').length;
+  const savableCount = items.filter((it) => it.kind !== 'error').length;
 
   const saveSession = useCallback(async (): Promise<void> => {
     if (bridge === null || busy || savableCount === 0) return;
@@ -519,7 +573,9 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
     const loaded: TranscriptItem[] = conversation.entries.map((entry) =>
       entry.kind === 'message'
         ? { kind: 'message', id: allocId(), role: entry.role, content: entry.content }
-        : { kind: 'amplify', id: allocId(), idea: entry.idea, result: entry.result },
+        : entry.kind === 'plan'
+          ? { kind: 'plan', id: allocId(), outcome: entry.outcome, result: entry.result }
+          : { kind: 'amplify', id: allocId(), idea: entry.idea, result: entry.result },
     );
     setItems(loaded);
     // Continuing forks a stored record: everything loaded still exists on disk
@@ -645,6 +701,8 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
     historyOpen,
     saveSession,
     toggleHistory,
+    automate,
+    draft,
   });
   useLayoutEffect(() => {
     latest.current = {
@@ -655,6 +713,8 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
       historyOpen,
       saveSession,
       toggleHistory,
+      automate,
+      draft,
     };
   });
 
@@ -671,6 +731,23 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
         event.preventDefault();
         if (!now.disabled && !now.busy && now.savableCount > 0 && now.viewing === null) {
           void now.saveSession();
+        }
+        return;
+      }
+
+      // Automate (ADR 0024). Shifted, so it cannot be hit by accident reaching
+      // for ⌘A (select all) — a mis-fire here spends a model call and clears the
+      // composer, which is a worse mistake than a mis-fired Save.
+      //
+      // It earns a shortcut on use: this is the action William said he expects
+      // to reach for constantly, and the whole point of the feature is that it
+      // costs one gesture. `event.code` rather than `event.key`, because with
+      // Shift held `key` is 'A' on some layouts and something else entirely on
+      // others; the physical key is what someone's hand actually learns.
+      if (chord && event.shiftKey && event.code === 'KeyA') {
+        event.preventDefault();
+        if (!now.disabled && !now.busy && now.draft.trim() !== '') {
+          void now.automate();
         }
         return;
       }
@@ -955,6 +1032,8 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
                 />
               ) : item.kind === 'amplify' ? (
                 <AmplifierCard key={item.id} idea={item.idea} result={item.result} />
+              ) : item.kind === 'plan' ? (
+                <AutomationPlanCard key={item.id} outcome={item.outcome} result={item.result} />
               ) : (
                 <ErrorLine key={item.id} text={item.text} />
               ),
@@ -969,6 +1048,7 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
             onKeyDown={onKeyDown}
             onSend={() => void send()}
             onAmplify={() => void amplify()}
+            onAutomate={() => void automate()}
             busy={busy}
             disabled={disabled}
           />
@@ -1343,6 +1423,8 @@ function SavedConversationView({
         {conversation.entries.map((entry, index) =>
           entry.kind === 'message' ? (
             <MessageBubble key={index} role={entry.role} content={entry.content} />
+          ) : entry.kind === 'plan' ? (
+            <AutomationPlanCard key={index} outcome={entry.outcome} result={entry.result} />
           ) : (
             <AmplifierCard key={index} idea={entry.idea} result={entry.result} />
           ),
@@ -1678,12 +1760,231 @@ function AmplifierCard({ idea, result }: { idea: string; result: AmplifierResult
 // Pulled from the design field-top rather than hard-coding a hex (CLAUDE.md §6).
 const background_fieldTop = '#05070a';
 
+/** The list sections of a plan, in reading order. */
+const PLAN_LISTS: { key: 'steps' | 'needs' | 'credentialsNeeded' | 'risks'; label: string }[] = [
+  { key: 'steps', label: 'Steps' },
+  { key: 'needs', label: 'What it needs' },
+  { key: 'credentialsNeeded', label: 'Logins it would touch' },
+  { key: 'risks', label: 'Risks' },
+];
+
+/**
+ * An automation plan (ADR 0024).
+ *
+ * Three deliberate choices in how this renders, all of them about not
+ * overselling what Jarvis did:
+ *
+ *   1. **`cannotDoYet` is shown in WARNING amber, not tucked at the bottom.**
+ *      It is the field that stops a plan reading like a promise. Burying it
+ *      would technically satisfy the contract and defeat its purpose.
+ *   2. **Logins are shown as labels, never as inputs.** There is no field here
+ *      to type a password into, on purpose: a credential must never enter a
+ *      model prompt, and a prompt is sent to a vendor.
+ *   3. **The card says the plan is not saved with the session.** Persisting it
+ *      needs a migration and a transcript entry kind that do not exist yet;
+ *      saying so is cheaper than someone losing a plan they wanted.
+ */
+function AutomationPlanCard({
+  outcome,
+  result,
+}: {
+  outcome: string;
+  result: AutomationPlan;
+}): JSX.Element {
+  const [copied, setCopied] = useState(false);
+
+  const copyPlan = (): void => {
+    const clipboard = navigator.clipboard as Clipboard | undefined;
+    if (clipboard === undefined) return;
+    clipboard
+      .writeText(planToMarkdown(outcome, result))
+      .then(() => {
+        setCopied(true);
+        window.setTimeout(() => {
+          setCopied(false);
+        }, 1600);
+      })
+      .catch(() => {
+        // Non-fatal: a denied clipboard is not a planning failure.
+      });
+  };
+
+  return (
+    <GlassPanel accentColor={accent.warning} padding={16} style={{ alignSelf: 'stretch' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          <span style={{ ...MONO_LABEL, color: accent.warning }}>Automation plan · v1</span>
+          <span style={{ color: text.secondaryDim, fontFamily: fontFamily.body, fontSize: 13 }}>
+            {outcome}
+          </span>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span style={{ ...MONO_LABEL, color: text.secondaryDim }}>Outcome</span>
+          <span
+            style={{
+              color: text.body,
+              fontFamily: fontFamily.body,
+              fontSize: 14,
+              lineHeight: 1.6,
+              whiteSpace: 'pre-wrap',
+            }}
+          >
+            {result.outcome}
+          </span>
+        </div>
+
+        {PLAN_LISTS.map(({ key, label }) => {
+          const values = result[key];
+          if (values.length === 0) return null;
+          const isCredentials = key === 'credentialsNeeded';
+          return (
+            <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span
+                style={{ ...MONO_LABEL, color: isCredentials ? accent.warning : text.secondaryDim }}
+              >
+                {label}
+              </span>
+              <ol
+                style={{
+                  margin: 0,
+                  paddingLeft: 18,
+                  color: text.body,
+                  listStyleType: key === 'steps' ? 'decimal' : 'disc',
+                }}
+              >
+                {values.map((v, i) => (
+                  <li
+                    key={i}
+                    style={{
+                      fontFamily: fontFamily.body,
+                      fontSize: 14,
+                      lineHeight: 1.6,
+                      marginBottom: 2,
+                    }}
+                  >
+                    {v}
+                  </li>
+                ))}
+              </ol>
+              {isCredentials && (
+                <span
+                  style={{
+                    color: text.secondaryDim,
+                    fontFamily: fontFamily.body,
+                    fontSize: 12,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  Named only. Jarvis never asks for, sees, or stores a password — a password put
+                  into a prompt is a password sent to a model vendor.
+                </span>
+              )}
+            </div>
+          );
+        })}
+
+        {/* The honesty field, given the weight it needs to actually be read. */}
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 4,
+            borderLeft: `2px solid ${accent.warning}`,
+            paddingLeft: 10,
+          }}
+        >
+          <span style={{ ...MONO_LABEL, color: accent.warning }}>Jarvis cannot do this part</span>
+          <span
+            style={{
+              color: text.body,
+              fontFamily: fontFamily.body,
+              fontSize: 14,
+              lineHeight: 1.6,
+              whiteSpace: 'pre-wrap',
+            }}
+          >
+            {result.cannotDoYet}
+          </span>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span style={{ ...MONO_LABEL, color: accent.success }}>Do this now</span>
+          <span
+            style={{
+              color: text.body,
+              fontFamily: fontFamily.body,
+              fontSize: 14,
+              lineHeight: 1.6,
+              whiteSpace: 'pre-wrap',
+            }}
+          >
+            {result.doThisNow}
+          </span>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={copyPlan}
+            style={{
+              ...MONO_LABEL,
+              color: copied ? background_fieldTop : accent.warning,
+              background: copied ? accent.warning : 'transparent',
+              border: `1px solid ${accent.warning}`,
+              borderRadius: 6,
+              padding: '4px 10px',
+              cursor: 'pointer',
+            }}
+          >
+            {copied ? 'Copied' : 'Copy plan'}
+          </button>
+          <span style={{ color: text.secondaryDim, fontFamily: fontFamily.body, fontSize: 12 }}>
+            Plans are not saved with the session yet — copy it if you want to keep it.
+          </span>
+        </div>
+      </div>
+    </GlassPanel>
+  );
+}
+
+/** A plan as Markdown, for the clipboard. */
+export function planToMarkdown(outcome: string, plan: AutomationPlan): string {
+  const list = (label: string, values: readonly string[], ordered: boolean): string[] =>
+    values.length === 0
+      ? []
+      : [
+          `## ${label}`,
+          ...values.map((v, i) => (ordered ? `${String(i + 1)}. ${v}` : `- ${v}`)),
+          '',
+        ];
+
+  return [
+    `# Automation plan: ${outcome}`,
+    '',
+    '## Outcome',
+    plan.outcome,
+    '',
+    ...list('Steps', plan.steps, true),
+    ...list('What it needs', plan.needs, false),
+    ...list('Logins it would touch', plan.credentialsNeeded, false),
+    ...list('Risks', plan.risks, false),
+    '## Jarvis cannot do this part',
+    plan.cannotDoYet,
+    '',
+    '## Do this now',
+    plan.doThisNow,
+    '',
+  ].join('\n');
+}
+
 function Composer({
   draft,
   onDraftChange,
   onKeyDown,
   onSend,
   onAmplify,
+  onAutomate,
   busy,
   disabled,
 }: {
@@ -1692,6 +1993,7 @@ function Composer({
   onKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
   onSend: () => void;
   onAmplify: () => void;
+  onAutomate: () => void;
   busy: boolean;
   disabled: boolean;
 }): JSX.Element {
@@ -1746,6 +2048,24 @@ function Composer({
             padding: '6px 6px',
           }}
         />
+        <button
+          type="button"
+          onClick={onAutomate}
+          disabled={!canAct}
+          title={`Plan an automation for this outcome (${MOD}\u21E7A). Writes a plan — Jarvis cannot run it yet.`}
+          style={{
+            ...MONO_LABEL,
+            color: canAct ? accent.warning : text.faint,
+            background: 'transparent',
+            border: `1px solid ${canAct ? accent.warning : surface.hairline}`,
+            borderRadius: 8,
+            padding: '8px 12px',
+            minHeight: 36,
+            cursor: canAct ? 'pointer' : 'default',
+          }}
+        >
+          Automate
+        </button>
         <button
           type="button"
           onClick={onAmplify}

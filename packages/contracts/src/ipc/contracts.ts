@@ -3,6 +3,8 @@ import { CHANNELS } from './channels.js';
 import {
   AmplifierResultSchema,
   AmplifyRequestSchema,
+  AutomationPlanRequestSchema,
+  AutomationPlanSchema,
   ChatReplySchema,
   ChatRequestSchema,
   PROVIDER_IDS,
@@ -111,6 +113,27 @@ export const jarvisAmplifyContract = defineContract({
   channel: CHANNELS.jarvisAmplify,
   request: AmplifyRequestSchema,
   response: AmplifierResultSchema,
+});
+
+// --- jarvis:plan-automation (ADR 0024) --------------------------------------
+
+/**
+ * "Automate this for me": an outcome in, a written plan out.
+ *
+ * The response is a DOCUMENT. This channel performs no automation, and the
+ * schema is what keeps that true rather than a promise in a comment —
+ * `cannotDoYet` is required and non-empty, so a model that returns a plan
+ * implying Jarvis will execute it is rejected at the boundary.
+ *
+ * `credentialsNeeded` names logins by label and never carries a value. Nothing
+ * in this system asks for one: a credential belongs in the OS keychain, is
+ * referenced rather than read, and must never enter a model prompt — a prompt
+ * is sent to a vendor, and on a free tier that vendor may train on it.
+ */
+export const jarvisPlanAutomationContract = defineContract({
+  channel: CHANNELS.jarvisPlanAutomation,
+  request: AutomationPlanRequestSchema,
+  response: AutomationPlanSchema,
 });
 
 // --- history:* (Stage 1A persistence, ADR 0008) -----------------------------
@@ -330,6 +353,7 @@ export const IPC_CONTRACTS = {
   [CHANNELS.appGetInfo]: appGetInfoContract,
   [CHANNELS.jarvisChat]: jarvisChatContract,
   [CHANNELS.jarvisAmplify]: jarvisAmplifyContract,
+  [CHANNELS.jarvisPlanAutomation]: jarvisPlanAutomationContract,
   [CHANNELS.historySave]: historySaveContract,
   [CHANNELS.historyList]: historyListContract,
   [CHANNELS.historyGet]: historyGetContract,

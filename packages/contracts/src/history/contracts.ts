@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AmplifierResultSchema } from '../model/contracts.js';
+import { AmplifierResultSchema, AutomationPlanSchema } from '../model/contracts.js';
 
 /**
  * Conversation-history schemas — the shapes stored and served by the Stage 1A
@@ -42,13 +42,30 @@ export const SavedAmplificationEntrySchema = z
   })
   .strict();
 
+/**
+ * A saved automation plan (ADR 0024).
+ *
+ * `outcome` is what William asked for; `result.outcome` is how Jarvis restated
+ * it. Both are kept, because the restatement is where a misunderstanding shows
+ * up and comparing them a week later is the whole value of having saved it.
+ */
+export const SavedPlanEntrySchema = z
+  .object({
+    kind: z.literal('plan'),
+    outcome: z.string().min(1),
+    result: AutomationPlanSchema,
+  })
+  .strict();
+
 export const TranscriptEntrySchema = z.discriminatedUnion('kind', [
   SavedMessageEntrySchema,
   SavedAmplificationEntrySchema,
+  SavedPlanEntrySchema,
 ]);
 
 export type SavedMessageEntry = z.infer<typeof SavedMessageEntrySchema>;
 export type SavedAmplificationEntry = z.infer<typeof SavedAmplificationEntrySchema>;
+export type SavedPlanEntry = z.infer<typeof SavedPlanEntrySchema>;
 export type TranscriptEntry = z.infer<typeof TranscriptEntrySchema>;
 
 /** Metadata for one saved conversation. Never contains the transcript. */

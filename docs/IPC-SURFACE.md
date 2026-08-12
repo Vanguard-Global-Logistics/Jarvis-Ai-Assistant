@@ -1,7 +1,9 @@
 # The IPC Surface
 
 Date: 2026-08-12
-Status: **THIRTEEN channels.** `model:describe`/`model:select` (ADR 0022) are IMPLEMENTED
+Status: **FOURTEEN channels.** `jarvis:plan-automation` (ADR 0024) is IMPLEMENTED AND
+VERIFIED on the Linux runtime probe — it returns a contract-shaped plan, always states what
+Jarvis cannot do, and the plan survives a save and reopen. `model:describe`/`model:select` (ADR 0022) are IMPLEMENTED
 AND VERIFIED on the Linux runtime probe — both are driven against the real app, and both
 directions of a switch are proven to re-route messages against a loopback stub provider,
 red-green (ADR 0022 §Decision.6). `profile:get`/`profile:set` (ADR 0013) are IMPLEMENTED AND
@@ -136,6 +138,30 @@ category in main (`toSafeModelError`) before any logging, and collapse to
 
 The response schema is `.strict()` and re-validated in main, so a provider that returns a
 malformed card fails at the boundary rather than reaching the amplifier UI.
+
+### `jarvis:plan-automation`
+
+|                       |                                                                                                                                                   |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Status**            | IMPLEMENTED AND VERIFIED on the Linux runtime probe (contract-shaped plan, required `cannotDoYet` populated, survives save + reopen), 2026-08-12. |
+| **Renderer call**     | `window.jarvis.planAutomation(outcome: string): Promise<AutomationPlan>`                                                                          |
+| **Request**           | `AutomationPlanRequestSchema` — `{ outcome }`, `.strict()`                                                                                        |
+| **Response**          | `AutomationPlanSchema`, `.strict()` — outcome, steps, needs, credentialsNeeded, risks, **cannotDoYet (required)**, **doThisNow (required)**       |
+| **Handler**           | `registerPlanAutomationHandler(getProvider)` in `apps/desktop/src/main/handlers/plan-automation.ts`                                               |
+| **Contract**          | `jarvisPlanAutomationContract`                                                                                                                    |
+| **Side effects**      | One model call. Nothing is written, opened, captured, or executed.                                                                                |
+| **Authority granted** | Identical to `jarvis:chat` — a model call and nothing more. **No screen capture, no computer control, no credential.**                            |
+
+The response is a **document, not an action** (ADR 0024). `cannotDoYet` being a
+required non-empty field is the enforcement: a model that returns a confident plan
+implying Jarvis will carry it out fails validation at this boundary rather than
+reaching the screen. Screen Vision and computer control are what AEGIS YELLOW exists to
+revoke, and `services/aegis` is empty by choice — so this channel plans and stops.
+
+`credentialsNeeded` carries **labels only** ("your Chase online banking login"), never a
+value. The contract forbids it, the prompt forbids it, and the UI has no field to type one
+into — a credential in a prompt is a credential sent to a vendor, and on a free tier that
+vendor may train on it (ADR 0023, ADR 0024 §5).
 
 ### `history:save`
 
@@ -360,7 +386,7 @@ JavaScript. SQLite needs no external at all — the driver is Node's builtin
   (`packages/contracts/src/ipc/contracts.test.ts`).
 - The `AppInfo` schema rejects unknown platforms, missing fields, empty strings, and
   extra keys; the request schema rejects any payload.
-- The bridge exposes exactly one namespace (`jarvis`) and exactly the thirteen allowlisted
+- The bridge exposes exactly one namespace (`jarvis`) and exactly the fourteen allowlisted
   functions, all values are functions, and no generic passthrough exists
   (`apps/desktop/src/preload/index.test.ts`). This test was verified red-green: it fails
   when a generic `invoke` is added to the bridge.

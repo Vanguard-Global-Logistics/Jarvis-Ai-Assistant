@@ -31,6 +31,7 @@ export {
   historyListContract,
   historySaveContract,
   jarvisAmplifyContract,
+  jarvisPlanAutomationContract,
   jarvisChatContract,
   modelDescribeContract,
   modelSelectContract,
@@ -64,12 +65,15 @@ export type {
   SavedConversation,
   SavedConversationMeta,
   SavedMessageEntry,
+  SavedPlanEntry,
   TranscriptEntry,
 } from './history/contracts.js';
 
 export {
   AmplifierResultSchema,
   AmplifyRequestSchema,
+  AutomationPlanRequestSchema,
+  AutomationPlanSchema,
   ChatMessageSchema,
   ChatReplySchema,
   ChatRequestSchema,
@@ -78,6 +82,8 @@ export {
 export type {
   AmplifierResult,
   AmplifyRequest,
+  AutomationPlan,
+  AutomationPlanRequest,
   ChatMessage,
   ChatReply,
   ChatRequest,

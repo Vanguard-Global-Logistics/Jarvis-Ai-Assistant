@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type {
   AmplifierResult,
+  AutomationPlan,
   SavedConversation,
   SavedConversationMeta,
   TranscriptEntry,
@@ -56,7 +57,16 @@ export function deriveTitle(entries: readonly TranscriptEntry[]): string {
 
   let raw = '';
   if (source !== undefined) {
-    raw = source.kind === 'message' ? source.content : source.idea;
+    // Each entry kind carries its own human-readable opener: a message's text,
+    // an amplified idea, or the outcome an automation plan was asked for. A
+    // plan-only session gets a title from the outcome — the same reasoning that
+    // made an amplifier-only session titleable in ADR 0009.
+    raw =
+      source.kind === 'message'
+        ? source.content
+        : source.kind === 'plan'
+          ? source.outcome
+          : source.idea;
   }
 
   const collapsed = raw.replace(/\s+/g, ' ').trim();
@@ -88,12 +98,15 @@ export function saveConversation(
         improved_concept, recommended_next_step, build_ready_prompt)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
   );
+  const insertPlan = db.prepare(INSERT_PLAN_SQL);
 
   withTransaction(db, () => {
     insertConversation.run(meta.id, meta.title, meta.savedAt);
     entries.forEach((entry, seq) => {
       if (entry.kind === 'message') {
         insertMessage.run(meta.id, seq, entry.role, entry.content);
+      } else if (entry.kind === 'plan') {
+        insertPlan.run(meta.id, seq, ...planParams(entry.outcome, entry.result));
       } else {
         const r = entry.result;
         insertAmplification.run(
@@ -134,7 +147,8 @@ const toMeta = (row: ConversationRow): SavedConversationMeta => ({
  */
 const ENTRY_COUNT_SQL = `
   ((SELECT COUNT(*) FROM conversation_messages m WHERE m.conversation_id = c.id) +
-   (SELECT COUNT(*) FROM conversation_amplifications a WHERE a.conversation_id = c.id))
+   (SELECT COUNT(*) FROM conversation_amplifications a WHERE a.conversation_id = c.id) +
+   (SELECT COUNT(*) FROM conversation_plans p WHERE p.conversation_id = c.id))
 `;
 
 /**
@@ -194,6 +208,68 @@ const rowToAmplifierResult = (row: AmplificationRow): AmplifierResult => ({
   buildReadyPrompt: row.build_ready_prompt,
 });
 
+// --- automation plans (ADR 0024) --------------------------------------------
+
+const INSERT_PLAN_SQL = `INSERT INTO conversation_plans
+    (conversation_id, seq, request_outcome, outcome, steps, needs,
+     credentials_needed, risks, cannot_do_yet, do_this_now)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+
+const SELECT_PLAN_SQL = `SELECT seq, request_outcome, outcome, steps, needs,
+         credentials_needed, risks, cannot_do_yet, do_this_now
+    FROM conversation_plans WHERE conversation_id = ?`;
+
+interface PlanRow {
+  seq: number;
+  request_outcome: string;
+  outcome: string;
+  steps: string;
+  needs: string;
+  credentials_needed: string;
+  risks: string;
+  cannot_do_yet: string;
+  do_this_now: string;
+}
+
+/** The eight bound values after `(conversation_id, seq)`, in column order. */
+const planParams = (requestOutcome: string, plan: AutomationPlan): string[] => [
+  requestOutcome,
+  plan.outcome,
+  JSON.stringify(plan.steps),
+  JSON.stringify(plan.needs),
+  JSON.stringify(plan.credentialsNeeded),
+  JSON.stringify(plan.risks),
+  plan.cannotDoYet,
+  plan.doThisNow,
+];
+
+/**
+ * Parse one stored JSON string array, defensively.
+ *
+ * Same reasoning as `parseMissingQuestions`: these columns are written only by
+ * `saveConversation` from an array the contract already validated, so a bad
+ * value cannot arrive through the app. If one ever does, failing loudly beats
+ * serving a malformed card — the boundary would reject it a moment later
+ * anyway, further from the cause.
+ */
+function parseStringArray(json: string, column: string): string[] {
+  const parsed: unknown = JSON.parse(json);
+  if (!Array.isArray(parsed) || !parsed.every((v): v is string => typeof v === 'string')) {
+    throw new Error(`Stored plan has a malformed ${column} payload.`);
+  }
+  return parsed;
+}
+
+const rowToPlan = (row: PlanRow): AutomationPlan => ({
+  outcome: row.outcome,
+  steps: parseStringArray(row.steps, 'steps'),
+  needs: parseStringArray(row.needs, 'needs'),
+  credentialsNeeded: parseStringArray(row.credentials_needed, 'credentials_needed'),
+  risks: parseStringArray(row.risks, 'risks'),
+  cannotDoYet: row.cannot_do_yet,
+  doThisNow: row.do_this_now,
+});
+
 /** One full saved conversation, or `null` when the id names nothing. */
 export function getConversation(db: SqliteDatabase, id: string): SavedConversation | null {
   const row = db
@@ -216,7 +292,10 @@ export function getConversation(db: SqliteDatabase, id: string): SavedConversati
     )
     .all(id) as unknown as AmplificationRow[];
 
-  // Merge the two tables back into one ordered transcript by seq.
+  const plans = db.prepare(SELECT_PLAN_SQL).all(id) as unknown as PlanRow[];
+
+  // Merge the three tables back into one ordered transcript by seq. Each seq
+  // lands in exactly one table, so this reconstructs the original order exactly.
   const bySeq: { seq: number; entry: TranscriptEntry }[] = [
     ...messages.map((m) => ({
       seq: m.seq,
@@ -225,6 +304,10 @@ export function getConversation(db: SqliteDatabase, id: string): SavedConversati
     ...amplifications.map((a) => ({
       seq: a.seq,
       entry: { kind: 'amplification' as const, idea: a.idea, result: rowToAmplifierResult(a) },
+    })),
+    ...plans.map((p) => ({
+      seq: p.seq,
+      entry: { kind: 'plan' as const, outcome: p.request_outcome, result: rowToPlan(p) },
     })),
   ];
   bySeq.sort((x, y) => x.seq - y.seq);
@@ -303,6 +386,7 @@ export function importConversations(
         improved_concept, recommended_next_step, build_ready_prompt)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
   );
+  const insertPlan = db.prepare(INSERT_PLAN_SQL);
 
   let added = 0;
   let skipped = 0;
@@ -332,6 +416,8 @@ export function importConversations(
       conversation.entries.forEach((entry, seq) => {
         if (entry.kind === 'message') {
           insertMessage.run(conversation.id, seq, entry.role, entry.content);
+        } else if (entry.kind === 'plan') {
+          insertPlan.run(conversation.id, seq, ...planParams(entry.outcome, entry.result));
         } else {
           const r = entry.result;
           insertAmplification.run(
@@ -356,7 +442,8 @@ export function importConversations(
 /**
  * Delete one saved conversation. Returns whether a row was actually removed —
  * a stale id reports `false` rather than pretending success (CLAUDE.md §8).
- * Messages and amplifications go with it via ON DELETE CASCADE (migrations 1, 2).
+ * Messages, amplifications and plans go with it via ON DELETE CASCADE
+ * (migrations 1, 2, 5).
  */
 export function deleteConversation(db: SqliteDatabase, id: string): boolean {
   const result = db.prepare('DELETE FROM conversations WHERE id = ?').run(id);

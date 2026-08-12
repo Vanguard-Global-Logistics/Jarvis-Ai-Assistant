@@ -79,15 +79,16 @@ storage, separate credentials. Phase 1 will not deliver OS-level enforcement. Wh
 state engine ships, this gap must be restated wherever AEGIS is described — not quietly
 dropped once the UI looks convincing.
 
-## 3. The IPC bridge exposes exactly thirteen narrow channels
+## 3. The IPC bridge exposes exactly fourteen narrow channels
 
 **Status: PARTIAL — intended for this stage.**
 
-`window.jarvis` exposes exactly thirteen purpose-named functions: `getAppInfo` (host
+`window.jarvis` exposes exactly fourteen purpose-named functions: `getAppInfo` (host
 facts), `sendChat` and `amplify` (model calls, ADR 0007), the four history
 operations (ADR 0008), `exportHistory` (ADR 0011), `importHistory` (ADR 0014),
 `describeModels`/`selectModel` (ADR 0022 — which brain is answering, and switching it
-without a restart), and `getProfile`/`setProfile`
+without a restart), `planAutomation` (ADR 0024 — writes a plan, performs nothing), and
+`getProfile`/`setProfile`
 (ADR 0013 — the orb's name and colour, which grant nothing). The authority envelope remains
 deliberately small: a model call, a conversation store, and one backup write whose
 destination the renderer can neither name nor learn — main opens the native save
@@ -126,9 +127,10 @@ exists as a step at all: there is no native module. The remaining honest caveats
 - `node:sqlite` is labeled **experimental on Node 22**, the runtime vitest uses. The
   app itself runs on Electron 43's embedded Node 24, where it is stable. If Node 22
   changes the API under the tests, the tests will say so loudly.
-- There are exactly **four** migrations (`conversation-history`,
-  `conversation-amplifications` ADR 0009, `profile` ADR 0013 — a single row holding a
-  display name and an accent — and `window-state` ADR 0017, a single row holding where
+- There are exactly **five** migrations (`conversation-history`,
+  `conversation-amplifications` ADR 0009, `conversation-plans` ADR 0024 — automation
+  plans, so a plan survives a save rather than evaporating, `profile` ADR 0013 — a single
+  row holding a display name and an accent — and `window-state` ADR 0017, a single row holding where
   the window was). No tables exist for memory, projects, tasks, or the audit log — those
   are feature design work and are not approved.
 - `window_state` is **not** reached over IPC. Main owns both the window and the database,
@@ -312,7 +314,7 @@ Four jobs, and the distinctions matter:
   did not.
 - **`runtime`** — installs Electron's GUI libraries and Xvfb, builds, then runs
   `npm run probe:runtime`: launches the real app (packaged path **and** `dev:desktop`) and
-  asserts React mounts, the bridge exposes exactly the thirteen allowlisted functions, a
+  asserts React mounts, the bridge exposes exactly the fourteen allowlisted functions, a
   brain switch really re-routes messages in both directions (ADR 0022), a
   chat/amplify round-trip works, the full history save/list/get/delete loop works against
   a real SQLite (including that an unsaved chat never persists), the renderer has no Node
