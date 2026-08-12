@@ -313,3 +313,38 @@ describe('/no_think reaches plain chat, not only the amplifier', () => {
     }
   });
 });
+
+describe('the token budget (measured, not guessed)', () => {
+  // The worst defect in this client, and the least visible. With no max_tokens,
+  // Ollama generates until the CONTEXT is exhausted: asked for two sentences,
+  // qwen3.5:4b produced 4,065 tokens and stopped only at the 4,096 wall —
+  // 3 minutes at a perfectly healthy 22 tokens/second. The machine was never the
+  // problem; nothing was telling the model when to stop.
+  const bodyOf = (fetchImpl: FetchLike): Record<string, unknown> => {
+    const init = (fetchImpl as unknown as { mock: { calls: [string, { body: string }][] } }).mock
+      .calls[0]?.[1];
+    return JSON.parse(init?.body ?? '{}') as Record<string, unknown>;
+  };
+
+  it('caps a chat reply so it lands in seconds, not minutes', async () => {
+    const fetchImpl = fetchReturning(completion('short'));
+    await new LocalProvider({
+      baseUrl: 'http://127.0.0.1:11434',
+      model: 'qwen3.5:4b',
+      fetch: fetchImpl,
+    }).chat({ messages: [{ role: 'user', content: 'hi' }] });
+
+    expect(bodyOf(fetchImpl).max_tokens).toBe(400);
+  });
+
+  it('gives the amplifier more room, because five fields genuinely need it', async () => {
+    const fetchImpl = fetchReturning(completion(JSON.stringify(AMP)));
+    await new LocalProvider({
+      baseUrl: 'http://127.0.0.1:11434',
+      model: 'qwen3.5:4b',
+      fetch: fetchImpl,
+    }).amplify('an idea');
+
+    expect(bodyOf(fetchImpl).max_tokens).toBe(900);
+  });
+});

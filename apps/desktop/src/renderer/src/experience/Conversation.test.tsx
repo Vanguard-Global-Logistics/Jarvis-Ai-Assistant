@@ -22,6 +22,25 @@ const SAVED_META = {
   entryCount: 2,
 };
 
+/** Two usable brains and two that are not — the shape a real machine reports. */
+const MODELS = {
+  active: 'mock' as const,
+  providers: [
+    { id: 'mock' as const, available: true },
+    { id: 'local' as const, available: true },
+    {
+      id: 'anthropic' as const,
+      available: false,
+      unavailableReason: 'The anthropic provider was selected but ANTHROPIC_API_KEY is not set.',
+    },
+    {
+      id: 'grok' as const,
+      available: false,
+      unavailableReason: 'The grok provider was selected but XAI_API_KEY is not set.',
+    },
+  ],
+};
+
 function fakeBridge(overrides: Partial<ConversationBridge> = {}): ConversationBridge {
   return {
     sendChat: vi.fn().mockResolvedValue({ text: 'Hello from the mock.', provider: 'mock' }),
@@ -32,6 +51,10 @@ function fakeBridge(overrides: Partial<ConversationBridge> = {}): ConversationBr
     deleteConversation: vi.fn().mockResolvedValue({ deleted: true }),
     exportHistory: vi.fn().mockResolvedValue({ exported: true, conversationCount: 1 }),
     importHistory: vi.fn().mockResolvedValue({ imported: true, added: 2, skipped: 0 }),
+    describeModels: vi.fn().mockResolvedValue(MODELS),
+    selectModel: vi
+      .fn()
+      .mockResolvedValue({ selected: true, active: 'local', providers: MODELS.providers }),
     ...overrides,
   };
 }
@@ -779,5 +802,80 @@ describe('Conversation', () => {
       // Nothing to lose, so no prompt.
       expect(await screen.findByText('archived question')).toBeTruthy();
     });
+  });
+});
+
+describe('choosing which brain answers (ADR 0022)', () => {
+  const openPicker = async (): Promise<void> => {
+    fireEvent.click(await screen.findByRole('button', { name: /brain · mock/i }));
+  };
+
+  it('names the brain that is answering, without being asked', async () => {
+    render(<Conversation bridge={fakeBridge()} />);
+    expect(await screen.findByRole('button', { name: /brain · mock/i })).toBeTruthy();
+  });
+
+  it('lists the unusable brains WITH the reason, rather than hiding them', async () => {
+    // Hiding them answers "why can't I use Claude?" with silence.
+    render(<Conversation bridge={fakeBridge()} />);
+    await openPicker();
+
+    expect(screen.getByText(/ANTHROPIC_API_KEY is not set/)).toBeTruthy();
+    expect(screen.getByText(/XAI_API_KEY is not set/)).toBeTruthy();
+  });
+
+  it('says what each choice costs — money and privacy, not just a name', async () => {
+    render(<Conversation bridge={fakeBridge()} />);
+    await openPicker();
+
+    expect(screen.getByText(/Free, private, slower and less capable/)).toBeTruthy();
+  });
+
+  it('switches, and sends only an identifier across the boundary', async () => {
+    // The renderer must never be able to name an endpoint or a key: that is what
+    // keeps ADR 0015's loopback rule meaningful.
+    const selectModel = vi
+      .fn()
+      .mockResolvedValue({ selected: true, active: 'local', providers: MODELS.providers });
+    render(<Conversation bridge={fakeBridge({ selectModel })} />);
+    await openPicker();
+
+    fireEvent.click(screen.getByRole('button', { name: /Local model/ }));
+
+    await waitFor(() => {
+      expect(selectModel).toHaveBeenCalledWith('local');
+    });
+    expect(selectModel.mock.calls[0]).toEqual(['local']);
+  });
+
+  it('shows the reason when main refuses, and leaves the old brain in place', async () => {
+    const selectModel = vi.fn().mockResolvedValue({
+      selected: false,
+      active: 'mock',
+      reason: 'The anthropic provider was selected but ANTHROPIC_API_KEY is not set.',
+      providers: MODELS.providers,
+    });
+    render(<Conversation bridge={fakeBridge({ selectModel })} />);
+    await openPicker();
+
+    // The disabled button cannot be clicked, so drive the refusal the way a
+    // stale UI would: pick one that was available when the list was drawn.
+    fireEvent.click(screen.getByRole('button', { name: /Local model/ }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('status').textContent).toMatch(/ANTHROPIC_API_KEY is not set/);
+    });
+    // Still mock: a refusal must not silently move the selection.
+    expect(screen.getByRole('button', { name: /brain · mock/i })).toBeTruthy();
+  });
+
+  it('does not crash when the preload predates these functions', async () => {
+    // A renderer hot-reloaded against an older preload really does arrive here
+    // without them. No picker is the right outcome; a blank screen is not.
+    const { describeModels: _d, selectModel: _s, ...older } = fakeBridge();
+    render(<Conversation bridge={older as never} />);
+
+    expect(await screen.findByRole('textbox', { name: /message jarvis/i })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /brain ·/i })).toBeNull();
   });
 });

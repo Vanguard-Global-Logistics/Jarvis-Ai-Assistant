@@ -3,6 +3,8 @@ import type { CSSProperties, JSX, KeyboardEvent, RefObject } from 'react';
 import type {
   AmplifierResult,
   ChatMessage,
+  ModelDescription,
+  ModelSelection,
   OrbState,
   ProviderId,
   SavedConversation,
@@ -77,6 +79,8 @@ export interface ConversationBridge {
   deleteConversation: (id: string) => Promise<{ deleted: boolean }>;
   exportHistory: () => Promise<{ exported: boolean; conversationCount: number }>;
   importHistory: () => Promise<{ imported: boolean; added: number; skipped: number }>;
+  describeModels: () => Promise<ModelDescription>;
+  selectModel: (id: ProviderId) => Promise<ModelSelection>;
 }
 
 export interface ConversationProps {
@@ -147,6 +151,15 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
   const [armedFor, setArmedFor] = useState<TranscriptItem[] | null>(null);
   /** True while Continue is one click away from replacing unsaved live work. */
   const [confirmContinue, setConfirmContinue] = useState(false);
+  /**
+   * Which brains exist and which is answering (ADR 0022), or null before the
+   * first read. Null renders nothing — an empty picker would imply there is no
+   * choice, which is a different claim from "not asked yet".
+   */
+  const [models, setModels] = useState<ModelDescription | null>(null);
+  const [modelsOpen, setModelsOpen] = useState(false);
+  /** Why the last attempted switch was refused, shown in place of a silent no-op. */
+  const [modelNotice, setModelNotice] = useState<string | null>(null);
   const nextId = useRef(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   /** The History filter box, so ⌘F can put the caret in it. */
@@ -443,6 +456,47 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
     continueSaved(conversation);
   };
 
+  useEffect(() => {
+    if (bridge === null) return;
+    // The bridge comes from `window.jarvis`, which TypeScript describes but does
+    // not control: a renderer hot-reloaded against an older preload really can
+    // arrive here without these functions. Absent means "no picker", not a
+    // crash that takes the whole conversation surface down with it.
+    if (typeof bridge.describeModels !== 'function') return;
+    // Read once at mount. Nothing else changes the active provider behind the
+    // UI's back — main only switches when this component asks it to.
+    bridge
+      .describeModels()
+      .then(setModels)
+      .catch((error: unknown) => {
+        console.error('[jarvis] model:describe failed', error);
+      });
+  }, [bridge]);
+
+  /**
+   * Switch the brain, and say so when main refuses.
+   *
+   * A refusal is normal — "you have not set an API key" — and main keeps the
+   * previous provider, so the honest thing is to show the reason and leave the
+   * selection where it was. Silently reverting a click the user just made would
+   * read as the app being broken.
+   */
+  const chooseModel = useCallback(
+    async (id: ProviderId): Promise<void> => {
+      if (bridge === null) return;
+      try {
+        const result = await bridge.selectModel(id);
+        setModels({ active: result.active, providers: result.providers });
+        setModelNotice(result.selected ? null : (result.reason ?? 'That model is not available.'));
+        if (result.selected) setModelsOpen(false);
+      } catch (error) {
+        console.error('[jarvis] model:select failed', error);
+        setModelNotice('The model could not be changed. The reason is in the terminal.');
+      }
+    },
+    [bridge],
+  );
+
   const continueSaved = (conversation: SavedConversation): void => {
     const loaded: TranscriptItem[] = conversation.entries.map((entry) =>
       entry.kind === 'message'
@@ -729,12 +783,75 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
           enabled={!disabled}
           title={`Saved sessions on this machine (${MOD}F to search, Esc to close)`}
         />
+        <ToolbarButton
+          label={
+            models === null
+              ? 'Brain'
+              : `Brain · ${PROVIDER_LABELS[models.active]} ${modelsOpen ? '▾' : '▸'}`
+          }
+          onClick={() => {
+            setModelsOpen((open) => !open);
+            setModelNotice(null);
+          }}
+          enabled={!disabled && models !== null}
+          title="Which model answers. Switching takes effect on the next message."
+        />
         {saveNotice !== null && (
           <span role="status" style={{ ...MONO_LABEL, color: accent.success }}>
             {saveNotice}
           </span>
         )}
       </div>
+
+      {/*
+        The brain picker (ADR 0022).
+
+        Every provider is listed, including the ones that cannot be used, each
+        with the reason. Hiding the unavailable ones would answer "why can't I
+        use Claude?" with silence; showing them with "no API key is set" answers
+        it in place. Main is the authority — this only ever sends an identifier
+        and renders what comes back.
+      */}
+      {modelsOpen && models !== null && (
+        <GlassPanel style={{ padding: 12, display: 'grid', gap: 8 }}>
+          <span style={MONO_LABEL}>Which brain answers</span>
+          {models.providers.map((option) => {
+            const active = option.id === models.active;
+            return (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => void chooseModel(option.id)}
+                disabled={!option.available && !active}
+                aria-current={active}
+                style={{
+                  textAlign: 'left',
+                  padding: '8px 10px',
+                  borderRadius: 10,
+                  cursor: option.available || active ? 'pointer' : 'not-allowed',
+                  background: active ? 'rgba(90,209,255,0.10)' : surface.glass,
+                  border: `1px solid ${active ? accent.jarvisBlue : surface.hairline}`,
+                  color: option.available ? text.body : text.faint,
+                  font: 'inherit',
+                }}
+              >
+                <span style={{ ...MONO_LABEL, color: active ? accent.jarvisBlue : text.secondary }}>
+                  {PROVIDER_LABELS[option.id]}
+                  {active ? ' · answering now' : ''}
+                </span>
+                <span style={{ display: 'block', fontSize: 12, marginTop: 2 }}>
+                  {option.available ? PROVIDER_BLURBS[option.id] : option.unavailableReason}
+                </span>
+              </button>
+            );
+          })}
+          {modelNotice !== null && (
+            <span role="status" style={{ ...MONO_LABEL, color: accent.warning }}>
+              {modelNotice}
+            </span>
+          )}
+        </GlassPanel>
+      )}
 
       {/* An always-visible one-liner when there is nothing to save yet, so the
           greyed button is never a mystery. */}
@@ -1278,6 +1395,27 @@ function CopyMarkdownButton({ markdown }: { markdown: string }): JSX.Element {
  * Amber for mock (nothing thought about this) and Jarvis blue for local (a real
  * model, on this machine, weaker than Claude — a caveat, not a warning).
  */
+/** Short names for the picker. The chip vocabulary, minus the chip. */
+const PROVIDER_LABELS: Record<ProviderId, string> = {
+  mock: 'Mock',
+  local: 'Local model',
+  anthropic: 'Claude',
+  grok: 'Grok',
+};
+
+/**
+ * One line on what choosing each costs, because the choice is a trade.
+ *
+ * Money and privacy are the two axes that matter here and neither is visible
+ * from the name alone.
+ */
+const PROVIDER_BLURBS: Record<ProviderId, string> = {
+  mock: 'Canned replies. Free, offline, and not thinking.',
+  local: 'On this machine. Free, private, slower and less capable.',
+  anthropic: 'Claude. Billed per message; the conversation leaves this machine.',
+  grok: 'Grok. Billed per message; the conversation leaves this machine.',
+};
+
 const PROVIDER_CHIPS: Partial<Record<ProviderId, { label: string; color: string; title: string }>> =
   {
     mock: {

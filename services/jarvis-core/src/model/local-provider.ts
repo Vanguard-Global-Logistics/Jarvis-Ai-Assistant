@@ -26,6 +26,19 @@ import type { JarvisModelProvider } from './provider.js';
  */
 
 /**
+ * How many tokens a local reply may take.
+ *
+ * Sized from a real measurement: this machine generates ~22 tokens/second, and a
+ * useful answer should land inside ~20 seconds, so ~400 is the budget that keeps
+ * the conversation feeling like a conversation. Uncapped, the same model wrote
+ * 4,065 tokens for a two-sentence question and stopped only at the context wall.
+ *
+ * A reply that hits the cap is marked as cut off rather than passed off as
+ * finished — a silently truncated answer is worse than a visibly short one.
+ */
+const LOCAL_TOKEN_BUDGET = 400;
+
+/**
  * How long to wait for a model sharing memory with the rest of the machine.
  *
  * 120s aborted a real Qwen3 amplify mid-answer on an 8GB MacBook Air. This is
@@ -79,6 +92,10 @@ export class LocalProvider implements JarvisModelProvider {
       // just slowly", not a target.
       timeoutMs: options.timeoutMs ?? LOCAL_TIMEOUT_MS,
       suppressReasoning: true,
+      // The cap that turns "three minutes" into "under twenty seconds" on a
+      // laptop. A small model asked for two sentences will happily write four
+      // thousand tokens if nothing stops it — measured, not guessed.
+      maxOutputTokens: LOCAL_TOKEN_BUDGET,
       ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
     });
   }

@@ -18,6 +18,15 @@ import { AMPLIFIER_SYSTEM_PROMPT, buildAmplifierUserMessage } from '../amplifier
  * provider is constructed, not be a flag a caller can pass.
  */
 
+/**
+ * Room for five fields of JSON, and no more.
+ *
+ * Larger than a chat turn because the amplifier's answer genuinely is larger;
+ * still bounded, because an unbounded amplifier is what timed out at 240
+ * seconds while the model wrote an essay nobody would read.
+ */
+const AMPLIFIER_TOKEN_BUDGET = 900;
+
 /** How long to wait before concluding the service is not going to answer. */
 const REQUEST_TIMEOUT_MS = 120_000;
 
@@ -79,10 +88,29 @@ export interface OpenAiCompatibleOptions {
    * and is not being paid for by a 4B model on 8GB of shared memory.
    */
   readonly suppressReasoning?: boolean;
+  /**
+   * Hard cap on generated tokens.
+   *
+   * NOT a nicety — its absence was the single worst defect in this client. With
+   * no `max_tokens`, Ollama generates until the CONTEXT is exhausted, so a local
+   * model asked for "two sentences" produced 4,065 tokens and stopped only
+   * because it hit the 4,096-token wall: three minutes for an answer that needed
+   * about ten seconds of it. The machine was never slow — it was doing 22
+   * tokens/second faithfully, for far too long.
+   *
+   * Frontier models stop when they are finished, so this matters most for the
+   * small ones, which is exactly where the wait is least affordable.
+   */
+  readonly maxOutputTokens?: number;
 }
 
 interface ChatCompletionResponse {
-  choices?: { message?: { content?: unknown } }[];
+  choices?: { message?: { content?: unknown }; finish_reason?: unknown }[];
+}
+
+/** True when the model was cut off by the token budget rather than finishing. */
+export function wasTruncated(payload: unknown): boolean {
+  return (payload as ChatCompletionResponse).choices?.[0]?.finish_reason === 'length';
 }
 
 /**
@@ -186,6 +214,7 @@ export class OpenAiCompatibleClient {
   private readonly timeoutMs: number;
   private readonly baseUrl: string;
   private readonly suppressReasoning: boolean;
+  private readonly maxOutputTokens: number | undefined;
 
   public constructor(options: OpenAiCompatibleOptions) {
     this.baseUrl = options.baseUrl.replace(/\/+$/, '');
@@ -196,6 +225,7 @@ export class OpenAiCompatibleClient {
     this.fetchImpl = options.fetch ?? globalThis.fetch;
     this.timeoutMs = options.timeoutMs ?? REQUEST_TIMEOUT_MS;
     this.suppressReasoning = options.suppressReasoning ?? false;
+    this.maxOutputTokens = options.maxOutputTokens;
   }
 
   /**
@@ -261,9 +291,10 @@ export class OpenAiCompatibleClient {
 
   public async complete(
     messages: readonly { role: string; content: string }[],
-    options: { jsonMode: boolean },
+    options: { jsonMode: boolean; maxTokens?: number },
   ): Promise<string> {
     const sent = this.suppressReasoning ? withNoThink(messages) : messages;
+    const budget = options.maxTokens ?? this.maxOutputTokens;
     const controller = new AbortController();
     const timer = setTimeout(() => {
       controller.abort();
@@ -285,6 +316,7 @@ export class OpenAiCompatibleClient {
           // Ollama honours this; servers that do not know it ignore an unknown
           // body field rather than failing, which is why it is safe to send.
           ...(this.suppressReasoning ? { think: false } : {}),
+          ...(budget === undefined ? {} : { max_tokens: budget }),
           // Honored by most implementations; harmlessly ignored by the rest,
           // which is why extractJsonObject stays tolerant.
           ...(options.jsonMode ? { response_format: { type: 'json_object' } } : {}),
@@ -331,7 +363,7 @@ export class OpenAiCompatibleClient {
         },
         { role: 'user', content: buildAmplifierUserMessage(idea) },
       ],
-      { jsonMode: true },
+      { jsonMode: true, maxTokens: AMPLIFIER_TOKEN_BUDGET },
     );
 
     const result = AmplifierResultSchema.safeParse(this.extractJsonObject(text));
