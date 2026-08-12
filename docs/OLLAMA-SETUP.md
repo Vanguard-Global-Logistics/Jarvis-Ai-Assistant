@@ -48,6 +48,11 @@ everything you type afterwards gets swallowed — the same trap `caffeinate` set
 You should get your prompt back within a second or two. Some startup logging is
 normal.
 
+**If you get `bind: address already in use`, that is success, not a failure.**
+It means Ollama is already serving on 11434 — the desktop app, or a
+`brew services` registration from an earlier install. Do not try to fix it. Skip
+to the `curl` check at the end of Step 3; if that returns JSON, you are running.
+
 ## Step 3 — Download the model
 
 ```bash
