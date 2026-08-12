@@ -1,7 +1,7 @@
 // @ts-check
 import { spawn, spawnSync } from 'node:child_process';
 import { DatabaseSync } from 'node:sqlite';
-import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -879,6 +879,83 @@ async function probe(mode) {
  * The file goes in a temporary working directory, never the repo, so running the
  * probe cannot disturb a real `.env`.
  */
+/**
+ * Prove the DOCUMENTED command finds the DOCUMENTED file (ADR 0021).
+ *
+ * `probeEnvFileIsRead` launches Electron directly with a chosen cwd. That is not
+ * what William runs. `npm run dev:desktop` executes the script inside the
+ * workspace, so `process.cwd()` is `apps/desktop` while every setup guide says
+ * to put `.env` in the repo ROOT — and the first version of the loader, which
+ * checked cwd alone, therefore still did not find it. The direct-launch probe
+ * passed the whole time.
+ *
+ * So this drives the real npm script against a real repo-root `.env`. It is the
+ * only check here that exercises the exact two things a human is told to do.
+ *
+ * The file is written to the repository and removed in a `finally`, with any
+ * pre-existing `.env` moved aside first and put back afterwards — the same
+ * move-aside pattern `diagnostics-redaction.test.ts` uses. Nothing a developer
+ * had on disk is destroyed.
+ */
+async function probeEnvFileViaNpmScript() {
+  const envPath = join(root, '.env');
+  const backupPath = join(root, '.env.probe-backup');
+  const hadExisting = existsSync(envPath);
+  if (hadExisting) renameSync(envPath, backupPath);
+
+  try {
+    writeFileSync(
+      envPath,
+      [
+        '# written by scripts/runtime-probe.mjs — removed when the probe finishes',
+        'JARVIS_LOCAL_MODEL_URL=https://someone-elses-server.example.com',
+        'JARVIS_LOCAL_MODEL=qwen3.5:4b',
+        '',
+      ].join('\n'),
+      'utf8',
+    );
+
+    // No PINNED_MOCK here: the whole point is to let the .env decide, and a
+    // non-loopback URL reaching createProvider must kill the app.
+    const child = launch('npm', ['run', 'dev:desktop'], {
+      NO_SANDBOX: '1',
+      JARVIS_USER_DATA_DIR: mkdtempSync(join(tmpdir(), 'jarvis-probe-npm-env-')),
+    });
+
+    /** @type {string[]} */
+    const output = [];
+    child.stdout?.on('data', (d) => output.push(String(d)));
+    child.stderr?.on('data', (d) => output.push(String(d)));
+
+    const exitCode = await new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        kill(child);
+        resolve('still running');
+      }, 60_000);
+      child.on('exit', (code) => {
+        clearTimeout(timer);
+        resolve(code);
+      });
+    });
+
+    const text = output.join('');
+    const refused = /must point at this machine/i.test(text);
+    return [
+      {
+        name: 'npm run dev:desktop finds a repo-root .env',
+        ok: refused,
+        detail: refused
+          ? `the loopback rule fired, so the repo-root file was found from apps/desktop (exit ${String(exitCode)})`
+          : `the repo-root .env was NOT found — cwd for this script is apps/desktop, not the root. ` +
+            `Last output: ${text.split('\n').filter(Boolean).slice(-3).join(' | ')}`,
+      },
+    ];
+  } finally {
+    rmSync(envPath, { force: true });
+    if (hadExisting) renameSync(backupPath, envPath);
+  }
+}
+
 async function probeEnvFileIsRead() {
   if (!existsSync(join(root, 'apps/desktop/out/main/index.js'))) {
     fail('No build output. Run `npm run build` first.');
@@ -1135,6 +1212,10 @@ for (const mode of /** @type {const} */ (['prod', 'dev', 'packaged'])) {
 if (wantProd) {
   console.log(`\n──────── .env IS ACTUALLY READ (ADR 0021) ────────\n`);
   for (const c of await probeEnvFileIsRead()) {
+    console.log(`  ${c.ok ? '✓' : '✗'} ${c.name.padEnd(38)} ${c.detail}`);
+    if (!c.ok) failed++;
+  }
+  for (const c of await probeEnvFileViaNpmScript()) {
     console.log(`  ${c.ok ? '✓' : '✗'} ${c.name.padEnd(38)} ${c.detail}`);
     if (!c.ok) failed++;
   }
