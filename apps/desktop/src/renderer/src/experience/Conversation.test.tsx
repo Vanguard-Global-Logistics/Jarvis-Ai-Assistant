@@ -184,6 +184,14 @@ describe('Conversation', () => {
 
     const alert = await screen.findByRole('alert');
     expect(alert.textContent).toContain('could not respond');
+    // It must point somewhere that actually answers the question. "Check the
+    // terminal" was a dead end for anyone who had closed it, scrolled past it,
+    // or was typing into a window still running the dev server — all of which
+    // happened. `check:model` asks the service and prints what it said.
+    expect(alert.textContent).toContain('npm run check:model');
+    // And it must NOT invent a cause: the renderer is never told why (ADR 0007),
+    // so a message naming one would be a guess presented as fact.
+    expect(alert.textContent).not.toMatch(/api key|quota|network|400|401|429/i);
     expect(consoleError).toHaveBeenCalled();
     consoleError.mockRestore();
   });

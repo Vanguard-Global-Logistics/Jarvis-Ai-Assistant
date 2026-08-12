@@ -66,6 +66,24 @@ import { transcriptToMarkdown } from './transcript-markdown.js';
  */
 const MOD = typeof navigator !== 'undefined' && /Mac/i.test(navigator.userAgent) ? '⌘' : 'Ctrl+';
 
+/**
+ * What to say when the model call fails.
+ *
+ * The renderer is NOT told why — main collapses every provider failure to a
+ * fixed category at the IPC boundary, deliberately, because a provider error can
+ * carry a URL, a header fragment, or worse (ADR 0007). So this cannot explain the
+ * failure and must not pretend to.
+ *
+ * What it CAN do is name the one command that will explain it.
+ * "Check the terminal" was the previous wording, and it was a dead end for
+ * someone who had closed the terminal, scrolled past it, or — as actually
+ * happened — typed into a window still running the dev server. `check:model`
+ * makes one real request and prints the service's own sentence, which is the
+ * difference between "something is wrong" and "your key is invalid".
+ */
+const MODEL_FAILURE_HINT = (what: string): string =>
+  `${what} Run \`npm run check:model\` in the project folder — it asks the service directly and prints what it said.`;
+
 /** What the renderer needs from the preload bridge. Kept minimal on purpose. */
 export interface ConversationBridge {
   sendChat: (request: { messages: ChatMessage[] }) => Promise<{
@@ -235,7 +253,7 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
         {
           kind: 'error',
           id: allocId(),
-          text: 'Jarvis could not respond. The reason is in the terminal where you started Jarvis.',
+          text: MODEL_FAILURE_HINT('Jarvis could not respond.'),
         },
       ]);
       setOrb('warning');
@@ -269,7 +287,7 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
         {
           kind: 'error',
           id: allocId(),
-          text: 'The amplifier could not run. The reason is in the terminal where you started Jarvis.',
+          text: MODEL_FAILURE_HINT('The amplifier could not run.'),
         },
       ]);
       setOrb('warning');
