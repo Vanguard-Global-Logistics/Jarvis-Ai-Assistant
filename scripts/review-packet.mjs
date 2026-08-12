@@ -1,9 +1,9 @@
 // @ts-check
-import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { findSecret } from './lib/secret-scan.mjs';
+import { resolveScope } from './lib/diff-scope.mjs';
 
 /**
  * Assemble a paste-ready INDEPENDENT REVIEW packet for another model.
@@ -106,10 +106,6 @@ const TOPICS = {
   },
 };
 
-function git(/** @type {string[]} */ args) {
-  return execFileSync('git', args, { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
-}
-
 /** Quote a repo file, truncated, so the reviewer judges against the real rule. */
 function quote(/** @type {string} */ relative, /** @type {number} */ maxLines = 120) {
   const path = join(root, relative);
@@ -157,9 +153,21 @@ if (topic !== undefined && selected === undefined) {
 }
 
 const paths = selected?.paths ?? [];
-const diff = git(['diff', `${base}...HEAD`, '--', ...paths]);
-const stat = git(['diff', '--stat', `${base}...HEAD`, '--', ...paths]);
-const log = git(['log', '--oneline', `${base}..HEAD`]);
+// Scope resolution is shared with `npm run swarm` via `lib/diff-scope.mjs`.
+// It was duplicated for about an hour and diverged inside that hour: the swarm
+// learned to read the WORKING TREE while this file stayed on committed history,
+// so the packet that actually goes to another vendor would have been assembled
+// from a different artifact than the one the swarm cleared.
+const {
+  diff,
+  stat,
+  log,
+  label: scopeLabel,
+} = resolveScope({
+  root,
+  since: sinceFlag === -1 ? undefined : base,
+  paths,
+});
 
 const sections = [
   `# Independent review request — Jarvis`,
@@ -168,7 +176,7 @@ const sections = [
     `(CLAUDE.md §5) is that a builder model is never the sole approver of its own work, so your ` +
     `job is to find what the author missed — not to confirm it looks fine.`,
   '',
-  `Scope: **${selected?.label ?? 'everything on this branch'}**, diffed against \`${base}\`.`,
+  `Scope: **${selected?.label ?? 'everything on this branch'}** — ${scopeLabel}.`,
   '',
   '## What to do',
   '',

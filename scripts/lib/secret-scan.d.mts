@@ -6,6 +6,9 @@
  * the same strict settings as the rest of the codebase.
  */
 
-export declare const SECRET_PATTERNS: readonly RegExp[];
+export declare const SECRET_PATTERNS: readonly {
+  readonly re: RegExp;
+  readonly exemptible: boolean;
+}[];
 export declare const FIXTURE_MARKERS: RegExp;
 export declare function findSecret(text: string): string | null;

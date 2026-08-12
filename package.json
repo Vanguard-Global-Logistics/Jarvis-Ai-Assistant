@@ -2,7 +2,7 @@
   "name": "jarvis-ai-assistant",
   "version": "0.0.0",
   "private": true,
-  "description": "Jarvis AI Assistant \u2014 production foundation (Phase 1). No application features implemented.",
+  "description": "Jarvis AI Assistant — production foundation (Phase 1). No application features implemented.",
   "license": "UNLICENSED",
   "type": "module",
   "engines": {
@@ -33,7 +33,8 @@
     "probe:packaged": "node scripts/runtime-probe.mjs --packaged",
     "diagnostics": "node scripts/collect-diagnostics.mjs",
     "check:model": "node scripts/check-model.mjs",
-    "review": "node scripts/review-packet.mjs"
+    "review": "node scripts/review-packet.mjs",
+    "swarm": "node scripts/swarm.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

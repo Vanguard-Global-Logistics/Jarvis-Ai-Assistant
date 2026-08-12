@@ -336,6 +336,43 @@ all if anything credential-shaped is in it, and costs one paste. A review that i
 but never obtained is a control this project does not actually have. No model silently approves its own security
 controls. This comes from `JARVIS-MASTER-SPEC.md` §Model separation and is not optional.
 
+### `npm run swarm` — critics read the code BEFORE William does
+
+> **No change is offered as done until the swarm has read it and every blocking
+> finding is fixed or explicitly declined in the report.**
+
+This exists because of a direct instruction: _"a bunch of critics look at Claude
+code and make sure that you aren't making mistakes"_ — and because the complaint
+behind it is fair. `.env` documented in four places and loaded by nothing. A leak
+test that passed against a deliberately injected leak. A fail-closed rule that
+failed open. A Gemini URL with a doubled version segment. Every one reached
+William; every one was findable by reading the code with the right question in mind.
+
+`npm run swarm` writes one prompt per **lens** — `correctness`, `boundaries`,
+`tests-are-real`, `docs-vs-code`, `simplicity` — each a different hostile question,
+because five reviewers asked the same question return the same answer and their
+agreement gets misread as confidence. Send each to its own fresh agent, then
+`node scripts/swarm.mjs verdict --files …` aggregates **worst-case**: one
+reviewer saying SHIP never outvotes another holding a blocking finding, and the
+command exits non-zero so the failure is mechanical rather than remembered.
+
+Three properties that are the whole point:
+
+- **It defaults to the WORKING TREE, including untracked files.** Reviewing only
+  committed history reviews the one version it is too late to fix quietly. It found
+  its own blind spot here: the first working-tree run reported 69 lines because the
+  script under review was untracked and invisible to its own swarm.
+- **It refuses to assemble a diff containing anything credential-shaped**, reusing
+  the same scanner as `npm run review`, because a diff handed to a reviewer is a
+  diff that may leave the machine.
+- **It refuses a diff over 4,000 lines.** A reviewer given 20,000 lines skims, and
+  skimming produces "looks reasonable" — the exact output this mechanism exists to
+  prevent. Narrow the scope instead.
+
+**This is not the §5 independent review and does not replace it.** Same model,
+same weights, same blind spots; it is a quality gate, not approval authority.
+Security-critical work still needs `npm run review` and a second vendor.
+
 ### A noted reconciliation
 
 `JARVIS-MASTER-SPEC.md` assigns Opus the *independent reviewer* role; William's direct

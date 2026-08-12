@@ -64,3 +64,6 @@ coverage/
 # Committing them would put that text in history permanently and would tempt the
 # secret scanner into refusing on its own output.
 docs/review/
+
+# Critic-swarm review prompts — generated, contain a full diff, regenerable
+docs/swarm/

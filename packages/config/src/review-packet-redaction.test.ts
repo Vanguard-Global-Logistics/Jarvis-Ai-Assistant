@@ -59,8 +59,80 @@ describe('findSecret', () => {
     expect(findSecret(`some diff line\n+  const key = "${value}";\nmore text`)).toBe(value);
   });
 
+  /**
+   * PEM fixtures, composed at runtime so no intact header literal sits in this
+   * file — the same reason the API-key fixtures above are built from fragments.
+   * A literal header here would make `npm run swarm` refuse to review this repo,
+   * which is how the fail-open bug below got introduced in the first place.
+   */
+  const DASHES = '-'.repeat(5);
+  const header = (kind: string): string => `${DASHES}BEGIN ${kind} PRIVATE KEY${DASHES}`;
+  const pem = (kind: string): string =>
+    [
+      header(kind),
+      `MIIEow${BODY}${BODY}IBAAKCAQEA`,
+      `${DASHES}END ${kind} PRIVATE KEY${DASHES}`,
+    ].join('\n');
+
+  /** Prefix every line, the way `git diff` does. */
+  const asDiff = (text: string, prefix: string): string =>
+    text
+      .split('\n')
+      .map((l) => prefix + l)
+      .join('\n');
+
   it('catches a private key block', () => {
-    expect(findSecret('-----BEGIN RSA PRIVATE KEY-----\nMIIE...')).toContain('PRIVATE KEY');
+    expect(findSecret(pem('RSA'))).toContain('PRIVATE KEY');
+  });
+
+  /**
+   * THE REGRESSION THAT MATTERS. Both call sites hand this scanner a git diff and
+   * nothing else, so raw-PEM tests alone prove almost nothing.
+   *
+   * A version of this pattern required a base64 body after the header. It passed
+   * every raw-PEM test and failed OPEN on `-` lines and on encrypted keys — and
+   * the commit that removes a leaked key is exactly the commit whose diff carries
+   * the key. Found by `npm run swarm`, not by this suite, because this suite did
+   * not think in diffs.
+   */
+  it.each([
+    ['added', '+'],
+    ['context', ' '],
+    ['REMOVED', '-'],
+  ])('catches a private key on a %s diff line', (_label, prefix) => {
+    expect(findSecret(asDiff(pem('RSA'), prefix))).toContain('PRIVATE KEY');
+  });
+
+  it('catches a passphrase-encrypted private key', () => {
+    // `Proc-Type:` and `DEK-Info:` sit between the header and the body. Any
+    // pattern that must reach the body to fire will miss this.
+    const [header, ...rest] = pem('RSA').split('\n');
+    const encrypted = [
+      header,
+      'Proc-Type: 4,ENCRYPTED',
+      'DEK-Info: AES-128-CBC,ABCDEF0123456789',
+      '',
+      ...rest,
+    ].join('\n');
+    expect(findSecret(encrypted)).toContain('PRIVATE KEY');
+  });
+
+  it('does not fire on prose that merely mentions a PEM header', () => {
+    // Docs, comments and error strings talk about PEM files. A guard that fires
+    // on every mention blocks the review tooling permanently, and a guard that
+    // always fires is one people route around. The 40-char base64 requirement is
+    // what separates a mention from a key.
+    expect(findSecret(`${header('RSA')} is a header, not a key`)).toBeNull();
+  });
+
+  it('does NOT let a fixture marker disarm a real private key', () => {
+    // The bypass a critic found, in the fix for the previous bypass: once the
+    // match spanned the whole header line, a single EXAMPLE on that line
+    // suppressed the only match and the real body underneath was never examined.
+    // Private keys are exempt from the fixture-marker escape entirely.
+    const [, ...body] = pem('RSA').split('\n');
+    const marked = [`${header('RSA')} (EXAMPLE)`, ...body].join('\n');
+    expect(findSecret(marked)).toContain('PRIVATE KEY');
   });
 
   it('allows key-SHAPED test fixtures through', () => {
