@@ -372,6 +372,10 @@ And the part with no caveat: **run longer than feels necessary.** The habit here
 "verify green, probe green, push" — a floor. Both were green on the `.env` bug, the missing
 `max_tokens`, and the AEGIS fail-closed defect.
 
+The runnable version lives at `.claude/skills/gauntlet-loop/SKILL.md` — the bar, the
+split, the three roles, blind A/B, the stopping conditions, the budget shape, and the
+red-green alternative for correctness work. Invoke it when starting taste-shaped work.
+
 This is a **build-process governance rule**, not a runtime software requirement. It has no
 direct code representation in Phase 1 beyond Forge's `reviewer` / `approvalStatus` fields,
 which can represent "an independent reviewer approved this" — human or model.

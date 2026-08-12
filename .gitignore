@@ -58,3 +58,9 @@ Desktop.ini
 coverage/
 .cache/
 .turbo/
+
+# Generated review packets (npm run review). Build artifacts, not source: each
+# one contains a full diff and is written to be pasted into a third-party chat.
+# Committing them would put that text in history permanently and would tempt the
+# secret scanner into refusing on its own output.
+docs/review/
