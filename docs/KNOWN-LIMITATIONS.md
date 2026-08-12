@@ -168,8 +168,17 @@ switch providers live, and the switch is not persisted — a restart returns to 
 `.env` and this table say.
 
 **What is not verified about `local`, stated plainly: no real local runner has ever
-answered.** Every test injects a fake `fetch`. Nothing in this repository has spoken to
-an actual Ollama, LM Studio, or `llama.cpp` server. The adapter's logic is covered — the
+answered.** Nothing in this repository has spoken to an actual Ollama, LM Studio, or
+`llama.cpp` server.
+
+One thing did get stronger and should be described exactly, not generously: since the
+brain-picker probe work (ADR 0022), the `local` adapter completes a **real HTTP
+round-trip over a real socket** against a minimal OpenAI-compatible server the probe
+starts on loopback — the request shape, the path, the model name, the message, and the
+response envelope are all exercised end to end from inside the running Electron app,
+rather than through an injected `fetch`. That is evidence the adapter speaks the dialect.
+It is **not** evidence that Ollama accepts it, because the stub accepts anything. The
+status stays `IMPLEMENTED, NOT YET VERIFIED`. The adapter's logic is covered — the
 request shape, the OpenAI-envelope parsing, the code-fence tolerance, and every error
 path — and that is a different claim from "it works". Verifying it needs a machine with a
 model installed, and is a manual step on the Mac.
@@ -298,6 +307,7 @@ Four jobs, and the distinctions matter:
 - **`runtime`** — installs Electron's GUI libraries and Xvfb, builds, then runs
   `npm run probe:runtime`: launches the real app (packaged path **and** `dev:desktop`) and
   asserts React mounts, the bridge exposes exactly the thirteen allowlisted functions, a
+  brain switch really re-routes messages in both directions (ADR 0022), a
   chat/amplify round-trip works, the full history save/list/get/delete loop works against
   a real SQLite (including that an unsaved chat never persists), the renderer has no Node
   globals, and the console is clean. It is verified red-green against the CSP defect.

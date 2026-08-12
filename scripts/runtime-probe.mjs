@@ -142,6 +142,96 @@ if (NEEDS_XVFB) {
 const PINNED_MOCK = { JARVIS_MODEL_PROVIDER: 'mock' };
 
 /**
+ * The sentence only the stub server can produce.
+ *
+ * Asserting `provider === 'local'` alone would pass if the switch merely relabeled
+ * the reply, which is precisely the bug this section exists to catch. Text that
+ * exists nowhere in the app is the difference between "the UI says local" and
+ * "an HTTP request left the process and a local server answered it".
+ */
+const STUB_MARKER = 'answered-by-the-loopback-stub-9f3a';
+
+/**
+ * A minimal OpenAI-compatible server on loopback.
+ *
+ * WHY THIS EXISTS. The brain picker's real risk is a control that looks
+ * functional and does nothing (CLAUDE.md §8 rule 1) — the chat handler capturing
+ * its provider by value at boot, so switching updates the UI while every message
+ * still reaches the old brain. Proving that needs a SECOND WORKING PROVIDER, and
+ * until now the probe had none: `mock` was the only one configured, so only a
+ * refused switch could be tested.
+ *
+ * This is a stub, and the honesty rules apply to it (CLAUDE.md §8). It proves the
+ * `local` adapter completes a real HTTP round-trip against a server speaking the
+ * OpenAI dialect — request shape, headers, envelope parsing, all over a real
+ * socket rather than an injected `fetch`. **It is not Ollama.** It does not prove
+ * a real runner accepts the request, and `local` stays IMPLEMENTED, NOT YET
+ * VERIFIED until one does.
+ *
+ * Loopback on purpose, twice over: it is the only thing ADR 0015 permits, and a
+ * probe that opened a listener on a routable interface would be a worse citizen
+ * than the app it is testing.
+ *
+ * @returns {Promise<{ url: string, requests: unknown[], close: () => Promise<void> }>}
+ */
+async function startStubModelServer() {
+  const { createServer } = await import('node:http');
+  /** @type {unknown[]} */
+  const requests = [];
+
+  const server = createServer((req, res) => {
+    /** @type {Buffer[]} */
+    const chunks = [];
+    req.on('data', (c) => chunks.push(c));
+    req.on('end', () => {
+      // Record what was actually posted, so a malformed request fails here rather
+      // than looking like a network problem.
+      try {
+        requests.push({
+          method: req.method,
+          url: req.url,
+          authorization: req.headers.authorization ?? null,
+          body: JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'),
+        });
+      } catch {
+        requests.push({ method: req.method, url: req.url, body: 'UNPARSEABLE' });
+      }
+
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(
+        JSON.stringify({
+          choices: [
+            { message: { role: 'assistant', content: STUB_MARKER }, finish_reason: 'stop' },
+          ],
+        }),
+      );
+    });
+  });
+
+  await new Promise((resolveListen) => {
+    // Port 0 lets the OS pick a free one — a fixed port would collide with the
+    // developer's real Ollama, and the collision would look like a probe failure.
+    server.listen(0, '127.0.0.1', () => resolveListen(undefined));
+  });
+
+  const address = server.address();
+  if (address === null || typeof address === 'string') {
+    fail('stub model server did not bind a TCP port');
+    throw new Error('unreachable');
+  }
+
+  return {
+    url: `http://127.0.0.1:${String(address.port)}`,
+    requests,
+    close: () =>
+      new Promise((resolveClose) => {
+        server.closeAllConnections?.();
+        server.close(() => resolveClose(undefined));
+      }),
+  };
+}
+
+/**
  * @param {string} command
  * @param {string[]} cmdArgs
  * @param {Record<string, string>} env
@@ -353,9 +443,11 @@ const PLATFORMS = ['win32', 'darwin', 'linux'];
 /**
  * @param {{ evaluate: (e: string) => Promise<any>, consoleErrors: string[] }} page
  * @param {'prod' | 'dev'} mode
+ * @param {{ url: string, requests: unknown[] } | null} stub the loopback model
+ *   server backing the `local` provider, when this mode started one
  * @returns {Promise<Check[]>}
  */
-async function runChecks(page, mode) {
+async function runChecks(page, mode, stub = null) {
   /** @type {Check[]} */
   const checks = [];
   /**
@@ -477,6 +569,80 @@ async function runChecks(page, mode) {
     reselect.value?.selected === true && reselect.value.active === 'mock',
     JSON.stringify(reselect.value),
   );
+
+  // --- an ACCEPTED switch must re-route messages, not just the label ----------
+  // The refusal checks above prove the brain is left ALONE when a switch fails.
+  // They cannot prove the opposite half, which is the half that hides the real
+  // bug: if the chat handler captured its provider at boot instead of reading a
+  // holder, switching would light up the UI while every message still went to the
+  // old brain — a control that looks functional and does nothing (CLAUDE.md §8
+  // rule 1). Catching that needs a second WORKING provider, which is what the
+  // loopback stub is for.
+  if (stub === null) {
+    add('accepted switch re-routes messages', false, 'no stub model server was started');
+  } else {
+    add(
+      'the stub-backed local provider is offered as available',
+      d?.providers?.some((p) => p.id === 'local' && p.available === true) === true,
+      JSON.stringify(d?.providers?.find((p) => p.id === 'local')),
+    );
+
+    const switched = await page.evaluate("await window.jarvis.selectModel('local')");
+    add(
+      'model:select ACCEPTS a configured provider',
+      switched.value?.selected === true && switched.value.active === 'local',
+      JSON.stringify(switched.value),
+    );
+
+    const before = stub.requests.length;
+    const fromLocal = await page.evaluate(
+      'await window.jarvis.sendChat({ messages: [{ role: "user", content: "after an accepted switch" }] })',
+    );
+    // Three independent pieces of evidence, because any one alone is weak: the
+    // label, text that only the stub can produce, and a request that actually
+    // arrived at the socket.
+    add(
+      'the reply is labeled local',
+      fromLocal.value?.provider === 'local',
+      JSON.stringify(fromLocal.value?.provider),
+    );
+    add(
+      'the reply TEXT came from the stub — the switch really re-routed it',
+      typeof fromLocal.value?.text === 'string' && fromLocal.value.text.includes(STUB_MARKER),
+      JSON.stringify(fromLocal.value?.text ?? null),
+    );
+    add(
+      'a real HTTP request reached the loopback server',
+      stub.requests.length > before,
+      `${String(before)} -> ${String(stub.requests.length)} requests`,
+    );
+
+    const posted = /** @type {any} */ (stub.requests[stub.requests.length - 1]);
+    add(
+      'it was POSTed to the OpenAI-compatible completions path',
+      posted?.method === 'POST' && posted?.url === '/v1/chat/completions',
+      `${String(posted?.method)} ${String(posted?.url)}`,
+    );
+    add(
+      'the posted body carries the message and the configured model',
+      posted?.body?.model === 'probe-stub' &&
+        JSON.stringify(posted?.body?.messages ?? []).includes('after an accepted switch'),
+      JSON.stringify(posted?.body?.model),
+    );
+
+    // Switch back, so everything after this section sees the same mock provider
+    // it would have seen before — and so the reverse direction is covered too.
+    await page.evaluate("await window.jarvis.selectModel('mock')");
+    const backToMock = await page.evaluate(
+      'await window.jarvis.sendChat({ messages: [{ role: "user", content: "after switching back" }] })',
+    );
+    add(
+      'switching BACK re-routes too — this is not a one-way door',
+      backToMock.value?.provider === 'mock' &&
+        !String(backToMock.value?.text ?? '').includes(STUB_MARKER),
+      JSON.stringify(backToMock.value?.provider),
+    );
+  }
 
   const info = await page.evaluate('window.jarvis ? await window.jarvis.getAppInfo() : null');
   const i = info.value;
@@ -823,6 +989,18 @@ async function probe(mode) {
   // override only when unpackaged (main/index.ts guards on !app.isPackaged).
   const userDataDir = mkdtempSync(join(tmpdir(), `jarvis-probe-${mode}-`));
 
+  // A second WORKING provider, so an accepted brain switch can be proven to
+  // re-route messages rather than merely relabel them (ADR 0022). The app still
+  // STARTS on mock — `JARVIS_MODEL_PROVIDER` beats precedence, which would
+  // otherwise put `local` first — so every existing assertion sees the same
+  // deterministic brain it always did, and `local` is simply available to switch
+  // to.
+  const stub = await startStubModelServer();
+  const STUB_ENV = {
+    JARVIS_LOCAL_MODEL_URL: stub.url,
+    JARVIS_LOCAL_MODEL: 'probe-stub',
+  };
+
   const packagedBin = mode === 'packaged' ? packagedBinary() : null;
 
   const child =
@@ -843,7 +1021,7 @@ async function probe(mode) {
             // one), so a GPU-less probe host needs it passed from outside.
             '--enable-unsafe-swiftshader',
           ],
-          { JARVIS_USER_DATA_DIR: userDataDir, ...PINNED_MOCK },
+          { JARVIS_USER_DATA_DIR: userDataDir, ...PINNED_MOCK, ...STUB_ENV },
         )
       : mode === 'prod'
         ? // Built HTML over file://, production CSP, no dev server.
@@ -853,6 +1031,7 @@ async function probe(mode) {
             {
               JARVIS_USER_DATA_DIR: userDataDir,
               ...PINNED_MOCK,
+              ...STUB_ENV,
             },
           )
         : // The REAL `npm run dev:desktop`. electron-vite forwards
@@ -864,6 +1043,7 @@ async function probe(mode) {
             NO_SANDBOX: '1',
             JARVIS_USER_DATA_DIR: userDataDir,
             ...PINNED_MOCK,
+            ...STUB_ENV,
           });
 
   /** @type {string[]} */
@@ -886,11 +1066,12 @@ async function probe(mode) {
     await page.send('Page.reload', { ignoreCache: true });
     await settle(page);
 
-    const checks = await runChecks(page, mode);
+    const checks = await runChecks(page, mode, stub);
     page.close();
     return checks;
   } finally {
     kill(child);
+    await stub.close();
     // Let the port free before the next mode.
     await new Promise((r) => setTimeout(r, 1500));
   }

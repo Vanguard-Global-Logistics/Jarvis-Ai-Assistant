@@ -246,8 +246,10 @@ built HTML and `dev:desktop` — drives it over the DevTools protocol, and asser
 mounts, `window.jarvis` exposes exactly the thirteen allowlisted functions, a chat/amplify
 round-trip answers, the full history save/list/get/delete loop works against a real
 SQLite (including that an unsaved chat never persists), the profile round-trips and
-rejects an invalid accent, the brain picker lists every provider and refuses an
-unconfigured one with a reason (ADR 0022), a repo-root `.env` actually reaches the
+rejects an invalid accent, the brain picker lists every provider, refuses an
+unconfigured one with a reason, and — against a loopback stub provider it starts itself —
+proves an accepted switch **actually re-routes messages** in both directions rather than
+just relabeling them (ADR 0022), a repo-root `.env` actually reaches the
 provider (ADR 0021), a non-loopback local model URL refuses to start the app
 (ADR 0015), the window reopens at its stored size (ADR 0017), the renderer has no Node
 globals, and the console is clean. **Run it before

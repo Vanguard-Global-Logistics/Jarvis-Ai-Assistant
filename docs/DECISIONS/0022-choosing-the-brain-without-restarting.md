@@ -6,11 +6,11 @@
   but left it fixed at startup. **Does not amend** ADR 0015 — the loopback rule is
   untouched, and §Decision.3 explains why this could not have been built any way
   that touched it.
-- **Implementation status:** `PARTIAL`. Both channels are exercised against the
-  real app on the Linux runtime probe, including a refused selection that is
-  proven not to change which brain answers. An **accepted** switch is not yet
-  proven to re-route messages — see §Decision.6. That the picker _lists_ five
-  providers is verified; that four of them _answer_ is not (ADR 0015, 0020, 0023).
+- **Implementation status:** `IMPLEMENTED AND VERIFIED` on the Linux runtime
+  probe. Both channels are driven against the real app, and **both directions of
+  a switch are proven to re-route messages** — see §Decision.6. That the picker
+  _lists_ five providers is verified; that the four remote/local ones answer from
+  a real vendor or runner is not (ADR 0015, 0020, 0023).
 
 ## Context
 
@@ -86,14 +86,29 @@ to work, in the UI, while every message continued to reach the old brain. That i
 the exact failure class CLAUDE.md §8 rule 1 calls out: a control that looks
 functional and does nothing. The holder is the fix.
 
-**The gap in the proof, stated rather than glossed:** the probe pins the provider
-to `mock`, so every other provider is unconfigured there. It therefore proves a
-_refused_ switch leaves the brain alone — it sends a real message afterwards and
-asserts `mock` still answered — but it does **not** yet prove an _accepted_ switch
-re-routes messages, because there is no second working provider to switch to. That
-is the half of the holder bug still uncovered, and closing it needs a stub server
-on loopback that the `local` provider can be pointed at. Recorded here so the next
-session finds it instead of assuming it is covered.
+**How that is proven, and what the proof does not cover.** This was written first
+as a gap: the probe pinned the provider to `mock`, so nothing else was configured,
+so only a _refused_ switch could be tested. Proving the other half needed a second
+**working** provider, so the probe now starts a minimal OpenAI-compatible server on
+loopback and points `local` at it. It then asserts, in both directions:
+
+- a refused switch leaves the brain alone — a real message afterwards is still
+  answered by `mock`;
+- an accepted switch re-routes — the reply is labeled `local`, **its text is a
+  marker only the stub can produce**, and a request actually arrived at the socket
+  with the right method, path, model, and message;
+- switching back re-routes again, so this is not a one-way door.
+
+The marker is the load-bearing part. Asserting the label alone would pass against a
+switch that only relabeled replies, which is the exact bug. **Verified red-green:**
+`current()` was pinned back to the boot provider and five checks failed — while
+`model:select ACCEPTS a configured provider` still passed, which is precisely how
+this defect would present to a human.
+
+What it does not cover: the stub is not Ollama. It proves the `local` adapter
+completes a real HTTP round-trip against a server speaking the OpenAI dialect —
+over a socket, not an injected `fetch` — and nothing about whether a real runner
+accepts the request. `local` stays `IMPLEMENTED, NOT YET VERIFIED`.
 
 **7. Selecting the already-active provider is a no-op.** Not a rebuild. A stray
 click on the current brain should not discard and reconstruct it.
