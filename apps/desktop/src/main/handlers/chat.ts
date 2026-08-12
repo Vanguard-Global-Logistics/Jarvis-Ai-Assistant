@@ -7,10 +7,12 @@ import { toSafeModelError } from './model-error.js';
 /**
  * `jarvis:chat` — one conversation turn against the main-process model provider.
  *
- * The provider is injected, not constructed here: it is created once at startup
- * (`createProvider(env)` in `main/index.ts`) so the Anthropic client — and the
- * API key inside it — lives in exactly one place in the trusted process and is
- * never rebuilt per request. The key never crosses to the renderer; the renderer
+ * The provider is READ per turn, not captured: `getProvider` returns whichever
+ * one is active right now, because ADR 0022 lets a human switch brains without
+ * restarting. Capturing the value instead would pin this handler to whatever
+ * existed at boot, and switching would appear to work while nothing changed.
+ * It is still constructed in main — the Anthropic client, and the API key inside
+ * it, live in exactly one place in the trusted process. The key never crosses to the renderer; the renderer
  * only ever sees `ChatReply` (text + provider id).
  *
  * `handleContract` has already parsed the request against `ChatRequestSchema`
@@ -21,10 +23,10 @@ import { toSafeModelError } from './model-error.js';
  * Provider failures are sanitised into a safe category before they propagate,
  * so nothing an SDK error carries can reach a log line or the renderer.
  */
-export function registerChatHandler(provider: JarvisModelProvider): void {
+export function registerChatHandler(getProvider: () => JarvisModelProvider): void {
   handleContract(jarvisChatContract, async (request): Promise<ChatReply> => {
     try {
-      return await provider.chat(request);
+      return await getProvider().chat(request);
     } catch (cause) {
       throw toSafeModelError(cause);
     }

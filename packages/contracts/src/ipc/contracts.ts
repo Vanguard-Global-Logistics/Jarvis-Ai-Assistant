@@ -5,6 +5,7 @@ import {
   AmplifyRequestSchema,
   ChatReplySchema,
   ChatRequestSchema,
+  PROVIDER_IDS,
 } from '../model/contracts.js';
 import {
   HistoryIdRequestSchema,
@@ -248,6 +249,76 @@ export const profileSetContract = defineContract({
   response: ProfileSchema,
 });
 
+// --- model:* (ADR 0022) -----------------------------------------------------
+
+/**
+ * One provider as the UI is allowed to see it.
+ *
+ * Identifier, whether it can be selected, and if not, WHY in one sentence a
+ * human can act on. Deliberately no endpoint, no model name, no key, not even a
+ * redacted one — the renderer's job is to let someone pick a brain, and none of
+ * that is needed to do it. `unavailableReason` is written by main from a fixed
+ * set of sentences; it never carries an error from a provider or an SDK.
+ */
+export const ProviderOptionSchema = z
+  .object({
+    id: z.enum(PROVIDER_IDS),
+    available: z.boolean(),
+    unavailableReason: z.string().max(200).optional(),
+  })
+  .strict();
+
+export type ProviderOption = z.infer<typeof ProviderOptionSchema>;
+
+/**
+ * `model:describe` — which brains exist, which can be used, which is answering.
+ *
+ * Read-only. `active` is always one of `providers`, and the mock provider is
+ * always available, so there is always something to fall back to.
+ */
+export const ModelDescriptionSchema = z
+  .object({
+    active: z.enum(PROVIDER_IDS),
+    providers: z.array(ProviderOptionSchema).min(1),
+  })
+  .strict();
+
+export type ModelDescription = z.infer<typeof ModelDescriptionSchema>;
+
+export const modelDescribeContract = defineContract({
+  channel: CHANNELS.modelDescribe,
+  request: z.undefined(),
+  response: ModelDescriptionSchema,
+});
+
+/**
+ * `model:select` — switch the active provider for subsequent turns.
+ *
+ * Takes an IDENTIFIER from a closed enum and nothing else. A refusal is a
+ * normal, described outcome rather than a thrown error: "you have not set an
+ * API key" is information, not a fault, and the UI can say so in place.
+ *
+ * The response echoes the full description so the caller cannot drift from
+ * main's view of what is active — and so a refused selection visibly leaves the
+ * previous provider in place rather than leaving the UI to guess.
+ */
+export const ModelSelectionSchema = z
+  .object({
+    selected: z.boolean(),
+    active: z.enum(PROVIDER_IDS),
+    reason: z.string().max(200).optional(),
+    providers: z.array(ProviderOptionSchema).min(1),
+  })
+  .strict();
+
+export type ModelSelection = z.infer<typeof ModelSelectionSchema>;
+
+export const modelSelectContract = defineContract({
+  channel: CHANNELS.modelSelect,
+  request: z.object({ id: z.enum(PROVIDER_IDS) }).strict(),
+  response: ModelSelectionSchema,
+});
+
 // --- registry ---------------------------------------------------------------
 
 /**
@@ -265,6 +336,8 @@ export const IPC_CONTRACTS = {
   [CHANNELS.historyDelete]: historyDeleteContract,
   [CHANNELS.historyExport]: historyExportContract,
   [CHANNELS.historyImport]: historyImportContract,
+  [CHANNELS.modelDescribe]: modelDescribeContract,
+  [CHANNELS.modelSelect]: modelSelectContract,
   [CHANNELS.profileGet]: profileGetContract,
   [CHANNELS.profileSet]: profileSetContract,
 } as const;

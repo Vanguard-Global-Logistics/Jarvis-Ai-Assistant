@@ -27,6 +27,7 @@
 
 export { AMPLIFIER_SYSTEM_PROMPT, buildAmplifierUserMessage } from './amplifier/prompt.js';
 export { AnthropicProvider, DEFAULT_MODEL, ModelRefusalError } from './model/anthropic-provider.js';
-export { createProvider } from './model/create-provider.js';
+export { buildProviderById, createProvider, describeProviders } from './model/create-provider.js';
+export type { ProviderAvailability } from './model/create-provider.js';
 export { MockProvider } from './model/mock-provider.js';
 export type { JarvisModelProvider } from './model/provider.js';

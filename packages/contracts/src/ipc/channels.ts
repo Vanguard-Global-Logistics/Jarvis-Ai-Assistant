@@ -73,6 +73,24 @@ export const CHANNELS = {
    * (ADR 0013). Appearance only: a profile grants no capability, and is not a
    * login. Data separation comes from OS user accounts (ADR 0012).
    */
+  /**
+   * Which brain is answering, and change it without restarting (ADR 0022).
+   *
+   * `model:describe` is READ-ONLY and returns provider IDENTIFIERS plus whether
+   * each is configured — never a key, a URL, or any part of one. `model:select`
+   * names one of the same closed set.
+   *
+   * Deliberately NOT a way to supply configuration. The renderer cannot set an
+   * endpoint, a model name, or a credential; it can only pick among providers
+   * main already built from the trusted environment. That keeps ADR 0015's
+   * loopback rule where it belongs — a renderer that could name a URL could
+   * name a remote one and call it local.
+   */
+  modelDescribe: 'model:describe',
+
+  /** Switch the active provider. Refuses, with a reason, if not configured. */
+  modelSelect: 'model:select',
+
   profileGet: 'profile:get',
 
   /** Set the profile. The only write, and it changes nothing but presentation. */

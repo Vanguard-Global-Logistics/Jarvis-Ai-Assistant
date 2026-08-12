@@ -7,7 +7,10 @@ import type {
   ChatReply,
   ChatRequest,
   HistoryIdRequest,
+  ModelDescription,
+  ModelSelection,
   Profile,
+  ProviderId,
   SaveConversationRequest,
   SavedConversation,
   SavedConversationMeta,
@@ -67,6 +70,21 @@ const api = {
     ipcRenderer.invoke(CHANNELS.jarvisAmplify, {
       idea,
     } satisfies AmplifyRequest) as Promise<AmplifierResult>,
+
+  /**
+   * Which brain is answering, and switch it (ADR 0022).
+   *
+   * `describeModels` is read-only. `selectModel` shapes a bare identifier into
+   * the `{ id }` request the contract expects, so a caller cannot smuggle a URL,
+   * a model name, or a key alongside it — and main re-validates against a closed
+   * enum anyway. The renderer picks among providers main already built; it never
+   * configures one.
+   */
+  describeModels: (): Promise<ModelDescription> =>
+    ipcRenderer.invoke(CHANNELS.modelDescribe) as Promise<ModelDescription>,
+
+  selectModel: (id: ProviderId): Promise<ModelSelection> =>
+    ipcRenderer.invoke(CHANNELS.modelSelect, { id }) as Promise<ModelSelection>,
 
   /**
    * Stage 1A persistence (ADR 0008) — four named operations against the

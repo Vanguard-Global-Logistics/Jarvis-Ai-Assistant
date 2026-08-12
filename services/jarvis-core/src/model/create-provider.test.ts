@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { parseEnv } from '@jarvis/config';
-import { LocalModelConfigError, createProvider, isLoopbackUrl } from './create-provider.js';
+import {
+  LocalModelConfigError,
+  buildProviderById,
+  createProvider,
+  describeProviders,
+  isLoopbackUrl,
+} from './create-provider.js';
 
 describe('createProvider', () => {
   it('defaults to the mock provider when no key is set', () => {
@@ -137,5 +143,72 @@ describe('createProvider — Grok and explicit selection (ADR 0020)', () => {
 
     const init = (fetchImpl.mock.calls[0] as [string, { headers: Record<string, string> }])[1];
     expect(Object.keys(init.headers).map((k) => k.toLowerCase())).not.toContain('authorization');
+  });
+});
+
+describe('describeProviders / buildProviderById (ADR 0022)', () => {
+  const base = parseEnv({ NODE_ENV: 'test' });
+
+  it('always offers mock, so a picker can never be empty', () => {
+    const mock = describeProviders(base).find((p) => p.id === 'mock');
+    expect(mock).toEqual({ id: 'mock', available: true });
+  });
+
+  it('explains each unavailable provider in terms of what to set', () => {
+    const byId = new Map(describeProviders(base).map((p) => [p.id, p]));
+    expect(byId.get('anthropic')?.available).toBe(false);
+    expect(byId.get('anthropic')?.unavailableReason).toMatch(/ANTHROPIC_API_KEY/);
+    expect(byId.get('grok')?.unavailableReason).toMatch(/XAI_API_KEY/);
+    expect(byId.get('local')?.unavailableReason).toMatch(/JARVIS_LOCAL_MODEL_URL/);
+  });
+
+  it('never puts a configured VALUE in a reason a UI will render', () => {
+    // Reasons cross the IPC boundary and land on screen. They may name
+    // variables; they may never carry what is in them.
+    const reasons = describeProviders({
+      ...base,
+      ANTHROPIC_API_KEY: 'sk-ant-SECRET-0001',
+      XAI_API_KEY: 'xai-SECRET-0002',
+      JARVIS_LOCAL_MODEL_URL: 'https://not-loopback.example.com',
+      JARVIS_LOCAL_MODEL: 'qwen3.5:4b',
+    })
+      .map((p) => p.unavailableReason ?? '')
+      .join(' ');
+    expect(reasons).not.toContain('SECRET');
+    expect(reasons).not.toContain('not-loopback.example.com');
+  });
+
+  it('marks local UNAVAILABLE when its URL is not loopback, rather than offering it', () => {
+    // The picker must not offer something createProvider would refuse. Offering
+    // it and failing on click would train someone to ignore the refusal.
+    const local = describeProviders({
+      ...base,
+      JARVIS_LOCAL_MODEL_URL: 'https://not-loopback.example.com',
+      JARVIS_LOCAL_MODEL: 'qwen3.5:4b',
+    }).find((p) => p.id === 'local');
+    expect(local?.available).toBe(false);
+    expect(local?.unavailableReason).toMatch(/must point at this machine/);
+  });
+
+  it('describe and build agree, provider for provider', () => {
+    // They share one implementation precisely so this can never drift; the test
+    // is what proves the sharing is real rather than intended.
+    const env = { ...base, ANTHROPIC_API_KEY: 'sk-ant', JARVIS_LOCAL_MODEL_URL: '' };
+    for (const described of describeProviders(env)) {
+      expect(buildProviderById(env, described.id).ok).toBe(described.available);
+    }
+  });
+
+  it('builds the provider it was asked for, not a substitute', () => {
+    const result = buildProviderById({ ...base, XAI_API_KEY: 'xai-test' }, 'grok');
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.provider.id).toBe('grok');
+  });
+
+  it('refuses instead of throwing, so a live picker can show the reason', () => {
+    // Unlike startup (ADR 0020), where an unhonourable choice must kill the app.
+    const result = buildProviderById(base, 'anthropic');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toMatch(/ANTHROPIC_API_KEY/);
   });
 });

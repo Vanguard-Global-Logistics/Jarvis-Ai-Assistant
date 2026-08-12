@@ -14,10 +14,10 @@ import { toSafeModelError } from './model-error.js';
  * before it leaves main — a provider that returns a malformed card fails at the
  * boundary rather than reaching the amplifier UI.
  */
-export function registerAmplifyHandler(provider: JarvisModelProvider): void {
+export function registerAmplifyHandler(getProvider: () => JarvisModelProvider): void {
   handleContract(jarvisAmplifyContract, async (request): Promise<AmplifierResult> => {
     try {
-      return await provider.amplify(request.idea);
+      return await getProvider().amplify(request.idea);
     } catch (cause) {
       throw toSafeModelError(cause);
     }

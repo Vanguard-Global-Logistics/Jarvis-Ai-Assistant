@@ -53,6 +53,11 @@ const ALLOWED_API = [
   'importHistory',
   'getProfile',
   'setProfile',
+  // ADR 0022. Both carry provider IDENTIFIERS only — never an endpoint, a model
+  // name, or a credential — so neither widens what the renderer can configure,
+  // only what it can choose among.
+  'describeModels',
+  'selectModel',
 ] as const;
 
 /** Load the bridge fresh and return what it handed to `exposeInMainWorld`. */

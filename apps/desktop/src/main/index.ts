@@ -6,6 +6,7 @@ import type { SqliteDatabase } from '@jarvis/database';
 import { createProvider } from '@jarvis/jarvis-core';
 import { loadEnvFile, upwardCandidates } from './env-file.js';
 import { registerAmplifyHandler } from './handlers/amplify.js';
+import { createProviderHolder, registerModelHandlers } from './handlers/model.js';
 import { registerAppInfoHandler } from './handlers/app-info.js';
 import { registerChatHandler } from './handlers/chat.js';
 import { registerHistoryHandlers } from './handlers/history.js';
@@ -122,6 +123,16 @@ function buildProvider(): ReturnType<typeof createProvider> {
 }
 
 const modelProvider = buildProvider();
+
+/**
+ * The live provider, behind a holder so it can change without a restart.
+ *
+ * `chat` and `amplify` are registered once and read through this, so a switch
+ * (ADR 0022) takes effect on the very next turn. The startup provider — and the
+ * loopback rule and explicit-choice rule that produced it — is unchanged; this
+ * only makes the choice revisable while the app is running.
+ */
+const providerHolder = createProviderHolder(modelProvider, modelProvider.id);
 
 const RENDERER_DEV_URL = process.env.ELECTRON_RENDERER_URL ?? null;
 
@@ -324,8 +335,12 @@ void app
     // main-owned conversation store — never the shell, env, arbitrary paths, or
     // AEGIS.
     registerAppInfoHandler();
-    registerChatHandler(modelProvider);
-    registerAmplifyHandler(modelProvider);
+    // The holder, not the provider: ADR 0022 lets a human switch brains without
+    // restarting, and a handler that captured the value would keep using the one
+    // that existed at boot while the UI happily reported the change.
+    registerChatHandler(providerHolder.current);
+    registerAmplifyHandler(providerHolder.current);
+    registerModelHandlers(env, providerHolder);
     registerHistoryHandlers(db);
     registerProfileHandlers(db);
 

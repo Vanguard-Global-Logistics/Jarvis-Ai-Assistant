@@ -5,6 +5,8 @@ import { GrokProvider } from './grok-provider.js';
 import { LocalProvider } from './local-provider.js';
 import { MockProvider } from './mock-provider.js';
 import type { JarvisModelProvider } from './provider.js';
+import { PROVIDER_IDS } from '@jarvis/contracts';
+import type { ProviderId } from '@jarvis/contracts';
 
 const log = createLogger({ scope: 'jarvis-core:model' });
 
@@ -147,4 +149,82 @@ function buildAnthropic(env: Env): JarvisModelProvider {
     );
   }
   return new AnthropicProvider({ apiKey });
+}
+
+/** How one provider looks to a UI that may offer it. */
+export interface ProviderAvailability {
+  readonly id: ProviderId;
+  readonly available: boolean;
+  /** One actionable sentence when it cannot be used. Never a value. */
+  readonly unavailableReason?: string;
+}
+
+/**
+ * Try to construct one provider, reporting a refusal rather than throwing.
+ *
+ * The single source of truth behind BOTH `describeProviders` and
+ * `buildProviderById`, so the list a user is shown and the result of picking
+ * from it cannot disagree — a picker that offers something main will then refuse
+ * is worse than no picker.
+ *
+ * Only messages from this module's own error types are passed through. They are
+ * sentences written here, naming environment VARIABLES and never values; any
+ * other failure collapses to a generic line, so an SDK or URL-parser message can
+ * never become UI text.
+ */
+function tryBuild(
+  env: Env,
+  id: ProviderId,
+): { ok: true; provider: JarvisModelProvider } | { ok: false; reason: string } {
+  try {
+    switch (id) {
+      case 'local':
+        return { ok: true, provider: buildLocal(env) };
+      case 'anthropic':
+        return { ok: true, provider: buildAnthropic(env) };
+      case 'grok':
+        return { ok: true, provider: buildGrok(env) };
+      case 'mock':
+        return { ok: true, provider: new MockProvider() };
+    }
+  } catch (cause) {
+    const known =
+      cause instanceof LocalModelConfigError || cause instanceof ModelProviderConfigError;
+    return {
+      ok: false,
+      reason: known && cause instanceof Error ? cause.message.slice(0, 200) : 'Not configured.',
+    };
+  }
+}
+
+/**
+ * Every provider, and whether it can be selected right now.
+ *
+ * `mock` is always available by construction, so a UI built on this always has
+ * something to fall back to and can never present an empty list.
+ */
+export function describeProviders(env: Env): ProviderAvailability[] {
+  return PROVIDER_IDS.map((id) => {
+    const result = tryBuild(env, id);
+    return result.ok
+      ? { id, available: true }
+      : { id, available: false, unavailableReason: result.reason };
+  });
+}
+
+/**
+ * Build one named provider, or explain why not.
+ *
+ * Returns the refusal instead of throwing: at STARTUP an unhonourable explicit
+ * choice must kill the app (ADR 0020) because continuing would silently use a
+ * different brain than the one configured. At RUNTIME the user is standing
+ * there choosing, so "you have not set an API key" is information to show them,
+ * and the previous provider stays active. Same rule — never substitute silently
+ * — expressed the way each moment can act on.
+ */
+export function buildProviderById(
+  env: Env,
+  id: ProviderId,
+): { ok: true; provider: JarvisModelProvider } | { ok: false; reason: string } {
+  return tryBuild(env, id);
 }

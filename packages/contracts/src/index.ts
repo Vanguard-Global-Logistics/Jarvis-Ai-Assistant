@@ -32,8 +32,19 @@ export {
   historySaveContract,
   jarvisAmplifyContract,
   jarvisChatContract,
+  modelDescribeContract,
+  modelSelectContract,
+  ModelDescriptionSchema,
+  ModelSelectionSchema,
+  ProviderOptionSchema,
 } from './ipc/contracts.js';
-export type { AppInfo, IpcContract } from './ipc/contracts.js';
+export type {
+  AppInfo,
+  IpcContract,
+  ModelDescription,
+  ModelSelection,
+  ProviderOption,
+} from './ipc/contracts.js';
 
 export {
   BackupDocumentSchema,
