@@ -224,7 +224,7 @@ packages/contracts     Zod schemas + shared types                  PARTIAL — I
 packages/ui            Design-system components                    PARTIAL — tokens, motion, Orb + glass primitives
 packages/config        Env validation + structured logging         IMPLEMENTED, unit-tested
 packages/database      SQLite (node:sqlite) + migration runner     PARTIAL — wired to Electron main, 5 migrations: history, amplifications, profile, window-state, plans (ADR 0008, 0009, 0013, 0017, 0024)
-docs/DECISIONS/        ADRs                                        0001–0026
+docs/DECISIONS/        ADRs                                        0001–0027
 docs/foundation/       Layer 2 foundation documents (ADR 0005)     PARTIAL — 01 APPROVED; 02, 07, 09 DRAFT; rest CONCEPTUAL
 ```
 
@@ -336,6 +336,32 @@ When Opus authored a design, the reviewer must be a different context and prefer
 different model (ChatGPT for architecture review, per the table above). The spec also
 names Fable 5 as a potential master architect/builder — permitted, subject to the same
 never-sole-approver rule.
+
+### How the work is iterated: the Gauntlet Loop (ADR 0027)
+
+Adopted from Matt Shumer's method: **split → build → blind-critic → repeat,
+against a hard bar the agent cannot argue its way around.** The builder never grades
+itself; the critic inspects the REAL output — running code, the rendered page, actual test
+results — not a summary of it, and compares it blind against a real reference.
+
+**Use it for taste-shaped work**, where the question is "is this good?": the visual
+surface (bar: `docs/VISUAL-DESIGN-TARGET.md` and the archived prototypes), prompts,
+error copy, docs. Name the bar BEFORE starting. This repo had no such bar for years of
+UI decisions, and `npm run verify` is not one — it says the thing works, not that it is good.
+
+**Do NOT use it for correctness or security work** — AEGIS, the IPC boundary, credentials,
+persistence. Those properties hold or they do not, and the instrument is **red-green**:
+deliberately break the rule, confirm the suite goes red, restore. A critic can be
+persuaded; a failing test cannot. A critic also cannot see an ABSENCE, and the strongest
+property in the AEGIS engine is that the Jarvis-facing type has no lowering method at all.
+
+**A Gauntlet Loop is not an independent review.** §5's never-sole-approver rule governs
+approval authority; the loop governs how many rounds of criticism precede the offer. One
+model running ten critic passes has still approved its own work.
+
+And the part with no caveat: **run longer than feels necessary.** The habit here has been
+"verify green, probe green, push" — a floor. Both were green on the `.env` bug, the missing
+`max_tokens`, and the AEGIS fail-closed defect.
 
 This is a **build-process governance rule**, not a runtime software requirement. It has no
 direct code representation in Phase 1 beyond Forge's `reviewer` / `approvalStatus` fields,
