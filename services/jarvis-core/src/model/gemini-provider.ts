@@ -78,6 +78,10 @@ export class GeminiProvider implements JarvisModelProvider {
       model: options.model ?? DEFAULT_MODEL,
       apiKey: options.apiKey,
       voice: GEMINI_VOICE,
+      // Stated, not inferred. Google's root already carries its version segment
+      // (`/v1beta/openai`), and letting the shared heuristic guess appended a
+      // second one — every request 404'd with a URL that looked almost right.
+      completionsPath: '/chat/completions',
       ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
       ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
     });

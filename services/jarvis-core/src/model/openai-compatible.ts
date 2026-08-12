@@ -102,6 +102,18 @@ export interface OpenAiCompatibleOptions {
    * small ones, which is exactly where the wait is least affordable.
    */
   readonly maxOutputTokens?: number;
+  /**
+   * The exact path to append to `baseUrl`, when guessing is not good enough.
+   *
+   * `chatCompletionsUrl` infers the path from the root, which works for a bare
+   * host (Ollama) and for a root ending in `/v1` (xAI). It got Google wrong:
+   * `https://generativelanguage.googleapis.com/v1beta/openai` ends in neither,
+   * so the inference appended a SECOND version segment and every request 404'd.
+   *
+   * A provider that knows its own shape should say so rather than hope the
+   * heuristic covers it. The next vendor will have a fourth shape.
+   */
+  readonly completionsPath?: string;
 }
 
 interface ChatCompletionResponse {
@@ -122,8 +134,9 @@ export function wasTruncated(payload: unknown): boolean {
  * config that works and a 404 that reads like the service is down. Trailing
  * slashes are normalised for the same reason.
  */
-export function chatCompletionsUrl(baseUrl: string): string {
+export function chatCompletionsUrl(baseUrl: string, completionsPath?: string): string {
   const root = baseUrl.replace(/\/+$/, '');
+  if (completionsPath !== undefined) return `${root}${completionsPath}`;
   return root.endsWith('/v1') ? `${root}/chat/completions` : `${root}/v1/chat/completions`;
 }
 
@@ -218,7 +231,7 @@ export class OpenAiCompatibleClient {
 
   public constructor(options: OpenAiCompatibleOptions) {
     this.baseUrl = options.baseUrl.replace(/\/+$/, '');
-    this.url = chatCompletionsUrl(options.baseUrl);
+    this.url = chatCompletionsUrl(options.baseUrl, options.completionsPath);
     this.model = options.model;
     this.apiKey = options.apiKey;
     this.voice = options.voice;

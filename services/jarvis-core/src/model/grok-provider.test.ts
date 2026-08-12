@@ -117,3 +117,34 @@ describe('chatCompletionsUrl', () => {
     );
   });
 });
+
+describe('chatCompletionsUrl — the shapes real vendors actually publish', () => {
+  // Three vendors, three different roots. The first version of this inferred the
+  // path and got Google wrong, producing `/v1beta/openai/v1/chat/completions`
+  // and a 404 on every request. Each of these is a real published base URL.
+  it('Ollama publishes a bare host', () => {
+    expect(chatCompletionsUrl('http://127.0.0.1:11434')).toBe(
+      'http://127.0.0.1:11434/v1/chat/completions',
+    );
+  });
+
+  it('xAI publishes a root ending in /v1', () => {
+    expect(chatCompletionsUrl('https://api.x.ai/v1')).toBe('https://api.x.ai/v1/chat/completions');
+  });
+
+  it('Google publishes a root that carries its own version AND namespace', () => {
+    // Inference cannot get this right, so the provider states the path.
+    expect(
+      chatCompletionsUrl(
+        'https://generativelanguage.googleapis.com/v1beta/openai',
+        '/chat/completions',
+      ),
+    ).toBe('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions');
+  });
+
+  it('an explicit path is never second-guessed', () => {
+    expect(chatCompletionsUrl('https://example.test/api/', '/chat/completions')).toBe(
+      'https://example.test/api/chat/completions',
+    );
+  });
+});
