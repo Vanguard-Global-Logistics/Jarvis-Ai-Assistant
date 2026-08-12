@@ -15,6 +15,26 @@
  * and imported everywhere else. Nothing re-declares a shape it did not define.
  */
 
+export {
+  AEGIS_CAPABILITIES,
+  AEGIS_LEVELS,
+  AegisAuditEntrySchema,
+  AegisCapabilitySchema,
+  AegisLevelSchema,
+  AegisRestrictionResultSchema,
+  AegisStatusSchema,
+  CAPABILITY_REVOKED_AT,
+  isCapabilityAllowed,
+  levelRank,
+} from './aegis/contracts.js';
+export type {
+  AegisAuditEntry,
+  AegisCapability,
+  AegisLevel,
+  AegisRestrictionResult,
+  AegisStatus,
+} from './aegis/contracts.js';
+
 export { ALL_CHANNELS, CHANNELS } from './ipc/channels.js';
 export type { ChannelName } from './ipc/channels.js';
 

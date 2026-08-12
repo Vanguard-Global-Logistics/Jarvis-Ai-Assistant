@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "AEGIS — independent, deterministic security and containment runtime. Not implemented.",
+  "description": "AEGIS — independent, deterministic security and containment runtime. State engine implemented (ADR 0025); application-layer only in Phase 1.",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
