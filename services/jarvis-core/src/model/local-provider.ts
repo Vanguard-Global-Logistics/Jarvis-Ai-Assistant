@@ -26,6 +26,14 @@ import type { JarvisModelProvider } from './provider.js';
  */
 
 /**
+ * How long to wait for a model sharing memory with the rest of the machine.
+ *
+ * 120s aborted a real Qwen3 amplify mid-answer on an 8GB MacBook Air. This is
+ * the ceiling for "it is working, just slowly" — not a target.
+ */
+const LOCAL_TIMEOUT_MS = 240_000;
+
+/**
  * How failures are worded for a runner on this machine.
  *
  * "Is it running?" is the right first question here and the wrong one for a
@@ -65,8 +73,13 @@ export class LocalProvider implements JarvisModelProvider {
       baseUrl: options.baseUrl,
       model: options.model,
       voice: LOCAL_VOICE,
+      // A model on a laptop is slower than a datacentre by an order of
+      // magnitude, and the amplifier asks for five fields at once. 120s aborted
+      // a real Qwen3 amplify mid-answer; this is the ceiling for "it is working,
+      // just slowly", not a target.
+      timeoutMs: options.timeoutMs ?? LOCAL_TIMEOUT_MS,
+      suppressReasoning: true,
       ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
-      ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
     });
   }
 

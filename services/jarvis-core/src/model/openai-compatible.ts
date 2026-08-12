@@ -60,6 +60,25 @@ export interface OpenAiCompatibleOptions {
   readonly voice: ServiceVoice;
   readonly fetch?: FetchLike;
   readonly timeoutMs?: number;
+  /**
+   * Ask the model not to think out loud.
+   *
+   * Reasoning-tuned models (Qwen3 and kin) emit hundreds of `<think>` tokens
+   * before answering. On a frontier API that is someone else's fast hardware; on
+   * a laptop it is the difference between an answer and a timeout — William's
+   * first real Amplify against a local Qwen3 aborted at 120 seconds having
+   * produced only reasoning.
+   *
+   * Two switches, because neither is universal: `think: false` in the body,
+   * which Ollama honours (and other servers ignore, harmlessly), and `/no_think`
+   * appended to the system prompt, which is Qwen3's own documented soft switch.
+   * Belt and braces on purpose — one of them working is enough, and a model that
+   * understands neither simply sees a body field it ignores and a stray token.
+   *
+   * Off for hosted providers: their reasoning is fast, often improves the answer,
+   * and is not being paid for by a 4B model on 8GB of shared memory.
+   */
+  readonly suppressReasoning?: boolean;
 }
 
 interface ChatCompletionResponse {
@@ -143,6 +162,7 @@ export class OpenAiCompatibleClient {
   private readonly fetchImpl: FetchLike;
   private readonly timeoutMs: number;
   private readonly baseUrl: string;
+  private readonly suppressReasoning: boolean;
 
   public constructor(options: OpenAiCompatibleOptions) {
     this.baseUrl = options.baseUrl.replace(/\/+$/, '');
@@ -152,6 +172,7 @@ export class OpenAiCompatibleClient {
     this.voice = options.voice;
     this.fetchImpl = options.fetch ?? globalThis.fetch;
     this.timeoutMs = options.timeoutMs ?? REQUEST_TIMEOUT_MS;
+    this.suppressReasoning = options.suppressReasoning ?? false;
   }
 
   /**
@@ -237,6 +258,9 @@ export class OpenAiCompatibleClient {
           model: this.model,
           messages,
           stream: false,
+          // Ollama honours this; servers that do not know it ignore an unknown
+          // body field rather than failing, which is why it is safe to send.
+          ...(this.suppressReasoning ? { think: false } : {}),
           // Honored by most implementations; harmlessly ignored by the rest,
           // which is why extractJsonObject stays tolerant.
           ...(options.jsonMode ? { response_format: { type: 'json_object' } } : {}),
@@ -276,7 +300,12 @@ export class OpenAiCompatibleClient {
       [
         {
           role: 'system',
-          content: `${AMPLIFIER_SYSTEM_PROMPT}\n\nRespond with ONLY a JSON object containing exactly these keys: clarifiedIntent (string), missingQuestions (array of strings), improvedConcept (string), recommendedNextStep (string), buildReadyPrompt (string).`,
+          content:
+            `${AMPLIFIER_SYSTEM_PROMPT}\n\nRespond with ONLY a JSON object containing exactly these keys: clarifiedIntent (string), missingQuestions (array of strings), improvedConcept (string), recommendedNextStep (string), buildReadyPrompt (string).` +
+            // Qwen3's documented soft switch. Harmless to a model that has never
+            // heard of it; the difference between an answer and a timeout to one
+            // that has.
+            (this.suppressReasoning ? '\n\n/no_think' : ''),
         },
         { role: 'user', content: buildAmplifierUserMessage(idea) },
       ],

@@ -216,3 +216,50 @@ describe('amplifier extraction against real reasoning-model output', () => {
     await expect(provider.amplify('an idea')).resolves.toEqual(withBrace);
   });
 });
+
+describe('reasoning suppression (why a real amplify timed out)', () => {
+  // William's first Amplify against a local Qwen3 aborted at 120s having emitted
+  // only <think> tokens. A reasoning model on a laptop spends its whole budget
+  // thinking unless told not to, so the local provider asks it not to — two ways,
+  // because neither switch is universal.
+  it('asks the server not to think, and says so in the prompt too', async () => {
+    const fetchImpl = fetchReturning(completion(JSON.stringify(AMP)));
+    await new LocalProvider({
+      baseUrl: 'http://127.0.0.1:11434',
+      model: 'qwen3.5:4b',
+      fetch: fetchImpl,
+    }).amplify('an idea');
+
+    const init = (fetchImpl as unknown as { mock: { calls: [string, { body: string }][] } }).mock
+      .calls[0]?.[1];
+    const body = JSON.parse(init?.body ?? '{}') as {
+      think?: boolean;
+      messages: { role: string; content: string }[];
+    };
+    expect(body.think).toBe(false);
+    expect(body.messages[0]?.content).toContain('/no_think');
+  });
+
+  it('reports a timeout as a timeout, not as a broken call', async () => {
+    // The failure William actually hit. The stub honours the abort signal the
+    // way a real fetch does — a stub that ignores it would hang the test rather
+    // than exercise the path, which is exactly what the first attempt did.
+    const neverAnswers: FetchLike = (_url, init) =>
+      new Promise((_resolve, reject) => {
+        init.signal.addEventListener('abort', () => {
+          reject(Object.assign(new Error('aborted'), { name: 'AbortError' }));
+        });
+      });
+
+    const provider = new LocalProvider({
+      baseUrl: 'http://127.0.0.1:11434',
+      model: 'qwen3.5:4b',
+      timeoutMs: 20,
+      fetch: neverAnswers,
+    });
+
+    await expect(provider.chat({ messages: [{ role: 'user', content: 'x' }] })).rejects.toThrow(
+      /did not answer in time/,
+    );
+  });
+});

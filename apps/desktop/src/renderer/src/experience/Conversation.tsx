@@ -222,7 +222,7 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
         {
           kind: 'error',
           id: allocId(),
-          text: 'Jarvis could not respond. See the console for details.',
+          text: 'Jarvis could not respond. The reason is in the terminal where you started Jarvis.',
         },
       ]);
       setOrb('warning');
@@ -256,7 +256,7 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
         {
           kind: 'error',
           id: allocId(),
-          text: 'The amplifier could not run. See the console for details.',
+          text: 'The amplifier could not run. The reason is in the terminal where you started Jarvis.',
         },
       ]);
       setOrb('warning');
@@ -278,7 +278,9 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
       setHistoryError(null);
     } catch (cause) {
       console.error('[conversation] history:list failed:', cause);
-      setHistoryError('Could not load saved sessions. See the console for details.');
+      setHistoryError(
+        'Could not load saved sessions. The reason is in the terminal where you started Jarvis.',
+      );
     }
   }, [bridge]);
 
@@ -324,7 +326,7 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
         {
           kind: 'error',
           id: allocId(),
-          text: 'The session could not be saved. See the console for details.',
+          text: 'The session could not be saved. The reason is in the terminal where you started Jarvis.',
         },
       ]);
     }
@@ -380,7 +382,9 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
         setViewing(conversation);
       } catch (cause) {
         console.error('[conversation] history:get failed:', cause);
-        setHistoryError('Could not open the saved session. See the console for details.');
+        setHistoryError(
+          'Could not open the saved session. The reason is in the terminal where you started Jarvis.',
+        );
       }
     },
     [bridge, refreshHistory],
@@ -409,7 +413,9 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
         if (!deleted) setHistoryError('That saved session was already gone.');
       } catch (cause) {
         console.error('[conversation] history:delete failed:', cause);
-        setHistoryError('Could not delete the saved session. See the console for details.');
+        setHistoryError(
+          'Could not delete the saved session. The reason is in the terminal where you started Jarvis.',
+        );
       }
     },
     [bridge, confirmDeleteId, viewing, persistedId, refreshHistory],
@@ -480,7 +486,9 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
       }, 3200);
     } catch (cause) {
       console.error('[conversation] history:export failed:', cause);
-      setHistoryError('The backup could not be written. See the console for details.');
+      setHistoryError(
+        'The backup could not be written. The reason is in the terminal where you started Jarvis.',
+      );
     }
   }, [bridge]);
 
@@ -520,7 +528,7 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
       setHistoryError(
         cause instanceof Error && cause.message !== ''
           ? cause.message
-          : 'The backup could not be restored. See the console for details.',
+          : 'The backup could not be restored. The reason is in the terminal where you started Jarvis.',
       );
     }
   }, [bridge, refreshHistory]);
