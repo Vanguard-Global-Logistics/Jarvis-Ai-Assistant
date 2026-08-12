@@ -1,8 +1,10 @@
 import type { AutomationPlan } from '@jarvis/contracts';
 import { jarvisPlanAutomationContract } from '@jarvis/contracts';
 import type { JarvisModelProvider } from '@jarvis/jarvis-core';
+import type { JarvisFacingAegis } from '@jarvis/aegis';
 import { handleContract } from '../ipc.js';
 import { toSafeModelError } from './model-error.js';
+import { assertSendingAllowed } from './sending-guard.js';
 
 /**
  * `jarvis:plan-automation` — an outcome in, a written plan out (ADR 0024).
@@ -21,10 +23,17 @@ import { toSafeModelError } from './model-error.js';
  * (ADR 0022) applies to planning too — switching to Claude mid-session changes
  * who writes the next plan.
  */
-export function registerPlanAutomationHandler(getProvider: () => JarvisModelProvider): void {
+export function registerPlanAutomationHandler(
+  getProvider: () => JarvisModelProvider,
+  aegis: JarvisFacingAegis,
+): void {
   handleContract(jarvisPlanAutomationContract, async (request): Promise<AutomationPlan> => {
     try {
-      return await getProvider().planAutomation(request.outcome);
+      const provider = getProvider();
+      // BEFORE the call, never after: a refusal that arrives once the words have
+      // already reached a vendor is not a refusal (ADR 0026).
+      assertSendingAllowed(aegis, provider.id);
+      return await provider.planAutomation(request.outcome);
     } catch (cause) {
       throw toSafeModelError(cause);
     }

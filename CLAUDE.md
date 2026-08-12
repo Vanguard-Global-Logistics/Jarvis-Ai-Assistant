@@ -23,11 +23,13 @@ Repository: `github.com/Vanguard-Global-Logistics/Jarvis-Ai-Assistant`.
   persistence** (Save Session / History / read-only reopen / Continue / confirmed delete;
   unsaved conversations are discarded on close, and the runtime probe proves it). As of ADR 0025 it also has a **real AEGIS state
   engine** — four levels, a capability matrix, an append-only hash-chained audit log the
-  level is replayed from — that **enforces nothing yet, because no governed capability
-  exists to enforce against**. It still has no orchestrator beyond a single stateless
+  level is replayed from — that **enforces exactly ONE capability of eleven** —
+  `sending`, so a remote provider is refused at YELLOW and above (ADR 0026); the other ten
+  govern things that do not exist yet. It still has no orchestrator beyond a single stateless
   model call, no Forge, no Ledger, no memory (a saved transcript is a stored record, not
-  recall), no voice, and no vision. **Do not describe any part of Jarvis as protected by
-  AEGIS** — nothing calls `allows()` before acting — or as remembering anything. **`docs/KNOWN-LIMITATIONS.md` is the authoritative list of what does not
+  recall), no voice, and no vision. **The only thing AEGIS protects today is that conversations stop leaving the
+  machine when restricted** — do not describe anything else as protected by it, or Jarvis
+  as remembering anything. **`docs/KNOWN-LIMITATIONS.md` is the authoritative list of what does not
   exist — read it before claiming anything works.**
 - **Sixteen IPC channels exist: `app:get-info`, `jarvis:chat`, `jarvis:amplify`,
   `jarvis:plan-automation`,
@@ -50,7 +52,7 @@ Repository: `github.com/Vanguard-Global-Logistics/Jarvis-Ai-Assistant`.
   a renderer that could name a URL could name a remote one and have it labeled `local`
   (ADR 0015). `jarvis:plan-automation` (ADR 0024) writes an automation PLAN and performs nothing — it
   neither sees a screen, drives an app, nor touches a credential, because those are what
-  AEGIS YELLOW exists to revoke and no capability is enforced by AEGIS yet (ADR 0025). `aegis:*` (ADR 0025) reads the REAL security level and lets anyone RAISE it; there is no
+  AEGIS YELLOW exists to revoke and neither is enforceable yet (ADR 0026 enforces only `sending`). `aegis:*` (ADR 0025) reads the REAL security level and lets anyone RAISE it; there is no
   channel that lowers one, and there must never be one. These sixteen are the whole of
   what `window.jarvis` exposes. `docs/IPC-SURFACE.md` is the
   authoritative inventory; adding a channel is a boundary change (ADR 0002), not a
@@ -217,12 +219,12 @@ column is the part that matters:
 apps/desktop           Electron shell (main / preload / renderer)  PARTIAL — hardened, 13 IPC channels, conversation + history + profile + brain-picker UI, owns SQLite
 apps/pwa               PWA shell                                   NOT IMPLEMENTED — empty, out of scope
 services/jarvis-core   Orchestration, isolated from renderer       PARTIAL — 5 model providers + amplifier, wired via chat/amplify/model (ADR 0007, 0022)
-services/aegis         AEGIS engine — independent, no GenAI        PARTIAL — real state engine + hash-chained audit log (ADR 0025); ENFORCES NOTHING yet
+services/aegis         AEGIS engine — independent, no GenAI        PARTIAL — real state engine + hash-chained audit log (ADR 0025); enforces 1 of 11 capabilities (ADR 0026)
 packages/contracts     Zod schemas + shared types                  PARTIAL — IPC (14 channels), model, history, profile, automation, experience
 packages/ui            Design-system components                    PARTIAL — tokens, motion, Orb + glass primitives
 packages/config        Env validation + structured logging         IMPLEMENTED, unit-tested
 packages/database      SQLite (node:sqlite) + migration runner     PARTIAL — wired to Electron main, 5 migrations: history, amplifications, profile, window-state, plans (ADR 0008, 0009, 0013, 0017, 0024)
-docs/DECISIONS/        ADRs                                        0001–0025
+docs/DECISIONS/        ADRs                                        0001–0026
 docs/foundation/       Layer 2 foundation documents (ADR 0005)     PARTIAL — 01 APPROVED; 02, 07, 09 DRAFT; rest CONCEPTUAL
 ```
 

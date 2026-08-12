@@ -22,6 +22,32 @@ import { z } from 'zod';
 export const PROVIDER_IDS = ['mock', 'anthropic', 'local', 'grok', 'gemini'] as const;
 export type ProviderId = (typeof PROVIDER_IDS)[number];
 
+/**
+ * Whether using this provider sends the conversation OFF this machine.
+ *
+ * Defined here, once, because three separate things need the same answer and a
+ * disagreement between them would be a security failure rather than a cosmetic
+ * one: the reply chip that tells a human where their words went, AEGIS
+ * enforcement of the `sending` capability (ADR 0026), and any future connector
+ * policy.
+ *
+ * `mock` is a fixture and `local` is a model on the user's own hardware —
+ * neither opens a socket to anyone else. The other three are hosted APIs, and
+ * the difference between them is billing, not privacy.
+ */
+export const PROVIDER_LEAVES_MACHINE: Readonly<Record<ProviderId, boolean>> = {
+  mock: false,
+  local: false,
+  anthropic: true,
+  gemini: true,
+  grok: true,
+};
+
+/** True when talking to this provider means the conversation leaves the house. */
+export function providerLeavesMachine(provider: ProviderId): boolean {
+  return PROVIDER_LEAVES_MACHINE[provider];
+}
+
 export const ChatMessageSchema = z
   .object({
     role: z.enum(['user', 'assistant']),

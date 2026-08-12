@@ -100,6 +100,8 @@ export {
   ChatReplySchema,
   ChatRequestSchema,
   PROVIDER_IDS,
+  PROVIDER_LEAVES_MACHINE,
+  providerLeavesMachine,
 } from './model/contracts.js';
 export type {
   AmplifierResult,

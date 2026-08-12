@@ -648,6 +648,38 @@ async function runChecks(page, mode, stub = null) {
     String(stillYellow.value),
   );
 
+  // --- AEGIS ACTUALLY ENFORCES SOMETHING (ADR 0026) --------------------------
+  // The probe runs pinned to `mock`, which never leaves the machine, so it stays
+  // usable at YELLOW — that is the point of the rule, not a gap in it. What can
+  // be proven here is that the guard consults the REAL engine and that the local
+  // side keeps working while restricted.
+  const chatWhileRestricted = await page.evaluate(
+    'await window.jarvis.sendChat({ messages: [{ role: "user", content: "restricted but local" }] })',
+  );
+  add(
+    'a provider that never leaves the machine still answers at YELLOW',
+    chatWhileRestricted.value?.provider === 'mock',
+    JSON.stringify(chatWhileRestricted.value?.provider ?? null),
+  );
+
+  // Switching to the stub-backed LOCAL provider must also survive restriction:
+  // local is exactly what a restricted Jarvis should fall back to by choice.
+  const toLocal = await page.evaluate("await window.jarvis.selectModel('local')");
+  add(
+    'and a local model can still be selected while restricted',
+    toLocal.value?.selected === true && toLocal.value.active === 'local',
+    JSON.stringify(toLocal.value?.active ?? null),
+  );
+  const localAnswer = await page.evaluate(
+    'await window.jarvis.sendChat({ messages: [{ role: "user", content: "still local at yellow" }] })',
+  );
+  add(
+    'the local model answers at YELLOW — restriction stops SENDING, not working',
+    localAnswer.value?.provider === 'local' && String(localAnswer.value.text).includes(STUB_MARKER),
+    JSON.stringify(localAnswer.value?.provider ?? null),
+  );
+  await page.evaluate("await window.jarvis.selectModel('mock')");
+
   add(
     'the bridge exposes NO way to lower a level',
     (

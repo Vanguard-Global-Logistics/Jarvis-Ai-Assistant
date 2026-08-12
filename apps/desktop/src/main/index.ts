@@ -7,6 +7,7 @@ import { createProvider } from '@jarvis/jarvis-core';
 import { loadEnvFile, upwardCandidates } from './env-file.js';
 import { registerAmplifyHandler } from './handlers/amplify.js';
 import { registerPlanAutomationHandler } from './handlers/plan-automation.js';
+import { forJarvis } from '@jarvis/aegis';
 import { createAegisForApp, registerAegisHandlers } from './handlers/aegis.js';
 import { installAegisMenu } from './aegis-menu.js';
 import { createProviderHolder, registerModelHandlers } from './handlers/model.js';
@@ -342,9 +343,15 @@ void app
     // The holder, not the provider: ADR 0022 lets a human switch brains without
     // restarting, and a handler that captured the value would keep using the one
     // that existed at boot while the UI happily reported the change.
-    registerChatHandler(providerHolder.current);
-    registerAmplifyHandler(providerHolder.current);
-    registerPlanAutomationHandler(providerHolder.current);
+    // AEGIS is built BEFORE the model handlers, because they now consult it:
+    // `sending` is the first capability with real teeth (ADR 0026), and a remote
+    // model call is refused while AEGIS has revoked it.
+    const aegis = createAegisForApp(app.getPath('userData'));
+    const jarvisAegis = forJarvis(aegis);
+
+    registerChatHandler(providerHolder.current, jarvisAegis);
+    registerAmplifyHandler(providerHolder.current, jarvisAegis);
+    registerPlanAutomationHandler(providerHolder.current, jarvisAegis);
     registerModelHandlers(env, providerHolder);
     registerHistoryHandlers(db);
     registerProfileHandlers(db);
@@ -352,8 +359,6 @@ void app
     // AEGIS is constructed HERE, in main, and the admin surface never leaves
     // this scope. The two channels registered below expose reading the status
     // and asking for a STRICTER level — nothing that lowers one (ADR 0025).
-    const aegis = createAegisForApp(app.getPath('userData'));
-
     // Lowering a level lives on the NATIVE MENU, never on an IPC channel. It is
     // built in main and clicked in main, so a compromised renderer cannot reach
     // it — while a human with the app focused can. Without a lowering path at

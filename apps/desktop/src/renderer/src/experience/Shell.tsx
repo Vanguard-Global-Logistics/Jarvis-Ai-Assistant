@@ -573,8 +573,8 @@ export function Shell({ devStateSwitcher = import.meta.env.DEV }: ShellProps): J
           }}
         >
           <span>
-            PHASE 1 FOUNDATION · NO APPLICATION FEATURES · AEGIS STATE ENGINE REAL, BUT NOTHING
-            CONSULTS IT YET — NO CAPABILITY IS ENFORCED BY IT
+            PHASE 1 FOUNDATION · NO APPLICATION FEATURES · AEGIS ENFORCES 1 OF 11 CAPABILITIES
+            (SENDING) — THE OTHER TEN GOVERN THINGS THAT DO NOT EXIST YET
           </span>
           <AegisStrip status={aegis} onRequest={requestAegis} />
           {host.kind === 'loading' && <span>Reading host info…</span>}

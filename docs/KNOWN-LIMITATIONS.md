@@ -54,10 +54,11 @@ With no model configured at all, replies come from the deterministic **mock** pr
 labeled "Mock provider" in the UI. A real key is opt-in and usage-billed; a local model
 (ADR 0015) is opt-in and free. The mock default is why the app costs $0 to run. See §6.
 
-## 1. The AEGIS state engine exists. It enforces nothing yet.
+## 1. AEGIS enforces one capability of eleven
 
-**Status: PARTIAL (ADR 0025). The engine is `IMPLEMENTED AND VERIFIED` on the Linux
-runtime probe. Enforcement of any Jarvis capability is `NOT IMPLEMENTED`.**
+**Status: PARTIAL. The engine is `IMPLEMENTED AND VERIFIED` (ADR 0025). `sending` is
+`IMPLEMENTED AND VERIFIED` (ADR 0026). The other ten capabilities are `NOT IMPLEMENTED`,
+because the things they govern do not exist.**
 
 This section used to say AEGIS did not exist at all. That changed, and the new claim is
 smaller than it sounds — read the second half before concluding anything is protected.
@@ -72,13 +73,24 @@ RED. Blackout needs the typed word `BLACKOUT` as an argument and does not lift t
 ordinary lowering path. Every rule here was verified red-green: each was deliberately
 removed and the suite re-run to confirm it went red.
 
-**What is NOT real, and this is the part that matters: nothing consults it.** AEGIS knows
-the level and reports it. No Jarvis capability asks permission before acting, because none
-of the governed capabilities exists — there is no computer control, no screen vision, no
-voice, no scheduler, no connector to revoke. **Nothing in this repository is currently
-protected by AEGIS.** The app's own footer says so. When one of those capabilities is
-built it must call `allows()` before acting, and that is the moment AEGIS stops being
-advisory.
+**ONE capability of eleven is enforced (ADR 0026); the other ten are not.** That sentence
+is the whole of the claim and must not be inflated.
+
+`sending` is enforced. At YELLOW or above, a request to a remote provider — Claude,
+Gemini, Grok — is **refused**, because using one means the conversation leaves the
+machine, and `SECURITY-BOUNDARIES.md` puts `sending` in the set YELLOW revokes. The guard
+runs before the call, in main, and it refuses rather than quietly answering with the local
+model: someone who believes they are restricted and is answered anyway has been told a
+comfortable lie by the one subsystem that exists not to tell them.
+
+Restriction stops sending, not working. At YELLOW the mock and local providers keep
+answering — the runtime probe proves it — which is the intended shape of a restricted
+Jarvis rather than a broken one.
+
+**The other ten capabilities cannot be enforced because the things they govern do not
+exist.** There is no computer control, no screen vision, no voice, no scheduler, no
+connector. When one is built it must call `allows()` before acting; until then AEGIS has
+nothing to say about it.
 
 Also absent: the software-review workflow (publisher, signature, hash, verdict), the voice
 trigger, any AEGIS console UI, and the separate-process architecture (§2).

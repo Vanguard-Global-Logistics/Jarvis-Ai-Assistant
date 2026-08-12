@@ -97,7 +97,7 @@ describe('Shell', () => {
     stubMatchMedia();
     stubBridge();
     render(<Shell devStateSwitcher={false} />);
-    expect(screen.getByText(/NO CAPABILITY IS ENFORCED BY IT/)).toBeTruthy();
+    expect(screen.getByText(/AEGIS ENFORCES 1 OF 11 CAPABILITIES/)).toBeTruthy();
     expect(screen.getByText(/PHASE 1 FOUNDATION/)).toBeTruthy();
   });
 
