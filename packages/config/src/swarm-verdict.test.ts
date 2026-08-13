@@ -113,11 +113,20 @@ describe('swarm verdict — the exit code is the product', () => {
     // critic correctly called re-implementing the artifact under test: it passed
     // against a detector that no longer matched real prompts at all. It now runs
     // `prep` for real and feeds it the file that `prep` actually wrote.
-    const prep = spawnSync('node', [script, '--lenses', 'correctness'], {
+    // `--since HEAD~1` rather than the default scope. The default reviews the
+    // working tree, or `origin/main...HEAD` when the tree is clean — so in a
+    // FRESH CLONE with nothing modified this found no diff, refused, and the
+    // test failed on a machine that had done nothing wrong.
+    //
+    // `npm run verify` never saw it: the tree it runs in always has changes.
+    // `npm run verify:cold` found it on its first full run, which is exactly the
+    // class of defect that command exists for. A test that depends on ambient
+    // repo state is testing the checkout, not the code.
+    const prep = spawnSync('node', [script, '--since', 'HEAD~1', '--lenses', 'correctness'], {
       cwd: root,
       encoding: 'utf8',
     });
-    expect(prep.status).toBe(0);
+    expect(prep.status, `swarm prep failed:\n${prep.stdout}${prep.stderr}`).toBe(0);
     const promptPath = /(\S*docs\/swarm\/\S+correctness\.md)/.exec(prep.stdout)?.[1];
     expect(promptPath).toBeDefined();
 
