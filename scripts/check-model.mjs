@@ -78,6 +78,15 @@ const PROVIDERS = {
     models: 'https://generativelanguage.googleapis.com/v1beta/openai/models',
     keyPage: 'aistudio.google.com',
   },
+  nvidia: {
+    label: 'NVIDIA NIM',
+    keyName: 'NVIDIA_API_KEY',
+    modelKey: 'JARVIS_NVIDIA_MODEL',
+    defaultModel: 'meta/llama-3.3-70b-instruct',
+    completions: 'https://integrate.api.nvidia.com/v1/chat/completions',
+    models: 'https://integrate.api.nvidia.com/v1/models',
+    keyPage: 'build.nvidia.com',
+  },
   grok: {
     label: 'Grok',
     keyName: 'XAI_API_KEY',
@@ -305,6 +314,7 @@ function chooseProvider() {
   if (setting(file, 'ANTHROPIC_API_KEY') !== undefined) return 'anthropic';
   if (setting(file, 'GEMINI_API_KEY') !== undefined) return 'gemini';
   if (setting(file, 'XAI_API_KEY') !== undefined) return 'grok';
+  if (setting(file, 'NVIDIA_API_KEY') !== undefined) return 'nvidia';
   return 'mock';
 }
 
@@ -317,7 +327,7 @@ console.log(`.env found    : ${existsSync(join(root, '.env')) ? 'yes' : 'NO'}`);
 let code = 0;
 if (chosen === 'local') {
   code = await checkLocal(file);
-} else if (chosen === 'gemini' || chosen === 'grok') {
+} else if (chosen === 'gemini' || chosen === 'grok' || chosen === 'nvidia') {
   code = await checkHosted(chosen, file);
 } else if (chosen === 'mock') {
   console.log('provider      : mock');
@@ -330,7 +340,7 @@ if (chosen === 'local') {
   );
   console.log('\nNot checked here: Anthropic uses its own SDK rather than this dialect.');
 } else {
-  console.log(`\nUnknown provider "${chosen}". Try: local, gemini, grok, anthropic, mock`);
+  console.log(`\nUnknown provider "${chosen}". Try: local, gemini, grok, nvidia, anthropic, mock`);
   code = 1;
 }
 

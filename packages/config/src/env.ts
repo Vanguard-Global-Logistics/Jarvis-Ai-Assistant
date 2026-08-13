@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { PROVIDER_IDS } from '@jarvis/contracts';
 
 /**
  * Environment schema.
@@ -42,8 +43,10 @@ const EnvSchema = z.object({
    * this means conversations leave the machine, exactly as with Anthropic.
    */
   XAI_API_KEY: z.string().min(1).optional(),
+  NVIDIA_API_KEY: z.string().min(1).optional(),
   /** Which Grok model to ask for. Defaults to `grok-4` in the provider. */
   JARVIS_XAI_MODEL: z.string().min(1).optional(),
+  JARVIS_NVIDIA_MODEL: z.string().min(1).optional(),
 
   /**
    * Google Gemini (ADR 0023). Remote, and the only capable option with a real
@@ -62,7 +65,16 @@ const EnvSchema = z.object({
    * conversation leaving the machine. This makes the choice statable. Unset,
    * `createProvider` falls back to its documented precedence.
    */
-  JARVIS_MODEL_PROVIDER: z.enum(['local', 'anthropic', 'grok', 'gemini', 'mock']).optional(),
+  /**
+   * DERIVED from `PROVIDER_IDS`, not a second hand-maintained list.
+   *
+   * It was a literal `z.enum([...])` until adding NVIDIA made the two disagree:
+   * the id was in the contract, the env schema had never heard of it, and the
+   * typechecker reported the mismatch as an impossible comparison rather than as
+   * the missing provider it was. A rule in two files drifts, and this one drifted
+   * the first time it was touched.
+   */
+  JARVIS_MODEL_PROVIDER: z.enum(PROVIDER_IDS).optional(),
 
   // --- Data / storage ---
   /**
@@ -95,6 +107,7 @@ const SECRET_KEYS = [
   'OPENAI_API_KEY',
   'ANTHROPIC_API_KEY',
   'XAI_API_KEY',
+  'NVIDIA_API_KEY',
   'GEMINI_API_KEY',
   'SUPABASE_SERVICE_ROLE_KEY',
   'PLAID_CLIENT_ID',

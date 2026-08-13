@@ -19,7 +19,7 @@ import { z } from 'zod';
  * because they differ in capability, in cost, and in whether the conversation
  * left the machine at all.
  */
-export const PROVIDER_IDS = ['mock', 'anthropic', 'local', 'grok', 'gemini'] as const;
+export const PROVIDER_IDS = ['mock', 'anthropic', 'local', 'grok', 'gemini', 'nvidia'] as const;
 export type ProviderId = (typeof PROVIDER_IDS)[number];
 
 /**
@@ -41,6 +41,7 @@ export const PROVIDER_LEAVES_MACHINE: Readonly<Record<ProviderId, boolean>> = {
   anthropic: true,
   gemini: true,
   grok: true,
+  nvidia: true,
 };
 
 /** True when talking to this provider means the conversation leaves the house. */

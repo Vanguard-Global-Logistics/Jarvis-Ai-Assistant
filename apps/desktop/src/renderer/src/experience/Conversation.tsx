@@ -1502,6 +1502,7 @@ const PROVIDER_LABELS: Record<ProviderId, string> = {
   anthropic: 'Claude',
   grok: 'Grok',
   gemini: 'Gemini',
+  nvidia: 'NVIDIA',
 };
 
 /**
@@ -1516,6 +1517,8 @@ const PROVIDER_BLURBS: Record<ProviderId, string> = {
   anthropic: 'Claude. Billed per message; the conversation leaves this machine.',
   grok: 'Grok. Billed per message; the conversation leaves this machine.',
   gemini: 'Gemini. Free daily allowance; the conversation leaves this machine.',
+  nvidia:
+    'Open models on NVIDIA. Free credits until they run out; the conversation leaves this machine.',
 };
 
 const PROVIDER_CHIPS: Partial<Record<ProviderId, { label: string; color: string; title: string }>> =

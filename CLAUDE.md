@@ -218,7 +218,7 @@ column is the part that matters:
 ```
 apps/desktop           Electron shell (main / preload / renderer)  PARTIAL — hardened, 13 IPC channels, conversation + history + profile + brain-picker UI, owns SQLite
 apps/pwa               PWA shell                                   NOT IMPLEMENTED — empty, out of scope
-services/jarvis-core   Orchestration, isolated from renderer       PARTIAL — 5 model providers + amplifier, wired via chat/amplify/model (ADR 0007, 0022)
+services/jarvis-core   Orchestration, isolated from renderer       PARTIAL — 6 model providers + amplifier, wired via chat/amplify/model (ADR 0007, 0022)
 services/aegis         AEGIS engine — independent, no GenAI        PARTIAL — real state engine + hash-chained audit log (ADR 0025); enforces 1 of 11 capabilities (ADR 0026)
 packages/contracts     Zod schemas + shared types                  PARTIAL — IPC (14 channels), model, history, profile, automation, experience
 packages/ui            Design-system components                    PARTIAL — tokens, motion, Orb + glass primitives
@@ -485,20 +485,22 @@ verify Phase 1. Adding a model must mean adding a config entry and a provider ad
 never editing call sites across the codebase. Any real key must never enter the renderer
 and must never be logged.
 
-That abstraction now has **five** adapters, chosen in this startup precedence:
+That abstraction now has **six** adapters, chosen in this startup precedence:
 **`local`** (ADR 0015 — a model on the user's own machine over an OpenAI-compatible
 endpoint: free, offline, private, and **loopback-only**, enforced by a startup crash
 rather than a silent downgrade) → **`anthropic`** (a real key, usage-billed) →
 **`gemini`** (ADR 0023 — a free daily allowance, no card) → **`grok`** (ADR 0020 — a real
-key, usage-billed) → **`mock`** (the $0 default). `JARVIS_MODEL_PROVIDER` names one
+key, usage-billed) → **`nvidia`** (ADR 0028 — 100+ open-weight models behind one
+OpenAI-compatible endpoint; free in money until a FIXED credit pool runs out, which is
+why it sits last among the remotes) → **`mock`** (the $0 default). `JARVIS_MODEL_PROVIDER` names one
 outright and beats precedence; a named provider that cannot be built **fails the app**
 rather than quietly substituting another brain (ADR 0020). Since ADR 0022 the running app
 can also switch live from the brain picker, and that choice is **not** persisted.
 
 Every reply is chipped with the brain that produced it and what that cost — `mock` and
-`local` stayed on the machine; `anthropic`, `gemini`, and `grok` did not. Four of the five
-are `IMPLEMENTED, NOT YET VERIFIED`: no real Ollama, Claude key, Google key, or xAI key
-has ever answered in this repo, and every test injects `fetch`.
+`local` stayed on the machine; `anthropic`, `gemini`, `grok` and `nvidia` did not. Five of the six
+are `IMPLEMENTED, NOT YET VERIFIED`: no real Ollama, Claude key, Google key, xAI key or
+NVIDIA key has ever answered in this repo, and every test injects `fetch`.
 
 Three things must never be softened. A model that fits on a laptop is meaningfully weaker
 than Claude — local hosting makes the *model* free, not Jarvis. Gemini's free tier is free

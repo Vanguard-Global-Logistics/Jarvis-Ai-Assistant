@@ -10,7 +10,7 @@ Personal AI assistant and orchestrator for William Lavold. Private, single-user.
 > (ADR 0007, 0008, 0010). Unsaved conversations are discarded on close, by design. It can
 > back up every saved session to a file and restore one without ever overwriting
 > (ADR 0011, 0014), wear a per-person orb identity (ADR 0013), answer from a model running
-> on your own machine (ADR 0015), switch between five brains without restarting
+> on your own machine (ADR 0015), switch between six brains without restarting
 > (ADR 0022 — mock, local, Claude, Gemini, Grok), and be packaged as an installable app
 > (ADR 0016).
 >

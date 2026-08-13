@@ -3,6 +3,7 @@ import { createLogger } from '@jarvis/config';
 import { AnthropicProvider } from './anthropic-provider.js';
 import { GeminiProvider } from './gemini-provider.js';
 import { GrokProvider } from './grok-provider.js';
+import { NvidiaProvider } from './nvidia-provider.js';
 import { LocalProvider } from './local-provider.js';
 import { MockProvider } from './mock-provider.js';
 import type { JarvisModelProvider } from './provider.js';
@@ -81,6 +82,26 @@ function buildGrok(env: Env): JarvisModelProvider {
   });
 }
 
+/**
+ * Construct the NVIDIA NIM provider (ADR 0028) — remote, credit-metered, key required.
+ *
+ * Free in money until the credit pool runs out, which is why it sits BELOW
+ * Gemini in precedence: Gemini's allowance refills daily and this one does not.
+ */
+function buildNvidia(env: Env): JarvisModelProvider {
+  const apiKey = env.NVIDIA_API_KEY;
+  if (apiKey === undefined || apiKey === '') {
+    throw new ModelProviderConfigError(
+      'The nvidia provider was selected but NVIDIA_API_KEY is not set. ' +
+        'A free key is available at build.nvidia.com.',
+    );
+  }
+  return new NvidiaProvider({
+    apiKey,
+    ...(env.JARVIS_NVIDIA_MODEL === undefined ? {} : { model: env.JARVIS_NVIDIA_MODEL }),
+  });
+}
+
 /** Construct the Gemini provider (ADR 0023) — remote, free tier, key required. */
 function buildGemini(env: Env): JarvisModelProvider {
   const apiKey = env.GEMINI_API_KEY;
@@ -116,7 +137,10 @@ function buildGemini(env: Env): JarvisModelProvider {
  *   3. **grok** — the other paid remote option (ADR 0020). After Anthropic only
  *      because that is the established default here, not as a quality claim;
  *      name it in `JARVIS_MODEL_PROVIDER` to prefer it.
- *   4. **mock** — the $0 default. No key, no local runner, no cost, and every
+ *   4. **nvidia** — open-weight models behind a key (ADR 0028). Last among the
+ *      remotes because its free allowance is a fixed credit pool, not a daily
+ *      refill; spending it on routine chat burns the cross-vendor review budget.
+ *   5. **mock** — the $0 default. No key, no local runner, no cost, and every
  *      reply labeled MOCK so nothing looks more real than it is (ADR 0006).
  *
  * Logs which provider was selected, never a key or a reason's value.
@@ -131,9 +155,11 @@ export function createProvider(env: Env): JarvisModelProvider {
           ? buildGrok(env)
           : chosen === 'gemini'
             ? buildGemini(env)
-            : chosen === 'anthropic'
-              ? buildAnthropic(env)
-              : new MockProvider();
+            : chosen === 'nvidia'
+              ? buildNvidia(env)
+              : chosen === 'anthropic'
+                ? buildAnthropic(env)
+                : new MockProvider();
     log.info('model provider selected', { provider: chosen, explicit: true });
     return provider;
   }
@@ -160,6 +186,15 @@ export function createProvider(env: Env): JarvisModelProvider {
   if (env.XAI_API_KEY !== undefined && env.XAI_API_KEY !== '') {
     log.info('model provider selected', { provider: 'grok' });
     return buildGrok(env);
+  }
+
+  // NVIDIA last among the configured remotes. Its free allowance is a FIXED
+  // POOL of credits rather than a daily refill, so silently spending it on
+  // routine chat would burn the budget that exists for cross-vendor review.
+  // Name it in JARVIS_MODEL_PROVIDER to use it deliberately.
+  if (env.NVIDIA_API_KEY !== undefined && env.NVIDIA_API_KEY !== '') {
+    log.info('model provider selected', { provider: 'nvidia' });
+    return buildNvidia(env);
   }
 
   log.info('model provider selected', { provider: 'mock' });
@@ -212,6 +247,8 @@ function tryBuild(
         return { ok: true, provider: buildGrok(env) };
       case 'gemini':
         return { ok: true, provider: buildGemini(env) };
+      case 'nvidia':
+        return { ok: true, provider: buildNvidia(env) };
       case 'mock':
         return { ok: true, provider: new MockProvider() };
     }
