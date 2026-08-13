@@ -421,6 +421,32 @@ that reason.
 A change offered as done without saying which lenses ran is a change that skipped
 the gate — **a lens not run is not a lens that passed.**
 
+### STANDING RULE — ask for `npm run diagnostics` BEFORE guessing at William's machine
+
+> **When something does not work on William's Mac, the first response is
+> "run `npm run diagnostics` and paste it" — not a guess.**
+
+2026-08-13 cost him most of a day, and reviewing it honestly, only one of the
+five time sinks was a memory failure. The rest were this: **I could not see his
+machine, so I guessed, and each guess cost a round trip.**
+
+- His clone sat **18 commits behind** for over an hour. Every instruction I gave
+  was correct for a commit he did not have: the file to edit did not exist yet,
+  the command to run was not in his `package.json`.
+- I wrote `~/path/to/Jarvis-Ai-Assistant` as a placeholder and he pasted it
+  literally, twice. **Never hand him a path with a placeholder in it** — ask for
+  the real one, or give a command that finds it.
+- I did not know whether `.env` existed, which keys were in it, or which provider
+  precedence would pick — all three are printed by one command.
+
+`npm run diagnostics` already answers every one of those, and now also reports
+**how many commits behind the remote** the checkout is and whether dependencies
+are installed and current. It prints `.env` key NAMES only, never values, so the
+whole output is safe to paste.
+
+The rule is not "document more." It is: **stop inferring the state of a machine
+you cannot see when one command reports it.**
+
 ### `npm run verify:cold` — because a warm tree proves nothing about a cold one
 
 > **Never tell William to pull without running it.**

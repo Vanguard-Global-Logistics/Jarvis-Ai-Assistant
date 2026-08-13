@@ -200,6 +200,57 @@ function aheadOfMain() {
 }
 
 /**
+ * HOW FAR BEHIND THE REMOTE THIS CHECKOUT IS.
+ *
+ * The single most expensive unknown of 2026-08-13. William's clone sat 18
+ * commits behind for over an hour while both of us assumed it was current: the
+ * file he was told to edit did not exist yet, the command he was told to run was
+ * not in his package.json, and every instruction I gave was correct for a commit
+ * he did not have. Neither of us could see it, so we guessed, and each guess cost
+ * a round trip.
+ *
+ * `ahead of main` was already reported. Behind-the-remote is the one that
+ * actually breaks people, and it was missing.
+ */
+function behindRemote() {
+  const upstream = cmd('git', ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}']);
+  if (upstream === '' || upstream.startsWith('(')) return '- behind remote: (no upstream branch)';
+  // Compare against the last FETCH, and say so — a stale fetch reports zero and
+  // means nothing.
+  const counts = cmd('git', ['rev-list', '--left-right', '--count', `HEAD...${upstream}`]);
+  const [ahead = '?', behind = '?'] = counts.split(/\s+/);
+  const fetchedAt = cmd('git', ['log', '-1', '--format=%cr', 'FETCH_HEAD']) || 'never fetched';
+  if (behind === '0')
+    return `- behind ${upstream}: 0 (up to date as of the last fetch — ${fetchedAt})`;
+  return (
+    `- behind ${upstream}: **${behind} COMMIT(S) BEHIND** — run \`git pull\`\n` +
+    `  (ahead ${ahead}; measured against the last fetch — ${fetchedAt})`
+  );
+}
+
+/**
+ * Whether dependencies are actually installed, and current.
+ *
+ * `npm install` failing is loud; NOT HAVING RUN IT is silent, and the symptom is
+ * whatever command the person tries next failing for an unrelated-looking
+ * reason.
+ */
+function installState() {
+  const modules = join(root, 'node_modules');
+  if (!existsSync(modules)) return '- dependencies: **NOT INSTALLED** — run `npm install`';
+  try {
+    const lock = statSync(join(root, 'package-lock.json')).mtimeMs;
+    const installed = statSync(join(modules, '.package-lock.json')).mtimeMs;
+    if (lock > installed + 1000)
+      return '- dependencies: **STALE** — package-lock.json is newer than the install. Run `npm install`';
+  } catch {
+    // No marker file to compare against; presence is all we can honestly claim.
+    return '- dependencies: installed (freshness unknown)';
+  }
+  return '- dependencies: installed and current';
+}
+
+/**
  * The working tree, and WHICH files if it is dirty.
  *
  * "HAS UNCOMMITTED CHANGES" on its own prompts the exact follow-up question this
@@ -322,6 +373,8 @@ const lines = [
   `- tracking: ${cmd('git', ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}'])}`,
   `- HEAD: ${cmd('git', ['rev-parse', '--short', 'HEAD'])}`,
   `- commits ahead of main: ${aheadOfMain()}`,
+  behindRemote(),
+  installState(),
   ...describeRemoteRefspec(),
   ...describeWorkingTree(),
   '',
