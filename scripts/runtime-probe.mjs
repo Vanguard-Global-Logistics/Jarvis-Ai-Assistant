@@ -6,6 +6,7 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readFileSync as readSourceForIds } from 'node:fs';
 
 /**
  * Runtime probe — launches the real Electron app and asserts what it actually does.
@@ -45,6 +46,30 @@ import { fileURLToPath } from 'node:url';
  */
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+
+/**
+ * The provider ids, READ FROM THE CONTRACT rather than retyped here.
+ *
+ * The probe is bare `node`, so it cannot import the TypeScript barrel — but it
+ * can read the one file that defines the list. Hardcoding a count instead turned
+ * this probe red when a sixth provider was added correctly, which is the same
+ * two-copies defect the provider work already had to fix twice.
+ *
+ * A failed parse THROWS. A silent fallback would let the assertion below pass
+ * against an empty list, which is the shape of every guard that proved nothing.
+ */
+const PROVIDER_IDS = (() => {
+  const source = readSourceForIds(
+    join(root, 'packages', 'contracts', 'src', 'model', 'contracts.ts'),
+    'utf8',
+  );
+  const match = /export const PROVIDER_IDS = \[([^\]]+)\]/.exec(source);
+  if (match === null) throw new Error('could not find PROVIDER_IDS in the model contract');
+  const ids = [...match[1].matchAll(/'([a-z]+)'/g)].map((m) => m[1]);
+  if (ids.length < 2)
+    throw new Error(`parsed an implausible provider list: ${JSON.stringify(ids)}`);
+  return ids;
+})();
 const args = process.argv.slice(2);
 const wantPackaged = args.includes('--packaged');
 // An explicit mode flag selects only that mode; bare invocation runs prod + dev.
@@ -699,7 +724,15 @@ async function runChecks(page, mode, stub = null) {
   const d = described.value;
   add(
     'model:describe names the active provider and offers every one',
-    d?.active === 'mock' && Array.isArray(d.providers) && d.providers.length === 5,
+    // Derived from the CONTRACT, not a hardcoded count. It was `=== 5`, so adding
+    // a sixth provider turned the probe red on a change that was entirely
+    // correct — the app offered six and the probe insisted on five. A literal
+    // count here is the same defect as the provider list living in two files,
+    // which this exact change already had to fix twice.
+    d?.active === 'mock' &&
+      Array.isArray(d.providers) &&
+      d.providers.length === PROVIDER_IDS.length &&
+      PROVIDER_IDS.every((id) => d.providers.some((p) => p.id === id)),
     JSON.stringify(d),
   );
   add(

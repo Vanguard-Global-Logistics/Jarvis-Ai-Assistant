@@ -336,6 +336,48 @@ async function checkHosted(
       .map((/** @type {string} */ n) => n.replace(/^models\//, ''));
 
     console.log(`  ✓ the key WORKS — it can see ${String(names.length)} models.`);
+    // DO NOT OVERCLAIM. A 200 from the model list proves the key is fine only if
+    // that endpoint REQUIRES a key. NVIDIA answered 401 on completions while
+    // listing 102 models for the same credential — and one of those models was
+    // the very one being requested. Either the listing is unauthenticated, or the
+    // credential is entitled to listing but not inference. Both are consistent
+    // with the evidence, and the script had been asserting one of them as fact.
+    //
+    // This is the failure this script exists to prevent: a diagnostic that states
+    // more than it observed sends someone to fix the wrong thing. It cost William
+    // a regenerated key that was never at fault.
+    const listingProvesAuth = await (async () => {
+      try {
+        const probe = await fetch(p.models, {
+          headers: { authorization: 'Bearer nvapi-deliberately-invalid-probe-key' },
+          signal: AbortSignal.timeout(20_000),
+        });
+        // If a junk key can still list models, a successful list says NOTHING
+        // about the real key.
+        return !probe.ok;
+      } catch {
+        return null; // could not determine — say so rather than guess
+      }
+    })();
+
+    if (listingProvesAuth === true) {
+      console.log('\n  The key WORKS: a junk key is rejected by this same endpoint,');
+      console.log('  so listing 200 means your credential authenticated.');
+    } else if (listingProvesAuth === false) {
+      console.log('\n  ⚠ CANNOT conclude the key is good. This endpoint accepts a JUNK key too,');
+      console.log('    so a successful model list proves nothing about your credential.');
+      console.log('    The 401 on completions is the only real signal, and it says the key');
+      console.log('    was NOT accepted for inference.');
+      console.log('');
+      console.log('    Most likely: the key is the wrong TYPE. NVIDIA issues an NGC key for');
+      console.log('    the container registry (the `docker login nvcr.io` flow) and a separate');
+      console.log('    API key for the hosted endpoint. Open a model at build.nvidia.com and');
+      console.log('    use its "Get API Key" button — that is the one this needs.');
+      return 1;
+    } else {
+      console.log('\n  (could not verify whether this endpoint requires a key — network issue)');
+    }
+
     console.log('\n  So the key is fine and the MODEL NAME is the problem.');
 
     // SAY WHETHER THE REQUESTED MODEL IS ACTUALLY IN THE LIST.
