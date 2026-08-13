@@ -73,7 +73,7 @@ const PROVIDERS = {
     label: 'Gemini',
     keyName: 'GEMINI_API_KEY',
     modelKey: 'JARVIS_GEMINI_MODEL',
-    defaultModel: 'gemini-2.5-flash',
+    defaultModel: 'gemini-3.7-flash',
     completions: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
     models: 'https://generativelanguage.googleapis.com/v1beta/openai/models',
     keyPage: 'aistudio.google.com',
@@ -274,8 +274,27 @@ async function checkHosted(
     });
     const listBody = await listed.text();
     if (!listed.ok) {
+      const listDetail = scrub(detailOf(listBody), key);
       console.log(`  ✗ the model list ALSO failed (HTTP ${String(listed.status)}).`);
-      console.log(`    it said: ${scrub(detailOf(listBody), key)}`);
+      console.log(`    it said: ${listDetail}`);
+
+      // BILLING IS NOT A BAD KEY, and saying so sends people to regenerate a
+      // credential that was never the problem. xAI's real answer to a working
+      // key on an unfunded team was "Your newly created team doesn't have any
+      // credits or licenses yet" — and this script replied "points at the KEY".
+      // The vendor already said what was wrong; read it rather than guessing.
+      if (
+        /credit|licen[cs]e|billing|quota|payment|subscription|top ?up|insufficient/i.test(
+          listDetail,
+        )
+      ) {
+        console.log('\n  That is a BILLING answer, not a rejected key.');
+        console.log('    The key authenticated fine — the account has nothing to spend.');
+        console.log('    Add credits with the vendor, or use a different provider for now.');
+        console.log(`    Do NOT regenerate ${p.keyName}; it is not the problem.`);
+        return 1;
+      }
+
       console.log('\n  Both calls failing the same way points at the KEY, not the model.');
       console.log(`    Check ${p.keyName} in .env — regenerate it at ${p.keyPage} if unsure.`);
       return 1;

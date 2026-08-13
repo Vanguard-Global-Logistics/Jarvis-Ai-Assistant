@@ -35,7 +35,8 @@
     "check:model": "node scripts/check-model.mjs",
     "review": "node scripts/review-packet.mjs",
     "swarm": "node scripts/swarm.mjs",
-    "skill:install": "node scripts/install-skill.mjs"
+    "skill:install": "node scripts/install-skill.mjs",
+    "verify:cold": "node scripts/cold-start.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

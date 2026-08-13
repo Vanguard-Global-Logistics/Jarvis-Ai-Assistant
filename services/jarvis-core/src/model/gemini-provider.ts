@@ -35,7 +35,7 @@ const DEFAULT_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/opena
  * Flash is the free tier's workhorse — the daily allowance is generous enough
  * for family use, where Pro's is not. Override with `JARVIS_GEMINI_MODEL`.
  */
-const DEFAULT_MODEL = 'gemini-2.5-flash';
+const DEFAULT_MODEL = 'gemini-3.7-flash';
 
 /** How failures are worded for a hosted API behind a key. */
 const GEMINI_VOICE: ServiceVoice = {
@@ -62,7 +62,7 @@ export interface GeminiProviderOptions {
   readonly apiKey: string;
   /** Defaults to Google's OpenAI-compatibility endpoint. */
   readonly baseUrl?: string;
-  /** Defaults to `gemini-2.5-flash`. */
+  /** Defaults to `gemini-3.7-flash`. */
   readonly model?: string;
   readonly fetch?: FetchLike;
   readonly timeoutMs?: number;

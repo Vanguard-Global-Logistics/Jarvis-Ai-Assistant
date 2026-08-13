@@ -54,7 +54,7 @@ const EnvSchema = z.object({
    * consumer AI APIs is commonly used to improve the provider's products.
    */
   GEMINI_API_KEY: z.string().min(1).optional(),
-  /** Which Gemini model to ask for. Defaults to `gemini-2.5-flash`. */
+  /** Which Gemini model to ask for. Defaults to `gemini-3.7-flash`. */
   JARVIS_GEMINI_MODEL: z.string().min(1).optional(),
 
   /**
