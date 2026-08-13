@@ -59,12 +59,34 @@ describe('NvidiaProvider', () => {
     expect(url.match(/\/v1/g)).toHaveLength(1);
   });
 
-  it('names the key, not the network, when NVIDIA rejects the credential', async () => {
-    const provider = new NvidiaProvider({ apiKey: 'wrong', fetch: failing(401) });
+  it('does NOT blame the key on a 401, because NVIDIA uses 401 for an unavailable model', async () => {
+    // This test used to assert the opposite, and the assertion was wrong.
+    //
+    // A REAL key proved it: the completion returned `401 Authentication failed`
+    // while the model list simultaneously returned 102 models. A dead credential
+    // cannot list 102 models. NVIDIA answers 401 when the ACCOUNT IS NOT
+    // ENTITLED to the model requested — and the model in question,
+    // `meta/llama-3.3-70b-instruct`, was not in that catalogue at all.
+    //
+    // The old message would have sent someone to regenerate a working key. The
+    // test encoded my wrong belief, so it passed while the guidance misled.
+    const provider = new NvidiaProvider({
+      apiKey: 'k',
+      model: 'meta/llama-3.3-70b-instruct',
+      fetch: failing(401),
+    });
 
-    await expect(provider.chat({ messages: [{ role: 'user', content: 'hi' }] })).rejects.toThrow(
-      /NVIDIA_API_KEY/,
-    );
+    const failure: unknown = await provider
+      .chat({ messages: [{ role: 'user', content: 'hi' }] })
+      .catch((error: unknown) => error);
+    const message = failure instanceof Error ? failure.message : String(failure);
+
+    // It names the MODEL and routes to the diagnostic that can settle it...
+    expect(message).toContain('meta/llama-3.3-70b-instruct');
+    expect(message).toMatch(/check:model/);
+    expect(message).toMatch(/JARVIS_NVIDIA_MODEL/);
+    // ...and does not assert the credential is at fault, which is the defect.
+    expect(message).not.toMatch(/rejected the API key/i);
   });
 
   it('points at the model id, not the key, on a 404', async () => {

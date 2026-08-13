@@ -55,20 +55,34 @@ const COMPLETIONS_PATH = '/chat/completions';
 /**
  * A conservative named default.
  *
+ * **Was `meta/llama-3.3-70b-instruct` until a real key answered.** That id is not
+ * in the catalogue a real account can see — 102 models, and 3.3 was not among
+ * them. I had picked it by pattern-matching what a recent Llama is called rather
+ * than by asking the service, which is CLAUDE.md §8 rule 10 exactly.
+ *
  * Deliberately a specific model rather than a floating alias — a silently
  * changing model is a silently changing assistant. Override with
  * `JARVIS_NVIDIA_MODEL`; the catalogue carries 100+ and the right one depends
  * on the job, which is why this is configuration rather than a hardcoded
  * assumption.
  */
-const DEFAULT_MODEL = 'meta/llama-3.3-70b-instruct';
+const DEFAULT_MODEL = 'meta/llama-3.1-70b-instruct';
 
 /** How failures are worded for a hosted API behind a key. */
 const NVIDIA_VOICE: ServiceVoice = {
   subject: 'NVIDIA NIM',
   httpHint: (status, model) => {
     if (status === 401 || status === 403) {
-      return `NVIDIA rejected the API key (${String(status)}). Check NVIDIA_API_KEY at build.nvidia.com.`;
+      // NVIDIA answers 401 "Authentication failed" for a model the ACCOUNT IS
+      // NOT ENTITLED TO, not only for a bad credential — observed against a real
+      // key that could simultaneously list 102 models. Naming only the key sends
+      // someone to regenerate a credential that was never the problem.
+      return (
+        `NVIDIA returned ${String(status)} for model "${model}". That is not only a key error: ` +
+        `NVIDIA answers 401 when the account cannot use the model requested. Run ` +
+        `\`npm run check:model -- nvidia\` — if it lists models, the key is fine and ` +
+        `JARVIS_NVIDIA_MODEL is the thing to change.`
+      );
     }
     if (status === 404) {
       return `NVIDIA does not recognise the model "${model}" (404). Model ids are namespaced like "meta/llama-3.3-70b-instruct" — check JARVIS_NVIDIA_MODEL against the catalogue.`;

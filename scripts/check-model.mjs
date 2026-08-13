@@ -82,7 +82,7 @@ const PROVIDERS = {
     label: 'NVIDIA NIM',
     keyName: 'NVIDIA_API_KEY',
     modelKey: 'JARVIS_NVIDIA_MODEL',
-    defaultModel: 'meta/llama-3.3-70b-instruct',
+    defaultModel: 'meta/llama-3.1-70b-instruct',
     completions: 'https://integrate.api.nvidia.com/v1/chat/completions',
     models: 'https://integrate.api.nvidia.com/v1/models',
     keyPage: 'build.nvidia.com',
@@ -337,8 +337,29 @@ async function checkHosted(
 
     console.log(`  ✓ the key WORKS — it can see ${String(names.length)} models.`);
     console.log('\n  So the key is fine and the MODEL NAME is the problem.');
-    const usable = names.filter((n) => !/embedding|aqa|imagen|veo|tts/i.test(n));
-    console.log(`  Models this key can use:\n    ${usable.slice(0, 25).join('\n    ')}`);
+
+    // SAY WHETHER THE REQUESTED MODEL IS ACTUALLY IN THE LIST.
+    //
+    // NVIDIA answers 401 "Authentication failed" for a model the account cannot
+    // use, which reads exactly like a rejected credential. The list is the
+    // evidence that settles it — but only if someone scans 100+ names for the
+    // one they asked for. The script can just check.
+    const present = names.includes(model);
+    console.log(
+      present
+        ? `  NOTE: "${model}" IS in that list, so the model name is not obviously wrong.\n` +
+            '        The account may lack entitlement for it specifically. Try another below.'
+        : `  CONFIRMED: "${model}" is NOT in the list of ${String(names.length)} models this key can see.\n` +
+            '             That is the whole problem. Your key is fine.',
+    );
+
+    const usable = names.filter((n) => !/embedding|aqa|imagen|veo|tts|rerank/i.test(n));
+    const shown = usable.slice(0, 40);
+    console.log(`\n  Models this key can use:\n    ${shown.join('\n    ')}`);
+    if (usable.length > shown.length)
+      console.log(
+        `    … and ${String(usable.length - shown.length)} more (${String(usable.length)} total)`,
+      );
     console.log(`\n  Set one of these in .env as ${p.modelKey}=<name> and try again.`);
   } catch (cause) {
     console.log(`  (could not list models: ${scrub(String(cause), key)})`);
