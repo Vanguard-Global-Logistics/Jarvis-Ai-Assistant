@@ -389,6 +389,7 @@ remaining item in `docs/BACKLOG.md` and every future change to this repository:
 
 | Work                                        | Gate before it is offered as done                     |
 | ------------------------------------------- | ----------------------------------------------------- |
+| Anything William will PULL or RUN           | `npm run verify:cold` — a fresh clone must install, verify and build   |
 | Any code change                             | `npm run swarm` — every blocking finding fixed, or declined in writing |
 | Anything with a visual or written surface   | `/gauntlet-skill` against a named bar                 |
 | Security, boundaries, credentials, money    | red-green **and** `npm run review` to a second vendor |
@@ -414,6 +415,40 @@ that reason.
 
 A change offered as done without saying which lenses ran is a change that skipped
 the gate — **a lens not run is not a lens that passed.**
+
+### `npm run verify:cold` — because a warm tree proves nothing about a cold one
+
+> **Never tell William to pull without running it.**
+
+Every defect that has reached him shares one cause, and it is not carelessness
+about any particular file: **verification ran in an environment that was already
+set up, against injected inputs, instead of the path he actually takes.**
+
+- `"@jarvis/contracts": "workspace:*"` — pnpm syntax npm rejects. It passed here
+  because `node_modules` was warm and there was nothing left to resolve; it made
+  the repository uninstallable on his machine, mid-setup, on a task about API
+  keys.
+- `.env` was documented in four places and loaded by nothing for a day, because
+  every test injected the environment and skipped the missing step (ADR 0021).
+- A leak test passed against a deliberately injected leak — the code path holding
+  the credential never executed.
+- A Gemini URL carried a doubled version segment, found only by calling the real
+  API. And its model id was retired out from under it, found the same way.
+
+`npm run verify` **structurally cannot** see this class: it runs inside the
+already-installed tree. `npm run verify:cold` builds a real fresh checkout with
+`git worktree`, installs from scratch with an isolated npm cache, and runs the
+gates there. It uses `npm install` rather than `npm ci` on purpose — `ci` reads
+the committed lockfile and would happily install a lockfile that agrees with a
+broken manifest.
+
+It earns its place twice over: reintroducing `workspace:*` reproduces William's
+exact `EUNSUPPORTEDPROTOCOL` in 0.4 seconds, and on its first full run it caught
+a second defect `verify` could not — a test that depended on the working tree
+having uncommitted changes, and so failed in any fresh clone.
+
+Use `--fast` (install + typecheck, ~30s) while iterating; the full run
+(install + verify + build, ~75s) before saying anything is ready to pull.
 
 ### A noted reconciliation
 
