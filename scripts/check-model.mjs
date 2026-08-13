@@ -98,6 +98,21 @@ const PROVIDERS = {
   },
 };
 
+/**
+ * Match the PROVIDER's ceiling, not a shorter one.
+ *
+ * This was 60s for a completion and 30s for the model list, while
+ * `openai-compatible.ts` waits 120s. So the diagnostic could report "could not
+ * reach it" for a service the running app would have waited out — a diagnostic
+ * that disagrees with the program it describes is worse than no diagnostic,
+ * which is this script's entire thesis.
+ *
+ * It happened on the first real NVIDIA call: a 70B model cold-starting on
+ * shared infrastructure took longer than 60s, and the script called it
+ * unreachable.
+ */
+const TIMEOUT_MS = 120_000;
+
 /** Trim a service's error body down to the sentence a human needs. */
 function detailOf(/** @type {string} */ body) {
   const trimmed = body.trim();
@@ -167,7 +182,7 @@ async function checkLocal(/** @type {Record<string,string>} */ file) {
         stream: false,
         max_tokens: 20,
       }),
-      signal: AbortSignal.timeout(60_000),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
     });
   } catch (cause) {
     console.log(`✗ could not reach it: ${cause instanceof Error ? cause.message : String(cause)}`);
@@ -235,10 +250,25 @@ async function checkHosted(
         messages: [{ role: 'user', content: 'Reply with the single word: ok' }],
         stream: false,
       }),
-      signal: AbortSignal.timeout(60_000),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
     });
   } catch (cause) {
     const why = cause instanceof Error ? cause.message : String(cause);
+    // A TIMEOUT IS NOT A REJECTION. The key was never judged, so reporting
+    // "could not reach it" sends someone to check a network that is fine.
+    // NVIDIA's first real call did exactly this: a 70B cold-starting on shared
+    // hardware outlasted the old 60s ceiling and got called unreachable.
+    if (/abort|timeout|timed out/i.test(why)) {
+      console.log(`✗ no answer within ${String(TIMEOUT_MS / 1000)}s.`);
+      console.log('');
+      console.log('  That is a TIMEOUT, not a rejection — your key was never judged,');
+      console.log('  so nothing here says it is wrong.');
+      console.log('  Large hosted models cold-start on shared hardware, and the first');
+      console.log('  request after an idle period is the slow one. Run it again first.');
+      console.log('  If it times out twice, ask for a smaller model:');
+      console.log(`    ${p.modelKey}=<a smaller model, e.g. meta/llama-3.1-8b-instruct>`);
+      return 1;
+    }
     console.log(`✗ could not reach it: ${scrub(why, key)}`);
     return 1;
   }
@@ -270,7 +300,7 @@ async function checkHosted(
   try {
     const listed = await fetch(p.models, {
       headers: { authorization: `Bearer ${key}` },
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     const listBody = await listed.text();
     if (!listed.ok) {

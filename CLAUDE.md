@@ -533,9 +533,16 @@ rather than quietly substituting another brain (ADR 0020). Since ADR 0022 the ru
 can also switch live from the brain picker, and that choice is **not** persisted.
 
 Every reply is chipped with the brain that produced it and what that cost — `mock` and
-`local` stayed on the machine; `anthropic`, `gemini`, `grok` and `nvidia` did not. Five of the six
-are `IMPLEMENTED, NOT YET VERIFIED`: no real Ollama, Claude key, Google key, xAI key or
-NVIDIA key has ever answered in this repo, and every test injects `fetch`.
+`local` stayed on the machine; `anthropic`, `gemini`, `grok` and `nvidia` did not. **`gemini` is now
+`IMPLEMENTED AND VERIFIED`** — on 2026-08-13 a real Google key answered through the real
+endpoint (`✓ it answered. reply: ok`), the first live model reply this repository has ever
+had. That same run corrected the code twice: the default model `gemini-2.5-flash` was
+retired for new accounts ("no longer available to new users"), and a 403 from xAI reading
+"your newly created team doesn't have any credits" was being reported as a bad key.
+
+The other four remain `IMPLEMENTED, NOT YET VERIFIED`: no real Ollama, Claude key, or xAI
+key has answered here, and NVIDIA's first call TIMED OUT rather than being judged — a
+timeout is not a verdict on a credential. Every test still injects `fetch`.
 
 Three things must never be softened. A model that fits on a laptop is meaningfully weaker
 than Claude — local hosting makes the *model* free, not Jarvis. Gemini's free tier is free
