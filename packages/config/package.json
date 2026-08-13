@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "zod": "^4.4.3",
-    "@jarvis/contracts": "workspace:*"
+    "@jarvis/contracts": "*"
   },
   "devDependencies": {
     "typescript": "^5.9.3"
