@@ -21,7 +21,7 @@
 
 ### Stage 1A — Jarvis Daily-Use Desktop MVP (ADR 0006)
 
-- **User value:** a daily-useful Jarvis on the personal Dell — conversation, Thought
+- **User value:** a daily-useful Jarvis on the personal Mac — conversation, Thought
   Amplifier v1, explicit local session saving.
 - **Dependency:** the verified Electron shell (ADR 0004). None open.
 - **Complexity:** moderate (~10–20 supervised hours; native SQLite rebuild and IPC
@@ -31,9 +31,12 @@
   documentation. Fully local on a trusted machine, so it safely precedes AEGIS v1.
 - **Status: conversation slice complete (ADR 0007) — `jarvis:chat` + `jarvis:amplify`
   wired end to end, mock-default, with `verify` + `build` + `probe:runtime` green on Linux.
-  REMAINING for the milestone: persistence (`history:*` channels + SQLite migrations +
-  `better-sqlite3` ABI rebuild), the Windows packaged-installer gate, and William's
-  acceptance (using it for one real task).**
+  Persistence landed (ADR 0008–0014). The PACKAGED-APP gate is now green — `package:dir`
+  then `probe:packaged` pass against a real asar build with `isPackaged: true`
+  (2026-08-13). A real Gemini key answered the same day, the first live model reply this
+  repository has had. REMAINING for the milestone: the macOS `.dmg` built and opened on
+  William's own Mac (`npm run package:mac`, ADR 0016 — it only runs on a Mac), and
+  William's acceptance: using it for one real task.**
 
 ---
 
@@ -70,8 +73,12 @@
   the dev runtime.
 - **Dependency:** none; can ride alongside either NEXT item.
 - **Complexity:** small. **Recurring cost:** $0.
-- **Promotion criteria:** a Windows packaged-build pass of
-  `docs/WINDOWS-ACCEPTANCE-TEST.md`.
+- **Status: the pipeline half is DONE** — `npm run package:dir` + `npm run probe:packaged`
+  pass on a genuinely packaged build (asar, collected node_modules, `isPackaged: true`).
+- **Promotion criteria:** what remains is platform-specific — a macOS `.dmg` built with
+  `npm run package:mac` and opened on William's Mac. `docs/WINDOWS-ACCEPTANCE-TEST.md`
+  stays a valid historical record and a valid gate _if_ Windows ever ships; it is no
+  longer the gate that matters, because the primary machine is a MacBook Air (ADR 0012).
 
 ---
 

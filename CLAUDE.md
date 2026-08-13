@@ -82,8 +82,13 @@ Repository: `github.com/Vanguard-Global-Logistics/Jarvis-Ai-Assistant`.
 - **Complete is not accepted.** The §5 independent review is done — ChatGPT reviewed the
   architecture, recorded 2026-07-16 (ADR 0004). The Windows development runtime gate has
   now been observed live on a Windows x64 laptop. The shell and the IPC channel are
-  `IMPLEMENTED AND VERIFIED` for development runtime; packaged installer verification
-  remains pending. Do not call packaged production builds verified unless they are.
+  `IMPLEMENTED AND VERIFIED` for development runtime. **The PACKAGED app is now verified
+  too, on 2026-08-13**: `npm run package:dir` followed by `npm run probe:packaged` passes
+  against a genuinely packaged build — `isPackaged: true`, loaded from `app.asar`, all
+  sixteen channels answering, renderer isolated, console clean. That closes ADR 0004's
+  packaging gate for the pipeline. What is still NOT verified is the **macOS `.dmg` on
+  William's own Mac**: `npm run package:mac` only runs on a Mac (ADR 0016), and no
+  installer has been opened there. Do not call the Mac installer verified until it is.
 - `reference/design-handoff/*.dc.html` and `support.js` are **design prototypes, not
   source to port**. `support.js` is explicitly marked "do not ship". Recreate the
   designs in real code; do not copy the prototype implementation.
