@@ -118,6 +118,24 @@ personal Jarvis. `docs/WINDOWS-ACCEPTANCE-TEST.md` remains a valid historical re
 a valid gate *if* Windows ever ships; it is no longer the gate that matters most.
 macOS packaging is ADR 0016 / `docs/MAC-PACKAGING.md`.
 
+**Clarified 2026-08-13 — whose Mac, and why the paths say `amylavold`.** The MacBook Air
+is Amy's machine, which she does not use; William has claimed it **exclusively for
+Jarvis**. So its macOS account is `amylavold` and every path reads
+`/Users/amylavold/Jarvis-Ai-Assistant` — that is an account NAME, not a second operator.
+
+Three consequences worth having in advance, because a future session will otherwise
+re-derive them or, worse, mistake the account for a multi-user requirement:
+
+- **The single-operator assumption HOLDS.** William is still the sole operator; nothing
+  here needs multi-user auth. (`Sophisticated Sips` is where that assumption genuinely
+  breaks — see §7 — and it is unrelated to this.)
+- **It is a DEDICATED machine**, which is what ADR 0012's "head node that never sleeps"
+  actually requires. Nothing else competes for it, so it is the right place for an
+  always-running local model (`npm run dev:awake` keeps it awake via `caffeinate`).
+- **Never write a placeholder path for William.** Use `/Users/amylavold/Jarvis-Ai-Assistant`
+  or a command that finds it. He pasted `~/path/to/Jarvis-Ai-Assistant` literally, twice,
+  because a session wrote it that way.
+
 ---
 
 ## 2. System Architecture
