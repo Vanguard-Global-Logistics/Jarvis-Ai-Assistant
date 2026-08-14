@@ -68,6 +68,22 @@ const ALLOWED_API = [
   // argument than either of these.
   'aegisStatus',
   'aegisRequestRestriction',
+  // ADR 0029 — Memory v1. The first store in this application whose contents are
+  // READ BACK INTO A PROMPT, which is why the widening argument is different
+  // from the history one it otherwise resembles.
+  //
+  // `remember` is the only write path and a HUMAN drives it — Jarvis does not
+  // decide what to remember (constitution §4), because AEGIS RED revokes
+  // `memory-writes` and AEGIS enforces one capability of eleven today. It sends
+  // a sentence and a tier: no id, no timestamp, no SQL, no path. Main mints the
+  // id, so the renderer cannot overwrite what Jarvis believes by guessing one.
+  //
+  // `remember` also REFUSES credential-shaped text at the boundary (§5) — the
+  // one function on this bridge that can reject its input on content, and the
+  // refusal quotes none of it back.
+  'remember',
+  'listMemories',
+  'forget',
 ] as const;
 
 /** Load the bridge fresh and return what it handed to `exposeInMainWorld`. */

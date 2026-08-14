@@ -21,6 +21,12 @@ import {
   SavedConversationSchema,
 } from '../history/contracts.js';
 import { ProfileSchema } from '../profile/contracts.js';
+import {
+  ForgetRequestSchema,
+  MemoryListSchema,
+  MemorySchema,
+  RememberRequestSchema,
+} from '../memory/contracts.js';
 
 /**
  * IPC contracts — the single definition of every message that crosses the
@@ -343,6 +349,46 @@ export const profileSetContract = defineContract({
   response: ProfileSchema,
 });
 
+// --- memory:* (ADR 0029) ----------------------------------------------------
+
+/**
+ * `memory:remember` — store one human-confirmed fact.
+ *
+ * The request schema is `RememberRequestSchema`, which has no `id` and no
+ * `learnedAt` **by construction**: main mints both. This is the same reasoning
+ * that keeps UUID minting in main for history (ADR 0008), sharpened by the fact
+ * that memory is replayed into every future prompt — a renderer that could pick
+ * an id could overwrite what Jarvis believes about a person.
+ *
+ * The response is the stored `Memory`, not an acknowledgement. The caller sees
+ * what persistence actually holds, so a write that silently did nothing cannot
+ * be reported to the UI as success (CLAUDE.md §8 rule 1).
+ */
+export const memoryRememberContract = defineContract({
+  channel: CHANNELS.memoryRemember,
+  request: RememberRequestSchema,
+  response: MemorySchema,
+});
+
+/** `memory:list` — everything Jarvis knows. The whole store (constitution §8). */
+export const memoryListContract = defineContract({
+  channel: CHANNELS.memoryList,
+  request: z.undefined(),
+  response: MemoryListSchema,
+});
+
+/**
+ * `memory:forget` — delete one memory.
+ *
+ * Responds with whether a row actually went, so "deleted" in the UI always
+ * corresponds to a deletion that happened.
+ */
+export const memoryForgetContract = defineContract({
+  channel: CHANNELS.memoryForget,
+  request: ForgetRequestSchema,
+  response: z.object({ forgotten: z.boolean() }).strict(),
+});
+
 // --- model:* (ADR 0022) -----------------------------------------------------
 
 /**
@@ -437,4 +483,7 @@ export const IPC_CONTRACTS = {
   [CHANNELS.modelSelect]: modelSelectContract,
   [CHANNELS.profileGet]: profileGetContract,
   [CHANNELS.profileSet]: profileSetContract,
+  [CHANNELS.memoryRemember]: memoryRememberContract,
+  [CHANNELS.memoryList]: memoryListContract,
+  [CHANNELS.memoryForget]: memoryForgetContract,
 } as const;

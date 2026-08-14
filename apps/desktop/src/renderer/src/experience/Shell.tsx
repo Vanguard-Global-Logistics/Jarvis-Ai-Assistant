@@ -5,6 +5,8 @@ import type {
   AegisLevel,
   AegisStatus,
   AppInfo,
+  Memory,
+  MemorySensitivity,
   OrbState,
   Profile,
   ProfileAccentId,
@@ -29,6 +31,7 @@ import {
 } from '@jarvis/ui';
 import { Conversation } from './Conversation.js';
 import type { ConversationBridge } from './Conversation.js';
+import { MemoryPanel } from './MemoryPanel.js';
 
 /**
  * The Experience Shell (task E2, visual correction pass): cinematic ambient
@@ -128,6 +131,60 @@ export function Shell({ devStateSwitcher = import.meta.env.DEV }: ShellProps): J
    */
   const [aegis, setAegis] = useState<AegisStatus | null>(null);
   const [rendererV2, setRendererV2] = useState(false);
+
+  /**
+   * What Jarvis durably knows (ADR 0029).
+   *
+   * Held here rather than inside `MemoryPanel` so that adding or forgetting a
+   * fact re-reads the store, and the list on screen is always what main
+   * actually holds — never an optimistic local guess. Memory is replayed into
+   * every future prompt, so a UI that showed a memory the store did not have
+   * (or hid one it did) would be lying about what Jarvis will say next.
+   */
+  const [memories, setMemories] = useState<readonly Memory[]>([]);
+  const [memoryOpen, setMemoryOpen] = useState(false);
+
+  const refreshMemories = useCallback((): void => {
+    const jarvis = window.jarvis;
+    if (jarvis === undefined || typeof jarvis.listMemories !== 'function') return;
+    jarvis
+      .listMemories()
+      .then(setMemories)
+      .catch((cause: unknown) => {
+        console.error('[shell] memory:list failed:', cause);
+      });
+  }, []);
+
+  useEffect(refreshMemories, [refreshMemories]);
+
+  /**
+   * Store a fact, then re-read.
+   *
+   * Deliberately does NOT catch: `MemoryPanel` awaits this and renders the
+   * refusal message itself. Swallowing the rejection here would leave a panel
+   * that looked like it had saved a credential it actually refused — the exact
+   * "no UI control that looks functional but does nothing" failure CLAUDE.md §8
+   * rule 1 forbids.
+   */
+  const rememberFact = useCallback(
+    async (fact: string, sensitivity: MemorySensitivity): Promise<void> => {
+      const jarvis = window.jarvis;
+      if (jarvis === undefined) throw new Error('No Jarvis bridge in this context.');
+      await jarvis.remember({ fact, sensitivity, learnedFrom: 'told' });
+      refreshMemories();
+    },
+    [refreshMemories],
+  );
+
+  const forgetFact = useCallback(
+    async (id: string): Promise<void> => {
+      const jarvis = window.jarvis;
+      if (jarvis === undefined) return;
+      await jarvis.forget(id);
+      refreshMemories();
+    },
+    [refreshMemories],
+  );
 
   /**
    * Ask AEGIS for a stricter level, and adopt whatever it says came back.
@@ -552,6 +609,58 @@ export function Shell({ devStateSwitcher = import.meta.env.DEV }: ShellProps): J
               });
           }}
         />
+      )}
+
+      {!cinematic && (
+        <section
+          aria-label="Memory"
+          style={{
+            position: 'absolute',
+            right: 14,
+            bottom: 54,
+            zIndex: 2,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 6,
+            alignItems: 'flex-end',
+          }}
+        >
+          {memoryOpen && (
+            <div
+              style={{
+                maxHeight: '60vh',
+                overflowY: 'auto',
+                padding: 10,
+                border: `1px solid ${surface.hairline}`,
+                borderRadius: surface.radiusMin,
+                background: 'rgba(5,7,10,0.92)',
+              }}
+            >
+              <MemoryPanel memories={memories} onRemember={rememberFact} onForget={forgetFact} />
+            </div>
+          )}
+          <button
+            type="button"
+            aria-expanded={memoryOpen}
+            onClick={() => {
+              setMemoryOpen((value) => !value);
+            }}
+            style={{
+              minHeight: 30,
+              padding: '5px 10px',
+              fontFamily: fontFamily.mono,
+              fontSize: 10,
+              letterSpacing: letterSpacing.label,
+              color: text.faint,
+              background: 'transparent',
+              border: `1px solid ${surface.hairline}`,
+              borderRadius: surface.radiusMin,
+              cursor: 'pointer',
+            }}
+          >
+            MEMORY · {memories.length} {memoryOpen ? '▾' : '▸'}
+          </button>
+        </section>
       )}
 
       {!cinematic && (

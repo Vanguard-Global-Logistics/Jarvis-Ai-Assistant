@@ -2,7 +2,10 @@ import type { ChatReply } from '@jarvis/contracts';
 import { jarvisChatContract } from '@jarvis/contracts';
 import type { JarvisModelProvider } from '@jarvis/jarvis-core';
 import type { JarvisFacingAegis } from '@jarvis/aegis';
+import type { SqliteDatabase } from '@jarvis/database';
 import { handleContract } from '../ipc.js';
+import { withRecall } from '../memory/recall.js';
+import { listMemories } from '../memory/store.js';
 import { toSafeModelError } from './model-error.js';
 import { assertSendingAllowed } from './sending-guard.js';
 
@@ -28,6 +31,7 @@ import { assertSendingAllowed } from './sending-guard.js';
 export function registerChatHandler(
   getProvider: () => JarvisModelProvider,
   aegis: JarvisFacingAegis,
+  db: SqliteDatabase,
 ): void {
   handleContract(jarvisChatContract, async (request): Promise<ChatReply> => {
     try {
@@ -35,7 +39,20 @@ export function registerChatHandler(
       // BEFORE the call, never after: a refusal that arrives once the words have
       // already reached a vendor is not a refusal (ADR 0026).
       assertSendingAllowed(aegis, provider.id);
-      return await provider.chat(request);
+
+      // Recall (ADR 0029). Read fresh per turn rather than cached at startup,
+      // for the same reason the provider is: a memory added or deleted a moment
+      // ago must take effect on the very next message, or "Jarvis, forget that"
+      // becomes a lie until restart.
+      //
+      // The provider id is passed in so `withRecall` can enforce constitution
+      // §3 — a `private` memory is never ASSEMBLED into a prompt bound for a
+      // brain that leaves the machine. Filtering here rather than inside the
+      // provider is deliberate: the text must not exist in a form that could be
+      // sent, rather than existing and being redacted on the way out.
+      const messages = withRecall(request.messages, listMemories(db), provider.id);
+
+      return await provider.chat({ messages });
     } catch (cause) {
       throw toSafeModelError(cause);
     }

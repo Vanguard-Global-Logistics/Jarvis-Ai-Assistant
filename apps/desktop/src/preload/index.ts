@@ -11,10 +11,13 @@ import type {
   AppInfo,
   ChatReply,
   ChatRequest,
+  ForgetRequest,
   HistoryIdRequest,
+  Memory,
   ModelDescription,
   ModelSelection,
   Profile,
+  RememberRequest,
   ProviderId,
   SaveConversationRequest,
   SavedConversation,
@@ -196,6 +199,30 @@ const api = {
 
   setProfile: (profile: Profile): Promise<Profile> =>
     ipcRenderer.invoke(CHANNELS.profileSet, profile) as Promise<Profile>,
+
+  /**
+   * Memory v1 (ADR 0029) — what Jarvis durably knows about the person whose
+   * account this is.
+   *
+   * Three functions, matching the three channels. `remember` sends a sentence
+   * and a sensitivity tier and nothing else: the id and the timestamp are minted
+   * in main, so the renderer cannot overwrite an existing memory by guessing an
+   * id or forge the provenance the constitution requires.
+   *
+   * `remember` REJECTS credential-shaped text — the promise rejects with a
+   * message the UI shows verbatim. That message names the rule and says where
+   * keys belong, and quotes none of the refused text back.
+   */
+  remember: (request: RememberRequest): Promise<Memory> =>
+    ipcRenderer.invoke(CHANNELS.memoryRemember, request) as Promise<Memory>,
+
+  listMemories: (): Promise<Memory[]> =>
+    ipcRenderer.invoke(CHANNELS.memoryList) as Promise<Memory[]>,
+
+  forget: (id: string): Promise<{ forgotten: boolean }> =>
+    ipcRenderer.invoke(CHANNELS.memoryForget, { id } satisfies ForgetRequest) as Promise<{
+      forgotten: boolean;
+    }>,
 } as const;
 
 export type JarvisApi = typeof api;

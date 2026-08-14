@@ -50,6 +50,9 @@ export {
   profileSetContract,
   historyListContract,
   historySaveContract,
+  memoryForgetContract,
+  memoryListContract,
+  memoryRememberContract,
   aegisRequestRestrictionContract,
   aegisStatusContract,
   jarvisAmplifyContract,
@@ -122,6 +125,34 @@ export {
   profileAccentColor,
 } from './profile/contracts.js';
 export type { Profile, ProfileAccentId } from './profile/contracts.js';
+
+export {
+  DEFAULT_SENSITIVITY,
+  ForgetRequestSchema,
+  MEMORY_MAX_LENGTH,
+  MEMORY_SENSITIVITIES,
+  MEMORY_SOURCES,
+  MemoryListSchema,
+  MemorySchema,
+  MemorySensitivitySchema,
+  MemorySourceSchema,
+  RememberRequestSchema,
+  sensitivityAllowsSending,
+} from './memory/contracts.js';
+export type {
+  ForgetRequest,
+  Memory,
+  MemoryList,
+  MemorySensitivity,
+  MemorySource,
+  RememberRequest,
+} from './memory/contracts.js';
+
+export {
+  CREDENTIAL_REFUSED_MESSAGE,
+  MEMORY_CREDENTIAL_PATTERNS,
+  looksLikeCredential,
+} from './memory/credential-guard.js';
 
 export { ORB_STATES, OrbStateSchema } from './experience/orb.js';
 export type { OrbState } from './experience/orb.js';

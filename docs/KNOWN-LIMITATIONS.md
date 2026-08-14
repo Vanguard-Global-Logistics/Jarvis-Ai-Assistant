@@ -113,11 +113,11 @@ storage, separate credentials. Phase 1 will not deliver OS-level enforcement. Wh
 state engine ships, this gap must be restated wherever AEGIS is described — not quietly
 dropped once the UI looks convincing.
 
-## 3. The IPC bridge exposes exactly sixteen narrow channels
+## 3. The IPC bridge exposes exactly nineteen narrow channels
 
 **Status: PARTIAL — intended for this stage.**
 
-`window.jarvis` exposes exactly sixteen purpose-named functions: `getAppInfo` (host
+`window.jarvis` exposes exactly nineteen purpose-named functions: `getAppInfo` (host
 facts), `sendChat` and `amplify` (model calls, ADR 0007), the four history
 operations (ADR 0008), `exportHistory` (ADR 0011), `importHistory` (ADR 0014),
 `describeModels`/`selectModel` (ADR 0022 — which brain is answering, and switching it
@@ -349,7 +349,7 @@ Four jobs, and the distinctions matter:
   did not.
 - **`runtime`** — installs Electron's GUI libraries and Xvfb, builds, then runs
   `npm run probe:runtime`: launches the real app (packaged path **and** `dev:desktop`) and
-  asserts React mounts, the bridge exposes exactly the sixteen allowlisted functions, a
+  asserts React mounts, the bridge exposes exactly the nineteen allowlisted functions, a
   brain switch really re-routes messages in both directions (ADR 0022), a
   chat/amplify round-trip works, the full history save/list/get/delete loop works against
   a real SQLite (including that an unsaved chat never persists), the renderer has no Node

@@ -25,17 +25,24 @@ Repository: `github.com/Vanguard-Global-Logistics/Jarvis-Ai-Assistant`.
   engine** — four levels, a capability matrix, an append-only hash-chained audit log the
   level is replayed from — that **enforces exactly ONE capability of eleven** —
   `sending`, so a remote provider is refused at YELLOW and above (ADR 0026); the other ten
-  govern things that do not exist yet. It still has no orchestrator beyond a single stateless
-  model call, no Forge, no Ledger, no memory (a saved transcript is a stored record, not
-  recall), no voice, and no vision. **The only thing AEGIS protects today is that conversations stop leaving the
-  machine when restricted** — do not describe anything else as protected by it, or Jarvis
-  as remembering anything. **`docs/KNOWN-LIMITATIONS.md` is the authoritative list of what does not
+  govern things that do not exist yet. As of ADR 0029 it also has **real memory** — short,
+  human-confirmed facts, recalled into every turn, per OS user account, governed by
+  `docs/foundation/06-MEMORY-CONSTITUTION.md`. Jarvis now genuinely remembers between
+  sessions; what it does NOT do is learn on its own (every write is a person pressing a
+  button, §4), recall by meaning (recall is lexical and small, §10), or promote anything
+  from repetition (§9). It still has no orchestrator beyond a single stateless model call,
+  no Forge, no Ledger, no voice, and no vision. **The only thing AEGIS protects today is
+  that conversations stop leaving the machine when restricted** — do not describe anything
+  else as protected by it. Memory's own travel rule (`private` never reaches a provider
+  that leaves the machine) is enforced by the recall filter, NOT by AEGIS, and the two must
+  not be conflated. **`docs/KNOWN-LIMITATIONS.md` is the authoritative list of what does not
   exist — read it before claiming anything works.**
-- **Sixteen IPC channels exist: `app:get-info`, `jarvis:chat`, `jarvis:amplify`,
+- **Nineteen IPC channels exist: `app:get-info`, `jarvis:chat`, `jarvis:amplify`,
   `jarvis:plan-automation`,
   `history:save`/`list`/`get`/`delete`, `history:export`, `history:import`,
-  `model:describe`/`model:select`, `aegis:status`/`aegis:request-restriction`, and
-  `profile:get`/`profile:set`.** `app:get-info` returns static host facts.
+  `model:describe`/`model:select`, `aegis:status`/`aegis:request-restriction`,
+  `profile:get`/`profile:set`, and
+  `memory:remember`/`memory:list`/`memory:forget`.** `app:get-info` returns static host facts.
   `jarvis:chat` and `jarvis:amplify` (ADR 0007) are narrow model calls: a transcript or
   an idea in, a reply or the five amplifier fields out. The `history:*` four (ADR 0008)
   are narrow calls against the main-owned conversation store: `history:save` is the only
@@ -53,7 +60,13 @@ Repository: `github.com/Vanguard-Global-Logistics/Jarvis-Ai-Assistant`.
   (ADR 0015). `jarvis:plan-automation` (ADR 0024) writes an automation PLAN and performs nothing — it
   neither sees a screen, drives an app, nor touches a credential, because those are what
   AEGIS YELLOW exists to revoke and neither is enforceable yet (ADR 0026 enforces only `sending`). `aegis:*` (ADR 0025) reads the REAL security level and lets anyone RAISE it; there is no
-  channel that lowers one, and there must never be one. These sixteen are the whole of
+  channel that lowers one, and there must never be one. `memory:*` (ADR 0029) is the first
+  store whose contents are READ BACK INTO A PROMPT, which is why its rules are stricter than
+  history's: `memory:remember` is the only write path and a HUMAN drives it (Jarvis never
+  decides what to remember), main mints the id and the timestamp so the renderer can neither
+  overwrite a memory nor forge its provenance, credential-shaped text is REFUSED at the
+  boundary rather than stored, and a `private` fact is never assembled into a prompt bound
+  for a brain that leaves the machine. These nineteen are the whole of
   what `window.jarvis` exposes. `docs/IPC-SURFACE.md` is the
   authoritative inventory; adding a channel is a boundary change (ADR 0002), not a
   routine edit.
@@ -85,7 +98,7 @@ Repository: `github.com/Vanguard-Global-Logistics/Jarvis-Ai-Assistant`.
   `IMPLEMENTED AND VERIFIED` for development runtime. **The PACKAGED app is now verified
   too, on 2026-08-13**: `npm run package:dir` followed by `npm run probe:packaged` passes
   against a genuinely packaged build — `isPackaged: true`, loaded from `app.asar`, all
-  sixteen channels answering, renderer isolated, console clean. That closes ADR 0004's
+  nineteen channels answering, renderer isolated, console clean. That closes ADR 0004's
   packaging gate for the pipeline. What is still NOT verified is the **macOS `.dmg` on
   William's own Mac**: `npm run package:mac` only runs on a Mac (ADR 0016), and no
   installer has been opened there. Do not call the Mac installer verified until it is.
@@ -117,6 +130,17 @@ Dell machines owned by BCI Integrated Solutions and are **not** a deployment tar
 personal Jarvis. `docs/WINDOWS-ACCEPTANCE-TEST.md` remains a valid historical record and
 a valid gate *if* Windows ever ships; it is no longer the gate that matters most.
 macOS packaging is ADR 0016 / `docs/MAC-PACKAGING.md`.
+
+**Settled 2026-08-14 — the head node is the Mac. Full stop.** William, in his own words:
+_"100% I'm using the Mac."_ This closes a contradiction that cost a session's attention:
+ADR 0012 Decision 1 names the MacBook Air as the head node, while
+`jarvis-hermes/brain-snapshot/hermes-home/memories/HARDWARE-PLAN.md` plans a used x86-64
+mini-PC on wired gigabit. **HARDWARE-PLAN.md is superseded on this point.** It is not
+wrong — it is ADR 0012's own _upgrade-trigger_ path written out in advance, and the
+triggers still stand (head unreachable twice in a month · more than two people depending
+on it daily · the local model making the machine unusable for its owner · Jarvis doing
+scheduled work that matters if missed). Until one of those fires, the Mac is the answer,
+and no session should re-open this or hedge between the two machines.
 
 **Clarified 2026-08-13 — whose Mac, and why the paths say `amylavold`.** The MacBook Air
 is Amy's machine, which she does not use; William has claimed it **exclusively for
@@ -281,7 +305,7 @@ React Refresh preamble). Both reached William before anyone noticed.
 
 **`npm run probe:runtime` is the check that catches those.** It launches the real app —
 built HTML and `dev:desktop` — drives it over the DevTools protocol, and asserts React
-mounts, `window.jarvis` exposes exactly the sixteen allowlisted functions, a chat/amplify
+mounts, `window.jarvis` exposes exactly the nineteen allowlisted functions, a chat/amplify
 round-trip answers, the full history save/list/get/delete loop works against a real
 SQLite (including that an unsaved chat never persists), the profile round-trips and
 rejects an invalid accent, the brain picker lists every provider, refuses an

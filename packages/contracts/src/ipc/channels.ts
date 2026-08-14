@@ -132,6 +132,35 @@ export const CHANNELS = {
 
   /** Set the profile. The only write, and it changes nothing but presentation. */
   profileSet: 'profile:set',
+
+  /**
+   * Memory v1 (ADR 0029; `docs/foundation/06-MEMORY-CONSTITUTION.md`).
+   *
+   * The first data in this application that is READ BACK INTO A PROMPT. Every
+   * other store here is a record a human opens deliberately; a memory is
+   * replayed every time Jarvis thinks. Three consequences shape these channels:
+   *
+   * - **`memory:remember` is the ONLY write path, and a human drives it.**
+   *   Jarvis does not decide what to remember (constitution §4). AEGIS RED
+   *   revokes `memory-writes` and AEGIS enforces one capability of eleven today
+   *   (ADR 0026) — building autonomous writes now would build the thing AEGIS
+   *   exists to revoke, before it can revoke it.
+   * - **The renderer supplies text and a tier. It never supplies an id or a
+   *   timestamp** — main mints both, so a renderer cannot overwrite an existing
+   *   memory by guessing an id or forge the provenance §2 requires.
+   * - **Credential-shaped text is refused at this boundary**, not stored with a
+   *   warning (§5). A key written here would be replayed into every future
+   *   prompt, including prompts sent to a brain that leaves the machine.
+   *
+   * As with `history:*`, no SQL, no path, and no column name ever crosses.
+   */
+  memoryRemember: 'memory:remember',
+
+  /** Everything Jarvis knows, newest first. The whole store — §8 requires it visible. */
+  memoryList: 'memory:list',
+
+  /** Delete one memory by id. Real deletion, not a tombstone (§8). */
+  memoryForget: 'memory:forget',
 } as const;
 
 export type ChannelName = (typeof CHANNELS)[keyof typeof CHANNELS];

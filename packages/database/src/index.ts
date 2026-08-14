@@ -22,6 +22,7 @@ import { conversationAmplificationsMigration } from './migrations/0002-conversat
 import { profileMigration } from './migrations/0003-profile.js';
 import { windowStateMigration } from './migrations/0004-window-state.js';
 import { conversationPlansMigration } from './migrations/0005-conversation-plans.js';
+import { memoryMigration } from './migrations/0006-memory.js';
 
 export { openDatabase, withTransaction } from './connection.js';
 export type { OpenDatabaseOptions, SqliteDatabase } from './connection.js';
@@ -41,4 +42,5 @@ export const migrations: readonly Migration[] = [
   profileMigration,
   windowStateMigration,
   conversationPlansMigration,
+  memoryMigration,
 ];

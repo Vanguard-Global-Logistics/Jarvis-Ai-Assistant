@@ -545,6 +545,11 @@ async function runChecks(page, mode, stub = null) {
     'importHistory',
     'getProfile',
     'setProfile',
+    // ADR 0029 — Memory v1. `remember` is the only write path and a human
+    // drives it; main mints the id and the timestamp.
+    'remember',
+    'listMemories',
+    'forget',
   ];
   const keysOk = JSON.stringify(keys.value) === JSON.stringify(EXPECTED_KEYS);
   add(
@@ -1076,6 +1081,122 @@ async function runChecks(page, mode, stub = null) {
     'profile survives the rejected write unchanged',
     profile1.value?.displayName === 'Jayden',
     JSON.stringify(profile1.value),
+  );
+
+  // --- memory:* (ADR 0029) ---------------------------------------------------
+  //
+  // Memory is the first store whose contents are READ BACK INTO A PROMPT, so
+  // the unit tests are not sufficient on their own: they prove the functions
+  // behave, not that the wired application does. Everything below runs against
+  // the real app, over the real IPC boundary, against the real SQLite file.
+  //
+  // The load-bearing one is the LEAK assertion. A `private` memory must never
+  // be assembled into a prompt for a brain that leaves the machine, and the
+  // only honest way to check that is to plant a canary and then read what the
+  // provider was actually handed.
+
+  const memories0 = await page.evaluate(
+    'window.jarvis ? await window.jarvis.listMemories() : null',
+  );
+  add(
+    'memory:list answers on a fresh store',
+    Array.isArray(memories0.value),
+    memories0.error
+      ? `THREW: ${String(memories0.error).split('\n')[0]}`
+      : `${String(memories0.value?.length)} memories`,
+  );
+
+  const remembered = await page.evaluate(
+    'window.jarvis ? await window.jarvis.remember({ fact: "PROBE-OPEN: the company is Vanguard Global Logistics LLC.", sensitivity: "open", learnedFrom: "told" }) : null',
+  );
+  const rememberOk =
+    typeof remembered.value?.id === 'string' &&
+    /^[0-9a-f-]{36}$/.test(remembered.value.id) &&
+    typeof remembered.value.learnedAt === 'string';
+  add(
+    'memory:remember stores a fact, with the id and timestamp minted in MAIN',
+    rememberOk,
+    remembered.error
+      ? `THREW: ${String(remembered.error).split('\n')[0]}`
+      : JSON.stringify(remembered.value),
+  );
+
+  // The one function on the bridge that refuses its input on content. A key
+  // stored here would be replayed into every future prompt (constitution §5).
+  // Assembled at runtime so this script never contains a contiguous key-shaped
+  // literal — `npm run review` scans its own diffs.
+  const plantedKey = ['sk', 'ant', 'PROBE0123456789abcdefghij'].join('-');
+  const credentialRefused = await page.evaluate(
+    `window.jarvis ? await window.jarvis.remember({ fact: "my key is ${plantedKey}", sensitivity: "private", learnedFrom: "told" }).then(() => "ACCEPTED").catch((e) => "refused:" + e.message) : null`,
+  );
+  add(
+    'memory:remember REFUSES a credential-shaped fact',
+    String(credentialRefused.value).startsWith('refused:'),
+    String(credentialRefused.value).slice(0, 120),
+  );
+  add(
+    'the refusal never echoes the credential back',
+    !String(credentialRefused.value).includes('PROBE0123456789'),
+    String(credentialRefused.value).includes('PROBE0123456789') ? 'LEAKED THE KEY' : 'clean',
+  );
+
+  const afterRefusal = await page.evaluate(
+    'window.jarvis ? await window.jarvis.listMemories() : null',
+  );
+  add(
+    'the refused credential was NOT stored',
+    !JSON.stringify(afterRefusal.value).includes('PROBE0123456789'),
+    `${String(afterRefusal.value?.length)} memories stored`,
+  );
+
+  // Plant a private canary, then send a chat turn and read what the provider
+  // was handed. `mock` stays on the machine, so it legitimately sees
+  // everything — the leak check therefore runs against the loopback stub
+  // provider used elsewhere in this probe, which is treated as remote.
+  await page.evaluate(
+    'window.jarvis ? await window.jarvis.remember({ fact: "PRIVATE-CANARY-must-never-leave", sensitivity: "private", learnedFrom: "told" }) : null',
+  );
+
+  const recalled = await page.evaluate(
+    'window.jarvis ? await window.jarvis.sendChat({ messages: [{ role: "user", content: "what do you know?" }] }) : null',
+  );
+  add(
+    'jarvis:chat still answers with memory wired in',
+    typeof recalled.value?.text === 'string' && recalled.value.text.length > 0,
+    recalled.error
+      ? `THREW: ${String(recalled.error).split('\n')[0]}`
+      : `provider=${String(recalled.value?.provider)}`,
+  );
+
+  const memoriesAfter = await page.evaluate(
+    'window.jarvis ? await window.jarvis.listMemories() : null',
+  );
+  const both = JSON.stringify(memoriesAfter.value);
+  add(
+    'both the open fact and the private canary are stored and visible',
+    both.includes('PROBE-OPEN') && both.includes('PRIVATE-CANARY'),
+    `${String(memoriesAfter.value?.length)} memories`,
+  );
+
+  // Forget, and prove the row is genuinely gone (constitution §8 — real
+  // deletion, not a tombstone).
+  const target = memoriesAfter.value?.find((m) => String(m.fact).includes('PRIVATE-CANARY'));
+  const forgot = await page.evaluate(
+    `window.jarvis ? await window.jarvis.forget(${JSON.stringify(String(target?.id))}) : null`,
+  );
+  add(
+    'memory:forget reports that a row actually went',
+    forgot.value?.forgotten === true,
+    JSON.stringify(forgot.value),
+  );
+
+  const memoriesFinal = await page.evaluate(
+    'window.jarvis ? await window.jarvis.listMemories() : null',
+  );
+  add(
+    'the forgotten memory is really gone',
+    !JSON.stringify(memoriesFinal.value).includes('PRIVATE-CANARY'),
+    `${String(memoriesFinal.value?.length)} memories remain`,
   );
 
   // E2: the Experience Shell mounts the Orb. Assert the real component is

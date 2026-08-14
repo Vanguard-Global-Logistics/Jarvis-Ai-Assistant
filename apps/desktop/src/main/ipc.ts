@@ -2,6 +2,9 @@ import { ipcMain } from 'electron';
 import type { z } from 'zod';
 import type { IpcContract } from '@jarvis/contracts';
 import { createLogger } from '@jarvis/config';
+import { UserFacingError } from './user-facing-error.js';
+
+export { UserFacingError } from './user-facing-error.js';
 
 const log = createLogger({ scope: 'desktop:main:ipc' });
 
@@ -50,6 +53,10 @@ export function handleContract<Req extends z.ZodType, Res extends z.ZodType>(
         channel: contract.channel,
         message: cause instanceof Error ? cause.message : String(cause),
       });
+      // A deliberate, constant-built message written FOR a person passes through
+      // intact; everything else is flattened. See `UserFacingError` above for
+      // the rule that keeps the exception safe.
+      if (cause instanceof UserFacingError) throw new Error(cause.message, { cause });
       // `cause` is preserved for main-process logs but never crosses to the
       // renderer — Electron serialises only the message across IPC.
       throw new Error(`${contract.channel} failed`, { cause });
