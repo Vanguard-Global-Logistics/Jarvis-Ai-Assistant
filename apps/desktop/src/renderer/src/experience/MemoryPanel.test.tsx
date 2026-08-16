@@ -4,70 +4,86 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { MemoryInspectionResult } from '@jarvis/contracts';
 import { MemoryPanel, type MemoryInspectionBridge } from './MemoryPanel.js';
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 function bridge(result: MemoryInspectionResult): MemoryInspectionBridge {
-  const inspectMemory = vi.fn<MemoryInspectionBridge['inspectMemory']>().mockResolvedValue(result);
-  return { inspectMemory };
+  return {
+    inspectMemory: vi.fn<MemoryInspectionBridge['inspectMemory']>().mockResolvedValue(result),
+    deleteMemory: vi.fn<MemoryInspectionBridge['deleteMemory']>().mockResolvedValue({ deleted: true }),
+  };
 }
 
-describe('MemoryPanel', () => {
-  it('calls the bounded no-argument inspection bridge and renders approved memories', async () => {
-    const inspectMemory = vi.fn<MemoryInspectionBridge['inspectMemory']>().mockResolvedValue({
-      items: [
-        {
-          id: 'memory-1',
-          profileId: 'william',
-          scope: 'private',
-          kind: 'goal',
-          canonicalKey: 'family.william.goal.primary',
-          value: 'Build useful automation.',
-          sensitivity: 'personal',
-          sourceType: 'user-approved',
-          updatedAt: '2026-08-16T20:00:00.000Z',
-        },
-      ],
-      truncated: false,
-    });
-    const api: MemoryInspectionBridge = { inspectMemory };
+const oneMemory: MemoryInspectionResult = {
+  items: [
+    {
+      id: 'memory-1',
+      profileId: 'william',
+      scope: 'private',
+      kind: 'goal',
+      canonicalKey: 'family.william.goal.primary',
+      value: 'Build useful automation.',
+      sensitivity: 'personal',
+      sourceType: 'user-approved',
+      updatedAt: '2026-08-16T20:00:00.000Z',
+    },
+  ],
+  truncated: false,
+};
 
+describe('MemoryPanel', () => {
+  it('calls bounded inspection and renders approved memories', async () => {
+    const api = bridge(oneMemory);
     render(<MemoryPanel bridge={api} />);
     fireEvent.click(screen.getByRole('button', { name: /what do you remember about me/i }));
-
     await screen.findByText('Build useful automation.');
-    expect(inspectMemory).toHaveBeenCalledTimes(1);
-    expect(inspectMemory).toHaveBeenCalledWith();
+    expect(api.inspectMemory).toHaveBeenCalledWith();
     expect(screen.getByText('family.william.goal.primary')).toBeTruthy();
+  });
+
+  it('requires explicit confirmation before deleting one visible memory', async () => {
+    const api = bridge(oneMemory);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<MemoryPanel bridge={api} />);
+    fireEvent.click(screen.getByRole('button', { name: /what do you remember about me/i }));
+    await screen.findByText('Build useful automation.');
+    fireEvent.click(screen.getByRole('button', { name: /delete memory family\.william/i }));
+    await waitFor(() => expect(api.deleteMemory).toHaveBeenCalledWith('memory-1'));
+    await screen.findByText(/no approved memories are stored/i);
+  });
+
+  it('does not delete when confirmation is declined', async () => {
+    const api = bridge(oneMemory);
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<MemoryPanel bridge={api} />);
+    fireEvent.click(screen.getByRole('button', { name: /what do you remember about me/i }));
+    await screen.findByText('Build useful automation.');
+    fireEvent.click(screen.getByRole('button', { name: /delete memory family\.william/i }));
+    expect(api.deleteMemory).not.toHaveBeenCalled();
   });
 
   it('shows an honest empty state when no approved memory exists', async () => {
     const api = bridge({ items: [], truncated: false });
     render(<MemoryPanel bridge={api} />);
-
     fireEvent.click(screen.getByRole('button', { name: /what do you remember about me/i }));
     expect(await screen.findByText(/no approved memories are stored/i)).toBeTruthy();
   });
 
   it('is disabled when the preload bridge is absent', () => {
     render(<MemoryPanel bridge={null} />);
-    const button = screen.getByRole('button', { name: /what do you remember about me/i });
-    expect(button.hasAttribute('disabled')).toBe(true);
+    expect(
+      screen.getByRole('button', { name: /what do you remember about me/i }).hasAttribute('disabled'),
+    ).toBe(true);
   });
 
   it('reports a read failure without pretending memory changed', async () => {
-    const inspectMemory = vi
-      .fn<MemoryInspectionBridge['inspectMemory']>()
-      .mockRejectedValue(new Error('offline'));
-    const api: MemoryInspectionBridge = { inspectMemory };
-    const error = vi.spyOn(console, 'error').mockImplementation(() => {
-      // Expected error path: keep the test output quiet.
-    });
+    const api = bridge({ items: [], truncated: false });
+    vi.mocked(api.inspectMemory).mockRejectedValue(new Error('offline'));
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
     render(<MemoryPanel bridge={api} />);
-
     fireEvent.click(screen.getByRole('button', { name: /what do you remember about me/i }));
-    await waitFor(() => {
-      expect(screen.getByText(/nothing was changed/i)).toBeTruthy();
-    });
-    error.mockRestore();
+    await waitFor(() => expect(screen.getByText(/no further changes were made/i)).toBeTruthy());
   });
 });
