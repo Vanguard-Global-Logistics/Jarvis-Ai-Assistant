@@ -37,6 +37,7 @@ pnpm-debug.log*
 *.sqlite
 *.sqlite3
 *.db
+.jarvis-private/
 
 # --- Private biometric / voice enrollment material ---
 .jarvis-owner-voice/
