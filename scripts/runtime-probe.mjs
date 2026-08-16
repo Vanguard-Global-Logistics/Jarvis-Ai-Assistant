@@ -386,6 +386,7 @@ async function runChecks(page, mode) {
     'listSessions',
     'getSession',
     'deleteSession',
+    'inspectMemory',
   ];
   const keysOk = JSON.stringify(keys.value) === JSON.stringify(expectedKeys);
   add('Object.keys matches the exact Stage 1A bridge', keysOk, JSON.stringify(keys.value));
@@ -408,6 +409,25 @@ async function runChecks(page, mode) {
     'getAppInfo() returns real platform info',
     infoOk,
     info.error ? `THREW: ${String(info.error).split('\n')[0]}` : JSON.stringify(i),
+  );
+
+  // Family Brain v1: prove the real Electron process owns a governed Memory v1
+  // runtime and the renderer can request only its bounded inspection projection.
+  const memoryInspection = await page.evaluate(
+    'window.jarvis ? await window.jarvis.inspectMemory() : null',
+  );
+  const memoryInspectionValue = memoryInspection.value;
+  const memoryInspectionOk =
+    memoryInspectionValue !== null &&
+    typeof memoryInspectionValue === 'object' &&
+    Array.isArray(memoryInspectionValue.items) &&
+    typeof memoryInspectionValue.truncated === 'boolean';
+  add(
+    'memory:inspect returns a bounded governed projection',
+    memoryInspectionOk,
+    memoryInspection.error
+      ? `THREW: ${String(memoryInspection.error).split('\n')[0]}`
+      : `count = ${Array.isArray(memoryInspectionValue?.items) ? String(memoryInspectionValue.items.length) : 'invalid'}, truncated = ${String(memoryInspectionValue?.truncated)}`,
   );
 
   const historyBefore = await page.evaluate(
