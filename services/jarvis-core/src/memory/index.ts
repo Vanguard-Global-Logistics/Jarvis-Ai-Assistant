@@ -21,6 +21,14 @@ export type {
 } from './schema.js';
 
 export {
+  FAMILY_PROFILE_SCHEMA_VERSION,
+  FamilyProfileEntrySchema,
+  FamilyProfileSeedSchema,
+  buildFamilyProfileMemories,
+} from './family-profile.js';
+export type { FamilyProfileEntry, FamilyProfileSeed } from './family-profile.js';
+
+export {
   evaluateMemoryRead,
   evaluateMemoryWrite,
   projectMemoriesForLocalModel,
