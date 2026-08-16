@@ -17,8 +17,20 @@ class FakeRepository implements MemoryRepositoryPort {
   public readonly records = new Map<string, MemoryRecord>();
 
   public replaceActive(record: MemoryRecord): MemoryPersistenceResult {
+    let supersededId: string | undefined;
+    for (const [id, existing] of this.records) {
+      if (
+        existing.status === 'active' &&
+        existing.profileId === record.profileId &&
+        existing.scope === record.scope &&
+        existing.canonicalKey === record.canonicalKey
+      ) {
+        supersededId = id;
+        this.records.set(id, { ...existing, status: 'superseded', updatedAt: record.updatedAt });
+      }
+    }
     this.records.set(record.id, record);
-    return { inserted: record };
+    return { inserted: record, ...(supersededId ? { supersededId } : {}) };
   }
 
   public getById(id: string): MemoryRecord | null {
@@ -82,6 +94,8 @@ describe('FamilyProfileImportService', () => {
       profileId: 'member-a',
       attempted: 2,
       stored: 0,
+      corrected: 0,
+      unchanged: 0,
       denied: 2,
       deniedReasons: ['target-profile-not-authorized'],
     });
@@ -106,6 +120,8 @@ describe('FamilyProfileImportService', () => {
       profileId: 'member-a',
       attempted: 2,
       stored: 2,
+      corrected: 0,
+      unchanged: 0,
       denied: 0,
       deniedReasons: [],
     });
@@ -115,6 +131,41 @@ describe('FamilyProfileImportService', () => {
           profileId: 'member-a',
           canonicalKey: 'family.member-a.career.goal',
           source: { type: 'user-approved', ref: 'owner-reviewed-family-v1' },
+        }),
+      ]),
+    );
+  });
+
+  it('reports identical re-imports as unchanged and corrections as supersessions', () => {
+    const repository = new FakeRepository();
+    const importer = new FamilyProfileImportService(new MemoryService(repository));
+    const context = {
+      actorProfileId: 'owner',
+      memoryWriteAllowed: true,
+      authorizedTargetProfileIds: ['member-a'],
+    } as const;
+
+    const first = importer.importProfile(seed(), context, { now: '2026-08-16T16:00:00.000Z' });
+    expect(first).toMatchObject({ stored: 2, corrected: 0, unchanged: 0, denied: 0 });
+
+    const second = importer.importProfile(seed(), context, { now: '2026-08-16T16:05:00.000Z' });
+    expect(second).toMatchObject({ stored: 0, corrected: 0, unchanged: 2, denied: 0 });
+
+    const correctedSeed = seed();
+    correctedSeed.entries[0] = {
+      ...correctedSeed.entries[0],
+      value: 'Prepare for an engineering career with advanced robotics projects.',
+    };
+    const corrected = importer.importProfile(correctedSeed, context, {
+      now: '2026-08-16T16:10:00.000Z',
+    });
+
+    expect(corrected).toMatchObject({ stored: 0, corrected: 1, unchanged: 1, denied: 0 });
+    expect(repository.listActiveOwnedBy('member-a')).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          canonicalKey: 'family.member-a.career.goal',
+          value: 'Prepare for an engineering career with advanced robotics projects.',
         }),
       ]),
     );
@@ -136,6 +187,8 @@ describe('FamilyProfileImportService', () => {
     });
 
     expect(result.stored).toBe(1);
+    expect(result.corrected).toBe(0);
+    expect(result.unchanged).toBe(0);
     expect(result.denied).toBe(1);
     expect(result.deniedReasons).toEqual(['shared-write-not-approved']);
   });
