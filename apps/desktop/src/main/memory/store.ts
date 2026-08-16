@@ -72,11 +72,24 @@ export class MemoryRefusedError extends UserFacingError {
  * string at millisecond resolution, and two facts typed in quick succession — or
  * two written by the same click — genuinely collide there. On a collision SQLite
  * is free to return either row first, so "newest first" was a claim the code did
- * not actually make. `rowid` is monotonic per insert, so this makes the order
- * total and deterministic. The order test asserts it, which it could not do
+ * not actually make. The order test asserts it now, which it could not do
  * before: it had been weakened to assert membership instead, because a strict
  * assertion against a non-deterministic query is flaky. The fix belonged here,
  * not in the test.
+ *
+ * **A correction to what this comment first claimed.** It said `rowid` is
+ * "monotonic per insert". It is not, and SQLite does not promise that: without
+ * `AUTOINCREMENT` a new rowid is `max(rowid) + 1` over the SURVIVING rows, so
+ * values are reused after a delete — and this table deletes for real
+ * (constitution §8). The property that actually holds, and it is all the
+ * tiebreak needs, is that a new row's rowid is GREATER THAN EVERY SURVIVING
+ * ROW'S. Ties therefore still resolve newest-insert-first. Stating the stronger
+ * claim was the more dangerous mistake: a false rule licenses a wrong future
+ * change, and this repository treats the comment as the rule.
+ *
+ * The dependency `memory` must keep is recorded in migration 6 as well, because
+ * that is where a future edit would break it: a `WITHOUT ROWID` table has no
+ * `rowid` column, and this query would then fail at prepare time.
  */
 export function listMemories(db: SqliteDatabase): Memory[] {
   const rows = db

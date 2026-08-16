@@ -4,10 +4,9 @@ Date: 2026-08-16
 Status: **NINETEEN channels.** `memory:remember`/`memory:list`/`memory:forget` (ADR 0029)
 are IMPLEMENTED AND VERIFIED on the Linux runtime probe — a fact is stored, listed, and
 really deleted against a real SQLite, and a credential-shaped fact is refused at the
-boundary with the message a person is meant to read. What the probe **cannot** show is the
-leak filter working, because every provider it can reach stays on the machine; that
-property is proven instead by `apps/desktop/src/main/handlers/chat.test.ts`, which drives
-the real handler over every provider id including the four that leave.
+boundary with the message a person is meant to read. One property of that channel group is
+**not** proven by the probe and is proven by unit test instead; the `memory:*` section
+below states it once and is the only place it is stated.
 `aegis:status`/`aegis:request-restriction` (ADR 0025) are
 IMPLEMENTED AND VERIFIED on the Linux runtime probe — the real level is read, a
 non-stricter request is refused, an accepted raise revokes the right capabilities, and the
@@ -345,16 +344,16 @@ asserts the boundary rejects `#ff5a5a` and leaves the stored profile unchanged.
 
 ### `memory:remember` / `memory:list` / `memory:forget`
 
-|                       |                                                                                                                                                                                                                                                                                                              |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Status**            | IMPLEMENTED AND VERIFIED on the Linux runtime probe (store / list / delete against a real SQLite, plus a refused credential whose message is read for its content, not merely for the fact that something was rejected), 2026-08-16. The travel rule is verified by unit test, not by the probe — see below. |
-| **Renderer call**     | `window.jarvis.remember(r: RememberRequest): Promise<Memory>` · `window.jarvis.listMemories(): Promise<Memory[]>` · `window.jarvis.forget(id: string): Promise<{ forgotten: boolean }>`                                                                                                                      |
-| **Request**           | remember: `{ fact (trimmed, 1–280), sensitivity }`, `.strict()`, sensitivity a **closed enum** (`open`/`private`/`never-send`). list: `z.undefined()`. forget: `{ id }` (UUID), `.strict()`                                                                                                                  |
-| **Response**          | `MemorySchema` / `MemoryListSchema` / `{ forgotten: boolean }`, all `.strict()`. remember returns what is now **stored**, not an echo of the request                                                                                                                                                         |
-| **Handler**           | `registerMemoryHandlers(db)` in `apps/desktop/src/main/handlers/memory.ts`, over the store in `apps/desktop/src/main/memory/store.ts`                                                                                                                                                                        |
-| **Contract**          | `memoryRememberContract` / `memoryListContract` / `memoryForgetContract`                                                                                                                                                                                                                                     |
-| **Side effects**      | remember: one insert into `memory` (migration 6). forget: one **real delete** — the row is gone, not tombstoned (constitution §8). list: read-only.                                                                                                                                                          |
-| **Authority granted** | Write, read, and delete rows in one main-owned table. No SQL, no path, no column name crosses. Grants nothing over any other store, and nothing over AEGIS.                                                                                                                                                  |
+|                       |                                                                                                                                                                                                                                      |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Status**            | IMPLEMENTED AND VERIFIED on the Linux runtime probe (store / list / delete against a real SQLite, plus a refused credential whose message is read for its content, not merely for the fact that something was rejected), 2026-08-16. |
+| **Renderer call**     | `window.jarvis.remember(r: RememberRequest): Promise<Memory>` · `window.jarvis.listMemories(): Promise<Memory[]>` · `window.jarvis.forget(id: string): Promise<{ forgotten: boolean }>`                                              |
+| **Request**           | remember: `{ fact (trimmed, 1–280), sensitivity }`, `.strict()`, sensitivity a **closed enum** (`open`/`private`/`never-send`). list: `z.undefined()`. forget: `{ id }` (UUID), `.strict()`                                          |
+| **Response**          | `MemorySchema` / `MemoryListSchema` / `{ forgotten: boolean }`, all `.strict()`. remember returns what is now **stored**, not an echo of the request                                                                                 |
+| **Handler**           | `registerMemoryHandlers(db)` in `apps/desktop/src/main/handlers/memory.ts`, over the store in `apps/desktop/src/main/memory/store.ts`                                                                                                |
+| **Contract**          | `memoryRememberContract` / `memoryListContract` / `memoryForgetContract`                                                                                                                                                             |
+| **Side effects**      | remember: one insert into `memory` (migration 6). forget: one **real delete** — the row is gone, not tombstoned (constitution §8). list: read-only.                                                                                  |
+| **Authority granted** | Write, read, and delete rows in one main-owned table. No SQL, no path, no column name crosses. Grants nothing over any other store, and nothing over AEGIS.                                                                          |
 
 **This is the first channel whose contents are read back into a prompt**, which is why its
 rules are stricter than `history:*`. A saved conversation is read when a person opens it; a
@@ -386,13 +385,19 @@ Four properties, each structural rather than advisory:
    disclosure path does not exist to have a bug in. Note this rule is enforced by the
    recall filter, **not by AEGIS** — the two must not be conflated.
 
-That fourth property is the one the runtime probe **cannot** prove, and saying so is the
-point. Every provider the probe can actually reach (`mock`, `local`) has
-`leavesMachine: false`, so `recallFor` takes its early-return branch and the filtering
-line never executes there — a green probe would be green for the ADR 0021 reason: the code
-holding the secret never ran. `apps/desktop/src/main/handlers/chat.test.ts` closes it by
-injecting the provider id and driving the real handler across every member of
-`PROVIDER_IDS`, asserting on the `ChatRequest` the provider actually received.
+That fourth property is the one the runtime probe **cannot** prove, and this paragraph is
+the only place in this file that says so — the claim was written out four times in four
+wordings, which is this repository's own "a rule in two places will drift" happening inside
+one document.
+
+Every provider the probe can actually reach (`mock`, `local`) has `leavesMachine: false`,
+so `recallFor` takes its early-return branch and the filtering line never executes there. A
+green probe would be green for the ADR 0021 reason: the code holding the secret never ran.
+`apps/desktop/src/main/handlers/chat.test.ts` closes it by injecting the provider id and
+driving the real handler across every member of `PROVIDER_IDS` — every provider whose
+`providerLeavesMachine` is true, not a count transcribed by hand — asserting on the
+`ChatRequest` the provider actually received, with `OPEN-FACT` as the negative control so a
+filter that returned `[]` unconditionally cannot pass.
 
 ---
 
@@ -496,8 +501,13 @@ JavaScript. SQLite needs no external at all — the driver is Node's builtin
 - `handleContract` flattens a vendor message carrying a filesystem path, flattens a bare
   non-`Error` throw, flattens a plain `Error` with the same text — and passes a
   `UserFacingError` (and a subclass of one) through intact
-  (`apps/desktop/src/main/ipc.test.ts`). Verified red-green: deleting the passthrough
-  line in `ipc.ts` turns the third group red.
+  (`apps/desktop/src/main/ipc.test.ts`). Verified red-green: deleting the
+  `UserFacingError` passthrough in `ipc.ts` turns **2** tests red — `delivers the message
+rather than "<channel> failed"` and `delivers it for a SUBCLASS too` — while `still
+flattens a plain Error thrown from the same handler shape` stays green as the control.
+  (An earlier version of this line said "turns the third group red", which is wrong: the
+  third group never lets the implementation run, so the mutation cannot reach it. A
+  verification instruction that fails when followed is worse than none.)
 - The memory store refuses a credential-shaped fact **before** the insert and stores
   nothing when it does, never echoes the refused text, still accepts prose that merely
   mentions keys, and really deletes rather than tombstoning — against the real migration
@@ -505,11 +515,8 @@ JavaScript. SQLite needs no external at all — the driver is Node's builtin
   constraints are asserted by deliberately bypassing Zod, so the database is proven to be
   the last line rather than assumed to be.
 - **Recall is actually wired into `jarvis:chat`, and a `private` memory reaches no
-  provider that leaves the machine** — driven through the real handler over every member
-  of `PROVIDER_IDS`, asserting on the `ChatRequest` the provider received
-  (`apps/desktop/src/main/handlers/chat.test.ts`). Replacing
-  `withRecall(request.messages, …)` with `request.messages` left the rest of the suite
-  and the whole runtime probe green, which is why this file exists.
+  provider that leaves the machine** (`apps/desktop/src/main/handlers/chat.test.ts`) —
+  see the `memory:*` section for why the probe cannot prove this and this test can.
 
 **Verified by inspecting the built artifact** (`npm run build`):
 

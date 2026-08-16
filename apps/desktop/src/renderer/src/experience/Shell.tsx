@@ -100,6 +100,37 @@ const STAGE_BACKGROUND = [
 const VIGNETTE = `radial-gradient(120% 90% at 50% 42%, transparent 55%, rgba(0,0,0,0.5) 100%)`;
 const HAZE = `linear-gradient(180deg, transparent 78%, rgba(5,7,10,0.55) 100%)`;
 
+/** The preload bridge as the renderer sees it. Optional, per `preload/index.d.ts`. */
+type JarvisBridge = NonNullable<Window['jarvis']>;
+
+/**
+ * ONE answer to "what does this app do with an incomplete bridge?".
+ *
+ * This file used to hold two. The AEGIS effect checked
+ * `typeof bridge.aegisStatus !== 'function'` and degraded honestly; the memory
+ * effect called `jarvis.listMemories()` with no such check at all. Both cannot
+ * be right, and the memory version was the dangerous one: a missing function
+ * throws a SYNCHRONOUS `TypeError` out of a mount effect, which no `.catch()`
+ * can intercept, so the whole Shell unmounts — and because the memory effect
+ * runs before the AEGIS effect, the crash takes the security indicator down
+ * with it. An indicator that vanishes is not better than one that shows GREEN
+ * wrongly; it is the same failure with no message.
+ *
+ * `Window['jarvis']` being typed does not settle this. The type constrains the
+ * TEST FAKE and the compile of this repository; it says nothing about the
+ * preload actually loaded at runtime by a packaged app, which is the only
+ * situation the check exists for — a stale `app.asar`, a preload that failed
+ * partway, a renderer newer than the shell around it.
+ *
+ * Returns the bridge when the named function is really there, `null` otherwise,
+ * so every call site reads the same and there is one rule to change.
+ */
+function bridgeWith(key: keyof JarvisBridge): JarvisBridge | null {
+  const bridge = window.jarvis;
+  if (bridge === undefined) return null;
+  return typeof bridge[key] === 'function' ? bridge : null;
+}
+
 export function Shell({ devStateSwitcher = import.meta.env.DEV }: ShellProps): JSX.Element {
   const [orbState, setOrbState] = useState<OrbState>('idle');
   const [host, setHost] = useState<HostFacts>({ kind: 'loading' });
@@ -144,18 +175,59 @@ export function Shell({ devStateSwitcher = import.meta.env.DEV }: ShellProps): J
   const [memories, setMemories] = useState<readonly Memory[]>([]);
   const [memoryOpen, setMemoryOpen] = useState(false);
 
-  const refreshMemories = useCallback((): void => {
-    const jarvis = window.jarvis;
-    if (jarvis === undefined) return;
-    jarvis
-      .listMemories()
-      .then(setMemories)
-      .catch((cause: unknown) => {
-        console.error('[shell] memory:list failed:', cause);
-      });
+  /**
+   * Set when `memory:list` could not be read.
+   *
+   * Without this, a failed read left `memories` at its previous value and said
+   * nothing — so the panel showed a store state that was not the store's, on the
+   * one surface constitution §8 requires to be truthful about what is stored.
+   * The failure mode is worse than a stale list looks: a fact stored a moment
+   * ago is already being read into every prompt by `withRecall`, so an invisible
+   * memory is a memory that is live and cannot be deleted.
+   *
+   * Same rule as the AEGIS strip four fields up — a surface that cannot read its
+   * source says so, rather than rendering the last reassuring thing it saw.
+   */
+  const [memoryError, setMemoryError] = useState<string | null>(null);
+
+  /**
+   * Re-read the store. Returns the promise — it is not fire-and-forget.
+   *
+   * `void` was the wrong return type and it produced a lie: `forgetFact` called
+   * this, did not await it, and then told the person "the list has been
+   * refreshed" at an instant when the read had provably not settled and might
+   * never settle. A message that describes a state transition must be written
+   * after that transition has been awaited.
+   */
+  const refreshMemories = useCallback(async (): Promise<void> => {
+    const jarvis = bridgeWith('listMemories');
+    if (jarvis === null) {
+      // A DIFFERENT message from the read-failure below, deliberately. "The
+      // store could not be read" and "this build has no memory channel" are
+      // different facts about the world and lead to different actions — one is
+      // a database problem, the other is a stale preload that needs the app
+      // reinstalled. Distinct text is also what makes this branch falsifiable:
+      // delete the `typeof` check in `bridgeWith` and the call below throws
+      // into the `catch`, producing the other message, and the test that names
+      // this one goes red.
+      //
+      // `window.jarvis === undefined` (a plain-browser preview) reaches here
+      // too, and says the same true thing.
+      setMemoryError('Memory is unavailable in this build — the preload does not provide it.');
+      return;
+    }
+    try {
+      setMemories(await jarvis.listMemories());
+      setMemoryError(null);
+    } catch (cause: unknown) {
+      console.error('[shell] memory:list failed:', cause);
+      setMemoryError('Jarvis could not read what it knows. The list below may be out of date.');
+    }
   }, []);
 
-  useEffect(refreshMemories, [refreshMemories]);
+  useEffect(() => {
+    void refreshMemories();
+  }, [refreshMemories]);
 
   /**
    * Store a fact, then re-read.
@@ -168,24 +240,29 @@ export function Shell({ devStateSwitcher = import.meta.env.DEV }: ShellProps): J
    */
   const rememberFact = useCallback(
     async (fact: string, sensitivity: MemorySensitivity): Promise<void> => {
-      const jarvis = window.jarvis;
-      if (jarvis === undefined) throw new Error('No Jarvis bridge in this context.');
+      const jarvis = bridgeWith('remember');
+      if (jarvis === null) throw new Error('No Jarvis bridge in this context.');
       await jarvis.remember({ fact, sensitivity });
-      refreshMemories();
+      await refreshMemories();
     },
     [refreshMemories],
   );
 
   const forgetFact = useCallback(
     async (id: string): Promise<void> => {
-      const jarvis = window.jarvis;
-      if (jarvis === undefined) throw new Error('No Jarvis bridge in this context.');
+      const jarvis = bridgeWith('forget');
+      if (jarvis === null) throw new Error('No Jarvis bridge in this context.');
       // The `{ forgotten }` flag exists so that "deleted" in the UI always
       // corresponds to a deletion that happened — and it was being discarded,
       // which made `false` and `true` look identical to a person. Now a delete
       // that matched nothing says so, through the panel's own alert.
       const { forgotten } = await jarvis.forget(id);
-      refreshMemories();
+      // AWAITED before the message below is thrown. The message names the
+      // refresh, so the refresh has to have happened — the first version of this
+      // said "the list has been refreshed" while the read was still in flight,
+      // which is the same defect (claiming work that did not happen) that
+      // discarding `forgotten` was.
+      await refreshMemories();
       if (!forgotten) {
         throw new Error('That memory was already gone — the list has been refreshed.');
       }
@@ -249,17 +326,20 @@ export function Shell({ devStateSwitcher = import.meta.env.DEV }: ShellProps): J
         if (!cancelled) setHost({ kind: 'bridgeError' });
       });
 
-    // Guarded: a bridge without this function is a browser preview or an older
-    // preload, and the honest response is "unavailable" rather than taking the
-    // whole shell down — or, worse, defaulting the indicator to GREEN.
-    if (typeof bridge.aegisStatus !== 'function') {
+    // Guarded through the SAME helper the memory effect uses, so there is one
+    // answer in this file rather than two. A bridge without this function is a
+    // browser preview or an older preload, and the honest response is
+    // "unavailable" rather than taking the whole shell down — or, worse,
+    // defaulting the indicator to GREEN.
+    const aegisBridge = bridgeWith('aegisStatus');
+    if (aegisBridge === null) {
       setAegis(null);
       return () => {
         cancelled = true;
       };
     }
 
-    bridge
+    aegisBridge
       .aegisStatus()
       .then((status) => {
         if (!cancelled) setAegis(status);
@@ -643,7 +723,12 @@ export function Shell({ devStateSwitcher = import.meta.env.DEV }: ShellProps): J
                 background: 'rgba(5,7,10,0.92)',
               }}
             >
-              <MemoryPanel memories={memories} onRemember={rememberFact} onForget={forgetFact} />
+              <MemoryPanel
+                memories={memories}
+                listError={memoryError}
+                onRemember={rememberFact}
+                onForget={forgetFact}
+              />
             </div>
           )}
           <button

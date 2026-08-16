@@ -32,6 +32,19 @@ import type { Migration } from '../migrator.js';
  * multi-user support" by adding this column would be removing a security
  * property, not adding a feature.
  *
+ * ## What must NOT be "optimized" later
+ *
+ * **This table must keep its `rowid`. Do not add `WITHOUT ROWID`.** A `STRICT`
+ * table with a `TEXT PRIMARY KEY` is exactly the shape SQLite's own
+ * documentation suggests `WITHOUT ROWID` for, which is why this warning is here
+ * rather than in a commit message. `listMemories` orders by
+ * `learned_at DESC, rowid DESC` — `learned_at` is an ISO string at millisecond
+ * resolution, so two facts entered in the same millisecond tie and only the
+ * tiebreak decides. A `WITHOUT ROWID` table has no `rowid` column, so that query
+ * would fail at PREPARE time and the whole memory panel would die.
+ *
+ * ## What is deliberately absent (continued)
+ *
  * **There is no `deleted_at`.** Deletion is real deletion (§8) — a person must
  * be able to unsay something about themselves, and a tombstoned memory is a
  * memory that still exists. This is the one place the repository's usual

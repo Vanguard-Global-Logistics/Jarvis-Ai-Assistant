@@ -136,6 +136,7 @@ export {
   MemorySchema,
   MemorySensitivitySchema,
   MemorySourceSchema,
+  NEVER_SEND,
   RememberRequestSchema,
   sensitivityAllowsSending,
 } from './memory/contracts.js';

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { AppInfo } from '@jarvis/contracts';
+import type { AppInfo, Memory } from '@jarvis/contracts';
 import { AEGIS_CAPABILITIES, DEFAULT_PROFILE, ORB_STATES } from '@jarvis/contracts';
 
 import { orbTiming } from '@jarvis/ui';
@@ -36,6 +36,38 @@ const AEGIS_TAMPERED = {
   integrityVerified: false,
 };
 
+/** Real-shaped fixtures for the bridge members the Shell tests never invoke. */
+const AMPLIFIER_RESULT = {
+  refined: 'refined',
+  assumptions: ['a'],
+  risks: ['r'],
+  nextSteps: ['n'],
+  openQuestions: ['q'],
+};
+
+const AUTOMATION_PLAN = {
+  outcome: 'outcome',
+  steps: ['step'],
+  cannotDo: ['Jarvis cannot drive an application.'],
+  provider: 'mock' as const,
+};
+
+const SAVED_META = {
+  id: '99999999-9999-4999-8999-999999999999',
+  title: 'A saved session',
+  savedAt: '2026-08-16T12:00:00.000Z',
+  entryCount: 1,
+};
+
+/** One memory, for the tests that drive the memory surface end to end. */
+const MEMORY: Memory = {
+  id: '11111111-1111-4111-8111-111111111111',
+  fact: 'The company is Vanguard Global Logistics LLC.',
+  sensitivity: 'open',
+  learnedFrom: 'told',
+  learnedAt: '2026-08-16T12:00:00.000Z',
+};
+
 /**
  * The bridge fake, and it is typed as the REAL `JarvisApi` on purpose.
  *
@@ -53,40 +85,56 @@ const AEGIS_TAMPERED = {
  * unrelated red at runtime.
  *
  * The type is reached through `Window['jarvis']` — the augmentation in
- * `preload/index.d.ts` — rather than by importing the preload module. The
- * renderer's tsconfig deliberately does not list preload sources, and that
- * exclusion is a boundary, not an oversight: a renderer file must not be able
- * to reach `electron` even at the type level.
+ * `preload/index.d.ts` — rather than by importing the preload module directly,
+ * which the renderer's TS project rejects (`TS6307`).
+ *
+ * **A correction, because the first version of this comment claimed a boundary
+ * that does not exist.** It said the renderer's tsconfig deliberately excludes
+ * preload sources and that this is what stops the renderer reaching `electron`
+ * at the type level. It is not. `apps/desktop/tsconfig.web.json` explicitly
+ * INCLUDES `src/preload/index.d.ts`, which type-imports `./index.js`, so the
+ * preload implementation — and with it `electron.d.ts` and `@types/node` — is in
+ * the renderer program already. The boundary is enforced by `eslint.config.js`,
+ * which makes importing `electron`, `node:*` or `@jarvis/database` from the
+ * renderer an error. Crediting the wrong mechanism is how a reviewer comes to
+ * trust a control that is not doing the work.
  *
  * `overrides` is how a test says the one thing it is actually about — a
  * rejecting `getAppInfo`, a tampered AEGIS status — without restating the other
- * eighteen functions it does not care about.
+ * eighteen functions it does not care about. Restating a default at a call site
+ * reintroduces exactly the drift this helper exists to kill, one layer up.
  */
 type JarvisBridge = NonNullable<Window['jarvis']>;
 
 function stubBridge(overrides: Partial<JarvisBridge> = {}): void {
   const bridge: JarvisBridge = {
+    // EVERY member resolves. A bare `vi.fn()` returns `undefined`, not the
+    // promise its type declares — and because `vi.fn()` is `any`-typed, the
+    // compiler checks that the KEY is present and nothing about what it returns.
+    // The first test to touch such a member would get
+    // `Cannot destructure property 'forgotten' of 'undefined'`: the same wall of
+    // unrelated red this helper was written to prevent, one indirection deeper.
     getAppInfo: vi.fn().mockResolvedValue(APP_INFO),
     sendChat: vi.fn().mockResolvedValue({ text: 'hi', provider: 'mock' }),
-    amplify: vi.fn(),
-    planAutomation: vi.fn(),
+    amplify: vi.fn().mockResolvedValue(AMPLIFIER_RESULT),
+    planAutomation: vi.fn().mockResolvedValue(AUTOMATION_PLAN),
     aegisStatus: vi.fn().mockResolvedValue(AEGIS_GREEN),
-    aegisRequestRestriction: vi.fn(),
+    aegisRequestRestriction: vi.fn().mockResolvedValue({ accepted: false, status: AEGIS_GREEN }),
     describeModels: vi.fn().mockResolvedValue({ active: 'mock', providers: [] }),
-    selectModel: vi.fn(),
-    saveConversation: vi.fn(),
+    selectModel: vi.fn().mockResolvedValue({ selected: 'mock', active: 'mock', providers: [] }),
+    saveConversation: vi.fn().mockResolvedValue(SAVED_META),
     listConversations: vi.fn().mockResolvedValue({ conversations: [] }),
     getConversation: vi.fn().mockResolvedValue({ conversation: null }),
-    deleteConversation: vi.fn(),
-    exportHistory: vi.fn(),
-    importHistory: vi.fn(),
+    deleteConversation: vi.fn().mockResolvedValue({ deleted: true }),
+    exportHistory: vi.fn().mockResolvedValue({ exported: false, conversationCount: 0 }),
+    importHistory: vi.fn().mockResolvedValue({ imported: false, added: 0, skipped: 0 }),
     getProfile: vi.fn().mockResolvedValue(DEFAULT_PROFILE),
-    setProfile: vi.fn(),
+    setProfile: vi.fn().mockResolvedValue(DEFAULT_PROFILE),
     // Memory (ADR 0029). `listMemories` resolving to `[]` is the honest default
     // for a Shell test: Jarvis knows nothing about this person yet.
-    remember: vi.fn(),
+    remember: vi.fn().mockResolvedValue(MEMORY),
     listMemories: vi.fn().mockResolvedValue([]),
-    forget: vi.fn(),
+    forget: vi.fn().mockResolvedValue({ forgotten: true }),
     ...overrides,
   };
   vi.stubGlobal('jarvis', bridge);
@@ -161,11 +209,7 @@ describe('Shell', () => {
   it('surfaces a present-but-failing bridge visibly and compactly', async () => {
     stubMatchMedia();
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    stubBridge({
-      getAppInfo: vi.fn().mockRejectedValue(new Error('ipc validation failed')),
-      getProfile: vi.fn().mockResolvedValue(DEFAULT_PROFILE),
-      aegisStatus: vi.fn().mockResolvedValue(AEGIS_GREEN),
-    });
+    stubBridge({ getAppInfo: vi.fn().mockRejectedValue(new Error('ipc validation failed')) });
     render(<Shell devStateSwitcher={false} />);
     expect(await screen.findByRole('alert')).toBeTruthy();
     expect(screen.getByRole('alert').textContent).toContain('HOST FACTS UNAVAILABLE');
@@ -250,11 +294,7 @@ describe('Shell', () => {
 describe('the AEGIS strip (ADR 0025)', () => {
   it('shows the REAL level from the engine, not a hardcoded one', async () => {
     stubMatchMedia();
-    stubBridge({
-      getAppInfo: vi.fn().mockResolvedValue(APP_INFO),
-      getProfile: vi.fn().mockResolvedValue(DEFAULT_PROFILE),
-      aegisStatus: vi.fn().mockResolvedValue(AEGIS_TAMPERED),
-    });
+    stubBridge({ aegisStatus: vi.fn().mockResolvedValue(AEGIS_TAMPERED) });
     render(<Shell devStateSwitcher={false} />);
 
     expect(await screen.findByText(/AEGIS · RED/)).toBeTruthy();
@@ -263,11 +303,7 @@ describe('the AEGIS strip (ADR 0025)', () => {
 
   it('shouts when the audit chain failed — it must not be a footnote', async () => {
     stubMatchMedia();
-    stubBridge({
-      getAppInfo: vi.fn().mockResolvedValue(APP_INFO),
-      getProfile: vi.fn().mockResolvedValue(DEFAULT_PROFILE),
-      aegisStatus: vi.fn().mockResolvedValue(AEGIS_TAMPERED),
-    });
+    stubBridge({ aegisStatus: vi.fn().mockResolvedValue(AEGIS_TAMPERED) });
     render(<Shell devStateSwitcher={false} />);
 
     expect(await screen.findByText(/AUDIT CHAIN FAILED VERIFICATION/)).toBeTruthy();
@@ -278,11 +314,7 @@ describe('the AEGIS strip (ADR 0025)', () => {
     // reassuring is worse than none, because it is believed.
     stubMatchMedia();
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    stubBridge({
-      getAppInfo: vi.fn().mockResolvedValue(APP_INFO),
-      getProfile: vi.fn().mockResolvedValue(DEFAULT_PROFILE),
-      aegisStatus: vi.fn().mockRejectedValue(new Error('ipc failed')),
-    });
+    stubBridge({ aegisStatus: vi.fn().mockRejectedValue(new Error('ipc failed')) });
     render(<Shell devStateSwitcher={false} />);
 
     expect(await screen.findByText(/AEGIS · READING…/)).toBeTruthy();
@@ -295,8 +327,6 @@ describe('the AEGIS console controls (ADR 0025)', () => {
   const withAegis = (status: unknown, request = vi.fn()) => {
     stubMatchMedia();
     stubBridge({
-      getAppInfo: vi.fn().mockResolvedValue(APP_INFO),
-      getProfile: vi.fn().mockResolvedValue(DEFAULT_PROFILE),
       aegisStatus: vi.fn().mockResolvedValue(status),
       aegisRequestRestriction: request,
     });
@@ -389,5 +419,146 @@ describe('the AEGIS console controls (ADR 0025)', () => {
 
     expect(await screen.findByText(/recovery is not available from this window/i)).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Blackout…' })).toBeNull();
+  });
+});
+
+/**
+ * Memory, driven through the REAL Shell (ADR 0029).
+ *
+ * ## Why this block exists
+ *
+ * The swarm's `tests-are-real` critic found that the headline behaviour of the
+ * forget path — Shell throwing when `memory:forget` reports `{ forgotten: false }`
+ * — had no test anywhere. `MemoryPanel.test.tsx` covers the consumer by handing
+ * the panel a rejection the test itself authored, which asserts that a
+ * hand-written mock's message renders. The PRODUCER of that rejection is here in
+ * Shell, and nothing crossed the seam: deleting the `if (!forgotten) throw` left
+ * the entire suite and the runtime probe green.
+ *
+ * The probe cannot close this either. It drives `memory:forget` over the real
+ * bridge, but the double-delete case is a UI decision made in the renderer, and
+ * the probe asserts on channel results rather than on what a person sees.
+ *
+ * So these tests render the real `Shell`, over a bridge fake, and assert on the
+ * rendered outcome — the closest this layer gets to a person using it.
+ */
+describe('memory reaches the person through the real Shell (ADR 0029)', () => {
+  const openPanel = async (): Promise<void> => {
+    fireEvent.click(await screen.findByRole('button', { name: /^MEMORY · / }));
+  };
+
+  it('lists what main actually holds', async () => {
+    stubMatchMedia();
+    stubBridge({ listMemories: vi.fn().mockResolvedValue([MEMORY]) });
+    render(<Shell devStateSwitcher={false} />);
+
+    await openPanel();
+    expect(await screen.findByText(MEMORY.fact)).toBeTruthy();
+  });
+
+  it('SAYS SO when a delete matched nothing, instead of looking like it worked', async () => {
+    // The mutation this kills: delete `if (!forgotten) throw ...` from
+    // `forgetFact`. Nothing else in the repository detects that, and the
+    // consequence is the exact failure `{ forgotten }` exists to prevent — a
+    // person told a memory is gone while it is still being read into every
+    // future prompt.
+    stubMatchMedia();
+    stubBridge({
+      listMemories: vi.fn().mockResolvedValue([MEMORY]),
+      forget: vi.fn().mockResolvedValue({ forgotten: false }),
+    });
+    render(<Shell devStateSwitcher={false} />);
+
+    await openPanel();
+    fireEvent.click(await screen.findByRole('button', { name: `Forget: ${MEMORY.fact}` }));
+    fireEvent.click(screen.getByRole('button', { name: /really forget/i }));
+
+    expect((await screen.findByRole('alert')).textContent).toContain('already gone');
+  });
+
+  it('says NOTHING when the delete really happened, and re-reads the store', async () => {
+    // The negative control. Without it the test above could pass against a
+    // Shell that threw unconditionally, which would be a different lie.
+    stubMatchMedia();
+    const listMemories = vi.fn().mockResolvedValueOnce([MEMORY]).mockResolvedValue([]);
+    stubBridge({ listMemories, forget: vi.fn().mockResolvedValue({ forgotten: true }) });
+    render(<Shell devStateSwitcher={false} />);
+
+    await openPanel();
+    fireEvent.click(await screen.findByRole('button', { name: `Forget: ${MEMORY.fact}` }));
+    fireEvent.click(screen.getByRole('button', { name: /really forget/i }));
+
+    // The re-read is part of the contract: the list on screen must be what main
+    // holds now, not an optimistic local guess.
+    await waitFor(() => {
+      expect(listMemories).toHaveBeenCalledTimes(2);
+    });
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.queryByText(MEMORY.fact)).toBeNull();
+  });
+
+  it('admits an unreadable store rather than showing a stale or empty list', async () => {
+    // A failed `memory:list` used to go to `console.error` and nowhere else, so
+    // the panel rendered its previous value as if it were the truth. `withRecall`
+    // reads the real store every turn, so an invisible memory is live and
+    // undeletable — precisely what constitution §8 forbids.
+    stubMatchMedia();
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    stubBridge({ listMemories: vi.fn().mockRejectedValue(new Error('db locked')) });
+    render(<Shell devStateSwitcher={false} />);
+
+    await openPanel();
+    expect((await screen.findByRole('alert')).textContent).toContain('could not read');
+    expect(screen.queryByText(/does not know anything about you yet/i)).toBeNull();
+    expect(consoleError).toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
+  it('names a MISSING memory channel as missing, not as an unreadable store', async () => {
+    // A preload older than ADR 0029 — a stale `app.asar`, a partially failed
+    // preload — gives a bridge that is PRESENT but has no `listMemories`.
+    //
+    // The mutation this kills: delete the `typeof bridge[key] === 'function'`
+    // check in `bridgeWith`. The call then throws into `refreshMemories`'s
+    // catch and the person is told the STORE could not be read — which is a
+    // different and false diagnosis. A database problem and a stale install
+    // need different actions from whoever is holding the machine.
+    stubMatchMedia();
+    stubBridge();
+    Reflect.deleteProperty(window.jarvis as object, 'listMemories');
+    render(<Shell devStateSwitcher={false} />);
+
+    await openPanel();
+    expect((await screen.findByRole('alert')).textContent).toContain('unavailable in this build');
+  });
+
+  it('keeps AEGIS visible when the memory channel is missing', async () => {
+    // The blast radius, asserted separately. The memory effect runs BEFORE the
+    // AEGIS effect, so a synchronous throw out of the first one unmounts the
+    // Shell and takes the security indicator with it — and an indicator that
+    // vanishes is the same failure as one that wrongly reads GREEN, with no
+    // message attached.
+    stubMatchMedia();
+    stubBridge();
+    Reflect.deleteProperty(window.jarvis as object, 'listMemories');
+    render(<Shell devStateSwitcher={false} />);
+
+    expect(await screen.findByText(/AEGIS · GREEN/)).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Jarvis');
+  });
+
+  it('says AEGIS is UNKNOWN — never GREEN — when the bridge has no aegisStatus', async () => {
+    // The other half of the one shared rule. This guard IS load-bearing on its
+    // own: the AEGIS path uses `.then`/`.catch`, so a missing function throws
+    // synchronously BEFORE any promise exists and no `.catch()` can intercept
+    // it. Delete the `typeof` check in `bridgeWith` and this test goes red by
+    // crashing the render.
+    stubMatchMedia();
+    stubBridge();
+    Reflect.deleteProperty(window.jarvis as object, 'aegisStatus');
+    render(<Shell devStateSwitcher={false} />);
+
+    expect(await screen.findByText(/AEGIS · READING…/)).toBeTruthy();
+    expect(screen.queryByText(/AEGIS · GREEN/)).toBeNull();
   });
 });

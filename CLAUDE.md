@@ -98,9 +98,12 @@ Repository: `github.com/Vanguard-Global-Logistics/Jarvis-Ai-Assistant`.
   now been observed live on a Windows x64 laptop. The shell and the IPC channel are
   `IMPLEMENTED AND VERIFIED` for development runtime. **The PACKAGED app is now verified
   too, on 2026-08-13**: `npm run package:dir` followed by `npm run probe:packaged` passes
-  against a genuinely packaged build — `isPackaged: true`, loaded from `app.asar`, all
-  sixteen channels answering, renderer isolated, console clean. That closes ADR 0004's
-  packaging gate for the pipeline. What is still NOT verified is the **macOS `.dmg` on
+  against a genuinely packaged build — `isPackaged: true`, loaded from `app.asar`, every
+  channel that existed on that date (sixteen; there are nineteen now) answering, renderer
+  isolated, console clean. That closes ADR 0004's packaging gate for the pipeline.
+  **The count is left at sixteen deliberately**: it is a record of a run that happened on a
+  named date, and raising it to nineteen would claim a verification nobody performed
+  (§8 rule 2). `npm run probe:packaged` has not been re-run since `memory:*` landed. What is still NOT verified is the **macOS `.dmg` on
   William's own Mac**: `npm run package:mac` only runs on a Mac (ADR 0016), and no
   installer has been opened there. Do not call the Mac installer verified until it is.
 - `reference/design-handoff/*.dc.html` and `support.js` are **design prototypes, not
@@ -264,11 +267,11 @@ The directories exist and the toolchain runs. **Most of them are empty**, and th
 column is the part that matters:
 
 ```
-apps/desktop           Electron shell (main / preload / renderer)  PARTIAL — hardened, 13 IPC channels, conversation + history + profile + brain-picker UI, owns SQLite
+apps/desktop           Electron shell (main / preload / renderer)  PARTIAL — hardened, 19 IPC channels, conversation + history + profile + brain-picker + memory UI, owns SQLite
 apps/pwa               PWA shell                                   NOT IMPLEMENTED — empty, out of scope
 services/jarvis-core   Orchestration, isolated from renderer       PARTIAL — 6 model providers + amplifier, wired via chat/amplify/model (ADR 0007, 0022)
 services/aegis         AEGIS engine — independent, no GenAI        PARTIAL — real state engine + hash-chained audit log (ADR 0025); enforces 1 of 11 capabilities (ADR 0026)
-packages/contracts     Zod schemas + shared types                  PARTIAL — IPC (14 channels), model, history, profile, automation, experience
+packages/contracts     Zod schemas + shared types                  PARTIAL — IPC (19 channels), model, history, profile, automation, memory, experience
 packages/ui            Design-system components                    PARTIAL — tokens, motion, Orb + glass primitives
 packages/config        Env validation + structured logging         IMPLEMENTED, unit-tested
 packages/database      SQLite (node:sqlite) + migration runner     PARTIAL — wired to Electron main, 5 migrations: history, amplifications, profile, window-state, plans (ADR 0008, 0009, 0013, 0017, 0024)

@@ -59,10 +59,17 @@ export const MEMORY_SENSITIVITIES = {
     description: 'Only brains that run on this machine ever see this.',
     leavesMachine: false,
   },
-  /** Recorded so Jarvis behaves correctly; must never leave, ever. */
+  /**
+   * Recorded so Jarvis behaves correctly; must never leave, ever.
+   *
+   * `leavesMachine: false` here is **belt, not braces** — see
+   * `sensitivityAllowsSending`, which denies this tier before it ever reads this
+   * table. The field is present so the shape stays uniform and so a reader of
+   * this table is not told something false; it is not what enforces the tier.
+   */
   'never-send': {
     label: 'Never send',
-    description: 'Never leaves this machine, and is never put in a prompt that could.',
+    description: 'Never leaves this machine. No future exception can be carved for it.',
     leavesMachine: false,
   },
 } as const;
@@ -83,6 +90,15 @@ export const MemorySensitivitySchema = z.enum(
 export const DEFAULT_SENSITIVITY: MemorySensitivity = 'private';
 
 /**
+ * The tier that is denied by NAME rather than by configuration.
+ *
+ * Exported so the difference between the two restrictive tiers is a value the
+ * tests and the UI can both point at, instead of a paragraph everyone has to
+ * remember.
+ */
+export const NEVER_SEND: MemorySensitivity = 'never-send';
+
+/**
  * May a memory at this tier be included in a prompt for a provider that leaves
  * the machine?
  *
@@ -90,8 +106,34 @@ export const DEFAULT_SENSITIVITY: MemorySensitivity = 'private';
  * nothing else decides; a second copy of this rule anywhere would be exactly the
  * drift CLAUDE.md §3 forbids. Total over the closed enum, so a new tier added
  * later cannot silently default to "yes".
+ *
+ * ## Why `never-send` is answered BEFORE the table is read
+ *
+ * `private` and `never-send` shipped behaviourally identical — both stayed on
+ * the machine, and nothing distinguished them. That is a real problem in a
+ * security control, not an untidy one: a person who deliberately picks the
+ * stronger-sounding option and receives the weaker guarantee has been told
+ * something false by the interface.
+ *
+ * The constitution's own table already says what the difference is. `private` is
+ * **"No — local models only"**: a policy, and policies can later admit an
+ * exception (a vetted provider, an enterprise endpoint with a no-training
+ * agreement, a self-hosted remote box). `never-send` is **"No, ever"**: an
+ * absolute, and an absolute that a one-line data edit can flip was never an
+ * absolute.
+ *
+ * So the tiers differ in WHERE their answer comes from. `private` is decided by
+ * `MEMORY_SENSITIVITIES` — configuration, deliberately changeable in one place
+ * if that exception is ever argued and approved. `never-send` is decided by this
+ * `if`, above the lookup, and no change to that table can reach it.
+ *
+ * `packages/contracts/src/memory/contracts.test.ts` proves it the only way this
+ * kind of claim can honestly be proven: it MUTATES the table at runtime to the
+ * exact bad value, and asserts `private` changes answer while `never-send` does
+ * not. Without that negative control the test would be two constants agreeing.
  */
 export function sensitivityAllowsSending(sensitivity: MemorySensitivity): boolean {
+  if (sensitivity === NEVER_SEND) return false;
   return MEMORY_SENSITIVITIES[sensitivity].leavesMachine;
 }
 

@@ -36,16 +36,48 @@ const TIER_COLOR: Record<MemorySensitivity, string> = {
 
 export function MemoryPanel({
   memories,
+  listError = null,
   onRemember,
   onForget,
 }: {
   memories: readonly Memory[];
+  /**
+   * Set when `memory:list` could not be read, so the list below may be stale.
+   *
+   * Passed in rather than derived here because Shell owns the read. Without it,
+   * a failed read rendered as an ordinary empty-or-old list — and an invisible
+   * memory is not merely a display bug: `withRecall` reads the store on every
+   * turn, so a fact the panel cannot show is still being said to the model and
+   * still cannot be deleted, which is precisely what constitution §8 forbids.
+   */
+  listError?: string | null;
   onRemember: (fact: string, sensitivity: MemorySensitivity) => Promise<void>;
   onForget: (id: string) => Promise<void>;
 }): JSX.Element {
   const [draft, setDraft] = useState('');
   const [sensitivity, setSensitivity] = useState<MemorySensitivity>(DEFAULT_SENSITIVITY);
-  const [error, setError] = useState<string | null>(null);
+  /**
+   * The ADD form's error — a credential refusal, a failed write.
+   *
+   * Named `addError` rather than `error` because there are now two, and the
+   * single shared slot they used to share was actively harmful. Three ways it
+   * went wrong, all reachable by ordinary use:
+   *
+   * - the `[draft]` effect below cleared it, so touching the textarea wiped a
+   *   DELETE failure the person had not read yet;
+   * - `confirmForget`'s success path cleared it, so successfully forgetting one
+   *   memory erased a credential refusal that was still on screen with the
+   *   refused text still sitting in the box;
+   * - it renders in the composer, above the list, inside a panel Shell caps at
+   *   `60vh` with `overflowY: auto` — so for any list past one screen the
+   *   message about the row you just tried to delete was off-viewport.
+   *
+   * One state per thing being reported. A failure belongs at the control that
+   * produced it.
+   */
+  const [addError, setAddError] = useState<string | null>(null);
+  /** A failed forget, carried WITH the id so it renders on that row. */
+  const [forgetError, setForgetError] = useState<{ id: string; message: string } | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
   /**
    * In-flight guard, held HERE rather than passed in.
@@ -61,8 +93,11 @@ export function MemoryPanel({
 
   // Clear a stale refusal as soon as the person edits — an error still on
   // screen after the text changed is an error about text that no longer exists.
+  // Scoped to the ADD error only: a delete failure has nothing to do with what
+  // is in the textarea, and clearing it here is how it used to disappear on the
+  // next keystroke.
   useEffect(() => {
-    setError(null);
+    setAddError(null);
   }, [draft]);
 
   const trimmed = draft.trim();
@@ -70,22 +105,26 @@ export function MemoryPanel({
   const canSubmit = trimmed.length > 0 && remaining >= 0 && !saving;
 
   const submit = useCallback(async (): Promise<void> => {
-    if (!canSubmit) return;
+    // No `if (!canSubmit) return;` here. The button carries `disabled`, this has
+    // no other caller, and a third copy of the same guard is a copy no test can
+    // distinguish from the other two — `fireEvent.click` on a disabled button
+    // dispatches nothing, so the early return could be deleted with the suite
+    // green. One guard, in the place the DOM enforces it.
     setSaving(true);
     try {
       await onRemember(trimmed, sensitivity);
       setDraft('');
       setSensitivity(DEFAULT_SENSITIVITY);
-      setError(null);
+      setAddError(null);
     } catch (cause) {
       // The refusal message from main is written for a human and quotes none of
       // the refused text (constitution §5), so it is shown verbatim rather than
       // replaced with something vaguer.
-      setError(cause instanceof Error ? cause.message : 'Jarvis could not remember that.');
+      setAddError(cause instanceof Error ? cause.message : 'Jarvis could not remember that.');
     } finally {
       setSaving(false);
     }
-  }, [canSubmit, onRemember, sensitivity, trimmed]);
+  }, [onRemember, sensitivity, trimmed]);
 
   /**
    * Forget, awaited and caught — the same treatment the add path already had.
@@ -99,11 +138,17 @@ export function MemoryPanel({
   const confirmForget = useCallback(
     async (id: string): Promise<void> => {
       setConfirming(null);
+      // Clear only THIS row's previous failure. Not `addError` — a successful
+      // delete says nothing about whether the credential the person is still
+      // holding in the textarea was refused.
+      setForgetError(null);
       try {
         await onForget(id);
-        setError(null);
       } catch (cause) {
-        setError(cause instanceof Error ? cause.message : 'Jarvis could not forget that.');
+        setForgetError({
+          id,
+          message: cause instanceof Error ? cause.message : 'Jarvis could not forget that.',
+        });
       }
     },
     [onForget],
@@ -207,7 +252,7 @@ export function MemoryPanel({
           </span>
         )}
 
-        {error !== null && (
+        {addError !== null && (
           <p
             role="alert"
             style={{
@@ -221,7 +266,7 @@ export function MemoryPanel({
               background: 'rgba(255,184,77,0.08)',
             }}
           >
-            {error}
+            {addError}
           </p>
         )}
 
@@ -247,8 +292,31 @@ export function MemoryPanel({
         </button>
       </div>
 
+      {/* Above the list, because it is about the list as a whole. An unreadable
+          store must SAY it is unreadable rather than rendering the last thing it
+          managed to read — the same rule the AEGIS strip follows, for the same
+          reason: a reassuring default on a surface people trust is worse than
+          an admitted unknown. */}
+      {listError !== null && (
+        <p
+          role="alert"
+          style={{
+            margin: 0,
+            padding: 8,
+            fontFamily: fontFamily.body,
+            fontSize: 11,
+            color: '#ffb84d',
+            border: '1px solid rgba(255,184,77,0.4)',
+            borderRadius: surface.radiusMin,
+            background: 'rgba(255,184,77,0.08)',
+          }}
+        >
+          {listError}
+        </p>
+      )}
+
       <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 6 }}>
-        {memories.length === 0 && (
+        {memories.length === 0 && listError === null && (
           <li style={{ fontFamily: fontFamily.body, fontSize: 11, color: text.faint }}>
             Jarvis does not know anything about you yet.
           </li>
@@ -322,6 +390,29 @@ export function MemoryPanel({
                 </button>
               )}
             </div>
+
+            {/* The failure belongs HERE, on the row whose delete failed — not in
+                the composer at the top of a panel Shell caps at 60vh with its
+                own scrollbar, where for any list past one screen the person
+                would never see it and the row would just collapse back to
+                FORGET, visually identical to pressing KEEP. */}
+            {forgetError?.id === memory.id && (
+              <p
+                role="alert"
+                style={{
+                  margin: 0,
+                  padding: 6,
+                  fontFamily: fontFamily.body,
+                  fontSize: 11,
+                  color: '#ffb84d',
+                  border: '1px solid rgba(255,184,77,0.4)',
+                  borderRadius: surface.radiusMin,
+                  background: 'rgba(255,184,77,0.08)',
+                }}
+              >
+                {forgetError.message}
+              </p>
+            )}
           </li>
         ))}
       </ul>

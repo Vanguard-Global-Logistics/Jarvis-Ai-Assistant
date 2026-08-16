@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Memory } from '@jarvis/contracts';
 import { MEMORY_MAX_LENGTH } from '@jarvis/contracts';
@@ -49,24 +49,67 @@ describe('MemoryPanel — showing what is known', () => {
     }
   });
 
-  it('labels each memory with its tier — scoped to the memory, not the picker', () => {
-    // The first version asserted `getAllByText('NEVER SEND').length > 0`, which
-    // the always-rendered tier-picker button satisfies on its own: it passed
-    // with `memories={[]}`. Counting is the fix — one badge for the picker, two
-    // when a `never-send` memory is also listed.
-    const { rerender } = render(
-      <MemoryPanel memories={[]} onRemember={vi.fn()} onForget={vi.fn()} />,
-    );
-    expect(screen.getAllByText('NEVER SEND')).toHaveLength(1);
-
-    rerender(
+  it("labels each memory with ITS OWN tier, scoped to that memory's row", () => {
+    // Two earlier versions of this test were satisfiable without the code under
+    // test. `getAllByText('NEVER SEND').length > 0` passed with `memories={[]}`,
+    // because the always-rendered tier picker renders that string by itself.
+    // Counting document-wide occurrences (1, then 2) fixed that but was still
+    // arithmetic over the whole page: it could not tell "the badge read its
+    // input" from "the badge returns a constant", and an unrelated picker change
+    // would break it.
+    //
+    // Scoping to each row, with one memory per tier, kills both mutations —
+    // hardcode the badge and two of the three rows go red.
+    render(
       <MemoryPanel
-        memories={[memory({ sensitivity: 'never-send', fact: 'Stays home.' })]}
+        memories={[
+          memory({
+            id: 'a0000000-0000-4000-8000-000000000000',
+            fact: 'Open one.',
+            sensitivity: 'open',
+          }),
+          memory({
+            id: 'b0000000-0000-4000-8000-000000000000',
+            fact: 'Private one.',
+            sensitivity: 'private',
+          }),
+          memory({
+            id: 'c0000000-0000-4000-8000-000000000000',
+            fact: 'Stays home.',
+            sensitivity: 'never-send',
+          }),
+        ]}
         onRemember={vi.fn()}
         onForget={vi.fn()}
       />,
     );
-    expect(screen.getAllByText('NEVER SEND')).toHaveLength(2);
+
+    const row = (fact: string): HTMLElement => screen.getByText(fact).closest('li') as HTMLElement;
+
+    expect(within(row('Open one.')).getByText('OPEN')).toBeTruthy();
+    expect(within(row('Private one.')).getByText('PRIVATE')).toBeTruthy();
+    expect(within(row('Stays home.')).getByText('NEVER SEND')).toBeTruthy();
+  });
+
+  it('says so when the store could not be READ, rather than showing a stale list', () => {
+    // A failed `memory:list` used to render as an ordinary list. That is worse
+    // than a display bug: `withRecall` reads the store on every turn, so a fact
+    // the panel cannot show is still being said to the model and still cannot be
+    // deleted — exactly what §8 forbids. Same rule as the AEGIS strip: an
+    // unreadable source says it is unreadable.
+    render(
+      <MemoryPanel
+        memories={[]}
+        listError="Jarvis could not read what it knows."
+        onRemember={vi.fn()}
+        onForget={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('alert').textContent).toContain('could not read');
+    // And it must NOT also claim Jarvis knows nothing — an unread store and an
+    // empty store are different facts about the world.
+    expect(screen.queryByText(/does not know anything about you yet/i)).toBeNull();
   });
 });
 
@@ -213,11 +256,55 @@ describe('MemoryPanel — the in-flight guard is real', () => {
     fireEvent.click(button);
 
     expect(onRemember).toHaveBeenCalledTimes(1);
+    // The button must actually BE disabled — the earlier version of this test
+    // only asserted the element existed, which is true in every state.
+    expect(button.hasAttribute('disabled')).toBe(true);
 
     release();
+
+    // Wait for the success path to have run. The cleared draft is the signal;
+    // it cannot be the ASSERTION, because `setDraft('')` also leaves the button
+    // disabled (empty text is not submittable), which is why checking
+    // `disabled` here would pass whether or not the guard released.
+    const box = screen.getByLabelText(/something for jarvis to remember/i);
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /remember this/i })).toBeTruthy();
+      expect((box as HTMLTextAreaElement).value).toBe('');
     });
+
+    // THE assertion. This is the half that was untested and the half that bricks
+    // the panel: delete `finally { setSaving(false) }` and `saving` stays true
+    // for the life of the mount, so no second memory can ever be stored — with
+    // the old body, the suite stayed green.
+    fireEvent.change(box, { target: { value: 'A second fact.' } });
+    expect(button.hasAttribute('disabled')).toBe(false);
+    fireEvent.click(button);
+    expect(onRemember).toHaveBeenCalledTimes(2);
+    expect(onRemember).toHaveBeenLastCalledWith('A second fact.', 'private');
+  });
+
+  it('releases the guard after a REFUSAL too, so the person can fix and retry', async () => {
+    // The failure path needs the release just as much: a refused credential
+    // leaves the text in the box precisely so it can be corrected, and a panel
+    // that stays disabled makes that impossible.
+    const onRemember = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('refused'))
+      .mockResolvedValueOnce(undefined);
+    render(<MemoryPanel memories={[]} onRemember={onRemember} onForget={vi.fn()} />);
+
+    const box = screen.getByLabelText(/something for jarvis to remember/i);
+    fireEvent.change(box, { target: { value: 'my key is redacted' } });
+    const button = screen.getByRole('button', { name: /remember this/i });
+    fireEvent.click(button);
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeTruthy();
+    });
+    expect(button.hasAttribute('disabled')).toBe(false);
+
+    fireEvent.change(box, { target: { value: 'A corrected fact.' } });
+    fireEvent.click(button);
+    expect(onRemember).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -241,20 +328,77 @@ describe('MemoryPanel — forgetting', () => {
     expect(onForget).toHaveBeenCalledWith('11111111-1111-4111-8111-111111111111');
   });
 
-  it('surfaces a failed delete instead of silently closing', async () => {
+  it('surfaces a failed delete ON THE ROW THAT FAILED, not in the composer', async () => {
     // The defect: `void onForget(id)` discarded the rejection AND the
     // `{ forgotten }` flag, so a delete that did not happen looked exactly like
     // one that did — on the surface constitution §8 requires to be truthful
     // about what is stored. It also produced an unhandled promise rejection.
+    //
+    // The FIRST fix put the message in the shared composer error slot, which is
+    // above the list inside a panel Shell caps at 60vh with its own scrollbar:
+    // for any list past one screen the person never saw it, and the row just
+    // collapsed back to FORGET — visually identical to pressing KEEP. So this
+    // asserts WHERE the message lands, not merely that one exists.
+    const rows = [
+      memory({ id: 'a0000000-0000-4000-8000-000000000000', fact: 'First.' }),
+      memory({ id: 'b0000000-0000-4000-8000-000000000000', fact: 'Second.' }),
+    ];
+    const onForget = vi.fn().mockRejectedValue(new Error('That memory was already gone.'));
+    render(<MemoryPanel memories={rows} onRemember={vi.fn()} onForget={onForget} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Forget: Second.' }));
+    fireEvent.click(screen.getByRole('button', { name: /really forget/i }));
+
+    const second = screen.getByText('Second.').closest('li') as HTMLElement;
+    const first = screen.getByText('First.').closest('li') as HTMLElement;
+    await waitFor(() => {
+      expect(within(second).getByRole('alert').textContent).toContain('already gone');
+    });
+    expect(within(first).queryByRole('alert')).toBeNull();
+  });
+
+  it('a delete failure SURVIVES typing in the composer', async () => {
+    // One shared `error` state meant the `[draft]` effect wiped a delete failure
+    // the moment the person touched the textarea. Two states, two lifetimes.
     const onForget = vi.fn().mockRejectedValue(new Error('That memory was already gone.'));
     render(<MemoryPanel memories={[memory()]} onRemember={vi.fn()} onForget={onForget} />);
 
     fireEvent.click(screen.getByRole('button', { name: /^forget:/i }));
     fireEvent.click(screen.getByRole('button', { name: /really forget/i }));
-
     await waitFor(() => {
-      expect(screen.getByRole('alert').textContent).toContain('already gone');
+      expect(screen.getByRole('alert')).toBeTruthy();
     });
+
+    fireEvent.change(screen.getByLabelText(/something for jarvis to remember/i), {
+      target: { value: 'an unrelated new fact' },
+    });
+
+    expect(screen.getByRole('alert').textContent).toContain('already gone');
+  });
+
+  it('a successful delete does NOT erase a credential refusal still on screen', async () => {
+    // The mirror of the above. `confirmForget` used to call `setError(null)` on
+    // success, so forgetting an unrelated memory wiped the refusal while the
+    // refused text was still sitting in the box waiting to be fixed.
+    const onRemember = vi.fn().mockRejectedValue(new Error('That looks like an API key.'));
+    const onForget = vi.fn().mockResolvedValue(undefined);
+    render(<MemoryPanel memories={[memory()]} onRemember={onRemember} onForget={onForget} />);
+
+    fireEvent.change(screen.getByLabelText(/something for jarvis to remember/i), {
+      target: { value: 'my key is redacted' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /remember this/i }));
+    await waitFor(() => {
+      expect(screen.getByRole('alert').textContent).toContain('API key');
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /^forget:/i }));
+    fireEvent.click(screen.getByRole('button', { name: /really forget/i }));
+    await waitFor(() => {
+      expect(onForget).toHaveBeenCalled();
+    });
+
+    expect(screen.getByRole('alert').textContent).toContain('API key');
   });
 
   it('backs out cleanly on KEEP', () => {

@@ -105,6 +105,32 @@ source that already drives the reply chips and AEGIS `sending`). A `private`
 memory is not "discouraged" from reaching Gemini — the code that builds the
 prompt for a leaves-the-machine provider never sees it.
 
+**`private` and `never-send` are not the same rule stated twice** (added
+2026-08-16, after they shipped behaviourally identical). Read the table above
+carefully: `private` is _"No — local models only"_ and `never-send` is
+_"No, ever"_. The first is a **policy**, and a policy may one day admit an
+argued, approved exception — a vetted endpoint with a no-training agreement, a
+self-hosted remote box on the Hive. The second is an **absolute**, and an
+absolute that a one-line data edit can flip was never an absolute.
+
+So the two tiers differ in **where their answer comes from**:
+
+- `private` is decided by the `MEMORY_SENSITIVITIES` table — configuration, in
+  one place, deliberately changeable if that exception is ever approved.
+- `never-send` is decided by a check **above** that lookup, in
+  `sensitivityAllowsSending`. No change to the table reaches it.
+
+`packages/contracts/src/memory/contracts.test.ts` proves the difference the only
+way it can honestly be proven: it mutates the table at runtime to the exact bad
+value and asserts `private` changes its answer while `never-send` does not. The
+first half is the negative control — without it the test would be two constants
+agreeing with each other, which is the ADR 0021 failure shape.
+
+Two tiers that behave identically are not a harmless redundancy in a security
+control. A person who reads "Never send", deliberately chooses it over the
+default, and receives exactly the default guarantee has been told something
+false by the interface.
+
 This is also the first capability where the Hive's shape shows up in code: a
 family that shares a house does not share a threat model. Jayden's node on
 school Wi-Fi and William's node with the freight book are the same software with
