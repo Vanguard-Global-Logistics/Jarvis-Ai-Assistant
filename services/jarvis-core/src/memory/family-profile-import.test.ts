@@ -59,20 +59,34 @@ class FakeRepository implements MemoryRepositoryPort {
   }
 }
 
-function seed(profileId = 'member-a') {
+interface SeedEntry {
+  canonicalKey: string;
+  kind: 'fact' | 'preference';
+  value: string;
+  scope?: 'private' | 'shared';
+}
+
+interface TestSeed {
+  schemaVersion: 1;
+  profileId: string;
+  displayName: string;
+  entries: SeedEntry[];
+}
+
+function seed(profileId = 'member-a'): TestSeed {
   return {
-    schemaVersion: 1 as const,
+    schemaVersion: 1,
     profileId,
     displayName: 'Member A',
     entries: [
       {
         canonicalKey: 'career.goal',
-        kind: 'fact' as const,
+        kind: 'fact',
         value: 'Explore engineering careers.',
       },
       {
         canonicalKey: 'education.support',
-        kind: 'preference' as const,
+        kind: 'preference',
         value: 'Use tutoring and project guidance to strengthen learning.',
       },
     ],
@@ -153,7 +167,8 @@ describe('FamilyProfileImportService', () => {
 
     const correctedSeed = seed();
     correctedSeed.entries[0] = {
-      ...correctedSeed.entries[0],
+      canonicalKey: 'career.goal',
+      kind: 'fact',
       value: 'Prepare for an engineering career with advanced robotics projects.',
     };
     const corrected = importer.importProfile(correctedSeed, context, {
@@ -176,8 +191,10 @@ describe('FamilyProfileImportService', () => {
     const importer = new FamilyProfileImportService(new MemoryService(repository));
     const sharedSeed = seed();
     sharedSeed.entries[0] = {
-      ...sharedSeed.entries[0],
-      scope: 'shared' as const,
+      canonicalKey: 'career.goal',
+      kind: 'fact',
+      value: 'Explore engineering careers.',
+      scope: 'shared',
     };
 
     const result = importer.importProfile(sharedSeed, {
