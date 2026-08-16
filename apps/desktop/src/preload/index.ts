@@ -7,6 +7,7 @@ import type {
   ChatReply,
   ChatRequest,
   DeleteSessionResult,
+  MemoryInspectionResult,
   SaveSessionRequest,
   SavedSession,
   SavedSessionSummary,
@@ -82,6 +83,13 @@ const api = {
   /** Delete one saved transcript by opaque id after renderer confirmation. */
   deleteSession: (id: string): Promise<DeleteSessionResult> =>
     ipcRenderer.invoke(CHANNELS.historyDelete, { id }) as Promise<DeleteSessionResult>,
+
+  /**
+   * Inspect only the active profile's policy-authorized Memory v1 projection.
+   * The renderer supplies no profile id, query, path, or approval flag.
+   */
+  inspectMemory: (): Promise<MemoryInspectionResult> =>
+    ipcRenderer.invoke(CHANNELS.memoryInspect) as Promise<MemoryInspectionResult>,
 } as const;
 
 export type JarvisApi = typeof api;
