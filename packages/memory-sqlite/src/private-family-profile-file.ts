@@ -71,7 +71,9 @@ export async function importPrivateFamilyProfileFile(
     throw new PrivateFamilyProfileFileError('Family profile path must be a regular file');
   }
   if (metadata.size > maxBytes) {
-    throw new PrivateFamilyProfileFileError(`Family profile file exceeds ${maxBytes} bytes`);
+    throw new PrivateFamilyProfileFileError(
+      `Family profile file exceeds ${String(maxBytes)} bytes`,
+    );
   }
 
   let candidate: unknown;
