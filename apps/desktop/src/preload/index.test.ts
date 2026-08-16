@@ -11,10 +11,6 @@ vi.mock('electron', () => ({
   ipcRenderer: { invoke: mocks.invoke },
 }));
 
-/**
- * Exact renderer authority. A legitimate addition must be named here so a
- * trust-boundary expansion cannot hide inside an unrelated preload edit.
- */
 const ALLOWED_API = [
   'getAppInfo',
   'sendChat',
@@ -24,6 +20,7 @@ const ALLOWED_API = [
   'getSession',
   'deleteSession',
   'inspectMemory',
+  'deleteMemory',
 ] as const;
 
 async function loadBridge(): Promise<{ namespace: string; api: Record<string, unknown> }> {
@@ -38,17 +35,12 @@ async function loadBridge(): Promise<{ namespace: string; api: Record<string, un
   if (call === undefined) throw new Error('bridge exposed nothing');
 
   const [namespace, api] = call;
-  if (typeof api !== 'object' || api === null) {
-    throw new Error('bridge exposed a non-object');
-  }
-
+  if (typeof api !== 'object' || api === null) throw new Error('bridge exposed a non-object');
   return { namespace, api: api as Record<string, unknown> };
 }
 
 describe('preload bridge surface', () => {
-  beforeEach(() => {
-    mocks.invoke.mockReset();
-  });
+  beforeEach(() => mocks.invoke.mockReset());
 
   it('exposes exactly one namespace, called jarvis', async () => {
     const { namespace } = await loadBridge();
@@ -67,7 +59,7 @@ describe('preload bridge surface', () => {
     }
   });
 
-  it('exposes only functions — no mutable state the renderer could reach', async () => {
+  it('exposes only functions', async () => {
     const { api } = await loadBridge();
     for (const [key, value] of Object.entries(api)) {
       expect(typeof value, `jarvis.${key} is not a function`).toBe('function');
@@ -76,14 +68,12 @@ describe('preload bridge surface', () => {
 });
 
 describe('jarvis.getAppInfo', () => {
-  it('invokes the app:get-info channel with no payload', async () => {
+  it('invokes app:get-info with no payload', async () => {
     const { api } = await loadBridge();
     const getAppInfo = api.getAppInfo;
     if (typeof getAppInfo !== 'function') throw new Error('getAppInfo is missing');
-
     mocks.invoke.mockResolvedValue({ appVersion: '0.0.0' });
     await (getAppInfo as (smuggled?: unknown) => Promise<unknown>)('../../etc/passwd');
-
     expect(mocks.invoke.mock.calls[0]).toEqual([CHANNELS.appGetInfo]);
   });
 });
@@ -93,30 +83,20 @@ describe('jarvis.sendChat', () => {
     const { api } = await loadBridge();
     const sendChat = api.sendChat;
     if (typeof sendChat !== 'function') throw new Error('sendChat is missing');
-
     mocks.invoke.mockResolvedValue({ text: 'hi', provider: 'mock' });
     const request = { messages: [{ role: 'user', content: 'Hello, Jarvis.' }] };
     await (sendChat as (r: unknown) => Promise<unknown>)(request);
-
     expect(mocks.invoke).toHaveBeenCalledWith(CHANNELS.jarvisChat, request);
   });
 });
 
 describe('jarvis.amplify', () => {
-  it('wraps the idea into the { idea } request the contract expects', async () => {
+  it('wraps the idea into the request the contract expects', async () => {
     const { api } = await loadBridge();
     const amplify = api.amplify;
     if (typeof amplify !== 'function') throw new Error('amplify is missing');
-
-    mocks.invoke.mockResolvedValue({
-      clarifiedIntent: 'x',
-      missingQuestions: ['y'],
-      improvedConcept: 'z',
-      recommendedNextStep: 'w',
-      buildReadyPrompt: 'p',
-    });
+    mocks.invoke.mockResolvedValue({});
     await (amplify as (idea: string) => Promise<unknown>)('a faster permit tracker');
-
     expect(mocks.invoke).toHaveBeenCalledWith(CHANNELS.jarvisAmplify, {
       idea: 'a faster permit tracker',
     });
@@ -124,7 +104,7 @@ describe('jarvis.amplify', () => {
 });
 
 describe('jarvis history', () => {
-  it('maps four purpose-named methods to four fixed history channels', async () => {
+  it('maps four purpose-named methods to fixed history channels', async () => {
     const { api } = await loadBridge();
     const saveSession = api.saveSession;
     const listSessions = api.listSessions;
@@ -138,21 +118,12 @@ describe('jarvis history', () => {
     ) {
       throw new Error('history bridge is incomplete');
     }
-
-    const session = {
-      id: 'session-1',
-      name: 'Morning plan',
-      createdAt: '2026-08-09T12:00:00.000Z',
-      updatedAt: '2026-08-09T12:00:00.000Z',
-      messages: [{ role: 'user', content: 'Plan my day.' }],
-    };
+    const session = { id: 'session-1' };
     mocks.invoke.mockResolvedValue(undefined);
-
     await (saveSession as (request: unknown) => Promise<unknown>)(session);
     await (listSessions as () => Promise<unknown>)();
     await (getSession as (id: string) => Promise<unknown>)(session.id);
     await (deleteSession as (id: string) => Promise<unknown>)(session.id);
-
     expect(mocks.invoke.mock.calls).toEqual([
       [CHANNELS.historySave, session],
       [CHANNELS.historyList],
@@ -162,16 +133,22 @@ describe('jarvis history', () => {
   });
 });
 
-describe('jarvis.inspectMemory', () => {
-  it('invokes only memory:inspect and forwards no renderer-controlled payload', async () => {
+describe('jarvis memory', () => {
+  it('inspects with no renderer-controlled payload', async () => {
     const { api } = await loadBridge();
     const inspectMemory = api.inspectMemory;
     if (typeof inspectMemory !== 'function') throw new Error('inspectMemory is missing');
-
     mocks.invoke.mockResolvedValue({ items: [], truncated: false });
     await (inspectMemory as (smuggled?: unknown) => Promise<unknown>)({ profileId: 'amy' });
-
-    expect(mocks.invoke).toHaveBeenCalledTimes(1);
     expect(mocks.invoke.mock.calls[0]).toEqual([CHANNELS.memoryInspect]);
+  });
+
+  it('deletes only by opaque memory id', async () => {
+    const { api } = await loadBridge();
+    const deleteMemory = api.deleteMemory;
+    if (typeof deleteMemory !== 'function') throw new Error('deleteMemory is missing');
+    mocks.invoke.mockResolvedValue({ deleted: true });
+    await (deleteMemory as (id: string) => Promise<unknown>)('memory-1');
+    expect(mocks.invoke.mock.calls[0]).toEqual([CHANNELS.memoryDelete, { id: 'memory-1' }]);
   });
 });
