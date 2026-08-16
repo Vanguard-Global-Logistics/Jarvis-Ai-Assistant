@@ -38,13 +38,26 @@ function stableHash(value: string): string {
   return hash.toString(16).padStart(8, '0');
 }
 
+function recordIdentity(seed: FamilyProfileSeed, entry: FamilyProfileEntry, canonicalKey: string) {
+  return JSON.stringify([
+    seed.schemaVersion,
+    seed.profileId,
+    canonicalKey,
+    entry.kind,
+    entry.value,
+    entry.sensitivity,
+    entry.confidence,
+    entry.scope,
+  ]);
+}
+
 /**
  * Convert an owner-reviewed private family profile into normal Memory v1 records.
  *
- * This function deliberately accepts data, not a filesystem path. The caller is
- * responsible for loading the private seed from an owner-controlled location
- * outside Git. Family biography must never become repository source code merely
- * because Jarvis can remember it.
+ * Record ids are content-addressed: importing the same approved fact again yields
+ * the same id, while correcting the value or governed metadata yields a new id
+ * that the repository can supersede by canonical key. This makes re-imports
+ * idempotent without preventing honest correction history.
  */
 export function buildFamilyProfileMemories(
   candidate: unknown,
@@ -67,7 +80,7 @@ export function buildFamilyProfileMemories(
     seenKeys.add(canonicalKey);
 
     return {
-      id: `family-${stableHash(`${seed.profileId}:${canonicalKey}`)}`,
+      id: `family-${stableHash(recordIdentity(seed, entry, canonicalKey))}`,
       profileId: seed.profileId,
       scope: entry.scope,
       kind: entry.kind,
