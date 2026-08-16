@@ -130,7 +130,7 @@ export const MemoryInspectionItemSchema = z
     value: z.string().max(16_384),
     sensitivity: z.string().min(1).max(32),
     sourceType: z.string().min(1).max(64),
-    updatedAt: z.string().datetime(),
+    updatedAt: z.iso.datetime(),
   })
   .strict();
 
