@@ -40,6 +40,18 @@ export const CHANNELS = {
 
   /** Delete one explicitly saved session by opaque id. */
   historyDelete: 'history:delete',
+
+  /**
+   * Return a bounded, policy-filtered view of the active profile's durable
+   * memories. The renderer cannot choose a profile or query raw persistence.
+   */
+  memoryInspect: 'memory:inspect',
+
+  /**
+   * Delete one memory already visible to the active profile. Main supplies the
+   * actor identity and policy context; the renderer supplies only an opaque id.
+   */
+  memoryDelete: 'memory:delete',
 } as const;
 
 export type ChannelName = (typeof CHANNELS)[keyof typeof CHANNELS];

@@ -15,6 +15,10 @@ import {
 } from '@jarvis/ui';
 import { Conversation } from './Conversation.js';
 import type { ConversationBridge } from './Conversation.js';
+import { MemoryPanel } from './MemoryPanel.js';
+import type { MemoryInspectionBridge } from './MemoryPanel.js';
+
+type ShellBridge = ConversationBridge & MemoryInspectionBridge;
 
 /**
  * The Experience Shell (task E2, visual correction pass): cinematic ambient
@@ -76,7 +80,7 @@ export function Shell({ devStateSwitcher = import.meta.env.DEV }: ShellProps): J
   // where the conversation composer disables itself and says so. Passing the
   // whole api is safe — it structurally satisfies the narrow ConversationBridge
   // (sendChat + amplify), and the extra getAppInfo is simply unused here.
-  const bridge = useMemo<ConversationBridge | null>(() => window.jarvis ?? null, []);
+  const bridge = useMemo<ShellBridge | null>(() => window.jarvis ?? null, []);
   // DEV-ONLY renderer study (E2 renderer reset): when on, the V2 three.js
   // study renders instead of the legacy Orb, and the frame goes cinematic
   // (wordmark/footer move into the dev diagnostics drawer). Unreachable in
@@ -195,6 +199,9 @@ export function Shell({ devStateSwitcher = import.meta.env.DEV }: ShellProps): J
             <Orb state={orbState} sizePx={132} />
           </div>
           <Conversation bridge={bridge} onOrbStateChange={setOrbState} />
+          <div style={{ marginTop: 8, zIndex: 1 }}>
+            <MemoryPanel bridge={bridge} />
+          </div>
         </>
       )}
 

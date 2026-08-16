@@ -1,4 +1,5 @@
 import {
+  evaluateMemoryRead,
   evaluateMemoryWrite,
   projectMemoriesForLocalModel,
   rankMemoriesForQuery,
@@ -20,6 +21,7 @@ export type MemoryRememberResult =
       readonly stored: true;
       readonly record: MemoryRecord;
       readonly supersededId?: string;
+      readonly unchanged?: true;
     }
   | {
       readonly stored: false;
@@ -42,6 +44,23 @@ export interface MemoryRecallResult {
   readonly localModelProjection: readonly MemoryPromptProjection[];
 }
 
+export interface MemoryInspectionItem {
+  readonly id: string;
+  readonly profileId: string;
+  readonly scope: MemoryRecord['scope'];
+  readonly kind: MemoryRecord['kind'];
+  readonly canonicalKey: string;
+  readonly value: string;
+  readonly sensitivity: MemoryRecord['sensitivity'];
+  readonly sourceType: MemoryRecord['source']['type'];
+  readonly updatedAt: string;
+}
+
+export interface MemoryInspectionResult {
+  readonly items: readonly MemoryInspectionItem[];
+  readonly truncated: boolean;
+}
+
 /**
  * Governed Memory v1 application service.
  *
@@ -62,6 +81,15 @@ export class MemoryService {
     // the persistence port receives a typed, normalized copy rather than caller-owned
     // mutable input.
     const record = MemoryRecordSchema.parse(candidate);
+    const existing = this.repository.getById(record.id);
+
+    // Content-addressed callers such as Family Brain deliberately produce the same
+    // id for the same approved fact. Treat an already-active record as an idempotent
+    // success instead of asking persistence to insert the same primary key again.
+    if (existing?.status === 'active') {
+      return { stored: true, record: existing, unchanged: true };
+    }
+
     const persisted = this.repository.replaceActive(record);
 
     return {
@@ -98,6 +126,54 @@ export class MemoryService {
       context.destination === 'local-model' ? projectMemoriesForLocalModel(ranked) : [];
 
     return { ranked, localModelProjection };
+  }
+
+  /**
+   * Return a bounded, owner-visible view of memories the requester is allowed to
+   * inspect. This is intentionally not a raw repository/list API: every record is
+   * run through the same Memory v1 read policy used by recall, restricted records
+   * still need explicit approval, and cloud-model destinations are denied before
+   * storage is touched.
+   */
+  public inspect(context: MemoryReadContext, limit = 64): MemoryInspectionResult {
+    if (!context.memoryReadAllowed || context.destination === 'cloud-model') {
+      return { items: [], truncated: false };
+    }
+
+    const safeLimit = Math.max(1, Math.min(128, Math.trunc(limit)));
+    const byId = new Map<string, MemoryRecord>();
+
+    for (const record of this.repository.listActiveOwnedBy(context.requesterProfileId)) {
+      byId.set(record.id, record);
+    }
+    if (context.allowShared === true) {
+      for (const record of this.repository.listActiveShared()) {
+        byId.set(record.id, record);
+      }
+    }
+
+    const allowed = [...byId.values()]
+      .filter((record) => evaluateMemoryRead(record, context).allowed)
+      .sort((left, right) => {
+        const byUpdatedAt = Date.parse(right.updatedAt) - Date.parse(left.updatedAt);
+        if (byUpdatedAt !== 0) return byUpdatedAt;
+        return left.canonicalKey.localeCompare(right.canonicalKey);
+      });
+
+    return {
+      items: allowed.slice(0, safeLimit).map((record) => ({
+        id: record.id,
+        profileId: record.profileId,
+        scope: record.scope,
+        kind: record.kind,
+        canonicalKey: record.canonicalKey,
+        value: record.value,
+        sensitivity: record.sensitivity,
+        sourceType: record.source.type,
+        updatedAt: record.updatedAt,
+      })),
+      truncated: allowed.length > safeLimit,
+    };
   }
 
   public delete(

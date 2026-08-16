@@ -21,6 +21,21 @@ export type {
 } from './schema.js';
 
 export {
+  FAMILY_PROFILE_SCHEMA_VERSION,
+  FamilyProfileEntrySchema,
+  FamilyProfileSeedSchema,
+  buildFamilyProfileMemories,
+} from './family-profile.js';
+export type { FamilyProfileEntry, FamilyProfileSeed } from './family-profile.js';
+
+export { FamilyProfileImportService } from './family-profile-import.js';
+export type {
+  FamilyProfileImportContext,
+  FamilyProfileImportResult,
+  FamilyProfileMemoryWriter,
+} from './family-profile-import.js';
+
+export {
   evaluateMemoryRead,
   evaluateMemoryWrite,
   projectMemoriesForLocalModel,
@@ -44,7 +59,13 @@ export type {
 } from './repository.js';
 
 export { MemoryService } from './service.js';
-export type { MemoryDeleteResult, MemoryRecallResult, MemoryRememberResult } from './service.js';
+export type {
+  MemoryDeleteResult,
+  MemoryInspectionItem,
+  MemoryInspectionResult,
+  MemoryRecallResult,
+  MemoryRememberResult,
+} from './service.js';
 
 export { MemoryAwareChatService } from './memory-aware-chat.js';
 export type { MemoryAwareChatContext, PreparedMemoryChatRequest } from './memory-aware-chat.js';

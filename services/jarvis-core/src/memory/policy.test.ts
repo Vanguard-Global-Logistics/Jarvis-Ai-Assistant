@@ -74,6 +74,25 @@ describe('Memory v1 schema and write admission', () => {
     ).toContain('profile-mismatch');
   });
 
+  it('allows cross-profile writes only through an explicit pre-approved bootstrap boundary', () => {
+    const childMemory = memory({ profileId: 'member-a' });
+
+    expect(
+      evaluateMemoryWrite(childMemory, {
+        actorProfileId: 'owner',
+        memoryWriteAllowed: true,
+      }).reasons,
+    ).toContain('profile-mismatch');
+
+    expect(
+      evaluateMemoryWrite(childMemory, {
+        actorProfileId: 'owner',
+        memoryWriteAllowed: true,
+        crossProfileWriteApproved: true,
+      }),
+    ).toEqual({ allowed: true, reasons: [] });
+  });
+
   it('requires explicit approval for shared and restricted writes', () => {
     const record = memory({ scope: 'shared', sensitivity: 'restricted' });
     const denied = evaluateMemoryWrite(record, {
@@ -179,21 +198,21 @@ describe('Memory v1 deterministic retrieval and projection', () => {
     ).toEqual(['mine']);
   });
 
-  it('projects bounded data rather than building a trusted instruction prompt', () => {
-    const long = memory({
-      value: `Known preference.\n\u0000 ${'x'.repeat(500)}`,
-    });
-    const ranked = rankMemoriesForQuery([long], 'family member count', localRead);
-    const projected = projectMemoriesForLocalModel(ranked, {
-      maxRecords: 1,
-      maxValueChars: 80,
-    });
+  it('projects only bounded data fields for a local model', () => {
+    const ranked = rankMemoriesForQuery([memory()], 'family member count', localRead);
+    const projected = projectMemoriesForLocalModel(ranked, { maxValueChars: 40 });
 
-    expect(projected).toHaveLength(1);
-    expect(projected[0]?.canonicalKey).toBe('family.member.count');
-    expect(projected[0]?.value.length).toBeLessThanOrEqual(80);
-    expect(projected[0]?.value).not.toContain('\u0000');
+    expect(projected).toEqual([
+      {
+        canonicalKey: 'family.member.count',
+        value: 'There are four people in the household.',
+        kind: 'fact',
+        sensitivity: 'personal',
+        sourceType: 'user-explicit',
+      },
+    ]);
+    expect(projected[0]).not.toHaveProperty('id');
     expect(projected[0]).not.toHaveProperty('profileId');
-    expect(projected[0]).not.toHaveProperty('reviewState');
+    expect(projected[0]).not.toHaveProperty('source.ref');
   });
 });

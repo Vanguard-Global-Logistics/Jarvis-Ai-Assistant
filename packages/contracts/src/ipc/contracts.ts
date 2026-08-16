@@ -14,21 +14,6 @@ import {
   SessionIdRequestSchema,
 } from '../history/contracts.js';
 
-/**
- * IPC contracts — the single definition of every message that crosses the
- * renderer/main trust boundary.
- *
- * SECURITY-BOUNDARIES.md requires cross-boundary communication to be
- * "narrow, authenticated, schema-validated" and to "reject code, shell, prompts,
- * config patches, secrets, arbitrary paths". Every channel below is a specific
- * named operation with a closed schema — never a generic passthrough.
- *
- * Both directions are validated. Validating the *response* as well as the
- * request is not paranoia about the renderer (it cannot forge a response); it
- * catches OUR bugs in main before they reach the UI as malformed data.
- */
-
-/** A single channel's request/response contract. */
 export interface IpcContract<Req extends z.ZodType, Res extends z.ZodType> {
   readonly channel: string;
   readonly request: Req;
@@ -41,16 +26,6 @@ function defineContract<Req extends z.ZodType, Res extends z.ZodType>(
   return contract;
 }
 
-// --- app:get-info -----------------------------------------------------------
-
-/**
- * Host facts the renderer legitimately needs to display (status bar, about,
- * bug reports). All static and non-sensitive.
- *
- * `platform` and `arch` are deliberately closed enums rather than free strings:
- * `process.platform` has a known finite domain, and a closed schema means a
- * malformed value fails loudly at the boundary instead of flowing into the UI.
- */
 export const AppInfoSchema = z
   .object({
     appVersion: z.string().min(1),
@@ -67,88 +42,103 @@ export type AppInfo = z.infer<typeof AppInfoSchema>;
 
 export const appGetInfoContract = defineContract({
   channel: CHANNELS.appGetInfo,
-  // This channel takes no argument. `z.undefined()` makes that explicit and
-  // rejects a renderer that tries to smuggle a payload in anyway.
   request: z.undefined(),
   response: AppInfoSchema,
 });
 
-// --- jarvis:chat ------------------------------------------------------------
-
-/**
- * One conversation turn. The request is the transcript the renderer holds; the
- * response is one model reply that names its own provider.
- *
- * The request and response schemas are the *same* `ChatRequestSchema` /
- * `ChatReplySchema` the jarvis-core provider consumes and produces
- * (`packages/contracts/src/model/contracts.ts`) — defined once, so the shape the
- * UI sends, the shape the IPC boundary validates, and the shape the provider
- * receives cannot drift (CLAUDE.md §3). Both are `.strict()`, so an extra field
- * in either direction fails at the boundary rather than flowing on.
- *
- * The transcript, not just the latest message, crosses the boundary because the
- * provider is stateless by design: the renderer owns the conversation, main owns
- * the key and the model call. No history is retained in main — Stage 1A persists
- * only on an explicit save, which is a separate channel set (ADR 0006), not this
- * one.
- */
 export const jarvisChatContract = defineContract({
   channel: CHANNELS.jarvisChat,
   request: ChatRequestSchema,
   response: ChatReplySchema,
 });
 
-// --- jarvis:amplify ---------------------------------------------------------
-
-/**
- * Thought Amplifier v1: one rough idea in, the five validated fields out
- * (ADR 0006). `AmplifierResultSchema` is `.strict()`, so a provider that returns
- * a sixth field — or omits one — fails at the boundary instead of reaching the
- * amplifier card as malformed data.
- */
 export const jarvisAmplifyContract = defineContract({
   channel: CHANNELS.jarvisAmplify,
   request: AmplifyRequestSchema,
   response: AmplifierResultSchema,
 });
 
-// --- history:* --------------------------------------------------------------
-
-/** Explicit owner action: persist one complete named transcript. */
 export const historySaveContract = defineContract({
   channel: CHANNELS.historySave,
   request: SaveSessionRequestSchema,
   response: SavedSessionSchema,
 });
 
-/** Read bounded metadata only; opening the transcript is a separate call. */
 export const historyListContract = defineContract({
   channel: CHANNELS.historyList,
   request: z.undefined(),
   response: z.array(SavedSessionSummarySchema).max(10_000),
 });
 
-/** Read one transcript by its opaque, bounded id. */
 export const historyGetContract = defineContract({
   channel: CHANNELS.historyGet,
   request: SessionIdRequestSchema,
   response: SavedSessionSchema.nullable(),
 });
 
-/** Delete one transcript by id; the renderer owns the confirmation UI. */
 export const historyDeleteContract = defineContract({
   channel: CHANNELS.historyDelete,
   request: SessionIdRequestSchema,
   response: DeleteSessionResultSchema,
 });
 
-// --- registry ---------------------------------------------------------------
+/**
+ * Owner-visible Memory v1 inspection. The renderer sends no profile id, query,
+ * path, or authority-bearing argument. Electron main chooses the active profile
+ * and returns only the already-policy-filtered projection from jarvis-core.
+ */
+export const MemoryInspectionItemSchema = z
+  .object({
+    id: z.string().min(1).max(256),
+    profileId: z.string().min(1).max(128),
+    scope: z.string().min(1).max(32),
+    kind: z.string().min(1).max(32),
+    canonicalKey: z.string().min(1).max(512),
+    value: z.string().max(16_384),
+    sensitivity: z.string().min(1).max(32),
+    sourceType: z.string().min(1).max(64),
+    updatedAt: z.iso.datetime(),
+  })
+  .strict();
+
+export const MemoryInspectionResultSchema = z
+  .object({
+    items: z.array(MemoryInspectionItemSchema).max(128),
+    truncated: z.boolean(),
+  })
+  .strict();
+
+export type MemoryInspectionItem = z.infer<typeof MemoryInspectionItemSchema>;
+export type MemoryInspectionResult = z.infer<typeof MemoryInspectionResultSchema>;
+
+export const memoryInspectContract = defineContract({
+  channel: CHANNELS.memoryInspect,
+  request: z.undefined(),
+  response: MemoryInspectionResultSchema,
+});
 
 /**
- * Every contract, keyed by channel. A channel present in CHANNELS but absent
- * here is a boundary with no schema — the registry test asserts that cannot
- * happen.
+ * Deliberately tiny owner-facing delete contract. The renderer may identify one
+ * memory it was shown, but cannot choose actor/profile, deletion time, reason,
+ * sharing approval, or restricted-data approval. Those remain trusted-main data.
  */
+export const MemoryDeleteRequestSchema = z.object({ id: z.string().min(1).max(256) }).strict();
+export const MemoryDeleteResultSchema = z
+  .object({
+    deleted: z.boolean(),
+    reason: z.enum(['not-found', 'policy-denied']).optional(),
+  })
+  .strict();
+
+export type MemoryDeleteRequest = z.infer<typeof MemoryDeleteRequestSchema>;
+export type MemoryDeleteResult = z.infer<typeof MemoryDeleteResultSchema>;
+
+export const memoryDeleteContract = defineContract({
+  channel: CHANNELS.memoryDelete,
+  request: MemoryDeleteRequestSchema,
+  response: MemoryDeleteResultSchema,
+});
+
 export const IPC_CONTRACTS = {
   [CHANNELS.appGetInfo]: appGetInfoContract,
   [CHANNELS.jarvisChat]: jarvisChatContract,
@@ -157,4 +147,6 @@ export const IPC_CONTRACTS = {
   [CHANNELS.historyList]: historyListContract,
   [CHANNELS.historyGet]: historyGetContract,
   [CHANNELS.historyDelete]: historyDeleteContract,
+  [CHANNELS.memoryInspect]: memoryInspectContract,
+  [CHANNELS.memoryDelete]: memoryDeleteContract,
 } as const;
