@@ -10,24 +10,22 @@ function bridge(result: MemoryInspectionResult): MemoryInspectionBridge {
 
 describe('MemoryPanel', () => {
   it('calls the bounded no-argument inspection bridge and renders approved memories', async () => {
-    const inspectMemory = vi
-      .fn<MemoryInspectionBridge['inspectMemory']>()
-      .mockResolvedValue({
-        items: [
-          {
-            id: 'memory-1',
-            profileId: 'william',
-            scope: 'private',
-            kind: 'goal',
-            canonicalKey: 'family.william.goal.primary',
-            value: 'Build useful automation.',
-            sensitivity: 'personal',
-            sourceType: 'user-approved',
-            updatedAt: '2026-08-16T20:00:00.000Z',
-          },
-        ],
-        truncated: false,
-      });
+    const inspectMemory = vi.fn<MemoryInspectionBridge['inspectMemory']>().mockResolvedValue({
+      items: [
+        {
+          id: 'memory-1',
+          profileId: 'william',
+          scope: 'private',
+          kind: 'goal',
+          canonicalKey: 'family.william.goal.primary',
+          value: 'Build useful automation.',
+          sensitivity: 'personal',
+          sourceType: 'user-approved',
+          updatedAt: '2026-08-16T20:00:00.000Z',
+        },
+      ],
+      truncated: false,
+    });
     const api: MemoryInspectionBridge = { inspectMemory };
 
     render(<MemoryPanel bridge={api} />);
