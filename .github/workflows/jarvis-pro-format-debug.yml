@@ -1,0 +1,27 @@
+name: Jarvis Pro format debug
+
+on:
+  push:
+    branches:
+      - agent/jarvis-pro-family-brain-v1
+
+permissions:
+  contents: read
+
+jobs:
+  format-family-profile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Print exact Prettier output
+        run: |
+          npx prettier services/jarvis-core/src/memory/family-profile.ts --write
+          echo '--- PRETTIER OUTPUT START ---'
+          cat services/jarvis-core/src/memory/family-profile.ts
+          echo '--- PRETTIER OUTPUT END ---'
