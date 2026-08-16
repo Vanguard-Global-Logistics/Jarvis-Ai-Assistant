@@ -78,7 +78,7 @@ describe('importPrivateFamilyProfileFile', () => {
     expect(memory.candidates).toHaveLength(1);
     expect(memory.candidates[0]).toMatchObject({
       profileId: 'jayden',
-      canonicalKey: 'education.goal.engineering',
+      canonicalKey: 'family.jayden.education.goal.engineering',
       source: { type: 'user-approved', ref: 'local-private-family-profile' },
     });
   });
