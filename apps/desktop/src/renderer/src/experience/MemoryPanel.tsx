@@ -25,11 +25,17 @@ export function MemoryPanel({ bridge }: MemoryPanelProps): JSX.Element {
     setState({ kind: 'loading' });
     bridge
       .inspectMemory()
-      .then((result) => setState({ kind: 'ready', result }))
+      .then((result) => {
+        setState({ kind: 'ready', result });
+      })
       .catch((cause: unknown) => {
         console.error('[memory] memory:inspect failed across the IPC boundary:', cause);
         setState({ kind: 'error' });
       });
+  };
+
+  const close = (): void => {
+    setState({ kind: 'closed' });
   };
 
   if (state.kind === 'closed') {
@@ -109,7 +115,7 @@ export function MemoryPanel({ bridge }: MemoryPanelProps): JSX.Element {
         </div>
         <button
           type="button"
-          onClick={() => setState({ kind: 'closed' })}
+          onClick={close}
           aria-label="Close memory panel"
           style={{
             minHeight: 30,
@@ -158,7 +164,7 @@ export function MemoryPanel({ bridge }: MemoryPanelProps): JSX.Element {
                 <div
                   style={{
                     marginTop: 5,
-                    color: accent.cyan,
+                    color: accent.jarvisBlue,
                     fontFamily: fontFamily.mono,
                     fontSize: 9,
                     wordBreak: 'break-word',
