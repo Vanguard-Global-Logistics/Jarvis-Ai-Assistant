@@ -1,7 +1,5 @@
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import * as scanner from '../../../../scripts/lib/secret-scan.mjs';
 import {
   CREDENTIAL_REFUSED_MESSAGE,
   MEMORY_CREDENTIAL_PATTERNS,
@@ -17,9 +15,6 @@ import {
  * These tests do two jobs: prove the guard catches real formats, and prove it
  * still AGREES with the module it was ported from.
  */
-
-const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
-const scannerSource = readFileSync(resolve(root, 'scripts/lib/secret-scan.mjs'), 'utf8');
 
 /**
  * Key-shaped strings, assembled at runtime.
@@ -94,32 +89,43 @@ describe('looksLikeCredential', () => {
 });
 
 describe('agreement with scripts/lib/secret-scan.mjs', () => {
-  it('reads the ported source at all', () => {
-    // Without this, a bad path makes every assertion below pass vacuously —
-    // the exact failure mode that let a green red-green test prove nothing here
-    // twice before.
-    expect(scannerSource).toContain('SECRET_PATTERNS');
+  /**
+   * Compares the LIVE rule sets, not scraped source text.
+   *
+   * The first version of this suite regex-scraped the `.mjs` and compared a
+   * COUNT plus six prefix substrings. The swarm pointed out that this repository
+   * had already tried that and rejected it: `packages/config/src/secret-scan-agreement.test.ts`
+   * records that the scraped version "failed open two ways" and was replaced
+   * with exactly this structural comparison. Reintroducing the rejected method —
+   * while a docstring claimed it was the accepted one — was a false claim about
+   * testing, on a security rule, guarding the one store whose rows are replayed
+   * into every prompt.
+   *
+   * Widening `AIza[A-Za-z0-9_-]{20,}` in the scanner now turns this red, which
+   * the count-and-prefix version did not.
+   */
+  it('has the same patterns, in the same order, as the module it was ported from', () => {
+    const ported = MEMORY_CREDENTIAL_PATTERNS.map((p) => [p.source, p.flags]);
+    const source = scanner.SECRET_PATTERNS.map(({ re }) => [re.source, re.flags]);
+
+    expect(ported).toEqual(source);
   });
 
-  it('covers every credential format the scanner knows', () => {
-    // Count `re:` entries in the source rather than eyeballing. If someone adds
-    // a seventh format to the scanner and not to this guard, this goes red and
-    // names the drift instead of letting memory quietly accept it.
-    const scannerPatternCount = (scannerSource.match(/^\s*(?:\{\s*)?re:/gm) ?? []).length;
-    expect(scannerPatternCount).toBeGreaterThan(0);
-    expect(MEMORY_CREDENTIAL_PATTERNS).toHaveLength(scannerPatternCount);
+  it('is not comparing two empty lists', () => {
+    // Without this, a broken import makes the assertion above pass vacuously —
+    // which is one of the two ways the scraped version failed open.
+    expect(MEMORY_CREDENTIAL_PATTERNS.length).toBeGreaterThan(3);
   });
 
-  it.each([
-    ['sk-ant-', 'sk-ant-'],
-    ['bare sk-', 'sk-['],
-    ['Google', 'AIza'],
-    ['xAI', 'xai-'],
-    ['GitHub', 'ghp_'],
-    ['PEM', 'BEGIN [A-Z ]*PRIVATE KEY'],
-  ])('still recognises the %s prefix the scanner uses', (_label, marker) => {
-    expect(scannerSource).toContain(marker);
-    expect(MEMORY_CREDENTIAL_PATTERNS.some((p) => p.source.includes(marker))).toBe(true);
+  it('deliberately does NOT inherit the fixture exemption', () => {
+    // The one intended difference, asserted rather than described. The scanner
+    // exempts marker-bearing fixtures for five of its six patterns; memory
+    // exempts nothing, because nobody types an example key as a durable fact and
+    // the exemption would be a one-word bypass.
+    expect(scanner.FIXTURE_MARKERS.test('EXAMPLE')).toBe(true);
+    const markedAsFake = ['sk', 'ant', 'EXAMPLE123456789abcdef'].join('-');
+    expect(scanner.findSecret(markedAsFake)).toBeNull();
+    expect(looksLikeCredential(markedAsFake)).toBe(true);
   });
 });
 

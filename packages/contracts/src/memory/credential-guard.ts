@@ -12,11 +12,18 @@
  * for as long as the row exists — including long after everyone has forgotten it
  * was written.
  *
- * The port is deliberate and pinned: `credential-guard.test.ts` asserts these
- * patterns still agree with the `.mjs` source, so the two cannot drift without
- * turning CI red. That is the same arrangement already used for the Gauntlet
- * skill's portable copy, and it exists because CLAUDE.md §3 is right that a rule
- * living in two files will drift.
+ * The port is deliberate and pinned: `credential-guard.test.ts` imports
+ * `SECRET_PATTERNS` from the `.mjs` and compares the live regex sources
+ * structurally, so the two cannot drift without turning CI red.
+ *
+ * It has to be that comparison and not a cheaper one. The first version of this
+ * test scraped the `.mjs` as TEXT and compared a pattern count plus six prefix
+ * substrings — and this repository had already tried that and rejected it:
+ * `packages/config/src/secret-scan-agreement.test.ts` records that the scraped
+ * version "failed open two ways". Widening a character class keeps the count and
+ * the prefixes identical, so memory would have kept the weaker rule with CI
+ * green. Same arrangement as the Gauntlet skill's portable copy, which compares
+ * the imported objects for the same reason.
  *
  * ## The one deliberate difference: no fixture exemption
  *

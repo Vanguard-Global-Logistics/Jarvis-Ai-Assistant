@@ -23,7 +23,7 @@ beforeEach(() => {
 });
 
 const told = (fact: string, sensitivity: 'open' | 'private' | 'never-send' = 'private') =>
-  remember(db, { fact, sensitivity, learnedFrom: 'told' as const });
+  remember(db, { fact, sensitivity });
 
 describe('remember', () => {
   it('mints the id and the timestamp in main', () => {
@@ -108,6 +108,16 @@ describe('the schema is the last line of defence', () => {
         )
         .run('11111111-1111-4111-8111-111111111111', tooLong, new Date().toISOString()),
     ).toThrow();
+  });
+
+  it('accepts EXACTLY the cap, which pins the constant to the SQL literal', () => {
+    // The other direction, and the one that was missing. The `+1` test below
+    // stays green if `MEMORY_MAX_LENGTH` is RAISED above the SQL literal — while
+    // Zod would then accept a fact SQLite rejects, surfacing to a person as
+    // "memory:remember failed". This assertion goes red the moment the two
+    // numbers diverge upward.
+    expect(() => told('x'.repeat(MEMORY_MAX_LENGTH), 'open')).not.toThrow();
+    expect(listMemories(db)).toHaveLength(1);
   });
 
   it('refuses an unknown sensitivity tier, at the DATABASE level', () => {

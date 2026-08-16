@@ -26,7 +26,8 @@ Repository: `github.com/Vanguard-Global-Logistics/Jarvis-Ai-Assistant`.
   level is replayed from — that **enforces exactly ONE capability of eleven** —
   `sending`, so a remote provider is refused at YELLOW and above (ADR 0026); the other ten
   govern things that do not exist yet. As of ADR 0029 it also has **real memory** — short,
-  human-confirmed facts, recalled into every turn, per OS user account, governed by
+  human-confirmed facts, recalled into every `jarvis:chat` turn (NOT into
+  `jarvis:amplify` or `jarvis:plan-automation`, which do not recall), per OS user account, governed by
   `docs/foundation/06-MEMORY-CONSTITUTION.md`. Jarvis now genuinely remembers between
   sessions; what it does NOT do is learn on its own (every write is a person pressing a
   button, §4), recall by meaning (recall is lexical and small, §10), or promote anything
@@ -98,7 +99,7 @@ Repository: `github.com/Vanguard-Global-Logistics/Jarvis-Ai-Assistant`.
   `IMPLEMENTED AND VERIFIED` for development runtime. **The PACKAGED app is now verified
   too, on 2026-08-13**: `npm run package:dir` followed by `npm run probe:packaged` passes
   against a genuinely packaged build — `isPackaged: true`, loaded from `app.asar`, all
-  nineteen channels answering, renderer isolated, console clean. That closes ADR 0004's
+  sixteen channels answering, renderer isolated, console clean. That closes ADR 0004's
   packaging gate for the pipeline. What is still NOT verified is the **macOS `.dmg` on
   William's own Mac**: `npm run package:mac` only runs on a Mac (ADR 0016), and no
   installer has been opened there. Do not call the Mac installer verified until it is.

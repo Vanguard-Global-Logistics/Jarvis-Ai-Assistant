@@ -141,10 +141,20 @@ remote providers, and including prompts in sessions long after everyone forgot
 it was written. `.env` is gitignored, secrets are main-process-only, and the
 renderer never sees a key — memory must not become the hole in that wall.
 
-The implementation refuses structurally: the same `findSecret` scanner that
-guards `npm run review` and `npm run swarm` runs on every write, and a memory
-that looks credential-shaped is **rejected at the boundary**, not stored with a
-warning.
+**What is actually enforced, stated exactly.** A hand-ported copy of
+`scripts/lib/secret-scan.mjs`'s patterns runs on every write and rejects the
+memory **at the boundary** rather than storing it with a warning. It is pinned to
+the source by a structural comparison in `credential-guard.test.ts`, and it takes
+no fixture-marker exemption.
+
+It catches **six formats**: `sk-ant-`, bare `sk-`, `AIza`, `xai-`, `ghp_`, and
+PEM private-key blocks. It does **NOT** catch passwords, account numbers, card
+numbers, AWS key pairs, Slack tokens, JWTs, or connection strings with a password
+in them. The list above is what a person should never type; the guard is a
+backstop for the subset it recognises, not a substitute for the rule. That gap is
+recorded in `docs/KNOWN-LIMITATIONS.md` rather than papered over here — the swarm
+found this paragraph claiming the broader coverage, and a constitution that
+overstates its own enforcement is worse than one that admits the edge.
 
 A rejection message must never echo the matched text back.
 
@@ -239,8 +249,11 @@ a deterministic promoter cannot be talked into anything.
 - It does not make Jarvis learn on its own. v1 remembers what it is told.
 - It does not make memory searchable by meaning. Recall in v1 is lexical and
   small, because a small honest recall beats a large plausible one.
-- It does not survive a machine loss on its own — that is `history:export`'s
-  job, and memory joins the same backup file rather than inventing a second one.
+- **It does not survive a machine loss at all today.** `history:export` carries
+  conversations only; memory is in no backup. Export, reinstall, import, and every
+  memory is gone. Adding it is a change to `BackupDocument` with its own ADR — and
+  that ADR must settle the tier rule first, because writing a `never-send` fact
+  into a portable file a person copies to a USB stick contradicts §3.
 - It does not make anything private that is sent to a remote provider. `open`
   memories reach whatever brain is answering, and the tier system exists so that
   is a choice rather than an accident.

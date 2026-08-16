@@ -4,10 +4,12 @@
  * STATUS: PARTIAL.
  *   - Connection ownership and the migration runner: IMPLEMENTED AND VERIFIED
  *     (unit tests, in-memory).
- *   - Feature schema: two migrations — conversation history (Stage 1A
- *     persistence, ADR 0008) and amplification entries (ADR 0009). No memory,
- *     projects, tasks, or audit-log tables exist; those are feature design work
- *     that is not approved.
+ *   - Feature schema: SIX migrations — see the `migrations` array below, which
+ *     is the single list. It now includes `memory` (ADR 0029), deliberately with
+ *     no owner column because ADR 0012 makes data separation the OS user
+ *     account. No projects, tasks, or audit-log tables exist; those are feature
+ *     design work that is not approved. AEGIS keeps its own hash-chained log
+ *     outside this database.
  *
  * Wired to Electron by ADR 0008: the main process — and only the main process —
  * opens the database and applies `migrations` at startup. The driver is Node's

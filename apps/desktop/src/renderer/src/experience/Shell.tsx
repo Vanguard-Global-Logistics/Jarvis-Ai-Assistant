@@ -170,7 +170,7 @@ export function Shell({ devStateSwitcher = import.meta.env.DEV }: ShellProps): J
     async (fact: string, sensitivity: MemorySensitivity): Promise<void> => {
       const jarvis = window.jarvis;
       if (jarvis === undefined) throw new Error('No Jarvis bridge in this context.');
-      await jarvis.remember({ fact, sensitivity, learnedFrom: 'told' });
+      await jarvis.remember({ fact, sensitivity });
       refreshMemories();
     },
     [refreshMemories],

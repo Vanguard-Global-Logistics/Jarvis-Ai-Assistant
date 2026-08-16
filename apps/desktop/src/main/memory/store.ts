@@ -39,12 +39,24 @@ const toMemory = (row: MemoryRow): Memory => ({
  * `CREDENTIAL_REFUSED_MESSAGE` and nothing else — it never interpolates the
  * refused text (constitution §5), so there is nothing sensitive in it to leak.
  *
- * The runtime probe asserts both halves: that the refusal is shown, and that it
- * does not contain the planted key.
+ * The runtime probe asserts both halves — that the person receives the real
+ * message (it checks for `.env`, not merely that something was rejected) and
+ * that the message contains no trace of the planted key. The weaker "did it
+ * reject at all" version of that assertion passed against the very bug this
+ * class was written to fix, which is why it now reads the text.
  */
 export class MemoryRefusedError extends UserFacingError {
-  public constructor(message: string) {
-    super(message);
+  /**
+   * No parameter, deliberately. `UserFacingError`'s rule is that the message
+   * must be built from constants only — and a `message: string` parameter left
+   * `new MemoryRefusedError(`refused: ${request.fact}`)` compiling, which would
+   * ship the refused text to the renderer. The rule is now enforced by the
+   * type rather than stated in a comment, which is the standard this repository
+   * sets everywhere else ("absent by construction", not "documented as
+   * forbidden").
+   */
+  public constructor() {
+    super(CREDENTIAL_REFUSED_MESSAGE);
     this.name = 'MemoryRefusedError';
   }
 }
@@ -82,14 +94,18 @@ export function listMemories(db: SqliteDatabase): Memory[] {
  */
 export function remember(db: SqliteDatabase, request: RememberRequest): Memory {
   if (looksLikeCredential(request.fact)) {
-    throw new MemoryRefusedError(CREDENTIAL_REFUSED_MESSAGE);
+    throw new MemoryRefusedError();
   }
 
   const memory: Memory = {
     id: randomUUID(),
     fact: request.fact,
     sensitivity: request.sensitivity,
-    learnedFrom: request.learnedFrom,
+    // Minted here, never accepted from the caller. Provenance is §2's whole
+    // point: a fact records how it was learned, and a renderer that could write
+    // that field could forge it. v1 has exactly one write path — a person typing
+    // into the panel — so the value is `told`.
+    learnedFrom: 'told',
     learnedAt: new Date().toISOString(),
   };
 

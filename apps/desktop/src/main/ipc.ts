@@ -4,8 +4,6 @@ import type { IpcContract } from '@jarvis/contracts';
 import { createLogger } from '@jarvis/config';
 import { UserFacingError } from './user-facing-error.js';
 
-export { UserFacingError } from './user-facing-error.js';
-
 const log = createLogger({ scope: 'desktop:main:ipc' });
 
 /**

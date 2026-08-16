@@ -111,7 +111,7 @@ write to and cannot edit.
 Stated as performed, per CLAUDE.md §8 rule 2.
 
 - `npm run verify` — **716 tests, 51 files, green**, including 26 recall tests,
-  20 store tests against a real SQLite with the real migrations, 14 panel tests,
+  16 store tests against a real SQLite with the real migrations, 14 panel tests,
   and the credential-guard agreement suite.
 - `npm run build` — green, bundle assertion passed, production CSP strict.
 - **Red-green on the security property**, twice, with the mutation asserted to

@@ -145,15 +145,25 @@ export type Memory = z.infer<typeof MemorySchema>;
 /**
  * What the renderer may send to create a memory.
  *
- * `id` and `learnedAt` are absent by construction — main mints both. A renderer
- * that could choose an id could overwrite an existing memory by guessing one,
- * and a renderer that could choose a timestamp could forge provenance.
+ * `id`, `learnedAt` AND `learnedFrom` are absent by construction — main mints
+ * all three. A renderer that could choose an id could overwrite an existing
+ * memory by guessing one, and a renderer that could choose a timestamp could
+ * forge when a fact was learned.
+ *
+ * **`learnedFrom` is here for the same reason, and it was the sharpest of the
+ * three.** Provenance IS `learnedFrom` (§2), so leaving it renderer-supplied
+ * meant a compromised renderer could stamp `confirmed` on a fact nobody
+ * confirmed — while `channels.ts` claimed in prose that main minted it. The
+ * swarm found the contradiction between the docstring and the schema. The
+ * schema now matches the promise rather than the promise being aspirational.
+ *
+ * When the confirm-flow lands it adds its own request field or its own channel;
+ * it does not re-open this one.
  */
 export const RememberRequestSchema = z
   .object({
     fact: z.string().trim().min(1).max(MEMORY_MAX_LENGTH),
     sensitivity: MemorySensitivitySchema,
-    learnedFrom: MemorySourceSchema,
   })
   .strict();
 

@@ -24,14 +24,38 @@ cards (ADR 0009), so an Amplifier-only session is savable. What this is **not**:
   conversation is discarded on close — the banner says so, and the runtime probe
   proves it (it chats first, then asserts the history list is still empty).
 - **Memory EXISTS as of ADR 0029 — and here is precisely what it is not.** Jarvis now
-  keeps short, human-confirmed facts and recalls them into every turn
-  (`docs/foundation/06-MEMORY-CONSTITUTION.md`). It still does **not** learn on its own:
+  keeps short, human-confirmed facts and recalls them into every **`jarvis:chat`** turn
+  (`docs/foundation/06-MEMORY-CONSTITUTION.md`). `jarvis:amplify` and
+  `jarvis:plan-automation` do **not** recall — they send no memory at all. It still does
+  **not** learn on its own:
   every write is a person pressing a button (§4), because AEGIS RED revokes
   `memory-writes` and AEGIS enforces one capability of eleven. It does **not** read saved
   transcripts back — a saved session is still a record, not recall, and memory is a
   separate store. Recall is **lexical and small**, not semantic (§10). Nothing is
   promoted from repetition (§9). And the `private` travel rule is enforced by the recall
   filter, **not by AEGIS** — do not describe memory as AEGIS-protected.
+
+  Four further gaps, named rather than implied:
+
+  - **The credential guard catches SIX vendor key formats and nothing else** —
+    `sk-ant-`, bare `sk-`, `AIza`, `xai-`, `ghp_`, and PEM private-key blocks. It does
+    **NOT** detect passwords, account numbers, card numbers, AWS key pairs, Slack tokens,
+    JWTs, or `postgres://user:pass@host` connection strings. A password typed as a memory
+    is stored, and at the `open` tier it is sent to whatever brain is answering. The
+    refusal copy says "API key or password"; only the first half is enforced.
+  - **Memory is NOT in the `history:export` backup.** `BackupDocument` carries
+    `conversations` only. Export, reinstall, import — every conversation returns and every
+    memory is gone, silently. Adding it is a change to `BackupDocument` and needs its own
+    ADR, including the tier rule (a `never-send` fact must not be written into a portable
+    file).
+  - **Memory deletions are NOT audited.** `forget()` issues a bare `DELETE`. CLAUDE.md §3's
+    "audit logs are append-only — including memory deletions" describes the intended end
+    state, not today's behaviour.
+  - **`private` and `never-send` behave identically today.** Both return `false` from
+    `sensitivityAllowsSending`, and nothing else reads the tier, so the UI offers three
+    levels of protection where the system implements two. `never-send` earns its own
+    behaviour when there is an export or sync surface to exclude it from.
+
 - **Resume forks, it does not mutate.** Opening a saved session is read-only, but
   **Continue** (ADR 0010) loads it back into the live composer to keep working.
   Continuing never edits the stored record; saving afterwards creates a new saved
@@ -168,7 +192,7 @@ exists as a step at all: there is no native module. The remaining honest caveats
 - `node:sqlite` is labeled **experimental on Node 22**, the runtime vitest uses. The
   app itself runs on Electron 43's embedded Node 24, where it is stable. If Node 22
   changes the API under the tests, the tests will say so loudly.
-- There are exactly **five** migrations (`conversation-history`,
+- There are exactly **six** migrations (`conversation-history`,
   `conversation-amplifications` ADR 0009, `conversation-plans` ADR 0024 — automation
   plans, so a plan survives a save rather than evaporating, `profile` ADR 0013 — a single
   row holding a display name and an accent — and `window-state` ADR 0017, a single row holding where

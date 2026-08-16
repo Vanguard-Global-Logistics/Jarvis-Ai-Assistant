@@ -1090,10 +1090,16 @@ async function runChecks(page, mode, stub = null) {
   // behave, not that the wired application does. Everything below runs against
   // the real app, over the real IPC boundary, against the real SQLite file.
   //
-  // The load-bearing one is the LEAK assertion. A `private` memory must never
-  // be assembled into a prompt for a brain that leaves the machine, and the
-  // only honest way to check that is to plant a canary and then read what the
-  // provider was actually handed.
+  // NOTE ON SCOPE, because an earlier version of this comment claimed more than
+  // the code did. The §3 LEAK property is NOT proven here and cannot be: every
+  // provider this probe can reach (`mock`, `local`) has `leavesMachine: false`,
+  // so `recallFor` takes its early-return branch and the filtering line never
+  // executes. Proving the leak filter needs an injected provider id, which is
+  // what `apps/desktop/src/main/handlers/chat.test.ts` does — exhaustively, over
+  // every id in `PROVIDER_IDS`, asserting on the request the provider received.
+  //
+  // What this block proves is the other half: that the wired application really
+  // stores, refuses, recalls and forgets.
 
   const memories0 = await page.evaluate(
     'window.jarvis ? await window.jarvis.listMemories() : null',
@@ -1107,7 +1113,7 @@ async function runChecks(page, mode, stub = null) {
   );
 
   const remembered = await page.evaluate(
-    'window.jarvis ? await window.jarvis.remember({ fact: "PROBE-OPEN: the company is Vanguard Global Logistics LLC.", sensitivity: "open", learnedFrom: "told" }) : null',
+    'window.jarvis ? await window.jarvis.remember({ fact: "PROBE-OPEN: the company is Vanguard Global Logistics LLC.", sensitivity: "open" }) : null',
   );
   const rememberOk =
     typeof remembered.value?.id === 'string' &&
@@ -1127,12 +1133,17 @@ async function runChecks(page, mode, stub = null) {
   // literal — `npm run review` scans its own diffs.
   const plantedKey = ['sk', 'ant', 'PROBE0123456789abcdefghij'].join('-');
   const credentialRefused = await page.evaluate(
-    `window.jarvis ? await window.jarvis.remember({ fact: "my key is ${plantedKey}", sensitivity: "private", learnedFrom: "told" }).then(() => "ACCEPTED").catch((e) => "refused:" + e.message) : null`,
+    `window.jarvis ? await window.jarvis.remember({ fact: "my key is ${plantedKey}", sensitivity: "private" }).then(() => "ACCEPTED").catch((e) => "refused:" + e.message) : null`,
   );
   add(
-    'memory:remember REFUSES a credential-shaped fact',
-    String(credentialRefused.value).startsWith('refused:'),
-    String(credentialRefused.value).slice(0, 120),
+    // NOT `startsWith('refused:')` — that prefix is added by this probe's own
+    // `.catch()`, so it passed against the flattened "memory:remember failed"
+    // that `UserFacingError` exists to prevent. Asserting on `.env` means the
+    // check fails if the boundary ever starts flattening this message again.
+    'memory:remember REFUSES a credential-shaped fact, with the message a person needs',
+    String(credentialRefused.value).includes('.env') &&
+      String(credentialRefused.value).includes('will not remember it'),
+    String(credentialRefused.value).slice(0, 140),
   );
   add(
     'the refusal never echoes the credential back',
@@ -1149,12 +1160,13 @@ async function runChecks(page, mode, stub = null) {
     `${String(afterRefusal.value?.length)} memories stored`,
   );
 
-  // Plant a private canary, then send a chat turn and read what the provider
-  // was handed. `mock` stays on the machine, so it legitimately sees
-  // everything — the leak check therefore runs against the loopback stub
-  // provider used elsewhere in this probe, which is treated as remote.
+  // Plant a private canary. The active provider here is `mock`, which stays on
+  // the machine and therefore legitimately sees everything — so this is a
+  // POSITIVE control: it proves recall reaches the provider at all. The negative
+  // control (a leaves-machine provider seeing only `open` facts) lives in
+  // `chat.test.ts`, where the provider id can be injected.
   await page.evaluate(
-    'window.jarvis ? await window.jarvis.remember({ fact: "PRIVATE-CANARY-must-never-leave", sensitivity: "private", learnedFrom: "told" }) : null',
+    'window.jarvis ? await window.jarvis.remember({ fact: "PRIVATE-CANARY-must-never-leave", sensitivity: "private" }) : null',
   );
 
   const recalled = await page.evaluate(
