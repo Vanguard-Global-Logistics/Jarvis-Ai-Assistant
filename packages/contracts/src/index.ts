@@ -9,11 +9,6 @@
  * Stage 1A explicit-save history contracts are defined at the client-neutral
  * domain boundary. AEGIS and permission contracts are NOT defined — those
  * depend on design decisions that have not been made.
- *
- * CLAUDE.md §3 requires no duplicated logic: "If a rule exists in two files, it
- * will drift, and for AEGIS rules, drift is a security failure." Every schema
- * that crosses a process, IPC, or storage boundary is defined here exactly once
- * and imported everywhere else. Nothing re-declares a shape it did not define.
  */
 
 export { ALL_CHANNELS, CHANNELS } from './ipc/channels.js';
@@ -22,6 +17,8 @@ export type { ChannelName } from './ipc/channels.js';
 export {
   AppInfoSchema,
   IPC_CONTRACTS,
+  MemoryInspectionItemSchema,
+  MemoryInspectionResultSchema,
   appGetInfoContract,
   historyDeleteContract,
   historyGetContract,
@@ -29,8 +26,14 @@ export {
   historySaveContract,
   jarvisAmplifyContract,
   jarvisChatContract,
+  memoryInspectContract,
 } from './ipc/contracts.js';
-export type { AppInfo, IpcContract } from './ipc/contracts.js';
+export type {
+  AppInfo,
+  IpcContract,
+  MemoryInspectionItem,
+  MemoryInspectionResult,
+} from './ipc/contracts.js';
 
 export {
   AmplifierResultSchema,
