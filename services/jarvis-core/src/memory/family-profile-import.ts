@@ -64,13 +64,18 @@ export class FamilyProfileImportService {
     const deniedReasons = new Set<string>();
 
     for (const record of records) {
-      const result = this.memory.remember(record, {
+      const writeContext: MemoryWriteContext = {
         actorProfileId: context.actorProfileId,
         memoryWriteAllowed: context.memoryWriteAllowed,
         crossProfileWriteApproved: crossProfile,
-        sharedWriteApproved: context.sharedWriteApproved,
-        restrictedWriteApproved: context.restrictedWriteApproved,
-      });
+        ...(context.sharedWriteApproved === undefined
+          ? {}
+          : { sharedWriteApproved: context.sharedWriteApproved }),
+        ...(context.restrictedWriteApproved === undefined
+          ? {}
+          : { restrictedWriteApproved: context.restrictedWriteApproved }),
+      };
+      const result = this.memory.remember(record, writeContext);
 
       if (!result.stored) {
         denied += 1;
