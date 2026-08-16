@@ -59,7 +59,13 @@ export type {
 } from './repository.js';
 
 export { MemoryService } from './service.js';
-export type { MemoryDeleteResult, MemoryRecallResult, MemoryRememberResult } from './service.js';
+export type {
+  MemoryDeleteResult,
+  MemoryInspectionItem,
+  MemoryInspectionResult,
+  MemoryRecallResult,
+  MemoryRememberResult,
+} from './service.js';
 
 export { MemoryAwareChatService } from './memory-aware-chat.js';
 export type { MemoryAwareChatContext, PreparedMemoryChatRequest } from './memory-aware-chat.js';
