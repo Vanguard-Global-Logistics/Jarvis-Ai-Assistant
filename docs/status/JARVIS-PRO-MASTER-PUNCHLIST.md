@@ -25,7 +25,7 @@ Rule: never check a box because a document, mock, UI tile, or proposal exists. A
 - [x] `REUSE` Preserve that branch unchanged as Jarvis Pro's donor architecture.
 - [x] `NEW` Create separate Jarvis Pro branch `agent/jarvis-pro-family-brain-v1`.
 - [x] `NEW` Open Jarvis Pro draft PR #3 against the advanced branch.
-- [ ] `AWAITING CI` Confirm full CI on the current Jarvis Pro head. Push CI run 405 is queued for head `8d624f5e`.
+- [x] `VERIFIED` Full CI passed on Jarvis Pro head `4e47016d` in CI run 422: format, lint, typecheck, 403 tests, build, archived-handoff integrity, and real Electron runtime probe.
 - [ ] `EXTEND` Add/update regression evidence after every Jarvis Pro milestone.
 - [ ] `EXTEND` Add explicit backup/restore acceptance for Jarvis Pro private memory.
 
@@ -39,11 +39,11 @@ Rule: never check a box because a document, mock, UI tile, or proposal exists. A
 - [x] `NEW` Add `.jarvis-private/` exclusion so real family biographies stay outside Git.
 - [x] `NEW` Add default-deny owner/guardian cross-profile bootstrap authorization.
 - [x] `NEW` Add Family Profile import service that sends records through normal Memory v1 policy.
-- [ ] `AWAITING CI` Verify the new Family Brain tests and full repo CI on the current PR head.
-- [ ] `AWAITING CI` Local/private JSON seed loader for `.jarvis-private/` is implemented with traversal/symlink protection, JSON-only input, and byte ceilings.
-- [ ] `AWAITING CI` Private profile import is wired into the existing single-writer persistent SQLite Memory v1 runtime with an integration test.
-- [ ] `EXTEND` Add idempotent re-import/correction behavior with clear supersession evidence.
-- [ ] `EXTEND` Add owner-visible import report: stored / corrected / denied / unchanged.
+- [x] `VERIFIED` Family Brain tests and full repo CI passed on head `4e47016d` in CI run 422.
+- [x] `NEW` Add local/private JSON seed loader for `.jarvis-private/` with traversal/symlink protection, JSON-only input, and byte ceilings.
+- [x] `EXTEND` Wire private profile import into the existing single-writer persistent SQLite Memory v1 runtime.
+- [x] `EXTEND` Add idempotent re-import/correction behavior with content-addressed identity and clear supersession evidence.
+- [x] `EXTEND` Add structured import report: stored / corrected / unchanged / denied. Owner-facing UI display remains a later presentation task.
 - [ ] `NEW` Add William canonical profile seed locally — never commit the biography to public Git.
 - [ ] `NEW` Add Amy canonical profile seed locally — never commit the biography to public Git.
 - [ ] `NEW` Add Jayden canonical profile seed locally — never commit the biography to public Git.
@@ -51,7 +51,7 @@ Rule: never check a box because a document, mock, UI tile, or proposal exists. A
 - [ ] `EXTEND` Add family-shared memory layer with explicit sharing approval.
 - [ ] `EXTEND` Add `What do you remember about me?` owner-visible memory inspection.
 - [ ] `EXTEND` Add memory correction and deletion workflows.
-- [ ] `EXTEND` Prove profile isolation: one family member cannot receive another's private memories.
+- [x] `VERIFIED` Prove profile isolation: persistent SQLite integration verifies one family profile cannot retrieve another profile's private memories.
 - [ ] `EXTEND` Connect profile-aware recall to live local Jarvis conversation.
 
 ## P2 — Second Brain / Obsidian
@@ -257,7 +257,7 @@ Rule: never check a box because a document, mock, UI tile, or proposal exists. A
 ## P18 — Reliability / release
 
 - [ ] `EXTEND` Full automated regression suite stays green.
-- [ ] `NEW` Family-memory isolation integration tests.
+- [x] `NEW` Family-memory isolation integration tests pass in CI run 422.
 - [ ] `NEW` Voice + memory integration tests.
 - [ ] `NEW` Vision/tool permission tests.
 - [ ] `NEW` AEGIS adversarial tests.
@@ -274,13 +274,21 @@ Rule: never check a box because a document, mock, UI tile, or proposal exists. A
 
 Work top-to-bottom unless a prerequisite blocks it:
 
-1. Confirm/fix CI for PR #3.
-2. Finish idempotent re-import/correction reporting.
-3. Add owner-visible memory inspection/recall path.
-4. Prove private-profile isolation.
-5. Import the four approved family profiles locally on target hardware.
-6. Connect profile-aware recall to live local conversation.
+1. Add owner-visible `What do you remember about me?` memory inspection path.
+2. Add memory correction/deletion presentation workflow.
+3. Connect profile-aware recall to live local conversation.
+4. Import the four approved family profiles locally on target hardware.
+5. Add family-shared memory presentation/approval flow.
+6. Add private-memory backup/restore acceptance.
 7. Begin Second Brain/Obsidian adapter design only after Family Brain v1 is accepted.
+
+## Latest verification evidence
+
+- CI run: **422**
+- Verified head: `4e47016d72b051e9f90bcea9e53f2a29364d1812`
+- Verify: format ✅ lint ✅ typecheck ✅ 403 tests ✅ build ✅
+- Runtime: real Electron runtime probe ✅
+- Archived design handoff integrity ✅
 
 ## Definition of done for every checked box
 
