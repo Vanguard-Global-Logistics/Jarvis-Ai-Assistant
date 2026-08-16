@@ -28,6 +28,13 @@ export {
 } from './family-profile.js';
 export type { FamilyProfileEntry, FamilyProfileSeed } from './family-profile.js';
 
+export { FamilyProfileImportService } from './family-profile-import.js';
+export type {
+  FamilyProfileImportContext,
+  FamilyProfileImportResult,
+  FamilyProfileMemoryWriter,
+} from './family-profile-import.js';
+
 export {
   evaluateMemoryRead,
   evaluateMemoryWrite,
