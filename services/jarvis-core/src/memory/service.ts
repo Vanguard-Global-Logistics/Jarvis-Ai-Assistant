@@ -20,6 +20,7 @@ export type MemoryRememberResult =
       readonly stored: true;
       readonly record: MemoryRecord;
       readonly supersededId?: string;
+      readonly unchanged?: true;
     }
   | {
       readonly stored: false;
@@ -62,6 +63,15 @@ export class MemoryService {
     // the persistence port receives a typed, normalized copy rather than caller-owned
     // mutable input.
     const record = MemoryRecordSchema.parse(candidate);
+    const existing = this.repository.getById(record.id);
+
+    // Content-addressed callers such as Family Brain deliberately produce the same
+    // id for the same approved fact. Treat an already-active record as an idempotent
+    // success instead of asking persistence to insert the same primary key again.
+    if (existing?.status === 'active') {
+      return { stored: true, record: existing, unchanged: true };
+    }
+
     const persisted = this.repository.replaceActive(record);
 
     return {
