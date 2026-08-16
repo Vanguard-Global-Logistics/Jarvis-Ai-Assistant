@@ -13,6 +13,7 @@ Draft PR: #3
 - `EXTEND` = working foundation exists but Jarvis Pro needs more capability.
 - `NEW` = meaningful new implementation is required.
 - `BLOCKED` = cannot honestly close until its stated prerequisite is satisfied.
+- `AWAITING CI` = code/tests are committed, but the box stays unchecked until CI finishes successfully.
 
 Rule: never check a box because a document, mock, UI tile, or proposal exists. A checked item must have code/configuration, relevant tests or runtime evidence, regression safety, and matching documentation.
 
@@ -24,7 +25,7 @@ Rule: never check a box because a document, mock, UI tile, or proposal exists. A
 - [x] `REUSE` Preserve that branch unchanged as Jarvis Pro's donor architecture.
 - [x] `NEW` Create separate Jarvis Pro branch `agent/jarvis-pro-family-brain-v1`.
 - [x] `NEW` Open Jarvis Pro draft PR #3 against the advanced branch.
-- [ ] `BLOCKED` Confirm full CI on the current Jarvis Pro head. No PR-triggered run is visible yet.
+- [ ] `AWAITING CI` Confirm full CI on the current Jarvis Pro head. Push CI run 405 is queued for head `8d624f5e`.
 - [ ] `EXTEND` Add/update regression evidence after every Jarvis Pro milestone.
 - [ ] `EXTEND` Add explicit backup/restore acceptance for Jarvis Pro private memory.
 
@@ -38,9 +39,9 @@ Rule: never check a box because a document, mock, UI tile, or proposal exists. A
 - [x] `NEW` Add `.jarvis-private/` exclusion so real family biographies stay outside Git.
 - [x] `NEW` Add default-deny owner/guardian cross-profile bootstrap authorization.
 - [x] `NEW` Add Family Profile import service that sends records through normal Memory v1 policy.
-- [ ] `BLOCKED` Verify the new Family Brain tests and full repo CI on the current PR head.
-- [ ] `EXTEND` Add local/private JSON seed loader for `.jarvis-private/`.
-- [ ] `EXTEND` Wire private profile import to the real SQLite Memory v1 repository/runtime.
+- [ ] `AWAITING CI` Verify the new Family Brain tests and full repo CI on the current PR head.
+- [ ] `AWAITING CI` Local/private JSON seed loader for `.jarvis-private/` is implemented with traversal/symlink protection, JSON-only input, and byte ceilings.
+- [ ] `AWAITING CI` Private profile import is wired into the existing single-writer persistent SQLite Memory v1 runtime with an integration test.
 - [ ] `EXTEND` Add idempotent re-import/correction behavior with clear supersession evidence.
 - [ ] `EXTEND` Add owner-visible import report: stored / corrected / denied / unchanged.
 - [ ] `NEW` Add William canonical profile seed locally — never commit the biography to public Git.
@@ -274,13 +275,12 @@ Rule: never check a box because a document, mock, UI tile, or proposal exists. A
 Work top-to-bottom unless a prerequisite blocks it:
 
 1. Confirm/fix CI for PR #3.
-2. Build local `.jarvis-private/` Family Profile seed loader.
-3. Wire that loader through `FamilyProfileImportService` into the real SQLite Memory v1 repository.
-4. Add idempotent import/correction report and tests.
-5. Add owner-visible memory inspection/recall path.
-6. Prove private-profile isolation.
-7. Import the four approved family profiles locally on target hardware.
-8. Connect profile-aware recall to live local conversation.
+2. Finish idempotent re-import/correction reporting.
+3. Add owner-visible memory inspection/recall path.
+4. Prove private-profile isolation.
+5. Import the four approved family profiles locally on target hardware.
+6. Connect profile-aware recall to live local conversation.
+7. Begin Second Brain/Obsidian adapter design only after Family Brain v1 is accepted.
 
 ## Definition of done for every checked box
 
