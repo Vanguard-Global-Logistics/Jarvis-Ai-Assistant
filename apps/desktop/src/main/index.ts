@@ -3,10 +3,7 @@ import { pathToFileURL } from 'node:url';
 import { BrowserWindow, app } from 'electron';
 import { createLogger, describeEnv, parseEnv } from '@jarvis/config';
 import { createProvider } from '@jarvis/jarvis-core';
-import {
-  openPersistentMemoryRuntime,
-  type PersistentMemoryRuntime,
-} from '@jarvis/memory-sqlite';
+import { openPersistentMemoryRuntime, type PersistentMemoryRuntime } from '@jarvis/memory-sqlite';
 import { registerAmplifyHandler } from './handlers/amplify.js';
 import { registerAppInfoHandler } from './handlers/app-info.js';
 import { registerChatHandler } from './handlers/chat.js';
