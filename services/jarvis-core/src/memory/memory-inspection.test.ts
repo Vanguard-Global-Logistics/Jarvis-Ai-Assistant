@@ -134,9 +134,7 @@ describe('MemoryService inspect', () => {
     );
     const service = new MemoryService(repository);
 
-    expect(
-      service.inspect({ ...inspectContext, maxSensitivity: 'restricted' }).items,
-    ).toEqual([]);
+    expect(service.inspect({ ...inspectContext, maxSensitivity: 'restricted' }).items).toEqual([]);
     expect(
       service.inspect({
         ...inspectContext,
@@ -151,18 +149,23 @@ describe('MemoryService inspect', () => {
     repository.records.set('mine', memory());
     const service = new MemoryService(repository);
 
-    expect(
-      service.inspect({ ...inspectContext, destination: 'cloud-model' }),
-    ).toEqual({ items: [], truncated: false });
-    expect(
-      service.inspect({ ...inspectContext, memoryReadAllowed: false }),
-    ).toEqual({ items: [], truncated: false });
+    expect(service.inspect({ ...inspectContext, destination: 'cloud-model' })).toEqual({
+      items: [],
+      truncated: false,
+    });
+    expect(service.inspect({ ...inspectContext, memoryReadAllowed: false })).toEqual({
+      items: [],
+      truncated: false,
+    });
     expect(repository.readCount).toBe(0);
   });
 
   it('returns newest authorized memories first and reports truncation', () => {
     const repository = new InspectionRepository();
-    repository.records.set('older', memory({ id: 'older', canonicalKey: 'family.william.older' }));
+    repository.records.set(
+      'older',
+      memory({ id: 'older', canonicalKey: 'family.william.older' }),
+    );
     repository.records.set(
       'newer',
       memory({
