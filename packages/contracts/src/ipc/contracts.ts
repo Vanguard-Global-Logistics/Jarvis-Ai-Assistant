@@ -14,21 +14,6 @@ import {
   SessionIdRequestSchema,
 } from '../history/contracts.js';
 
-/**
- * IPC contracts — the single definition of every message that crosses the
- * renderer/main trust boundary.
- *
- * SECURITY-BOUNDARIES.md requires cross-boundary communication to be
- * "narrow, authenticated, schema-validated" and to "reject code, shell, prompts,
- * config patches, secrets, arbitrary paths". Every channel below is a specific
- * named operation with a closed schema — never a generic passthrough.
- *
- * Both directions are validated. Validating the *response* as well as the
- * request is not paranoia about the renderer (it cannot forge a response); it
- * catches OUR bugs in main before they reach the UI as malformed data.
- */
-
-/** A single channel's request/response contract. */
 export interface IpcContract<Req extends z.ZodType, Res extends z.ZodType> {
   readonly channel: string;
   readonly request: Req;
@@ -41,16 +26,6 @@ function defineContract<Req extends z.ZodType, Res extends z.ZodType>(
   return contract;
 }
 
-// --- app:get-info -----------------------------------------------------------
-
-/**
- * Host facts the renderer legitimately needs to display (status bar, about,
- * bug reports). All static and non-sensitive.
- *
- * `platform` and `arch` are deliberately closed enums rather than free strings:
- * `process.platform` has a known finite domain, and a closed schema means a
- * malformed value fails loudly at the boundary instead of flowing into the UI.
- */
 export const AppInfoSchema = z
   .object({
     appVersion: z.string().min(1),
@@ -71,23 +46,17 @@ export const appGetInfoContract = defineContract({
   response: AppInfoSchema,
 });
 
-// --- jarvis:chat ------------------------------------------------------------
-
 export const jarvisChatContract = defineContract({
   channel: CHANNELS.jarvisChat,
   request: ChatRequestSchema,
   response: ChatReplySchema,
 });
 
-// --- jarvis:amplify ---------------------------------------------------------
-
 export const jarvisAmplifyContract = defineContract({
   channel: CHANNELS.jarvisAmplify,
   request: AmplifyRequestSchema,
   response: AmplifierResultSchema,
 });
-
-// --- history:* --------------------------------------------------------------
 
 export const historySaveContract = defineContract({
   channel: CHANNELS.historySave,
@@ -112,8 +81,6 @@ export const historyDeleteContract = defineContract({
   request: SessionIdRequestSchema,
   response: DeleteSessionResultSchema,
 });
-
-// --- memory:inspect ---------------------------------------------------------
 
 /**
  * Owner-visible Memory v1 inspection. The renderer sends no profile id, query,
@@ -150,7 +117,27 @@ export const memoryInspectContract = defineContract({
   response: MemoryInspectionResultSchema,
 });
 
-// --- registry ---------------------------------------------------------------
+/**
+ * Deliberately tiny owner-facing delete contract. The renderer may identify one
+ * memory it was shown, but cannot choose actor/profile, deletion time, reason,
+ * sharing approval, or restricted-data approval. Those remain trusted-main data.
+ */
+export const MemoryDeleteRequestSchema = z.object({ id: z.string().min(1).max(256) }).strict();
+export const MemoryDeleteResultSchema = z
+  .object({
+    deleted: z.boolean(),
+    reason: z.enum(['not-found', 'policy-denied']).optional(),
+  })
+  .strict();
+
+export type MemoryDeleteRequest = z.infer<typeof MemoryDeleteRequestSchema>;
+export type MemoryDeleteResult = z.infer<typeof MemoryDeleteResultSchema>;
+
+export const memoryDeleteContract = defineContract({
+  channel: CHANNELS.memoryDelete,
+  request: MemoryDeleteRequestSchema,
+  response: MemoryDeleteResultSchema,
+});
 
 export const IPC_CONTRACTS = {
   [CHANNELS.appGetInfo]: appGetInfoContract,
@@ -161,4 +148,5 @@ export const IPC_CONTRACTS = {
   [CHANNELS.historyGet]: historyGetContract,
   [CHANNELS.historyDelete]: historyDeleteContract,
   [CHANNELS.memoryInspect]: memoryInspectContract,
+  [CHANNELS.memoryDelete]: memoryDeleteContract,
 } as const;
