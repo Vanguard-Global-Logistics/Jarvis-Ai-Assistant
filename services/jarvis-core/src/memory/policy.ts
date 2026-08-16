@@ -11,6 +11,12 @@ export type MemoryDestination = 'deterministic-code' | 'local-model' | 'cloud-mo
 export interface MemoryWriteContext {
   actorProfileId: string;
   memoryWriteAllowed: boolean;
+  /**
+   * Narrow bootstrap/guardian override for an already-authorized target profile.
+   * Callers must establish that authorization outside Memory v1; this flag must
+   * never be inferred from model output.
+   */
+  crossProfileWriteApproved?: boolean;
   sharedWriteApproved?: boolean;
   restrictedWriteApproved?: boolean;
 }
@@ -77,7 +83,9 @@ export function evaluateMemoryWrite(
   const reasons: MemoryPolicyReason[] = [];
 
   if (!context.memoryWriteAllowed) reasons.push('memory-write-disabled');
-  if (record.profileId !== context.actorProfileId) reasons.push('profile-mismatch');
+  if (record.profileId !== context.actorProfileId && context.crossProfileWriteApproved !== true) {
+    reasons.push('profile-mismatch');
+  }
   if (record.reviewState !== 'approved') reasons.push('review-not-approved');
   if (record.status !== 'active') reasons.push('record-not-active');
   if (record.scope === 'shared' && context.sharedWriteApproved !== true) {
@@ -192,8 +200,6 @@ export function rankMemoriesForQuery(
     const score =
       exactKey * 10_000 + keyOverlap * 100 + valueOverlap * 10 + Math.round(record.confidence * 9);
 
-    // A natural-language query with no lexical/exact relationship should not
-    // retrieve arbitrary memories merely because they passed access policy.
     if (score <= 9) continue;
 
     ranked.push({ record, score });
