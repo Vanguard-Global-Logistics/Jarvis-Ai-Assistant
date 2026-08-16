@@ -1,0 +1,21 @@
+name: Format diagnostic
+
+on:
+  push:
+    branches:
+      - agent/jarvis-pro-family-brain-v1
+
+jobs:
+  prettier-diff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Show exact Prettier diff
+        run: |
+          npx prettier --write services/jarvis-core/src/memory/memory-inspection.test.ts
+          git diff -- services/jarvis-core/src/memory/memory-inspection.test.ts
