@@ -38,17 +38,26 @@ export function MemoryPanel({
   memories,
   onRemember,
   onForget,
-  busy = false,
 }: {
   memories: readonly Memory[];
   onRemember: (fact: string, sensitivity: MemorySensitivity) => Promise<void>;
   onForget: (id: string) => Promise<void>;
-  busy?: boolean;
 }): JSX.Element {
   const [draft, setDraft] = useState('');
   const [sensitivity, setSensitivity] = useState<MemorySensitivity>(DEFAULT_SENSITIVITY);
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
+  /**
+   * In-flight guard, held HERE rather than passed in.
+   *
+   * The first version took a `busy` prop that no caller ever passed, so the
+   * guard existed in the type signature and nowhere in the running app — the
+   * "control that looks functional and does nothing" CLAUDE.md §8 rule 1 names.
+   * The consequence was not cosmetic: a double-click during the IPC round-trip
+   * stored the same sentence twice with two distinct main-minted ids, and both
+   * copies were then recalled into EVERY future prompt.
+   */
+  const [saving, setSaving] = useState(false);
 
   // Clear a stale refusal as soon as the person edits — an error still on
   // screen after the text changed is an error about text that no longer exists.
@@ -58,10 +67,11 @@ export function MemoryPanel({
 
   const trimmed = draft.trim();
   const remaining = MEMORY_MAX_LENGTH - trimmed.length;
-  const canSubmit = trimmed.length > 0 && remaining >= 0 && !busy;
+  const canSubmit = trimmed.length > 0 && remaining >= 0 && !saving;
 
   const submit = useCallback(async (): Promise<void> => {
     if (!canSubmit) return;
+    setSaving(true);
     try {
       await onRemember(trimmed, sensitivity);
       setDraft('');
@@ -72,8 +82,32 @@ export function MemoryPanel({
       // the refused text (constitution §5), so it is shown verbatim rather than
       // replaced with something vaguer.
       setError(cause instanceof Error ? cause.message : 'Jarvis could not remember that.');
+    } finally {
+      setSaving(false);
     }
   }, [canSubmit, onRemember, sensitivity, trimmed]);
+
+  /**
+   * Forget, awaited and caught — the same treatment the add path already had.
+   *
+   * The first version was `void onForget(id)`, which discarded the rejection (an
+   * unhandled promise rejection, which the probe's "console clean" check would
+   * fail) and discarded the `{ forgotten }` the contract exists to return. A
+   * delete that did not happen looked identical to one that did, in the one
+   * surface constitution §8 requires to be truthful about what is stored.
+   */
+  const confirmForget = useCallback(
+    async (id: string): Promise<void> => {
+      setConfirming(null);
+      try {
+        await onForget(id);
+        setError(null);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : 'Jarvis could not forget that.');
+      }
+    },
+    [onForget],
+  );
 
   return (
     <section
@@ -259,8 +293,7 @@ export function MemoryPanel({
                   <button
                     type="button"
                     onClick={() => {
-                      void onForget(memory.id);
-                      setConfirming(null);
+                      void confirmForget(memory.id);
                     }}
                     style={deleteButton('#ff5a5a')}
                   >

@@ -146,7 +146,7 @@ export function Shell({ devStateSwitcher = import.meta.env.DEV }: ShellProps): J
 
   const refreshMemories = useCallback((): void => {
     const jarvis = window.jarvis;
-    if (jarvis === undefined || typeof jarvis.listMemories !== 'function') return;
+    if (jarvis === undefined) return;
     jarvis
       .listMemories()
       .then(setMemories)
@@ -179,9 +179,16 @@ export function Shell({ devStateSwitcher = import.meta.env.DEV }: ShellProps): J
   const forgetFact = useCallback(
     async (id: string): Promise<void> => {
       const jarvis = window.jarvis;
-      if (jarvis === undefined) return;
-      await jarvis.forget(id);
+      if (jarvis === undefined) throw new Error('No Jarvis bridge in this context.');
+      // The `{ forgotten }` flag exists so that "deleted" in the UI always
+      // corresponds to a deletion that happened — and it was being discarded,
+      // which made `false` and `true` look identical to a person. Now a delete
+      // that matched nothing says so, through the panel's own alert.
+      const { forgotten } = await jarvis.forget(id);
       refreshMemories();
+      if (!forgotten) {
+        throw new Error('That memory was already gone — the list has been refreshed.');
+      }
     },
     [refreshMemories],
   );

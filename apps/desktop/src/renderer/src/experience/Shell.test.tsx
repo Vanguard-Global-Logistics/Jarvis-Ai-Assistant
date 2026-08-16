@@ -36,18 +36,60 @@ const AEGIS_TAMPERED = {
   integrityVerified: false,
 };
 
-function stubBridge(): void {
-  // The full bridge: host facts plus the two Stage 1A model calls. The
-  // conversation surface reads sendChat/amplify from here; these Shell tests do
-  // not invoke them (Conversation.test.tsx covers that), but the bridge should
-  // be shaped realistically.
-  vi.stubGlobal('jarvis', {
+/**
+ * The bridge fake, and it is typed as the REAL `JarvisApi` on purpose.
+ *
+ * Every stub in this file used to be a bare object literal with the four or
+ * five functions that particular test happened to need. TypeScript never
+ * compared them to anything, so the fake could drift from the real preload
+ * silently — and it did. Adding `memory:*` to the bridge and reading it during
+ * mount made seventeen tests fail at once with
+ * `jarvis.listMemories is not a function`: not one of them was about memory,
+ * and none of them had any reason to know memory existed.
+ *
+ * Returning `JarvisApi` fixes the class rather than the instance. A future
+ * channel that this fake does not implement is now a COMPILE error in one
+ * place, with the compiler naming the missing function, instead of a wall of
+ * unrelated red at runtime.
+ *
+ * The type is reached through `Window['jarvis']` — the augmentation in
+ * `preload/index.d.ts` — rather than by importing the preload module. The
+ * renderer's tsconfig deliberately does not list preload sources, and that
+ * exclusion is a boundary, not an oversight: a renderer file must not be able
+ * to reach `electron` even at the type level.
+ *
+ * `overrides` is how a test says the one thing it is actually about — a
+ * rejecting `getAppInfo`, a tampered AEGIS status — without restating the other
+ * eighteen functions it does not care about.
+ */
+type JarvisBridge = NonNullable<Window['jarvis']>;
+
+function stubBridge(overrides: Partial<JarvisBridge> = {}): void {
+  const bridge: JarvisBridge = {
     getAppInfo: vi.fn().mockResolvedValue(APP_INFO),
     sendChat: vi.fn().mockResolvedValue({ text: 'hi', provider: 'mock' }),
     amplify: vi.fn(),
-    getProfile: vi.fn().mockResolvedValue(DEFAULT_PROFILE),
+    planAutomation: vi.fn(),
     aegisStatus: vi.fn().mockResolvedValue(AEGIS_GREEN),
-  });
+    aegisRequestRestriction: vi.fn(),
+    describeModels: vi.fn().mockResolvedValue({ active: 'mock', providers: [] }),
+    selectModel: vi.fn(),
+    saveConversation: vi.fn(),
+    listConversations: vi.fn().mockResolvedValue({ conversations: [] }),
+    getConversation: vi.fn().mockResolvedValue({ conversation: null }),
+    deleteConversation: vi.fn(),
+    exportHistory: vi.fn(),
+    importHistory: vi.fn(),
+    getProfile: vi.fn().mockResolvedValue(DEFAULT_PROFILE),
+    setProfile: vi.fn(),
+    // Memory (ADR 0029). `listMemories` resolving to `[]` is the honest default
+    // for a Shell test: Jarvis knows nothing about this person yet.
+    remember: vi.fn(),
+    listMemories: vi.fn().mockResolvedValue([]),
+    forget: vi.fn(),
+    ...overrides,
+  };
+  vi.stubGlobal('jarvis', bridge);
 }
 
 /** The dev-only switcher region, or throw — scopes button counts to the switcher. */
@@ -119,7 +161,7 @@ describe('Shell', () => {
   it('surfaces a present-but-failing bridge visibly and compactly', async () => {
     stubMatchMedia();
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    vi.stubGlobal('jarvis', {
+    stubBridge({
       getAppInfo: vi.fn().mockRejectedValue(new Error('ipc validation failed')),
       getProfile: vi.fn().mockResolvedValue(DEFAULT_PROFILE),
       aegisStatus: vi.fn().mockResolvedValue(AEGIS_GREEN),
@@ -208,7 +250,7 @@ describe('Shell', () => {
 describe('the AEGIS strip (ADR 0025)', () => {
   it('shows the REAL level from the engine, not a hardcoded one', async () => {
     stubMatchMedia();
-    vi.stubGlobal('jarvis', {
+    stubBridge({
       getAppInfo: vi.fn().mockResolvedValue(APP_INFO),
       getProfile: vi.fn().mockResolvedValue(DEFAULT_PROFILE),
       aegisStatus: vi.fn().mockResolvedValue(AEGIS_TAMPERED),
@@ -221,7 +263,7 @@ describe('the AEGIS strip (ADR 0025)', () => {
 
   it('shouts when the audit chain failed — it must not be a footnote', async () => {
     stubMatchMedia();
-    vi.stubGlobal('jarvis', {
+    stubBridge({
       getAppInfo: vi.fn().mockResolvedValue(APP_INFO),
       getProfile: vi.fn().mockResolvedValue(DEFAULT_PROFILE),
       aegisStatus: vi.fn().mockResolvedValue(AEGIS_TAMPERED),
@@ -236,7 +278,7 @@ describe('the AEGIS strip (ADR 0025)', () => {
     // reassuring is worse than none, because it is believed.
     stubMatchMedia();
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    vi.stubGlobal('jarvis', {
+    stubBridge({
       getAppInfo: vi.fn().mockResolvedValue(APP_INFO),
       getProfile: vi.fn().mockResolvedValue(DEFAULT_PROFILE),
       aegisStatus: vi.fn().mockRejectedValue(new Error('ipc failed')),
@@ -252,7 +294,7 @@ describe('the AEGIS strip (ADR 0025)', () => {
 describe('the AEGIS console controls (ADR 0025)', () => {
   const withAegis = (status: unknown, request = vi.fn()) => {
     stubMatchMedia();
-    vi.stubGlobal('jarvis', {
+    stubBridge({
       getAppInfo: vi.fn().mockResolvedValue(APP_INFO),
       getProfile: vi.fn().mockResolvedValue(DEFAULT_PROFILE),
       aegisStatus: vi.fn().mockResolvedValue(status),

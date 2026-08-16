@@ -49,15 +49,24 @@ describe('MemoryPanel — showing what is known', () => {
     }
   });
 
-  it('labels each memory with its tier', () => {
-    render(
+  it('labels each memory with its tier — scoped to the memory, not the picker', () => {
+    // The first version asserted `getAllByText('NEVER SEND').length > 0`, which
+    // the always-rendered tier-picker button satisfies on its own: it passed
+    // with `memories={[]}`. Counting is the fix — one badge for the picker, two
+    // when a `never-send` memory is also listed.
+    const { rerender } = render(
+      <MemoryPanel memories={[]} onRemember={vi.fn()} onForget={vi.fn()} />,
+    );
+    expect(screen.getAllByText('NEVER SEND')).toHaveLength(1);
+
+    rerender(
       <MemoryPanel
         memories={[memory({ sensitivity: 'never-send', fact: 'Stays home.' })]}
         onRemember={vi.fn()}
         onForget={vi.fn()}
       />,
     );
-    expect(screen.getAllByText('NEVER SEND').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('NEVER SEND')).toHaveLength(2);
   });
 });
 
@@ -181,6 +190,37 @@ describe('MemoryPanel — the credential refusal reaches the person', () => {
   });
 });
 
+describe('MemoryPanel — the in-flight guard is real', () => {
+  it('stores a fact ONCE even when the button is clicked twice', async () => {
+    // The defect: `busy` was a prop no caller passed, so `canSubmit` was never
+    // false during the round-trip. A double-click stored the same sentence
+    // twice with two ids, and BOTH copies were then recalled into every future
+    // prompt — permanently doubling that line of context.
+    let release: () => void = () => undefined;
+    const onRemember = vi.fn().mockReturnValue(
+      new Promise<void>((resolve) => {
+        release = resolve;
+      }),
+    );
+    render(<MemoryPanel memories={[]} onRemember={onRemember} onForget={vi.fn()} />);
+
+    fireEvent.change(screen.getByLabelText(/something for jarvis to remember/i), {
+      target: { value: 'Brokers call before 7am.' },
+    });
+    const button = screen.getByRole('button', { name: /remember this/i });
+    fireEvent.click(button);
+    fireEvent.click(button);
+    fireEvent.click(button);
+
+    expect(onRemember).toHaveBeenCalledTimes(1);
+
+    release();
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /remember this/i })).toBeTruthy();
+    });
+  });
+});
+
 describe('MemoryPanel — forgetting', () => {
   it('confirms before deleting, because deletion is real and has no undo', () => {
     const onForget = vi.fn();
@@ -199,6 +239,22 @@ describe('MemoryPanel — forgetting', () => {
     fireEvent.click(screen.getByRole('button', { name: /really forget/i }));
 
     expect(onForget).toHaveBeenCalledWith('11111111-1111-4111-8111-111111111111');
+  });
+
+  it('surfaces a failed delete instead of silently closing', async () => {
+    // The defect: `void onForget(id)` discarded the rejection AND the
+    // `{ forgotten }` flag, so a delete that did not happen looked exactly like
+    // one that did — on the surface constitution §8 requires to be truthful
+    // about what is stored. It also produced an unhandled promise rejection.
+    const onForget = vi.fn().mockRejectedValue(new Error('That memory was already gone.'));
+    render(<MemoryPanel memories={[memory()]} onRemember={vi.fn()} onForget={onForget} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /^forget:/i }));
+    fireEvent.click(screen.getByRole('button', { name: /really forget/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert').textContent).toContain('already gone');
+    });
   });
 
   it('backs out cleanly on KEEP', () => {

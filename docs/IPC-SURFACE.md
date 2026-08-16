@@ -1,7 +1,14 @@
 # The IPC Surface
 
-Date: 2026-08-12
-Status: **SIXTEEN channels.** `aegis:status`/`aegis:request-restriction` (ADR 0025) are
+Date: 2026-08-16
+Status: **NINETEEN channels.** `memory:remember`/`memory:list`/`memory:forget` (ADR 0029)
+are IMPLEMENTED AND VERIFIED on the Linux runtime probe — a fact is stored, listed, and
+really deleted against a real SQLite, and a credential-shaped fact is refused at the
+boundary with the message a person is meant to read. What the probe **cannot** show is the
+leak filter working, because every provider it can reach stays on the machine; that
+property is proven instead by `apps/desktop/src/main/handlers/chat.test.ts`, which drives
+the real handler over every provider id including the four that leave.
+`aegis:status`/`aegis:request-restriction` (ADR 0025) are
 IMPLEMENTED AND VERIFIED on the Linux runtime probe — the real level is read, a
 non-stricter request is refused, an accepted raise revokes the right capabilities, and the
 bridge is asserted to expose no way to lower one. `jarvis:plan-automation` (ADR 0024) is IMPLEMENTED AND
@@ -112,7 +119,7 @@ the boundary machinery end to end without widening the attack surface.
 | **Status**            | IMPLEMENTED AND VERIFIED on the Linux runtime probe (prod + dev, mock round-trip). Windows packaged gate open; not yet _accepted_ (ADR 0006). |
 | **Renderer call**     | `window.jarvis.sendChat(request: ChatRequest): Promise<ChatReply>`                                                                            |
 | **Request**           | `ChatRequestSchema` — `{ messages: { role: 'user' \| 'assistant', content: string }[] }`, min one message, `.strict()`                        |
-| **Response**          | `ChatReplySchema` — `{ text: string, provider: 'mock' \| 'anthropic' }`, `.strict()`                                                          |
+| **Response**          | `ChatReplySchema` — `{ text: string, provider: ProviderId }` (the closed six-member enum), `.strict()`                                        |
 | **Handler**           | `registerChatHandler(provider)` in `apps/desktop/src/main/handlers/chat.ts`                                                                   |
 | **Contract**          | `jarvisChatContract` in `packages/contracts/src/ipc/contracts.ts`                                                                             |
 | **Side effects**      | One model call against the shared main-process provider. No filesystem, no persistence, no state retained in main.                            |
@@ -296,7 +303,7 @@ act on, and nothing partial enters the store (ADR 0014).
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **Status**            | IMPLEMENTED AND VERIFIED on the Linux runtime probe: describe returns the active provider and the full list; a refused selection keeps the active one, proven by a real message afterwards; an accepted selection re-routes messages, proven by reply text only a loopback stub server can produce plus the request arriving at that socket; switching back re-routes again. Verified red-green, 2026-08-12. |
 | **Renderer call**     | `window.jarvis.describeModels(): Promise<ModelDescription>` · `window.jarvis.selectModel(id: ProviderId): Promise<ModelSelection>`                                                                                                                                                                                                                                                                           |
-| **Request**           | describe: `z.undefined()`. select: `{ id }`, `.strict()`, `id` a **closed enum** (`mock`/`local`/`anthropic`/`grok`/`gemini`)                                                                                                                                                                                                                                                                                |
+| **Request**           | describe: `z.undefined()`. select: `{ id }`, `.strict()`, `id` a **closed enum** (`mock`/`local`/`anthropic`/`grok`/`gemini`/`nvidia`)                                                                                                                                                                                                                                                                       |
 | **Response**          | `{ active, providers[] }` / `{ selected, active, reason?, providers[] }`, both `.strict()`. Each provider is `{ id, available, unavailableReason? }` — **identifiers only**                                                                                                                                                                                                                                  |
 | **Handler**           | `registerModelHandlers(env, holder)` in `apps/desktop/src/main/handlers/model.ts`                                                                                                                                                                                                                                                                                                                            |
 | **Contract**          | `modelDescribeContract` / `modelSelectContract`                                                                                                                                                                                                                                                                                                                                                              |
@@ -335,6 +342,57 @@ on.
 The closed accent enum is a security property, not tidiness: a free-form colour could
 impersonate the alert red, letting identity look like a warning (ADR 0013). The probe
 asserts the boundary rejects `#ff5a5a` and leaves the stored profile unchanged.
+
+### `memory:remember` / `memory:list` / `memory:forget`
+
+|                       |                                                                                                                                                                                                                                                                                                              |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Status**            | IMPLEMENTED AND VERIFIED on the Linux runtime probe (store / list / delete against a real SQLite, plus a refused credential whose message is read for its content, not merely for the fact that something was rejected), 2026-08-16. The travel rule is verified by unit test, not by the probe — see below. |
+| **Renderer call**     | `window.jarvis.remember(r: RememberRequest): Promise<Memory>` · `window.jarvis.listMemories(): Promise<Memory[]>` · `window.jarvis.forget(id: string): Promise<{ forgotten: boolean }>`                                                                                                                      |
+| **Request**           | remember: `{ fact (trimmed, 1–280), sensitivity }`, `.strict()`, sensitivity a **closed enum** (`open`/`private`/`never-send`). list: `z.undefined()`. forget: `{ id }` (UUID), `.strict()`                                                                                                                  |
+| **Response**          | `MemorySchema` / `MemoryListSchema` / `{ forgotten: boolean }`, all `.strict()`. remember returns what is now **stored**, not an echo of the request                                                                                                                                                         |
+| **Handler**           | `registerMemoryHandlers(db)` in `apps/desktop/src/main/handlers/memory.ts`, over the store in `apps/desktop/src/main/memory/store.ts`                                                                                                                                                                        |
+| **Contract**          | `memoryRememberContract` / `memoryListContract` / `memoryForgetContract`                                                                                                                                                                                                                                     |
+| **Side effects**      | remember: one insert into `memory` (migration 6). forget: one **real delete** — the row is gone, not tombstoned (constitution §8). list: read-only.                                                                                                                                                          |
+| **Authority granted** | Write, read, and delete rows in one main-owned table. No SQL, no path, no column name crosses. Grants nothing over any other store, and nothing over AEGIS.                                                                                                                                                  |
+
+**This is the first channel whose contents are read back into a prompt**, which is why its
+rules are stricter than `history:*`. A saved conversation is read when a person opens it; a
+memory is read every time Jarvis thinks, so a mistake here is not a mistake that happened
+once — it is a mistake that happens forever, in every future answer.
+
+Four properties, each structural rather than advisory:
+
+1. **A human drives every write.** `memory:remember` is the only write path and it is
+   reached by a person pressing a button. Jarvis does not decide what to remember
+   (constitution §4). There is no channel by which a model, a provider reply, or a
+   conversation turn writes a memory, and adding one is a boundary change.
+2. **Main mints `id`, `learnedAt`, AND `learnedFrom`.** All three are absent from
+   `RememberRequestSchema` by construction. `learnedFrom` matters most and was the one
+   that nearly shipped renderer-supplied: provenance _is_ `learnedFrom` (§2), so a
+   renderer that could set it could stamp `confirmed` on a fact nobody confirmed.
+3. **Credential-shaped text is REFUSED, not stored.** The check runs before the insert —
+   a refusal that arrives after the row is written is not a refusal. The rejection message
+   is a module-level constant that names the rule and says where keys belong, and
+   **quotes none of the refused text back**; a rejection that echoed the secret would
+   write it into a log line, a screenshot, or a pasted bug report. It reaches the person
+   intact rather than flattened to `"memory:remember failed"` because
+   `MemoryRefusedError` extends `UserFacingError` — the narrow, constants-only exception
+   to `handleContract`'s flattening, whose message parameter does not exist so the rule
+   cannot be broken by a future caller.
+4. **A `private` fact is never ASSEMBLED into a prompt bound off-machine.** The filter is
+   in `apps/desktop/src/main/memory/recall.ts` and it removes the text before the request
+   is built, rather than redacting on the way out. Filtering at assembly means the
+   disclosure path does not exist to have a bug in. Note this rule is enforced by the
+   recall filter, **not by AEGIS** — the two must not be conflated.
+
+That fourth property is the one the runtime probe **cannot** prove, and saying so is the
+point. Every provider the probe can actually reach (`mock`, `local`) has
+`leavesMachine: false`, so `recallFor` takes its early-return branch and the filtering
+line never executes there — a green probe would be green for the ADR 0021 reason: the code
+holding the secret never ran. `apps/desktop/src/main/handlers/chat.test.ts` closes it by
+injecting the provider id and driving the real handler across every member of
+`PROVIDER_IDS`, asserting on the `ChatRequest` the provider actually received.
 
 ---
 
@@ -435,6 +493,23 @@ JavaScript. SQLite needs no external at all — the driver is Node's builtin
 - The store round-trips, orders, cascades deletes, and reports stale ids honestly against
   the REAL migration on in-memory databases
   (`apps/desktop/src/main/history/store.test.ts`).
+- `handleContract` flattens a vendor message carrying a filesystem path, flattens a bare
+  non-`Error` throw, flattens a plain `Error` with the same text — and passes a
+  `UserFacingError` (and a subclass of one) through intact
+  (`apps/desktop/src/main/ipc.test.ts`). Verified red-green: deleting the passthrough
+  line in `ipc.ts` turns the third group red.
+- The memory store refuses a credential-shaped fact **before** the insert and stores
+  nothing when it does, never echoes the refused text, still accepts prose that merely
+  mentions keys, and really deletes rather than tombstoning — against the real migration
+  (`apps/desktop/src/main/memory/store.test.ts`). The `length` and `sensitivity` CHECK
+  constraints are asserted by deliberately bypassing Zod, so the database is proven to be
+  the last line rather than assumed to be.
+- **Recall is actually wired into `jarvis:chat`, and a `private` memory reaches no
+  provider that leaves the machine** — driven through the real handler over every member
+  of `PROVIDER_IDS`, asserting on the `ChatRequest` the provider received
+  (`apps/desktop/src/main/handlers/chat.test.ts`). Replacing
+  `withRecall(request.messages, …)` with `request.messages` left the rest of the suite
+  and the whole runtime probe green, which is why this file exists.
 
 **Verified by inspecting the built artifact** (`npm run build`):
 

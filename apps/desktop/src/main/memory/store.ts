@@ -67,13 +67,23 @@ export class MemoryRefusedError extends UserFacingError {
  * The WHOLE store, deliberately unpaginated — constitution §8 requires every
  * memory to be visible, and a paginated view has something below the fold, which
  * is where a poisoned memory would prefer to live.
+ *
+ * `rowid` is the TIEBREAKER, and it is not decoration. `learned_at` is an ISO
+ * string at millisecond resolution, and two facts typed in quick succession — or
+ * two written by the same click — genuinely collide there. On a collision SQLite
+ * is free to return either row first, so "newest first" was a claim the code did
+ * not actually make. `rowid` is monotonic per insert, so this makes the order
+ * total and deterministic. The order test asserts it, which it could not do
+ * before: it had been weakened to assert membership instead, because a strict
+ * assertion against a non-deterministic query is flaky. The fix belonged here,
+ * not in the test.
  */
 export function listMemories(db: SqliteDatabase): Memory[] {
   const rows = db
     .prepare(
       `SELECT id, fact, sensitivity, learned_from, learned_at
          FROM memory
-        ORDER BY learned_at DESC`,
+        ORDER BY learned_at DESC, rowid DESC`,
     )
     .all() as unknown as MemoryRow[];
   return rows.map(toMemory);

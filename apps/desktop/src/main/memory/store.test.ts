@@ -153,16 +153,63 @@ describe('listMemories', () => {
   });
 
   it('returns newest first', () => {
+    // This assertion used to check MEMBERSHIP and call it ordering, because the
+    // query was `ORDER BY learned_at DESC` alone and three inserts inside one
+    // millisecond genuinely tie — SQLite may then return them in any order. A
+    // test weakened to survive a non-deterministic query proves nothing about
+    // the property it is named after. The `rowid` tiebreaker in `listMemories`
+    // makes the order total, so it can now be asserted outright.
     told('Oldest.');
     told('Middle.');
     told('Newest.');
 
-    const facts = listMemories(db).map((m) => m.fact);
-    // Timestamps can collide at millisecond resolution, so assert on membership
-    // and count rather than a strict order that would be flaky.
-    expect(facts).toHaveLength(3);
-    expect(facts).toContain('Newest.');
-    expect(facts).toContain('Oldest.');
+    expect(listMemories(db).map((m) => m.fact)).toEqual(['Newest.', 'Middle.', 'Oldest.']);
+  });
+
+  it('orders by learned_at first, and only falls back to insert order on a tie', () => {
+    // The tiebreaker must not become the primary key of the sort. Rows written
+    // with EXPLICIT timestamps prove `learned_at` still wins even when it
+    // disagrees with insertion order — otherwise a future "just order by rowid"
+    // simplification would pass the test above and silently change the meaning
+    // of the list.
+    const insert = db.prepare(
+      `INSERT INTO memory (id, fact, sensitivity, learned_from, learned_at)
+       VALUES (?, ?, 'open', 'told', ?)`,
+    );
+    insert.run(
+      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      'Written first, dated LAST.',
+      '2026-08-16T12:00:00.000Z',
+    );
+    insert.run(
+      'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      'Written second, dated FIRST.',
+      '2026-08-15T12:00:00.000Z',
+    );
+
+    expect(listMemories(db).map((m) => m.fact)).toEqual([
+      'Written first, dated LAST.',
+      'Written second, dated FIRST.',
+    ]);
+  });
+
+  it('breaks an exact timestamp tie by insert order, newest insert first', () => {
+    // The collision the millisecond-resolution comment was hand-waving about,
+    // made explicit: identical `learned_at`, so ONLY the tiebreaker can decide.
+    // Delete `, rowid DESC` from the query and this is the assertion that goes
+    // red (or flaky, which is the same failure with a slower fuse).
+    const sameInstant = '2026-08-16T12:00:00.000Z';
+    const insert = db.prepare(
+      `INSERT INTO memory (id, fact, sensitivity, learned_from, learned_at)
+       VALUES (?, ?, 'open', 'told', ?)`,
+    );
+    insert.run('cccccccc-cccc-4ccc-8ccc-cccccccccccc', 'Tied, inserted first.', sameInstant);
+    insert.run('dddddddd-dddd-4ddd-8ddd-dddddddddddd', 'Tied, inserted second.', sameInstant);
+
+    expect(listMemories(db).map((m) => m.fact)).toEqual([
+      'Tied, inserted second.',
+      'Tied, inserted first.',
+    ]);
   });
 
   it('carries the tier and provenance through to the caller', () => {
