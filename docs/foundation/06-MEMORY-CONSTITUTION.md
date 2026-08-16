@@ -131,6 +131,22 @@ control. A person who reads "Never send", deliberately chooses it over the
 default, and receives exactly the default guarantee has been told something
 false by the interface.
 
+**And now the honest limit of what that change bought, because the paragraph
+above reads stronger than the truth.** In the SHIPPED BUILD, `private` and
+`never-send` still behave identically to the person using it: `recallFor`
+filters both out of every prompt bound for a provider that leaves the machine,
+and includes both for one that does not. Nothing observable differs. What
+changed is where the answer comes from — resistance to a future edit, which is a
+developer-facing property.
+
+That distinction matters enough to be written down because it was briefly got
+wrong in the worst possible place: the `never-send` tier's user-facing
+description was changed to read "No future exception can be carved for it" — a
+promise about this project's governance, in a tooltip, describing something no
+running build can deliver. It has been restored to describing what the code
+does. A tier's copy states an observable property of the running build and
+nothing else.
+
 This is also the first capability where the Hive's shape shows up in code: a
 family that shares a house does not share a threat model. Jayden's node on
 school Wi-Fi and William's node with the freight book are the same software with

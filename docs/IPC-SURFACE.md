@@ -4,9 +4,7 @@ Date: 2026-08-16
 Status: **NINETEEN channels.** `memory:remember`/`memory:list`/`memory:forget` (ADR 0029)
 are IMPLEMENTED AND VERIFIED on the Linux runtime probe — a fact is stored, listed, and
 really deleted against a real SQLite, and a credential-shaped fact is refused at the
-boundary with the message a person is meant to read. One property of that channel group is
-**not** proven by the probe and is proven by unit test instead; the `memory:*` section
-below states it once and is the only place it is stated.
+boundary with the message a person is meant to read.
 `aegis:status`/`aegis:request-restriction` (ADR 0025) are
 IMPLEMENTED AND VERIFIED on the Linux runtime probe — the real level is read, a
 non-stricter request is refused, an accepted raise revokes the right capabilities, and the
@@ -344,16 +342,16 @@ asserts the boundary rejects `#ff5a5a` and leaves the stored profile unchanged.
 
 ### `memory:remember` / `memory:list` / `memory:forget`
 
-|                       |                                                                                                                                                                                                                                      |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Status**            | IMPLEMENTED AND VERIFIED on the Linux runtime probe (store / list / delete against a real SQLite, plus a refused credential whose message is read for its content, not merely for the fact that something was rejected), 2026-08-16. |
-| **Renderer call**     | `window.jarvis.remember(r: RememberRequest): Promise<Memory>` · `window.jarvis.listMemories(): Promise<Memory[]>` · `window.jarvis.forget(id: string): Promise<{ forgotten: boolean }>`                                              |
-| **Request**           | remember: `{ fact (trimmed, 1–280), sensitivity }`, `.strict()`, sensitivity a **closed enum** (`open`/`private`/`never-send`). list: `z.undefined()`. forget: `{ id }` (UUID), `.strict()`                                          |
-| **Response**          | `MemorySchema` / `MemoryListSchema` / `{ forgotten: boolean }`, all `.strict()`. remember returns what is now **stored**, not an echo of the request                                                                                 |
-| **Handler**           | `registerMemoryHandlers(db)` in `apps/desktop/src/main/handlers/memory.ts`, over the store in `apps/desktop/src/main/memory/store.ts`                                                                                                |
-| **Contract**          | `memoryRememberContract` / `memoryListContract` / `memoryForgetContract`                                                                                                                                                             |
-| **Side effects**      | remember: one insert into `memory` (migration 6). forget: one **real delete** — the row is gone, not tombstoned (constitution §8). list: read-only.                                                                                  |
-| **Authority granted** | Write, read, and delete rows in one main-owned table. No SQL, no path, no column name crosses. Grants nothing over any other store, and nothing over AEGIS.                                                                          |
+|                       |                                                                                                                                                                                                                                                                                                                    |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Status**            | IMPLEMENTED AND VERIFIED on the Linux runtime probe (store / list / delete against a real SQLite, plus a refused credential whose message is read for its content, not merely for the fact that something was rejected), 2026-08-16. **The travel rule is NOT probe-proven** — see the four-properties note below. |
+| **Renderer call**     | `window.jarvis.remember(r: RememberRequest): Promise<Memory>` · `window.jarvis.listMemories(): Promise<Memory[]>` · `window.jarvis.forget(id: string): Promise<{ forgotten: boolean }>`                                                                                                                            |
+| **Request**           | remember: `{ fact (trimmed, 1–280), sensitivity }`, `.strict()`, sensitivity a **closed enum** (`open`/`private`/`never-send`). list: `z.undefined()`. forget: `{ id }` (UUID), `.strict()`                                                                                                                        |
+| **Response**          | `MemorySchema` / `MemoryListSchema` / `{ forgotten: boolean }`, all `.strict()`. remember returns what is now **stored**, not an echo of the request                                                                                                                                                               |
+| **Handler**           | `registerMemoryHandlers(db)` in `apps/desktop/src/main/handlers/memory.ts`, over the store in `apps/desktop/src/main/memory/store.ts`                                                                                                                                                                              |
+| **Contract**          | `memoryRememberContract` / `memoryListContract` / `memoryForgetContract`                                                                                                                                                                                                                                           |
+| **Side effects**      | remember: one insert into `memory` (migration 6). forget: one **real delete** — the row is gone, not tombstoned (constitution §8). list: read-only.                                                                                                                                                                |
+| **Authority granted** | Write, read, and delete rows in one main-owned table. No SQL, no path, no column name crosses. Grants nothing over any other store, and nothing over AEGIS.                                                                                                                                                        |
 
 **This is the first channel whose contents are read back into a prompt**, which is why its
 rules are stricter than `history:*`. A saved conversation is read when a person opens it; a
@@ -390,7 +388,9 @@ the only place in this file that says so — the claim was written out four time
 wordings, which is this repository's own "a rule in two places will drift" happening inside
 one document.
 
-Every provider the probe can actually reach (`mock`, `local`) has `leavesMachine: false`,
+Every provider the probe can actually reach (`mock`, `local`) is `providerLeavesMachine(id) === false`
+— note that is the PROVIDER predicate in `model/contracts.ts`, not the tier's `leavesMachine`
+field in `MEMORY_SENSITIVITIES`; collapsing the two names sends a reader to the wrong file —
 so `recallFor` takes its early-return branch and the filtering line never executes there. A
 green probe would be green for the ADR 0021 reason: the code holding the secret never ran.
 `apps/desktop/src/main/handlers/chat.test.ts` closes it by injecting the provider id and

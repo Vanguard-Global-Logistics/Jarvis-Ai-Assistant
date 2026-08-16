@@ -519,7 +519,7 @@ describe('memory reaches the person through the real Shell (ADR 0029)', () => {
     // preload — gives a bridge that is PRESENT but has no `listMemories`.
     //
     // The mutation this kills: delete the `typeof bridge[key] === 'function'`
-    // check in `bridgeWith`. The call then throws into `refreshMemories`'s
+    // check in `bridgeMember`. The call then throws into `refreshMemories`'s
     // catch and the person is told the STORE could not be read — which is a
     // different and false diagnosis. A database problem and a stale install
     // need different actions from whoever is holding the machine.
@@ -528,30 +528,108 @@ describe('memory reaches the person through the real Shell (ADR 0029)', () => {
     Reflect.deleteProperty(window.jarvis as object, 'listMemories');
     render(<Shell devStateSwitcher={false} />);
 
+    // Asserted BEFORE opening the panel: the AEGIS strip and the heading are
+    // still there, so nothing unmounted. This used to be a separate test whose
+    // comment credited `bridgeMember` with preventing a crash — but the memory
+    // effect is `async`, so its own try/catch catches the throw and that test
+    // could not fail. Folded in here, where the assertion has a real anchor.
+    expect(await screen.findByText(/AEGIS · GREEN/)).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Jarvis');
+
     await openPanel();
     expect((await screen.findByRole('alert')).textContent).toContain('unavailable in this build');
   });
 
-  it('keeps AEGIS visible when the memory channel is missing', async () => {
-    // The blast radius, asserted separately. The memory effect runs BEFORE the
-    // AEGIS effect, so a synchronous throw out of the first one unmounts the
-    // Shell and takes the security indicator with it — and an indicator that
-    // vanishes is the same failure as one that wrongly reads GREEN, with no
-    // message attached.
+  it('never publishes MEMORY · 0 from a store it could not read', async () => {
+    // The chip is the DEFAULT surface — the panel is collapsed until someone
+    // opens it — so `MEMORY · 0` on an unread store is the same lie the panel's
+    // own alert refuses, published more prominently and to more people. Every
+    // other memory test here opens the panel first, so none of them can see it.
+    // This one deliberately never opens it.
     stubMatchMedia();
-    stubBridge();
-    Reflect.deleteProperty(window.jarvis as object, 'listMemories');
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    stubBridge({ listMemories: vi.fn().mockRejectedValue(new Error('db locked')) });
     render(<Shell devStateSwitcher={false} />);
 
-    expect(await screen.findByText(/AEGIS · GREEN/)).toBeTruthy();
-    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Jarvis');
+    const chip = await screen.findByRole('button', { name: /^MEMORY · / });
+    await waitFor(() => {
+      expect(chip.textContent).toContain('—');
+    });
+    expect(chip.textContent).not.toContain('0');
+    consoleError.mockRestore();
+  });
+
+  it('shows a stored fact by RE-READING the store, not by guessing', async () => {
+    // The add path across the same seam the forget path already crosses. The
+    // mutation this kills: delete `await refreshMemories()` from `rememberFact`
+    // — the fact is stored and never appears, and nothing else notices.
+    stubMatchMedia();
+    const listMemories = vi.fn().mockResolvedValueOnce([]).mockResolvedValue([MEMORY]);
+    stubBridge({ listMemories, remember: vi.fn().mockResolvedValue(MEMORY) });
+    render(<Shell devStateSwitcher={false} />);
+
+    await openPanel();
+    fireEvent.change(screen.getByLabelText(/something for jarvis to remember/i), {
+      target: { value: MEMORY.fact },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /remember this/i }));
+
+    // Scoped to the LIST. An unscoped `findByText(MEMORY.fact)` passed even with
+    // the re-read deleted — the composer's own textarea satisfied it — which is
+    // the whole reason mutations get run rather than assumed.
+    await waitFor(() => {
+      expect(within(screen.getByRole('list')).getByText(MEMORY.fact)).toBeTruthy();
+    });
+    expect(listMemories).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not render a raw TypeError as if it were main's refusal message", async () => {
+    // The other guard on the add path. Delete the `bridgeMember('remember')`
+    // check and the panel renders "remember is not a function" in the same
+    // alert that shows main's carefully-worded credential refusal — a message
+    // written for a developer, in the place a person reads for safety.
+    stubMatchMedia();
+    stubBridge();
+    Reflect.deleteProperty(window.jarvis as object, 'remember');
+    render(<Shell devStateSwitcher={false} />);
+
+    await openPanel();
+    fireEvent.change(screen.getByLabelText(/something for jarvis to remember/i), {
+      target: { value: 'A fact that cannot be stored.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /remember this/i }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).not.toContain('is not a function');
+    expect(alert.textContent).toContain('No Jarvis bridge');
+  });
+
+  it('still says a delete failed when the memory is gone from the list', async () => {
+    // The case `{ forgotten: false }` GUARANTEES, and the one the first fix was
+    // blind to. `forgotten: false` means no row matched, so the refresh that
+    // follows removes the row — and a row-scoped alert for that id then has
+    // nowhere to render. The earlier test passed only because its fake returned
+    // the memory forever WHILE reporting it already gone: a pair of answers main
+    // cannot produce. This models the real store.
+    stubMatchMedia();
+    const listMemories = vi.fn().mockResolvedValueOnce([MEMORY]).mockResolvedValue([]);
+    stubBridge({ listMemories, forget: vi.fn().mockResolvedValue({ forgotten: false }) });
+    render(<Shell devStateSwitcher={false} />);
+
+    await openPanel();
+    fireEvent.click(await screen.findByRole('button', { name: `Forget: ${MEMORY.fact}` }));
+    fireEvent.click(screen.getByRole('button', { name: /really forget/i }));
+
+    expect((await screen.findByRole('alert')).textContent).toContain('already gone');
+    // And the row really is gone, so the message cannot have been on it.
+    expect(screen.queryByText(MEMORY.fact)).toBeNull();
   });
 
   it('says AEGIS is UNKNOWN — never GREEN — when the bridge has no aegisStatus', async () => {
     // The other half of the one shared rule. This guard IS load-bearing on its
     // own: the AEGIS path uses `.then`/`.catch`, so a missing function throws
     // synchronously BEFORE any promise exists and no `.catch()` can intercept
-    // it. Delete the `typeof` check in `bridgeWith` and this test goes red by
+    // it. Delete the `typeof` check in `bridgeMember` and this test goes red by
     // crashing the render.
     stubMatchMedia();
     stubBridge();

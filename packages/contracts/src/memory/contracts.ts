@@ -66,10 +66,17 @@ export const MEMORY_SENSITIVITIES = {
    * `sensitivityAllowsSending`, which denies this tier before it ever reads this
    * table. The field is present so the shape stays uniform and so a reader of
    * this table is not told something false; it is not what enforces the tier.
+   *
+   * **`description` is rendered to the person**, as the tier's meaning and as
+   * the picker button's `title`. It briefly read "No future exception can be
+   * carved for it" — a promise about this project's future governance, in a
+   * tooltip, describing something no running build can deliver. It says what the
+   * code does instead. The governance claim is a rule for developers and lives
+   * in `sensitivityAllowsSending` and the constitution, where developers read.
    */
   'never-send': {
     label: 'Never send',
-    description: 'Never leaves this machine. No future exception can be carved for it.',
+    description: 'Never leaves this machine, and is never put in a prompt that could.',
     leavesMachine: false,
   },
 } as const;
@@ -96,7 +103,7 @@ export const DEFAULT_SENSITIVITY: MemorySensitivity = 'private';
  * tests and the UI can both point at, instead of a paragraph everyone has to
  * remember.
  */
-export const NEVER_SEND: MemorySensitivity = 'never-send';
+export const NEVER_SEND = 'never-send' as const;
 
 /**
  * May a memory at this tier be included in a prompt for a provider that leaves
@@ -131,6 +138,17 @@ export const NEVER_SEND: MemorySensitivity = 'never-send';
  * kind of claim can honestly be proven: it MUTATES the table at runtime to the
  * exact bad value, and asserts `private` changes answer while `never-send` does
  * not. Without that negative control the test would be two constants agreeing.
+ *
+ * ## What this did NOT change, stated plainly
+ *
+ * **A person using this build gets the same behaviour from both tiers today.**
+ * `recallFor` filters both out of every prompt bound for a provider that leaves
+ * the machine, and includes both for one that does not. Nothing observable
+ * differs. What changed is where the answer comes from, which is resistance to a
+ * future edit — a developer-facing property, not a user-facing one.
+ *
+ * Saying otherwise would be the exact overstatement the tier split was meant to
+ * end. It was briefly said otherwise, in the user-facing `description` above.
  */
 export function sensitivityAllowsSending(sensitivity: MemorySensitivity): boolean {
   if (sensitivity === NEVER_SEND) return false;

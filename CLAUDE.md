@@ -274,8 +274,8 @@ services/aegis         AEGIS engine — independent, no GenAI        PARTIAL —
 packages/contracts     Zod schemas + shared types                  PARTIAL — IPC (19 channels), model, history, profile, automation, memory, experience
 packages/ui            Design-system components                    PARTIAL — tokens, motion, Orb + glass primitives
 packages/config        Env validation + structured logging         IMPLEMENTED, unit-tested
-packages/database      SQLite (node:sqlite) + migration runner     PARTIAL — wired to Electron main, 5 migrations: history, amplifications, profile, window-state, plans (ADR 0008, 0009, 0013, 0017, 0024)
-docs/DECISIONS/        ADRs                                        0001–0027
+packages/database      SQLite (node:sqlite) + migration runner     PARTIAL — wired to Electron main, 6 migrations: history, amplifications, profile, window-state, plans, memory (ADR 0008, 0009, 0013, 0017, 0024, 0029)
+docs/DECISIONS/        ADRs                                        0001–0030
 docs/foundation/       Layer 2 foundation documents (ADR 0005)     PARTIAL — 01 APPROVED; 02, 07, 09 DRAFT; rest CONCEPTUAL
 ```
 

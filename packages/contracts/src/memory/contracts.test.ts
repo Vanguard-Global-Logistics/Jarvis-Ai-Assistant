@@ -4,6 +4,7 @@ import {
   MEMORY_MAX_LENGTH,
   MEMORY_SENSITIVITIES,
   MemorySchema,
+  MemorySensitivitySchema,
   NEVER_SEND,
   RememberRequestSchema,
   sensitivityAllowsSending,
@@ -81,12 +82,42 @@ describe('sensitivityAllowsSending — the ordinary answers', () => {
     expect(sensitivityAllowsSending(NEVER_SEND)).toBe(false);
   });
 
-  it('is total over the closed enum — no tier falls through to undefined', () => {
-    // A new tier added without a travel rule would return `undefined` here,
-    // which is falsy and would LOOK safe while being unconsidered.
-    for (const tier of Object.keys(MEMORY_SENSITIVITIES) as MemorySensitivity[]) {
-      expect(typeof sensitivityAllowsSending(tier), tier).toBe('boolean');
-    }
+  it('refuses a tier the table does not contain, rather than returning undefined', () => {
+    // The earlier version of this test walked `Object.keys(MEMORY_SENSITIVITIES)`
+    // and indexed the same object with those same keys, so it could only confirm
+    // the table agreed with itself — `return true`, `return false`, and deleting
+    // the body all left it green. Its comment was wrong twice over: an unknown
+    // key does not return `undefined` from that lookup, it throws.
+    //
+    // Calling THROUGH an unknown tier is the falsifiable version. It is
+    // deliberately a lie to the type system, because the state being defended
+    // against — a value that reached the predicate without a travel rule — is
+    // one the types say cannot happen and a database row or an old backup could
+    // still produce.
+    expect(() => sensitivityAllowsSending('audit-only' as MemorySensitivity)).toThrow();
+  });
+
+  it('pins the enum to a literal, so ADDING a tier forces a human to decide', () => {
+    // The other half. `MemorySensitivitySchema` is derived from this table, so
+    // nothing else in the codebase notices a new member — it would simply
+    // inherit whatever `leavesMachine` its author typed, which is exactly the
+    // "unconsidered default" the deleted test claimed to catch and could not.
+    expect(Object.keys(MEMORY_SENSITIVITIES).sort()).toEqual(
+      ['never-send', 'open', 'private'].sort(),
+    );
+    expect(MemorySensitivitySchema.options.slice().sort()).toEqual(
+      Object.keys(MEMORY_SENSITIVITIES).sort(),
+    );
+  });
+
+  it('pins MEMORY_MAX_LENGTH to the SQL literal in migration 6', () => {
+    // The cap lives in two files: this constant and
+    // `CHECK (length(fact) BETWEEN 1 AND 280)` in
+    // `packages/database/src/migrations/0006-memory.ts`. Every bound in this
+    // file is expressed as `MEMORY_MAX_LENGTH ± 1`, so raising the constant
+    // leaves them all green while a fact Zod accepts dies on a SQLite
+    // constraint the person reads as "memory:remember failed".
+    expect(MEMORY_MAX_LENGTH).toBe(280);
   });
 });
 
