@@ -17,6 +17,8 @@ export type { ChannelName } from './ipc/channels.js';
 export {
   AppInfoSchema,
   IPC_CONTRACTS,
+  MemoryDeleteRequestSchema,
+  MemoryDeleteResultSchema,
   MemoryInspectionItemSchema,
   MemoryInspectionResultSchema,
   appGetInfoContract,
@@ -26,11 +28,14 @@ export {
   historySaveContract,
   jarvisAmplifyContract,
   jarvisChatContract,
+  memoryDeleteContract,
   memoryInspectContract,
 } from './ipc/contracts.js';
 export type {
   AppInfo,
   IpcContract,
+  MemoryDeleteRequest,
+  MemoryDeleteResult,
   MemoryInspectionItem,
   MemoryInspectionResult,
 } from './ipc/contracts.js';
