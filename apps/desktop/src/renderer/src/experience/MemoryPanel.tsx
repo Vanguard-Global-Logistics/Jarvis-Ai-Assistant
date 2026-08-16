@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import type { JSX } from 'react';
-import type { MemoryInspectionResult } from '@jarvis/contracts';
+import type { MemoryDeleteResult, MemoryInspectionResult } from '@jarvis/contracts';
 import { accent, fontFamily, letterSpacing, surface, text } from '@jarvis/ui';
 
 export interface MemoryInspectionBridge {
   inspectMemory(): Promise<MemoryInspectionResult>;
+  deleteMemory(id: string): Promise<MemoryDeleteResult>;
 }
 
 export interface MemoryPanelProps {
@@ -19,23 +20,50 @@ type MemoryPanelState =
 
 export function MemoryPanel({ bridge }: MemoryPanelProps): JSX.Element {
   const [state, setState] = useState<MemoryPanelState>({ kind: 'closed' });
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const open = (): void => {
     if (bridge === null) return;
     setState({ kind: 'loading' });
     bridge
       .inspectMemory()
-      .then((result) => {
-        setState({ kind: 'ready', result });
-      })
+      .then((result) => setState({ kind: 'ready', result }))
       .catch((cause: unknown) => {
         console.error('[memory] memory:inspect failed across the IPC boundary:', cause);
         setState({ kind: 'error' });
       });
   };
 
-  const close = (): void => {
-    setState({ kind: 'closed' });
+  const close = (): void => setState({ kind: 'closed' });
+
+  const deleteMemory = (id: string): void => {
+    if (bridge === null || state.kind !== 'ready') return;
+    if (!window.confirm('Delete this memory? This removes it from active Jarvis memory.')) return;
+
+    setDeletingId(id);
+    bridge
+      .deleteMemory(id)
+      .then((result) => {
+        if (!result.deleted) {
+          throw new Error(`Memory deletion was denied: ${result.reason ?? 'unknown'}`);
+        }
+        setState((current) =>
+          current.kind === 'ready'
+            ? {
+                kind: 'ready',
+                result: {
+                  ...current.result,
+                  items: current.result.items.filter((item) => item.id !== id),
+                },
+              }
+            : current,
+        );
+      })
+      .catch((cause: unknown) => {
+        console.error('[memory] memory:delete failed across the IPC boundary:', cause);
+        setState({ kind: 'error' });
+      })
+      .finally(() => setDeletingId(null));
   };
 
   if (state.kind === 'closed') {
@@ -138,7 +166,7 @@ export function MemoryPanel({ bridge }: MemoryPanelProps): JSX.Element {
 
         {state.kind === 'error' && (
           <p style={{ margin: 0, color: text.body, fontSize: 12 }}>
-            Jarvis could not read memory right now. Nothing was changed.
+            Jarvis could not update memory right now. No further changes were made.
           </p>
         )}
 
@@ -175,12 +203,35 @@ export function MemoryPanel({ bridge }: MemoryPanelProps): JSX.Element {
                 <div
                   style={{
                     marginTop: 3,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 8,
                     color: text.faint,
                     fontFamily: fontFamily.mono,
                     fontSize: 9,
                   }}
                 >
-                  {item.kind} · {item.sensitivity} · {new Date(item.updatedAt).toLocaleString()}
+                  <span>
+                    {item.kind} · {item.sensitivity} · {new Date(item.updatedAt).toLocaleString()}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => deleteMemory(item.id)}
+                    disabled={deletingId !== null}
+                    aria-label={`Delete memory ${item.canonicalKey}`}
+                    style={{
+                      border: `1px solid ${surface.hairline}`,
+                      borderRadius: surface.radiusMin,
+                      background: 'transparent',
+                      color: text.body,
+                      fontFamily: fontFamily.mono,
+                      fontSize: 9,
+                      cursor: deletingId === null ? 'pointer' : 'wait',
+                    }}
+                  >
+                    {deletingId === item.id ? 'Deleting…' : 'Delete'}
+                  </button>
                 </div>
               </article>
             ))}
