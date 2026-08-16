@@ -387,6 +387,7 @@ async function runChecks(page, mode) {
     'getSession',
     'deleteSession',
     'inspectMemory',
+    'deleteMemory',
   ];
   const keysOk = JSON.stringify(keys.value) === JSON.stringify(expectedKeys);
   add('Object.keys matches the exact Stage 1A bridge', keysOk, JSON.stringify(keys.value));
