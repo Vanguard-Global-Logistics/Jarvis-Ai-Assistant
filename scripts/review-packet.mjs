@@ -90,6 +90,30 @@ const TOPICS = {
       'Does any channel leak something the renderer should not learn — a filesystem path, a model endpoint, an API key fragment, an internal error string?',
     ],
   },
+  memory: {
+    label: 'Memory v1 — the only store that is replayed into every prompt',
+    paths: [
+      'apps/desktop/src/main/memory',
+      'apps/desktop/src/main/handlers/memory.ts',
+      'apps/desktop/src/main/user-facing-error.ts',
+      'packages/contracts/src/memory',
+      'packages/database/src/migrations/0006-memory.ts',
+    ],
+    rules: [
+      'docs/foundation/06-MEMORY-CONSTITUTION.md',
+      'docs/DECISIONS/0029-memory-v1-jarvis-finally-remembers.md',
+    ],
+    questions: [
+      // The load-bearing one. Everything else in this feature is convenience.
+      'A memory marked `private` or `never-send` must NEVER be assembled into a prompt for a provider that leaves the machine. Find any path — a second call site, a future provider, a reordering, a caller that builds the prompt itself, a code path that reads the store directly instead of through `recallFor` — by which one could still reach Anthropic, Gemini, Grok or NVIDIA.',
+      'Memory text is inserted into a prompt under a preamble saying it is fact, never instruction. Write a memory, within 280 characters, that would nonetheless steer the model into treating it as a command. How would you strengthen the framing without an LLM in the loop?',
+      'Credential-shaped text is refused at the boundary and the refusal is a constant that never interpolates the refused text. Find a credential format the guard misses, or a path by which the refused text could still reach a log, an error, or the renderer.',
+      '`UserFacingError` is a deliberate opt-out from the boundary flattening every handler error. Its rule is that the message must be built from constants only. Is that rule enforceable, or is it honour-system? What is the worst thing a future subclass could leak through it?',
+      'The `memory` table has NO owner column — separation is the OS user account per ADR 0012. Argue the opposite case: what breaks with separate files that a filtered shared table would have handled, and is any of it a security regression?',
+      'Deletion is real deletion, not a tombstone. Is there a path by which a deleted memory survives — in a backup, an export, a WAL file, a log, or a prompt already in flight?',
+    ],
+  },
+
   model: {
     label: 'The model provider layer and credential handling',
     paths: [

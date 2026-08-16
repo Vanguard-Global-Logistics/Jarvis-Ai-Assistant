@@ -34,7 +34,11 @@
   Persistence landed (ADR 0008–0014). The PACKAGED-APP gate is now green — `package:dir`
   then `probe:packaged` pass against a real asar build with `isPackaged: true`
   (2026-08-13). A real Gemini key answered the same day, the first live model reply this
-  repository has had. REMAINING for the milestone: the macOS `.dmg` built and opened on
+  repository has had. Memory v1 landed on 2026-08-14 (ADR 0029) — out of order relative
+  to this list, on William's explicit approval, because an assistant that forgets you is
+  one nobody opens twice and that made it the item deciding whether the MVP is worth
+  accepting at all. The head node is settled: **the Mac** ("100% I'm using the Mac",
+  2026-08-14). REMAINING for the milestone: the macOS `.dmg` built and opened on
   William's own Mac (`npm run package:mac`, ADR 0016 — it only runs on a Mac), and
   William's acceptance: using it for one real task.**
 
@@ -56,16 +60,28 @@
 - **Promotion criteria:** Stage 1A accepted · definition ADR approved · design passes
   the Chief Architect gate.
 
-### Memory v1 — `06-MEMORY-CONSTITUTION.md`, then Memory CRUD
+### ~~Memory v1~~ — **DONE (ADR 0029, 2026-08-14)**
 
-- **User value:** durable, governed memory with the sensitivity-level and
-  approval/review workflow already flagged as a Phase 1 design decision.
-- **Dependency:** 06 drafted and approved first; SQLite wiring from Stage 1A.
-- **Complexity:** moderate. **Recurring cost:** $0 (local SQLite).
-- **Why this priority:** standing §7 Phase 1 requirement; the MVP's explicit-save
-  sessions are deliberately not memory — this is where memory becomes real.
-- **Promotion criteria:** as above; ordering relative to Stage 1B is William's call at
-  promotion time (both sit in NEXT).
+Promoted out of NEXT by William's explicit approval ("Ok build"), which is the gate
+ADR 0005 requires. `06-MEMORY-CONSTITUTION.md` was written and approved **before** the
+code, in the order this list specified.
+
+- **Shipped:** three IPC channels (`memory:remember`/`list`/`forget`), migration 6,
+  recall wired into `jarvis:chat` and filtered by the ACTIVE provider, three
+  sensitivity tiers defaulting to the restrictive one, credential refusal at the
+  boundary, and a panel showing the whole store with confirmed real deletion.
+- **The sensitivity level and approval workflow** that §7 of CLAUDE.md flagged as an
+  undecided Phase 1 design decision is now decided — constitution §3 and §4.
+- **Evidence:** `verify` 716/716, `build` green, `probe:runtime` PASSED against the
+  real app, red-green on the leak filter (17 and 19 red on two different mutations,
+  26 green restored).
+- **Still open on it:** `npm run review -- memory` packet is written
+  (`docs/review/review-memory.md`) but has NOT been sent to a second vendor. Under
+  CLAUDE.md §5 that review is required, not optional, and this item is not fully
+  closed until it happens.
+- **Deliberately NOT built:** autonomous writes (constitution §4 — AEGIS must enforce
+  `memory-writes` first), semantic recall (§10), promotion from repetition (§9), and
+  any shared family vault (§6 — needs its own ADR).
 
 ### Gate closure — packaged-installer verification (small; not a capability)
 

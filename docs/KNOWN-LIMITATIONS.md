@@ -23,9 +23,15 @@ cards (ADR 0009), so an Amplifier-only session is savable. What this is **not**:
 - **No autosave.** Only an explicit Save Session persists anything. An unsaved
   conversation is discarded on close — the banner says so, and the runtime probe
   proves it (it chats first, then asserts the history list is still empty).
-- **No memory.** A saved transcript is a stored record, not recall. Jarvis does not
-  read saved sessions back into new conversations, does not learn from them, and has
-  no Memory module (§7 of CLAUDE.md — Memory CRUD is a separate milestone).
+- **Memory EXISTS as of ADR 0029 — and here is precisely what it is not.** Jarvis now
+  keeps short, human-confirmed facts and recalls them into every turn
+  (`docs/foundation/06-MEMORY-CONSTITUTION.md`). It still does **not** learn on its own:
+  every write is a person pressing a button (§4), because AEGIS RED revokes
+  `memory-writes` and AEGIS enforces one capability of eleven. It does **not** read saved
+  transcripts back — a saved session is still a record, not recall, and memory is a
+  separate store. Recall is **lexical and small**, not semantic (§10). Nothing is
+  promoted from repetition (§9). And the `private` travel rule is enforced by the recall
+  filter, **not by AEGIS** — do not describe memory as AEGIS-protected.
 - **Resume forks, it does not mutate.** Opening a saved session is read-only, but
   **Continue** (ADR 0010) loads it back into the live composer to keep working.
   Continuing never edits the stored record; saving afterwards creates a new saved
@@ -166,8 +172,10 @@ exists as a step at all: there is no native module. The remaining honest caveats
   `conversation-amplifications` ADR 0009, `conversation-plans` ADR 0024 — automation
   plans, so a plan survives a save rather than evaporating, `profile` ADR 0013 — a single
   row holding a display name and an accent — and `window-state` ADR 0017, a single row holding where
-  the window was). No tables exist for memory, projects, tasks, or the audit log — those
-  are feature design work and are not approved.
+  the window was, and `memory` ADR 0029 — short human-confirmed facts, deliberately with
+  **no owner column**, because ADR 0012 makes data separation the OS user account). No
+  tables exist for projects, tasks, or the audit log — those are feature design work and
+  are not approved. AEGIS keeps its own hash-chained log outside this database.
 - `window_state` is **not** reached over IPC. Main owns both the window and the database,
   so the whole feature lives on the trusted side and adds nothing to the bridge. It is verified by the runtime probe, which forces a distinctive size onto
   disk between two launches and asserts the second comes up at it.
