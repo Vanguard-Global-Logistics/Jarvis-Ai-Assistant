@@ -136,11 +136,13 @@ describe('MemoryService inspect', () => {
 
     expect(service.inspect({ ...inspectContext, maxSensitivity: 'restricted' }).items).toEqual([]);
     expect(
-      service.inspect({
-        ...inspectContext,
-        maxSensitivity: 'restricted',
-        restrictedReadApproved: true,
-      }).items.map((item) => item.id),
+      service
+        .inspect({
+          ...inspectContext,
+          maxSensitivity: 'restricted',
+          restrictedReadApproved: true,
+        })
+        .items.map((item) => item.id),
     ).toEqual(['restricted']);
   });
 
@@ -162,10 +164,7 @@ describe('MemoryService inspect', () => {
 
   it('returns newest authorized memories first and reports truncation', () => {
     const repository = new InspectionRepository();
-    repository.records.set(
-      'older',
-      memory({ id: 'older', canonicalKey: 'family.william.older' }),
-    );
+    repository.records.set('older', memory({ id: 'older', canonicalKey: 'family.william.older' }));
     repository.records.set(
       'newer',
       memory({
