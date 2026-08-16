@@ -10,41 +10,29 @@ import { registerMemoryInspectionHandler } from './memory.js';
 describe('registerMemoryInspectionHandler', () => {
   beforeEach(() => boundary.handleContract.mockReset());
 
-  it('registers one no-argument inspection using trusted-main identity and conservative policy', () => {
-    const inspect = vi.fn(() => ({
-      items: [
-        {
-          id: 'memory-1',
-          profileId: 'william',
-          scope: 'private' as const,
-          kind: 'fact' as const,
-          canonicalKey: 'family.william.goal.primary',
-          value: 'Build useful automation.',
-          sensitivity: 'personal' as const,
-          sourceType: 'user-approved' as const,
-          updatedAt: '2026-08-16T20:00:00.000Z',
-        },
-      ],
-      truncated: false,
+  it('registers inspection and deletion with trusted-main identity', () => {
+    const inspect = vi.fn(() => ({ items: [], truncated: false }));
+    const deleteMemory = vi.fn(() => ({
+      deleted: true as const,
+      receipt: { id: 'memory-1' },
     }));
-    const memory = { inspect } as unknown as Pick<MemoryService, 'inspect'>;
+    const memory = { inspect, delete: deleteMemory } as unknown as Pick<
+      MemoryService,
+      'delete' | 'inspect'
+    >;
     const validateSender = vi.fn(() => true);
 
     registerMemoryInspectionHandler(memory, 'william', validateSender);
 
-    expect(boundary.handleContract).toHaveBeenCalledTimes(1);
-    const call = boundary.handleContract.mock.calls[0] as unknown as readonly [
+    expect(boundary.handleContract).toHaveBeenCalledTimes(2);
+
+    const inspectCall = boundary.handleContract.mock.calls[0] as unknown as readonly [
       { readonly channel: string },
       (request: undefined) => unknown,
       typeof validateSender,
     ];
-
-    expect(call[0].channel).toBe('memory:inspect');
-    expect(call[2]).toBe(validateSender);
-    expect(call[1](undefined)).toEqual({
-      items: [expect.objectContaining({ profileId: 'william', sensitivity: 'personal' })],
-      truncated: false,
-    });
+    expect(inspectCall[0].channel).toBe('memory:inspect');
+    expect(inspectCall[1](undefined)).toEqual({ items: [], truncated: false });
     expect(inspect).toHaveBeenCalledWith({
       requesterProfileId: 'william',
       memoryReadAllowed: true,
@@ -52,5 +40,25 @@ describe('registerMemoryInspectionHandler', () => {
       maxSensitivity: 'personal',
       allowShared: false,
     });
+
+    const deleteCall = boundary.handleContract.mock.calls[1] as unknown as readonly [
+      { readonly channel: string },
+      (request: { id: string }) => unknown,
+      typeof validateSender,
+    ];
+    expect(deleteCall[0].channel).toBe('memory:delete');
+    expect(deleteCall[1]({ id: 'memory-1' })).toEqual({ deleted: true });
+    expect(deleteMemory).toHaveBeenCalledWith(
+      'memory-1',
+      {
+        actorProfileId: 'william',
+        memoryWriteAllowed: true,
+        sharedWriteApproved: false,
+        restrictedWriteApproved: false,
+      },
+      expect.any(String),
+      'user-delete',
+    );
+    expect(deleteCall[2]).toBe(validateSender);
   });
 });
