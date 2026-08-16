@@ -18,6 +18,8 @@ export interface FamilyProfileImportResult {
   profileId: string;
   attempted: number;
   stored: number;
+  corrected: number;
+  unchanged: number;
   denied: number;
   deniedReasons: readonly string[];
 }
@@ -48,12 +50,17 @@ export class FamilyProfileImportService {
         profileId: seed.profileId,
         attempted: records.length,
         stored: 0,
+        corrected: 0,
+        unchanged: 0,
         denied: records.length,
         deniedReasons: ['target-profile-not-authorized'],
       };
     }
 
     let stored = 0;
+    let corrected = 0;
+    let unchanged = 0;
+    let denied = 0;
     const deniedReasons = new Set<string>();
 
     for (const record of records) {
@@ -65,10 +72,15 @@ export class FamilyProfileImportService {
         restrictedWriteApproved: context.restrictedWriteApproved,
       });
 
-      if (result.stored) {
-        stored += 1;
-      } else {
+      if (!result.stored) {
+        denied += 1;
         for (const reason of result.decision.reasons) deniedReasons.add(reason);
+      } else if (result.unchanged) {
+        unchanged += 1;
+      } else if (result.supersededId) {
+        corrected += 1;
+      } else {
+        stored += 1;
       }
     }
 
@@ -76,7 +88,9 @@ export class FamilyProfileImportService {
       profileId: seed.profileId,
       attempted: records.length,
       stored,
-      denied: records.length - stored,
+      corrected,
+      unchanged,
+      denied,
       deniedReasons: [...deniedReasons].sort(),
     };
   }
