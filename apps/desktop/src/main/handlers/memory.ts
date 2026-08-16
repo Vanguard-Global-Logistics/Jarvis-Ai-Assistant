@@ -1,17 +1,16 @@
-import { memoryInspectContract } from '@jarvis/contracts';
+import { memoryDeleteContract, memoryInspectContract } from '@jarvis/contracts';
 import type { MemoryService } from '@jarvis/jarvis-core';
 import { handleContract } from '../ipc.js';
 import type { IpcSenderValidator } from '../ipc-sender.js';
 
 /**
- * Register the one owner-visible Memory v1 inspection operation.
+ * Register owner-visible Memory v1 operations.
  *
- * The requester profile comes from trusted Electron-main composition, never from
- * the renderer. Restricted reads and shared reads are deliberately disabled in
- * this first surface; adding either later must be an explicit permission change.
+ * The active profile comes from trusted Electron-main composition, never from
+ * the renderer. Shared/restricted authority remains disabled in this surface.
  */
 export function registerMemoryInspectionHandler(
-  memory: Pick<MemoryService, 'inspect'>,
+  memory: Pick<MemoryService, 'delete' | 'inspect'>,
   requesterProfileId: string,
   validateSender: IpcSenderValidator,
 ): void {
@@ -26,12 +25,30 @@ export function registerMemoryInspectionHandler(
         allowShared: false,
       });
 
-      // Rebuild the bounded projection as plain mutable arrays for the Zod IPC
-      // contract rather than leaking MemoryService's readonly internal view.
       return {
         items: result.items.map((item) => ({ ...item })),
         truncated: result.truncated,
       };
+    },
+    validateSender,
+  );
+
+  handleContract(
+    memoryDeleteContract,
+    (request) => {
+      const result = memory.delete(
+        request.id,
+        {
+          actorProfileId: requesterProfileId,
+          memoryWriteAllowed: true,
+          sharedWriteApproved: false,
+          restrictedWriteApproved: false,
+        },
+        new Date().toISOString(),
+        'user-delete',
+      );
+
+      return result.deleted ? { deleted: true } : { deleted: false, reason: result.reason };
     },
     validateSender,
   );
