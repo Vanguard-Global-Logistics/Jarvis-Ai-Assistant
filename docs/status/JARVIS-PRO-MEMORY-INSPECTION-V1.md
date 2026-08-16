@@ -1,6 +1,6 @@
 # Jarvis Pro — Memory Inspection v1
 
-Status: **AWAITING FULL CI**
+Status: **AWAITING FINAL FULL CI AFTER STRICT-LINT/FORMAT FIXES**
 Date: 2026-08-16
 Branch: `agent/jarvis-pro-family-brain-v1`
 
@@ -43,5 +43,7 @@ Do not mark the master punch-list item complete until the current head passes:
 - production build
 - archived-handoff integrity
 - real Electron production + development runtime probe, including `memory:inspect`
+
+The first UI verification run exposed only strict lint/format issues in the new panel/tests. Those were fixed without rule suppression, then the affected test file was formatted with the repository's pinned Prettier. This direct documentation commit intentionally triggers the final full CI against that corrected head.
 
 After that evidence is green, update `docs/status/JARVIS-PRO-MASTER-PUNCHLIST.md` and mark owner-visible memory inspection complete.
