@@ -57,14 +57,18 @@ Rule: never check a box because a document, mock, UI tile, or proposal exists. A
 ## P2 — Second Brain / Obsidian
 
 - [ ] `EXTEND` Define Second Brain namespaces: People, Family, Businesses, Projects, Decisions, Lessons, Skills, Experiments.
-- [ ] `NEW` Add governed Obsidian vault adapter.
-- [ ] `EXTEND` Keep operational SQLite memory separate from human-readable Obsidian knowledge.
+- [ ] `NEW` Add governed Obsidian vault adapter using normal Markdown/files rather than making Obsidian executable authority.
+- [ ] `EXTEND` Keep operational SQLite Memory v1 separate from human-readable Obsidian knowledge.
 - [ ] `NEW` Add source/provenance links between Obsidian notes and Memory v1 records.
+- [ ] `NEW` Add deterministic note identity/frontmatter so repeated syncs update rather than duplicate knowledge.
+- [ ] `NEW` Add one-way Memory v1 → Obsidian projection first; require explicit approval before any Obsidian → Memory promotion.
 - [ ] `NEW` Add owner-reviewed conversation-to-knowledge candidate extraction.
 - [ ] `NEW` Add durable decision journal.
 - [ ] `NEW` Add goals and milestone tracking.
 - [ ] `NEW` Add knowledge backup/export/restore.
-- [ ] `NEW` Add privacy deletion propagation.
+- [ ] `NEW` Add privacy deletion propagation from governed memory into projected Obsidian knowledge.
+- [ ] `NEW` Add vault path allowlist and traversal/symlink defenses.
+- [ ] `NEW` Prove an Obsidian note cannot grant Jarvis permissions, credentials, or executable authority.
 
 ## P3 — Unified Jarvis brain / model router
 
@@ -142,7 +146,7 @@ Rule: never check a box because a document, mock, UI tile, or proposal exists. A
 - [ ] `NEW` Prove Jarvis cannot lower/disable AEGIS.
 - [ ] `NEW` Add adversarial tests and rollback proof.
 
-## P9 — Hermes Tool Bridge
+## P9 — Hermes Tool Bridge / n8n automation engine
 
 - [x] `REUSE` Preserve Hermes 0.20 pinned/governed installation architecture.
 - [x] `REUSE` Preserve Jarvis-owned Hermes skills and governed update intake.
@@ -156,6 +160,16 @@ Rule: never check a box because a document, mock, UI tile, or proposal exists. A
 - [ ] `NEW` Add execution evidence and result verification.
 - [ ] `NEW` Return bounded results to voice/UI.
 - [ ] `NEW` Add restart recovery and rollback behavior.
+- [ ] `NEW` Add governed n8n Workflow Bridge as Jarvis Pro's workflow-orchestration engine.
+- [ ] `NEW` Allowlist callable n8n workflow IDs; never expose unrestricted workflow execution to the model.
+- [ ] `NEW` Define typed/versioned Jarvis ↔ n8n request and result envelopes.
+- [ ] `NEW` Require AEGIS preflight before n8n workflows with external side effects.
+- [ ] `NEW` Keep n8n credentials outside prompts, Family Brain, Obsidian, and normal Jarvis logs.
+- [ ] `NEW` Add n8n execution receipts, correlation IDs, timeouts, cancellation, retry policy, and idempotency keys.
+- [ ] `NEW` Verify workflow outcomes before Jarvis reports completion.
+- [ ] `NEW` Separate n8n development/test workflows from approved production workflows.
+- [ ] `NEW` Add n8n security audit/configuration checks and restrict risky nodes/capabilities.
+- [ ] `NEW` Add initial approved business workflow pack only after AEGIS and credential boundaries are proven.
 
 ## P10 — Governed self-learning
 
@@ -274,31 +288,33 @@ Rule: never check a box because a document, mock, UI tile, or proposal exists. A
 
 Work top-to-bottom unless a prerequisite blocks it:
 
-1. Add owner-visible `What do you remember about me?` memory inspection path.
+1. Finish and verify owner-visible `What do you remember about me?` memory inspection path.
 2. Add memory correction/deletion presentation workflow.
 3. Connect profile-aware recall to live local conversation.
 4. Import the four approved family profiles locally on target hardware.
 5. Add family-shared memory presentation/approval flow.
 6. Add private-memory backup/restore acceptance.
-7. Begin Second Brain/Obsidian adapter design only after Family Brain v1 is accepted.
+7. Build the governed Obsidian Second Brain adapter after Family Brain v1 acceptance.
+8. Build the governed n8n Workflow Bridge after AEGIS/tool-action prerequisites are satisfied.
 
 ## Latest verification evidence
 
 - CI run: **422**
 - Verified head: `4e47016d72b051e9f90bcea9e53f2a29364d1812`
 - Verify: format ✅ lint ✅ typecheck ✅ 403 tests ✅ build ✅
-- Runtime: real Electron runtime probe ✅
-- Archived design handoff integrity ✅
+- Runtime probe: Electron native rebuild ✅ production build ✅ real Electron probe ✅
+- Archived handoff integrity: ✅
+- Family Brain verified behaviors include private JSON loading, path/symlink escape denial, persistent SQLite import, idempotent unchanged re-import, corrected-value supersession, structured stored/corrected/unchanged/denied reporting, and cross-profile recall isolation.
 
-## Definition of done for every checked box
+## Definition of done for every future checked box
 
-A box may become `[x]` only when applicable evidence exists for all of these:
+A feature is checked only when all applicable evidence exists:
 
-- implementation/configuration exists;
-- focused tests pass;
-- relevant regression tests pass;
-- runtime/physical acceptance is performed when the feature depends on real hardware or OS behavior;
-- privacy/security boundaries are reviewed;
-- rollback/failure behavior is known for privileged features;
-- documentation matches reality;
-- the commit/PR containing the change is identifiable.
+- [ ] Implementation/configuration exists.
+- [ ] Relevant focused tests pass.
+- [ ] Full regression gate passes.
+- [ ] Security/privacy impact is reviewed.
+- [ ] Runtime evidence exists when the feature claims runtime behavior.
+- [ ] Evidence is recorded in this file or a linked handoff/status artifact.
+
+Standing instruction: continue from the highest-priority unchecked item that is not blocked. Inspect and reuse proven Jarvis code before creating replacements. Never mark an item complete merely because documentation, placeholder code, or a proposal exists.
