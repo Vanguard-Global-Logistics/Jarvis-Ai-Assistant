@@ -1,7 +1,10 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+// @vitest-environment jsdom
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { MemoryInspectionResult } from '@jarvis/contracts';
 import { MemoryPanel, type MemoryInspectionBridge } from './MemoryPanel.js';
+
+afterEach(cleanup);
 
 function bridge(result: MemoryInspectionResult): MemoryInspectionBridge {
   const inspectMemory = vi.fn<MemoryInspectionBridge['inspectMemory']>().mockResolvedValue(result);
