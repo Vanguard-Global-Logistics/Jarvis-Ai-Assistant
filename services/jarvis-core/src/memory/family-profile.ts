@@ -1,11 +1,6 @@
 import { z } from 'zod';
 
-import {
-  MEMORY_KINDS,
-  MEMORY_SCOPES,
-  MEMORY_SENSITIVITIES,
-  type MemoryRecord,
-} from './schema.js';
+import { MEMORY_KINDS, MEMORY_SCOPES, MEMORY_SENSITIVITIES, type MemoryRecord } from './schema.js';
 import { normalizeCanonicalKey } from './schema.js';
 
 export const FAMILY_PROFILE_SCHEMA_VERSION = 1 as const;
@@ -38,11 +33,7 @@ function stableHash(value: string): string {
   return hash.toString(16).padStart(8, '0');
 }
 
-function recordIdentity(
-  seed: FamilyProfileSeed,
-  entry: FamilyProfileEntry,
-  canonicalKey: string,
-) {
+function recordIdentity(seed: FamilyProfileSeed, entry: FamilyProfileEntry, canonicalKey: string) {
   return JSON.stringify([
     seed.schemaVersion,
     seed.profileId,
@@ -69,16 +60,13 @@ export function buildFamilyProfileMemories(
 ): MemoryRecord[] {
   const seed = FamilyProfileSeedSchema.parse(candidate);
   const now = options.now ?? new Date().toISOString();
-  const sourceRef =
-    options.sourceRef ?? `family-profile:${seed.profileId}:v${seed.schemaVersion}`;
+  const sourceRef = options.sourceRef ?? `family-profile:${seed.profileId}:v${seed.schemaVersion}`;
 
   const seenKeys = new Set<string>();
 
   return seed.entries.map((entry) => {
     const normalizedEntryKey = normalizeCanonicalKey(entry.canonicalKey);
-    const canonicalKey = normalizeCanonicalKey(
-      `family.${seed.profileId}.${normalizedEntryKey}`,
-    );
+    const canonicalKey = normalizeCanonicalKey(`family.${seed.profileId}.${normalizedEntryKey}`);
 
     if (seenKeys.has(canonicalKey)) {
       throw new Error(`Duplicate family profile canonical key: ${canonicalKey}`);
