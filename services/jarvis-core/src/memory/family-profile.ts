@@ -60,7 +60,8 @@ export function buildFamilyProfileMemories(
 ): MemoryRecord[] {
   const seed = FamilyProfileSeedSchema.parse(candidate);
   const now = options.now ?? new Date().toISOString();
-  const sourceRef = options.sourceRef ?? `family-profile:${seed.profileId}:v${seed.schemaVersion}`;
+  const sourceRef =
+    options.sourceRef ?? `family-profile:${seed.profileId}:v${String(seed.schemaVersion)}`;
 
   const seenKeys = new Set<string>();
 
