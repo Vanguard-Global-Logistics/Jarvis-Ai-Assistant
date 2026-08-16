@@ -1,0 +1,33 @@
+name: Format memory panel test
+
+on:
+  push:
+    branches:
+      - agent/jarvis-pro-family-brain-v1
+    paths:
+      - .github/workflows/format-memory-panel-test.yml
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/jarvis-pro-family-brain-v1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx prettier --write apps/desktop/src/renderer/src/experience/MemoryPanel.test.tsx
+      - name: Commit formatted file and remove one-shot workflow
+        run: |
+          rm .github/workflows/format-memory-panel-test.yml
+          git config user.name "Jarvis Pro CI"
+          git config user.email "management@vanguardgloballogisticsllc.com"
+          git add apps/desktop/src/renderer/src/experience/MemoryPanel.test.tsx .github/workflows/format-memory-panel-test.yml
+          git commit -m "style(memory): format panel tests"
+          git push origin HEAD:agent/jarvis-pro-family-brain-v1
