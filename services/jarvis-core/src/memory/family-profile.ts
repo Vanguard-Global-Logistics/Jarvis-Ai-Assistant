@@ -38,7 +38,11 @@ function stableHash(value: string): string {
   return hash.toString(16).padStart(8, '0');
 }
 
-function recordIdentity(seed: FamilyProfileSeed, entry: FamilyProfileEntry, canonicalKey: string) {
+function recordIdentity(
+  seed: FamilyProfileSeed,
+  entry: FamilyProfileEntry,
+  canonicalKey: string,
+) {
   return JSON.stringify([
     seed.schemaVersion,
     seed.profileId,
@@ -72,7 +76,9 @@ export function buildFamilyProfileMemories(
 
   return seed.entries.map((entry) => {
     const normalizedEntryKey = normalizeCanonicalKey(entry.canonicalKey);
-    const canonicalKey = normalizeCanonicalKey(`family.${seed.profileId}.${normalizedEntryKey}`);
+    const canonicalKey = normalizeCanonicalKey(
+      `family.${seed.profileId}.${normalizedEntryKey}`,
+    );
 
     if (seenKeys.has(canonicalKey)) {
       throw new Error(`Duplicate family profile canonical key: ${canonicalKey}`);
