@@ -361,6 +361,20 @@ export function exportAllConversations(db: SqliteDatabase): SavedConversation[] 
  */
 export function importConversations(
   db: SqliteDatabase,
+  conversations: readonly SavedConversation[],
+): { added: number; skipped: number } {
+  return withTransaction(db, () => importConversationsInto(db, conversations));
+}
+
+/**
+ * The NON-TRANSACTIONAL core, exported so `backup.ts` can compose the
+ * conversation and memory halves of a restore under ONE transaction —
+ * `withTransaction` is not re-entrant, and two separate commits meant a memory
+ * failure could leave conversations restored while the person was told the
+ * restore failed. The caller owns the transaction; call this only inside one.
+ */
+export function importConversationsInto(
+  db: SqliteDatabase,
   /**
    * In **backup order — newest first**, exactly as `exportAllConversations`
    * emits it and `parseBackupDocument` returns it.
@@ -391,9 +405,11 @@ export function importConversations(
   let added = 0;
   let skipped = 0;
 
-  // One transaction for the whole restore: a partial import that left some
-  // conversations half-written would be worse than no import at all.
-  withTransaction(db, () => {
+  // The transaction is owned by the CALLER (see the wrapper above and
+  // `importHistoryFromFile`): a partial import that left some conversations
+  // half-written would be worse than no import at all, and since ADR 0031 the
+  // "whole restore" includes memories, so the boundary moved up one level.
+  {
     // Oldest first — see the note above.
     //
     // Reverse BEFORE sorting, and the order of those two steps is the whole
@@ -434,7 +450,7 @@ export function importConversations(
       });
       added += 1;
     }
-  });
+  }
 
   return { added, skipped };
 }

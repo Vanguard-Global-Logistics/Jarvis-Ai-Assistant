@@ -131,13 +131,17 @@ control. A person who reads "Never send", deliberately chooses it over the
 default, and receives exactly the default guarantee has been told something
 false by the interface.
 
-**And now the honest limit of what that change bought, because the paragraph
-above reads stronger than the truth.** In the SHIPPED BUILD, `private` and
-`never-send` still behave identically to the person using it: `recallFor`
-filters both out of every prompt bound for a provider that leaves the machine,
-and includes both for one that does not. Nothing observable differs. What
-changed is where the answer comes from — resistance to a future edit, which is a
-developer-facing property.
+**And the honest limit, kept current.** As of ADR 0031 the two tiers differ at
+exactly ONE observable surface: the backup file. `never-send` facts are
+excluded from `history:export`'s document (at assembly and again at the
+schema); `private` facts travel in it. Everywhere else — recall, prompts,
+providers — the tiers still behave identically: `recallFor` filters both out
+of every prompt bound for a provider that leaves the machine, and includes
+both for one that does not. One divergence exists; do not describe the tiers
+as fully distinct. And one channel around the exclusion is open and stated:
+conversation transcripts export unfiltered, so a local brain's reply that
+restated a `never-send` fact, once saved, is in the transcript half of the
+backup verbatim.
 
 That distinction matters enough to be written down because it was briefly got
 wrong in the worst possible place: the `never-send` tier's user-facing
@@ -189,14 +193,13 @@ memory **at the boundary** rather than storing it with a warning. It is pinned t
 the source by a structural comparison in `credential-guard.test.ts`, and it takes
 no fixture-marker exemption.
 
-It catches **six formats**: `sk-ant-`, bare `sk-`, `AIza`, `xai-`, `ghp_`, and
-PEM private-key blocks. It does **NOT** catch passwords, account numbers, card
-numbers, AWS key pairs, Slack tokens, JWTs, or connection strings with a password
-in them. The list above is what a person should never type; the guard is a
-backstop for the subset it recognises, not a substitute for the rule. That gap is
-recorded in `docs/KNOWN-LIMITATIONS.md` rather than papered over here — the swarm
-found this paragraph claiming the broader coverage, and a constitution that
-overstates its own enforcement is worse than one that admits the edge.
+It catches **ten formats** (widened 2026-08-18, ADR 0033): the original six —
+`sk-ant-`, bare `sk-`, `AIza`, `xai-`, `ghp_`, PEM private-key blocks — plus
+AWS access key ids, Slack tokens, JWTs, and connection strings carrying an 8+
+character password. It does **NOT** catch a bare password, an account number,
+a card number, or a short/placeholder connection-string password — a bare
+password typed as a fact is still stored, and the refusal copy's "or password"
+remains only partially enforced
 
 A rejection message must never echo the matched text back.
 
@@ -291,11 +294,13 @@ a deterministic promoter cannot be talked into anything.
 - It does not make Jarvis learn on its own. v1 remembers what it is told.
 - It does not make memory searchable by meaning. Recall in v1 is lexical and
   small, because a small honest recall beats a large plausible one.
-- **It does not survive a machine loss at all today.** `history:export` carries
-  conversations only; memory is in no backup. Export, reinstall, import, and every
-  memory is gone. Adding it is a change to `BackupDocument` with its own ADR — and
-  that ADR must settle the tier rule first, because writing a `never-send` fact
-  into a portable file a person copies to a USB stick contradicts §3.
+- **It survives a machine loss as of ADR 0031** — `history:export` (backup
+  format v2) carries every `open` and `private` memory; restore merges by id
+  and never overwrites; the credential guard runs at the import door. What the
+  backup does NOT carry: `never-send` facts (excluded at assembly and refused
+  by the schema — a portable file has left the machine) and any encryption at
+  all (the file is plain JSON; a `private` fact in it is protected only by
+  where the person puts the file).
 - It does not make anything private that is sent to a remote provider. `open`
   memories reach whatever brain is answering, and the tier system exists so that
   is a choice rather than an accident.

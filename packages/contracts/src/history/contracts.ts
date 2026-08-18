@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { AmplifierResultSchema, AutomationPlanSchema } from '../model/contracts.js';
-import { MemorySchema } from '../memory/contracts.js';
+import { MemorySchema, sensitivityAllowsBackup } from '../memory/contracts.js';
 
 /**
  * Conversation-history schemas — the shapes stored and served by the Stage 1A
@@ -152,12 +152,27 @@ const BackupDocumentV2Schema = z
     conversations: z.array(SavedConversationSchema),
     memoryCount: z.number().int().min(0),
     memories: z.array(
-      MemorySchema.refine((memory) => memory.sensitivity !== 'never-send', {
+      // The SAME predicate the export path uses — one backup travel rule, one
+      // place (`sensitivityAllowsBackup`). A bare `!== 'never-send'` here was
+      // a second hand-written copy of a security rule, and it failed open for
+      // any future tier.
+      MemorySchema.refine((memory) => sensitivityAllowsBackup(memory.sensitivity), {
         message: 'A never-send memory must not appear in a portable backup file.',
       }),
     ),
   })
-  .strict();
+  .strict()
+  // The counts are not decoration: a foreign file whose counts disagree with
+  // its arrays has been edited or truncated, and refusing it is kinder than
+  // restoring something other than what the person believes the file holds.
+  // Without this refine, `{ memoryCount: 0, memories: [ …500 facts… ] }`
+  // parsed clean and the persisted counts were a second source of truth
+  // nobody read.
+  .refine(
+    (doc) =>
+      doc.memoryCount === doc.memories.length && doc.conversationCount === doc.conversations.length,
+    { message: 'The backup counts do not match its contents.' },
+  );
 
 /**
  * Both versions are accepted on READ, so a backup written before memory existed

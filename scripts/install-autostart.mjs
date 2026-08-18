@@ -23,7 +23,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { homedir, userInfo } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -40,16 +40,37 @@ if (process.platform !== 'darwin') {
 const repoDir = join(dirname(fileURLToPath(import.meta.url)), '..');
 const agentsDir = join(homedir(), 'Library', 'LaunchAgents');
 const logsDir = join(homedir(), 'Library', 'Logs', 'Jarvis');
-// The npm actually running this script — the absolute path launchd needs,
-// because launchd's minimal PATH knows nothing about nvm or homebrew.
-const npmPath =
-  process.env.npm_execpath ?? execFileSync('which', ['npm'], { encoding: 'utf8' }).trim();
+// The absolute path to the npm EXECUTABLE, because launchd's minimal PATH
+// knows nothing about nvm or homebrew.
+//
+// NOT `process.env.npm_execpath` — the first version used it, and a critic
+// caught that it points at `.../npm/bin/npm-cli.js`, a script whose
+// `#!/usr/bin/env node` shebang would then resolve `node` against launchd's
+// bare PATH: the exact works-in-a-terminal-never-at-login failure this
+// installer exists to prevent, reintroduced by the line claiming to prevent
+// it. `which npm` returns the shim that embeds its own node resolution.
+const npmPath = execFileSync('which', ['npm'], { encoding: 'utf8' }).trim();
+if (!existsSync(npmPath) || npmPath.endsWith('.js')) {
+  console.error(
+    `✗ could not find a real npm executable (got "${npmPath}").\n` +
+      '  launchd needs the binary shim, not a .js entry point — its minimal\n' +
+      '  PATH cannot resolve the shebang. Install node via nvm or homebrew\n' +
+      '  and re-run from a normal terminal.',
+  );
+  process.exit(1);
+}
 
 mkdirSync(agentsDir, { recursive: true });
 mkdirSync(logsDir, { recursive: true });
 
 const uid = String(userInfo().uid);
-for (const agent of buildAgents({ repoDir, npmPath, logsDir })) {
+// The directory holding node and npm — prepended to the agents' PATH, because
+// the children (`dev:awake` spawns bare `npm` and `caffeinate`) need it too,
+// not just ProgramArguments[0].
+const nodeBinDir = dirname(process.execPath);
+
+let anyFailed = false;
+for (const agent of buildAgents({ repoDir, npmPath, logsDir, nodeBinDir })) {
   const target = join(agentsDir, agent.filename);
   writeFileSync(target, agent.content, 'utf8');
   const label = agent.filename.replace(/\.plist$/, '');
@@ -59,9 +80,20 @@ for (const agent of buildAgents({ repoDir, npmPath, logsDir })) {
   } catch {
     /* not loaded — first install */
   }
-  execFileSync('launchctl', ['bootstrap', `gui/${uid}`, target], { stdio: 'inherit' });
-  console.log(`✓ installed and loaded ${label}`);
-  console.log(`    ${target}`);
+  // Guarded: `bootstrap` routinely fails on a stale registration, and an
+  // unguarded throw here killed the script after the FIRST plist — leaving the
+  // machine half-installed with the undo instructions never printed, under a
+  // docstring claiming idempotence. A partial install is stated, per agent,
+  // and the script exits non-zero at the end.
+  try {
+    execFileSync('launchctl', ['bootstrap', `gui/${uid}`, target], { stdio: 'inherit' });
+    console.log(`✓ installed and loaded ${label}`);
+    console.log(`    ${target}`);
+  } catch {
+    anyFailed = true;
+    console.error(`✗ wrote ${target} but launchctl bootstrap FAILED for ${label}.`);
+    console.error(`  Load it by hand:  launchctl bootstrap gui/${uid} ${target}`);
+  }
 }
 
 console.log(`
@@ -75,3 +107,5 @@ Without it, a reboot stops at the login screen and nothing above runs.
 To undo:  launchctl bootout gui/${uid}/com.jarvis.desktop
           launchctl bootout gui/${uid}/com.jarvis.health
           rm ${agentsDir}/com.jarvis.{desktop,health}.plist`);
+
+if (anyFailed) process.exit(1);

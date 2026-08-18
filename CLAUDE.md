@@ -102,9 +102,13 @@ Repository: `github.com/Vanguard-Global-Logistics/Jarvis-Ai-Assistant`.
   channel that existed on that date (sixteen; there are nineteen now) answering, renderer
   isolated, console clean. That closes ADR 0004's packaging gate for the pipeline.
   **Re-run on 2026-08-18** against a freshly packaged build: `isPackaged: true`, loaded
-  from `app.asar`, all NINETEEN channels answering including `memory:*` store/refuse/
-  forget driven end to end, renderer isolated, console clean (ADR 0033). The 2026-08-13
-  sixteen-channel record stands as history; the current claim is the current run. What is still NOT verified is the **macOS `.dmg` on
+  from `app.asar`, renderer isolated, console clean (ADR 0033). Precisely: seventeen of
+  nineteen channels driven end to end, including `memory:*` store/refuse/forget;
+  `history:export` and `history:import` asserted PRESENT only — the probe deliberately
+  never invokes them, because a native modal dialog hangs a headless run, so their
+  dialog paths remain `IMPLEMENTED, NOT YET VERIFIED` (ADR 0011/0014). An earlier
+  wording said "all nineteen answering", which upgraded exposed to answering — exactly
+  the §8 rule 2 claim the previous sixteen-channel note refused to make. What is still NOT verified is the **macOS `.dmg` on
   William's own Mac**: `npm run package:mac` only runs on a Mac (ADR 0016), and no
   installer has been opened there. Do not call the Mac installer verified until it is.
 - `reference/design-handoff/*.dc.html` and `support.js` are **design prototypes, not

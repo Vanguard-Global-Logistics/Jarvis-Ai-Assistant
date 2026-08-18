@@ -1,4 +1,4 @@
-import { migrate, migrations, openDatabase } from '@jarvis/database';
+import { migrate, migrations, openDatabase, withTransaction } from '@jarvis/database';
 import type { SqliteDatabase } from '@jarvis/database';
 import { MEMORY_MAX_LENGTH } from '@jarvis/contracts';
 import type { Memory } from '@jarvis/contracts';
@@ -8,6 +8,7 @@ import {
   exportableMemories,
   forget,
   importMemories,
+  importMemoriesInto,
   listMemories,
   remember,
 } from './store.js';
@@ -279,7 +280,10 @@ describe('forget is AUDITED (ADR 0032; CLAUDE.md §3)', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]?.memory_id).toBe(memory.id);
     expect(rows[0]?.learned_at).toBe(memory.learnedAt);
-    expect(() => new Date(rows[0]?.deleted_at ?? '').toISOString()).not.toThrow();
+    // Freshness, not merely parseability — a hardcoded '1999-01-01' would have
+    // passed the old `new Date(...)` assertion.
+    const deletedAt = new Date(rows[0]?.deleted_at ?? '').getTime();
+    expect(Math.abs(Date.now() - deletedAt)).toBeLessThan(10_000);
   });
 
   it('records NEITHER the fact text NOR the tier — deletion stays real (§8)', () => {
@@ -290,7 +294,20 @@ describe('forget is AUDITED (ADR 0032; CLAUDE.md §3)', () => {
     const memory = told('SECRET-SAUCE the family recipe uses cardamom.', 'never-send');
     forget(db, memory.id);
 
-    const dump = JSON.stringify(db.prepare('SELECT * FROM memory_audit').all());
+    // PRESENCE first — an absence assertion over an empty table is vacuous
+    // (delete the audit INSERT and `[]` contains no cardamom either). One row,
+    // with exactly the four designed columns, is the anchor that makes the
+    // not-contains lines below mean something.
+    const rows = db.prepare('SELECT * FROM memory_audit').all() as unknown as Record<
+      string,
+      unknown
+    >[];
+    expect(rows).toHaveLength(1);
+    expect(Object.keys(rows[0] ?? {}).sort()).toEqual(
+      ['deleted_at', 'id', 'learned_at', 'memory_id'].sort(),
+    );
+
+    const dump = JSON.stringify(rows);
     expect(dump).not.toContain('SECRET-SAUCE');
     expect(dump).not.toContain('cardamom');
     expect(dump).not.toContain('never-send');
@@ -386,5 +403,33 @@ describe('importMemories — restore merges and never overwrites (ADR 0031)', ()
 
     expect(result).toEqual({ added: 1, skipped: 1 });
     expect(JSON.stringify(listMemories(db))).not.toContain(fakeKey);
+  });
+});
+
+describe('the ...Into cores compose under ONE transaction (ADR 0031)', () => {
+  it('a throw after importMemoriesInto rolls the memories back too', () => {
+    // Why the cores exist: `withTransaction` is not re-entrant, and the first
+    // restore ran conversations and memories as two separate commits — so a
+    // memory failure left the store half-restored while the person was told
+    // the restore failed. The composed shape must roll back EVERYTHING on any
+    // throw, which is only possible because the cores open no transaction of
+    // their own. Red-green anchor: wrap `importMemoriesInto`'s body in its own
+    // `withTransaction` again and this test dies on the nested BEGIN.
+    const incoming: Memory = {
+      id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+      fact: 'Should not survive the rollback.',
+      sensitivity: 'open',
+      learnedFrom: 'told',
+      learnedAt: '2026-08-01T12:00:00.000Z',
+    };
+
+    expect(() =>
+      withTransaction(db, () => {
+        importMemoriesInto(db, [incoming]);
+        throw new Error('simulated failure after the memory half');
+      }),
+    ).toThrow('simulated failure');
+
+    expect(listMemories(db)).toEqual([]);
   });
 });

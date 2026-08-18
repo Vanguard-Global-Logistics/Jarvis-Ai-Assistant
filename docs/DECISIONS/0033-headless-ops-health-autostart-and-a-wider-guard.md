@@ -47,9 +47,21 @@ Choices worth recording:
   by the installer itself: a reboot stops at the login screen unless the
   account is set to log in automatically, which is a System Settings step only
   a human at the machine can perform once.
-- **npm by absolute path.** launchd's minimal PATH knows nothing of nvm or
-  homebrew — the classic agent that works in a terminal test and never at
-  login. Pinned by test.
+- **The whole process TREE gets a working PATH, not just argv[0].** Three
+  rounds of critics got this right. Round one used `npm_execpath` — which is
+  `npm-cli.js`, whose shebang resolves `node` against launchd's bare PATH: the
+  exact works-in-a-terminal-never-at-login failure, reintroduced by the line
+  claiming to prevent it. Round two resolved the real npm binary (`which npm`,
+  validated at runtime: exists, not a `.js`). Round three found that was STILL
+  insufficient one process deeper — `dev:awake` spawns bare `npm` and
+  `caffeinate` by name — so the plists now carry an explicit
+  `EnvironmentVariables.PATH` with the node bin dir prepended, `dev-awake` has
+  a spawn-error handler (an ENOENT under KeepAlive was an infinite silent
+  restart loop), and `launchctl bootstrap` failures are per-agent and stated
+  rather than killing the script half-installed. What the unit tests pin is
+  the PLIST CONTENT (including the PATH dict); the installer's runtime
+  derivation is validated by its own refusal checks, and nothing here is
+  verified until a Mac runs it.
 - **Refuses off-macOS** rather than no-op'ing, the ADR 0016 rule: a CI that
   "verified" an installer that installs nothing would be the exact green-but-
   false signal this repo keeps hunting down.
@@ -80,7 +92,10 @@ defence for those, and `docs/KNOWN-LIMITATIONS.md` keeps saying so.
 
 Backup carries memory with `never-send` excluded — ADR 0031. Memory deletions
 audited without content — ADR 0032. And `npm run probe:packaged` was re-run
-against a freshly packaged asar build on 2026-08-18: `isPackaged: true`, all
-**nineteen** channels answering including `memory:*`, renderer isolated,
-console clean — retiring the "sixteen channels, not re-run since memory
-landed" caveat with a run that actually happened.
+against a freshly packaged asar build on 2026-08-18: `isPackaged: true`,
+renderer isolated, console clean — **seventeen of nineteen** channels driven
+end to end including `memory:*` store/refuse/forget; `history:export` and
+`history:import` asserted present only, their modal-dialog paths still
+`IMPLEMENTED, NOT YET VERIFIED` (ADR 0011/0014). That retires the "sixteen
+channels, not re-run since memory landed" caveat with a run that actually
+happened, without upgrading "exposed" to "answering".

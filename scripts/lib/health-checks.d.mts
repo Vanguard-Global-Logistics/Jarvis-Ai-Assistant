@@ -14,7 +14,11 @@ export interface CheckResult {
 export declare function checkNodeVersion(version?: string): CheckResult;
 export declare function checkCommitsBehind(repoDir: string): CheckResult;
 export declare function checkDependencies(repoDir: string): CheckResult;
-export declare function defaultDatabasePath(platform?: string, home?: string): string;
+export declare function defaultDatabasePath(
+  platform?: string,
+  home?: string,
+  userDataDir?: string,
+): string;
 export declare function checkDatabase(dbPath: string): CheckResult;
 export declare function checkEnvFile(repoDir: string): CheckResult;
 export declare function checkDiskSpace(repoDir: string, minimumFreeBytes?: number): CheckResult;

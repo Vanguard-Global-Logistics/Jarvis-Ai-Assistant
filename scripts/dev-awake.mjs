@@ -49,6 +49,18 @@ if (IS_MAC) {
 
 const child = spawn(bin, args, { stdio: 'inherit' });
 
+child.on('error', (cause) => {
+  // Without this, a spawn failure (ENOENT: `caffeinate` or `npm` not on PATH —
+  // the launchd case, where PATH is minimal) was an UNHANDLED 'error' event: a
+  // throw, a crash, and under a KeepAlive agent an infinite silent restart
+  // loop. Name the failure and exit non-zero so the health log shows a
+  // sentence instead of a stack trace.
+  console.error(`✗ could not start "${bin}": ${cause.message}`);
+  console.error('  If this is running under launchd, the agent PATH may be missing the');
+  console.error('  node bin directory — re-run: npm run install:autostart');
+  process.exit(1);
+});
+
 child.on('exit', (code, signal) => {
   // Mirror the child's fate so CI and shells see the real result rather than a
   // wrapper's cheerful zero.

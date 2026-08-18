@@ -35,8 +35,9 @@ cards (ADR 0009), so an Amplifier-only session is savable. What this is **not**:
   promoted from repetition (§9). And the `private` travel rule is enforced by the recall
   filter, **not by AEGIS** — do not describe memory as AEGIS-protected.
 
-  Of the four gaps this section used to name, three closed on 2026-08-18
-  (ADR 0031–0033) and one narrowed. Honest current state:
+  Of the four gaps this section used to name, two closed on 2026-08-18
+  (ADR 0031, 0032) and two narrowed (ADR 0031, 0033) — the summary is the
+  weakest of its parts, not the strongest. Honest current state:
 
   - **The credential guard catches TEN credential formats and nothing else** —
     the original six (`sk-ant-`, bare `sk-`, `AIza`, `xai-`, `ghp_`, PEM
@@ -54,7 +55,12 @@ cards (ADR 0009), so an Amplifier-only session is savable. What this is **not**:
     first place the `private`/`never-send` tiers genuinely diverge. What
     remains true: the backup is **plain JSON, unencrypted** — a `private` fact
     in the file is protected only by where the person puts the file. Encrypted
-    backup is still open (punchlist §2).
+    backup is still open (punchlist §2). And one channel around the exclusion,
+    stated rather than implied: **conversation transcripts export unfiltered**,
+    and `never-send` facts ARE recalled into prompts for on-machine brains — so
+    a local model's reply that restates one, once saved, is in the transcript
+    half of the backup verbatim. The exclusion covers the `memories` array,
+    not text derived from it.
   - **Memory deletions ARE audited as of ADR 0032** — `memory_audit` records
     that a deletion happened (ids and timestamps), append-only enforced by
     database triggers, same transaction as the delete. Deliberately WITHOUT the

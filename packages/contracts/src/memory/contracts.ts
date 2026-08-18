@@ -156,6 +156,34 @@ export function sensitivityAllowsSending(sensitivity: MemorySensitivity): boolea
 }
 
 /**
+ * May a memory at this tier be written into a PORTABLE BACKUP FILE? (ADR 0031)
+ *
+ * THE single predicate for the backup travel rule, for the same reason
+ * `sensitivityAllowsSending` is the single predicate for the prompt travel
+ * rule: the first version wrote `sensitivity !== 'never-send'` as a bare
+ * string comparison in two packages, and a bare comparison fails OPEN — a
+ * future tier (say `work-only`, `leavesMachine: false`) would be exported into
+ * a plaintext file by default, in both copies, with nothing forcing anyone to
+ * decide.
+ *
+ * The exhaustive switch is the fail-closed mechanism: adding a tier to
+ * `MEMORY_SENSITIVITIES` makes this function fail to COMPILE until a human
+ * writes the new tier's backup answer down. `never-send` is answered above the
+ * switch, by name, for the same reason it is in `sensitivityAllowsSending`.
+ */
+export function sensitivityAllowsBackup(sensitivity: MemorySensitivity): boolean {
+  if (sensitivity === NEVER_SEND) return false;
+  switch (sensitivity) {
+    case 'open':
+      return true;
+    case 'private':
+      // The person's next machine is still their machine — `private` restricts
+      // which BRAINS see a fact, not which disks hold it.
+      return true;
+  }
+}
+
+/**
  * How a fact came to be known. Constitution §2 — provenance is required, so
  * this is not optional and has no "unknown" member.
  */

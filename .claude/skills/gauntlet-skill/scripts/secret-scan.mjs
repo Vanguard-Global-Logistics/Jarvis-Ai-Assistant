@@ -70,7 +70,15 @@ export const SECRET_PATTERNS = [
   { re: /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/, exemptible: true },
   { re: /xox[baprs]-[A-Za-z0-9-]{10,}/, exemptible: true },
   { re: /eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}/, exemptible: true },
-  { re: /[a-z][a-z0-9+.-]{1,20}:\/\/[^\s:@/]{1,64}:[^\s@/]{8,}@/i, exemptible: true },
+  {
+    re: /[a-z][a-z0-9+.-]{1,20}:\/\/[^\s:@/]{1,64}:[^\s@/]{8,}@/i,
+    // NOT exemptible, same reasoning as the PEM block: the match CONTAINS the
+    // password, and a password is human-chosen text — `postgres://demo:Dummy!Pass99@db`
+    // would exempt itself. The fixture-marker argument ("no real credential
+    // contains the word PLANTED") holds for vendor-issued keys and does not
+    // hold for anything a person typed.
+    exemptible: false,
+  },
 ];
 
 /**
@@ -114,9 +122,10 @@ export function findSecret(text) {
 /**
  * Belt and braces for CHOOSING A FILE, as opposed to scanning its contents.
  *
- * `findSecret` knows ten credential FORMATS (widened 2026-08-18 to cover AWS
- * key ids, Slack tokens, JWTs, and passworded connection strings). It still
- * does not know a bare password, an account number, or a personal note — so a
+ * `findSecret` knows exactly the formats in `SECRET_PATTERNS` above — a number
+ * deliberately not restated here, because a count in prose goes stale the day
+ * the list grows (the agreement test pins the length instead). It still does
+ * not know a bare password, an account number, or a personal note — so a
  * `.env.local` can sail straight through a content scan. The threat is a FILE
  * CHOICE, and the answer is an allowlist of source-shaped extensions minus
  * anything whose NAME suggests it holds a secret.

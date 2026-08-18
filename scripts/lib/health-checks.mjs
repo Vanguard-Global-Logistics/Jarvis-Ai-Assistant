@@ -26,6 +26,7 @@
  */
 
 import { statSync, openSync, readSync, closeSync, existsSync, readFileSync } from 'node:fs';
+import { safeEnvNames } from './env-text.mjs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
@@ -43,11 +44,31 @@ export function checkNodeVersion(version = process.versions.node) {
 
 /**
  * Commits behind the LAST-FETCHED remote. Deliberately no network: a health
- * check that needs the internet reports the internet, not the machine. Being
- * behind is a warning that the box is drifting from what the repo says it runs
- * — the exact state that cost a day on 2026-08-13 (18 commits behind).
+ * check that needs the internet reports the internet, not the machine.
+ *
+ * Honest scope note (a critic caught the first docstring overclaiming): with
+ * no fetch, this CANNOT detect unattended drift — nothing on a headless box
+ * refreshes the remote ref, so "up to date with the last-fetched remote" can
+ * be true forever while the branch races ahead. What it catches is the state
+ * where someone fetched or pulled partially and stopped — real, and the cheap
+ * half. Detecting true drift needs a fetch, which needs the network, which is
+ * a different check with its own failure mode.
  */
 export function checkCommitsBehind(repoDir) {
+  // Distinguish "no upstream" from "git itself failed". The first version had
+  // one catch-all returning ok:true "no upstream configured" for EVERY failure
+  // — a missing git binary, a corrupt .git, a detached HEAD — which converts
+  // "I could not check" into "checked, fine": the swallowing error path this
+  // repository keeps hunting down.
+  try {
+    execFileSync('git', ['rev-parse', '--abbrev-ref', '@{upstream}'], {
+      cwd: repoDir,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  } catch {
+    return { ok: true, detail: 'no upstream configured; skipped (nothing to be behind)' };
+  }
   try {
     const out = execFileSync('git', ['rev-list', '--count', 'HEAD..@{upstream}'], {
       cwd: repoDir,
@@ -55,17 +76,18 @@ export function checkCommitsBehind(repoDir) {
       stdio: ['ignore', 'pipe', 'pipe'],
     }).trim();
     const behind = Number(out);
+    if (!Number.isFinite(behind)) {
+      return { ok: false, detail: 'git output unrecognised; commits-behind not checked' };
+    }
     return {
       ok: behind === 0,
       detail:
         behind === 0
-          ? 'up to date with the last-fetched remote'
+          ? 'up to date with the last-fetched remote (no fetch performed — see docstring)'
           : `${String(behind)} commits behind the last-fetched remote — run: git pull`,
     };
   } catch {
-    // No upstream, or not a git checkout (a packaged install). Not a failure —
-    // there is nothing to be behind — but say what was actually checked.
-    return { ok: true, detail: 'no upstream configured; skipped (nothing to be behind)' };
+    return { ok: false, detail: 'could not run git — the checkout may be corrupt' };
   }
 }
 
@@ -83,7 +105,19 @@ export function checkDependencies(repoDir) {
  * `@jarvis/desktop`, which Electron sanitises. Overridable for tests and for
  * `JARVIS_USER_DATA_DIR` setups.
  */
-export function defaultDatabasePath(platform = process.platform, home = homedir()) {
+export function defaultDatabasePath(
+  platform = process.platform,
+  home = homedir(),
+  userDataDir = process.env.JARVIS_USER_DATA_DIR,
+) {
+  // `JARVIS_USER_DATA_DIR` is the app's own documented unpackaged override
+  // (`apps/desktop/src/main/index.ts` sets userData from it; the runtime probe
+  // uses it throughout). A health check that ignored it looked at a directory
+  // the app never touches and reported "no database yet" forever — a check
+  // that could not fail, on the machine configurations that set the variable.
+  if (userDataDir !== undefined && userDataDir !== '') {
+    return join(userDataDir, 'jarvis.db');
+  }
   const appDir =
     platform === 'darwin'
       ? join(home, 'Library', 'Application Support', '@jarvis', 'desktop')
@@ -129,18 +163,21 @@ export function checkEnvFile(repoDir) {
     // Mock provider still works with no .env; a head node probably wants one.
     return { ok: true, detail: 'no .env — the mock provider will answer (free, offline)' };
   }
-  const names = readFileSync(envPath, 'utf8')
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line !== '' && !line.startsWith('#') && line.includes('='))
-    .map((line) => line.slice(0, line.indexOf('=')).trim())
-    .filter((name) => {
-      const value = readFileSync(envPath, 'utf8')
-        .split('\n')
-        .find((line) => line.trim().startsWith(`${name}=`));
-      return value !== undefined && value.slice(value.indexOf('=') + 1).trim() !== '';
-    });
-  return { ok: true, detail: `.env present — keys set: ${names.join(', ') || '(none)'}` };
+  // Only names DECLARED in `.env.example` are ever printed; anything else is
+  // a count. Two rounds of hardening got here: the first version hand-rolled a
+  // parser that printed continuation lines of multi-line secrets as "key
+  // names"; switching to the pinned parser was proposed and a test proved it
+  // insufficient — a base64 body is a VALID identifier, so no parser can make
+  // key material unprintable. `safeEnvNames` makes it unprintable by
+  // construction: a credential fragment cannot appear in the committed example
+  // file. "Set" still means what it means to the app (empty values dropped).
+  const examplePath = join(repoDir, '.env.example');
+  const { known, unknownCount } = safeEnvNames(
+    readFileSync(envPath, 'utf8'),
+    existsSync(examplePath) ? readFileSync(examplePath, 'utf8') : '',
+  );
+  const extra = unknownCount > 0 ? ` (+${String(unknownCount)} not in .env.example, unnamed)` : '';
+  return { ok: true, detail: `.env present — keys set: ${known.join(', ') || '(none)'}${extra}` };
 }
 
 /** Free disk on the volume holding the repo. A full disk is the classic silent killer. */
@@ -149,6 +186,15 @@ export function checkDiskSpace(repoDir, minimumFreeBytes = 2 * 1024 * 1024 * 102
     const out = execFileSync('df', ['-k', repoDir], { encoding: 'utf8' });
     const line = out.trim().split('\n').at(-1) ?? '';
     const freeKb = Number(line.split(/\s+/)[3]);
+    if (!Number.isFinite(freeKb)) {
+      // Without this, unrecognised df output became "only NaN GB free" and a
+      // non-zero exit — a fabricated failure on the machine whose only signal
+      // is this log.
+      return {
+        ok: true,
+        detail: 'df output unrecognised; disk space not checked (said, not hidden)',
+      };
+    }
     const freeBytes = freeKb * 1024;
     const freeGb = (freeBytes / 1024 ** 3).toFixed(1);
     return {
@@ -163,14 +209,28 @@ export function checkDiskSpace(repoDir, minimumFreeBytes = 2 * 1024 * 1024 * 102
   }
 }
 
-/** Every check, in display order. */
+/**
+ * Every check, in display order — each ISOLATED, so one throwing check (an
+ * EACCES on the database file, an unreadable .env) becomes a failed line
+ * instead of replacing the whole report with a stack trace and silencing the
+ * checks after it. On the machine whose only signal is this log, a partial
+ * report that says which check died beats no report.
+ */
 export function runAllChecks(repoDir, dbPath = defaultDatabasePath()) {
+  const guarded = (name, run) => {
+    try {
+      return [name, run()];
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : String(cause);
+      return [name, { ok: false, detail: `check threw: ${message}` }];
+    }
+  };
   return [
-    ['node version', checkNodeVersion()],
-    ['commits behind', checkCommitsBehind(repoDir)],
-    ['dependencies', checkDependencies(repoDir)],
-    ['database file', checkDatabase(dbPath)],
-    ['.env (names only)', checkEnvFile(repoDir)],
-    ['disk space', checkDiskSpace(repoDir)],
+    guarded('node version', () => checkNodeVersion()),
+    guarded('commits behind', () => checkCommitsBehind(repoDir)),
+    guarded('dependencies', () => checkDependencies(repoDir)),
+    guarded('database file', () => checkDatabase(dbPath)),
+    guarded('.env (names only)', () => checkEnvFile(repoDir)),
+    guarded('disk space', () => checkDiskSpace(repoDir)),
   ];
 }

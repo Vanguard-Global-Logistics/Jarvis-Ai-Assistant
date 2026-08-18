@@ -187,6 +187,14 @@ describe('the backup document carries memory (ADR 0031)', () => {
       memories: [memoryFixture({ sensitivity: 'never-send' })],
       memoryCount: 1,
     };
-    expect(() => parseBackupDocument(JSON.stringify(smuggled))).toThrow(/not a Jarvis backup/i);
+    // The message NAMES the rule. The generic "not a Jarvis backup" would be
+    // false for a real-but-tampered file and would hide the actual reason from
+    // the one person who needs it. (And it must not echo the fact text.)
+    expect(() => parseBackupDocument(JSON.stringify(smuggled))).toThrow(/never-send/);
+    try {
+      parseBackupDocument(JSON.stringify(smuggled));
+    } catch (error) {
+      expect(error instanceof Error ? error.message : '').not.toContain('Rate confirmations');
+    }
   });
 });

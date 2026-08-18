@@ -1,6 +1,8 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { CHANNELS } from '@jarvis/contracts/ipc/channels';
 import type {
+  HistoryExportResult,
+  HistoryImportResult,
   AegisLevel,
   AegisRestrictionResult,
   AegisStatus,
@@ -172,36 +174,16 @@ const api = {
    * the destination on the trusted side. `exported: false` means the user
    * cancelled the dialog.
    */
-  exportHistory: (): Promise<{
-    exported: boolean;
-    conversationCount: number;
-    memoryCount: number;
-  }> =>
-    ipcRenderer.invoke(CHANNELS.historyExport) as Promise<{
-      exported: boolean;
-      conversationCount: number;
-      memoryCount: number;
-    }>,
+  exportHistory: (): Promise<HistoryExportResult> =>
+    ipcRenderer.invoke(CHANNELS.historyExport) as Promise<HistoryExportResult>,
 
   /**
    * Restore conversations from a backup the user picks (ADR 0014). Like
    * export: no path in, none out — main opens the native open dialog. The
    * merge is additive; existing conversations are never overwritten.
    */
-  importHistory: (): Promise<{
-    imported: boolean;
-    added: number;
-    skipped: number;
-    memoriesAdded: number;
-    memoriesSkipped: number;
-  }> =>
-    ipcRenderer.invoke(CHANNELS.historyImport) as Promise<{
-      imported: boolean;
-      added: number;
-      skipped: number;
-      memoriesAdded: number;
-      memoriesSkipped: number;
-    }>,
+  importHistory: (): Promise<HistoryImportResult> =>
+    ipcRenderer.invoke(CHANNELS.historyImport) as Promise<HistoryImportResult>,
 
   /**
    * The orb's name and accent (ADR 0013). Appearance only — these grant no

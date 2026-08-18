@@ -538,6 +538,53 @@ describe('Conversation', () => {
     const restoreNotice = (await screen.findByRole('status')).textContent;
     expect(restoreNotice).toContain('Restored 3 sessions');
     expect(restoreNotice).toContain('2 memories');
+  });
+
+  it('reports a MEMORY-ONLY restore, not "empty"', async () => {
+    // The branch the critics found untested: reverting the guard to the old
+    // `added === 0` alone made a memory-only backup report "That backup was
+    // empty — nothing to restore" immediately after memories were written — a
+    // false claim about a completed write.
+    const importHistory = vi.fn().mockResolvedValue({
+      imported: true,
+      added: 0,
+      skipped: 0,
+      memoriesAdded: 2,
+      memoriesSkipped: 0,
+    });
+    const bridge = fakeBridge({ importHistory });
+    render(<Conversation bridge={bridge} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /history/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /restore/i }));
+
+    const notice = (await screen.findByRole('status')).textContent;
+    expect(notice).toContain('2 memories');
+    expect(notice).not.toContain('empty');
+  });
+
+  it('says when memories were NOT restored — refused or already here', async () => {
+    // `memoriesSkipped` counts both already-present rows and credential-shaped
+    // facts refused at the import door. A backup of three refused facts used to
+    // read "That backup was empty" — the one channel for learning a memory was
+    // rejected said the opposite. A reported-but-unread counter is untestable
+    // by construction, so this test is what forces the field to stay rendered.
+    const importHistory = vi.fn().mockResolvedValue({
+      imported: true,
+      added: 0,
+      skipped: 0,
+      memoriesAdded: 0,
+      memoriesSkipped: 3,
+    });
+    const bridge = fakeBridge({ importHistory });
+    render(<Conversation bridge={bridge} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /history/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /restore/i }));
+
+    const notice = (await screen.findByRole('status')).textContent;
+    expect(notice).toContain('3 memories not restored');
+    expect(notice).not.toContain('empty');
     // Refreshed so the restored sessions appear without reopening the panel.
     expect(bridge.listConversations).toHaveBeenCalledTimes(2);
 

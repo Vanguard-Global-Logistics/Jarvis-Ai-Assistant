@@ -12,3 +12,7 @@
 export declare function parseEnvText(text: string): { key: string; value: string }[];
 
 export declare function parseEnvMap(text: string): Record<string, string>;
+export declare function safeEnvNames(
+  envText: string,
+  exampleText: string,
+): { known: string[]; unknownCount: number };

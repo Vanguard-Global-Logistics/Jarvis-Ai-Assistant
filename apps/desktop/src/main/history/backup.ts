@@ -1,10 +1,17 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { BrowserWindow, dialog } from 'electron';
-import type { Memory, SavedConversation } from '@jarvis/contracts';
-import { BackupDocumentSchema } from '@jarvis/contracts';
+import type {
+  BackupDocumentV2,
+  HistoryExportResult,
+  HistoryImportResult,
+  Memory,
+  SavedConversation,
+} from '@jarvis/contracts';
+import { BackupDocumentSchema, NEVER_SEND } from '@jarvis/contracts';
 import type { SqliteDatabase } from '@jarvis/database';
-import { exportableMemories, importMemories } from '../memory/store.js';
-import { exportAllConversations, importConversations } from './store.js';
+import { withTransaction } from '@jarvis/database';
+import { exportableMemories, importMemoriesInto } from '../memory/store.js';
+import { exportAllConversations, importConversationsInto } from './store.js';
 
 /**
  * Backup export (ADR 0011) — the only filesystem write in the application, and
@@ -24,37 +31,33 @@ import { exportAllConversations, importConversations } from './store.js';
  */
 
 /**
- * The on-disk backup document — VERSION 2 as of ADR 0031, which added memory.
+ * Build the backup document — VERSION 2 as of ADR 0031, which added memory.
  *
- * v1 carried conversations only, so "export, reinstall, import" returned every
- * conversation and silently lost every memory. `parseBackupDocument` still
+ * The return type is `BackupDocumentV2`, INFERRED from the schema in contracts.
+ * A hand-written local interface used to sit here — a copy of the schema that
+ * collided by name with the exported union and let this builder keep compiling
+ * while emitting a document its own strict schema would refuse on read. The
+ * writer is now typed by the thing it must satisfy.
+ *
+ * Pure apart from the clock, so it is testable. `parseBackupDocument` still
  * accepts v1 files (the disaster path must not punish old backups); the
  * application writes v2 only.
  */
-export interface BackupDocument {
-  readonly format: 'jarvis.conversation-backup';
-  readonly formatVersion: 2;
-  readonly exportedAt: string;
-  readonly conversationCount: number;
-  readonly conversations: readonly SavedConversation[];
-  readonly memoryCount: number;
-  /** Never contains a `never-send` fact — see `exportableMemories` (ADR 0031). */
-  readonly memories: readonly Memory[];
-}
-
-/** Build the backup document. Pure apart from the clock, so it is testable. */
 export function buildBackupDocument(
   conversations: readonly SavedConversation[],
   memories: readonly Memory[],
-): BackupDocument {
+): BackupDocumentV2 {
   return {
     format: 'jarvis.conversation-backup',
     formatVersion: 2,
     exportedAt: new Date().toISOString(),
     conversationCount: conversations.length,
     memoryCount: memories.length,
-    conversations,
-    memories,
+    // Spread rather than aliased: `z.infer` produces mutable arrays, and the
+    // inputs are deliberately `readonly` so this builder cannot edit its
+    // caller's data. A shallow copy satisfies both without a cast.
+    conversations: [...conversations],
+    memories: [...memories],
   };
 }
 
@@ -62,12 +65,6 @@ export function buildBackupDocument(
 export function defaultBackupFilename(now: Date): string {
   const iso = now.toISOString();
   return `jarvis-backup-${iso.slice(0, 10)}.json`;
-}
-
-export interface ExportResult {
-  readonly exported: boolean;
-  readonly conversationCount: number;
-  readonly memoryCount: number;
 }
 
 /**
@@ -78,7 +75,7 @@ export interface ExportResult {
  * surfaces a stated failure rather than a silent non-backup — the worst
  * possible outcome for a feature whose whole purpose is not losing data.
  */
-export async function exportHistoryToFile(db: SqliteDatabase): Promise<ExportResult> {
+export async function exportHistoryToFile(db: SqliteDatabase): Promise<HistoryExportResult> {
   const conversations = exportAllConversations(db);
   // Everything except `never-send`, filtered at assembly (ADR 0031) — the
   // excluded fact is never in the document, not in it and redacted.
@@ -104,17 +101,16 @@ export async function exportHistoryToFile(db: SqliteDatabase): Promise<ExportRes
   }
 
   const document = buildBackupDocument(conversations, memories);
+  // Parse the document BEFORE writing it, against the same schema the import
+  // door uses. This is what makes ADR 0031's "enforced twice" true on the
+  // WRITE path: without it, a future edit that swapped `exportableMemories`
+  // for the unfiltered `listMemories` would put a never-send fact on a thumb
+  // drive with every test green — the schema's refine is only a guard on this
+  // side if this side actually runs it.
+  BackupDocumentSchema.parse(document);
   await writeFile(result.filePath, `${JSON.stringify(document, null, 2)}\n`, 'utf8');
 
   return { exported: true, conversationCount: conversations.length, memoryCount: memories.length };
-}
-
-export interface ImportResult {
-  readonly imported: boolean;
-  readonly added: number;
-  readonly skipped: number;
-  readonly memoriesAdded: number;
-  readonly memoriesSkipped: number;
 }
 
 /**
@@ -134,6 +130,28 @@ export function parseBackupDocument(raw: string): ReturnType<typeof BackupDocume
 
   const parsed = BackupDocumentSchema.safeParse(json);
   if (!parsed.success) {
+    // Name the never-send case specifically. A v2 document carrying one fails
+    // the v2 refine and then fails strict v1 too, so the generic message would
+    // call a real-but-tampered backup "not a Jarvis backup" — false, and it
+    // hides the actual rule from the one person who needs to hear it. Checked
+    // structurally rather than from Zod's issue list so no fact text from the
+    // file is ever interpolated into an error a person will paste.
+    const smuggledNeverSend =
+      typeof json === 'object' &&
+      json !== null &&
+      Array.isArray((json as { memories?: unknown }).memories) &&
+      (json as { memories: unknown[] }).memories.some(
+        (memory) =>
+          typeof memory === 'object' &&
+          memory !== null &&
+          (memory as { sensitivity?: unknown }).sensitivity === NEVER_SEND,
+      );
+    if (smuggledNeverSend) {
+      throw new Error(
+        'That backup contains a memory marked never-send, which must not exist in a ' +
+          'portable file. Nothing was imported.',
+      );
+    }
     throw new Error(
       'That file is not a Jarvis backup (or was written by an incompatible version). ' +
         'Nothing was imported.',
@@ -153,7 +171,7 @@ export function parseBackupDocument(raw: string): ReturnType<typeof BackupDocume
  * overwritten (see `importConversations`). A restore must not be able to
  * destroy what the user already has.
  */
-export async function importHistoryFromFile(db: SqliteDatabase): Promise<ImportResult> {
+export async function importHistoryFromFile(db: SqliteDatabase): Promise<HistoryImportResult> {
   const parent = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
   const options = {
     title: 'Restore Jarvis sessions from a backup',
@@ -172,18 +190,30 @@ export async function importHistoryFromFile(db: SqliteDatabase): Promise<ImportR
   }
 
   const document = parseBackupDocument(await readFile(chosen, 'utf8'));
-  const { added, skipped } = importConversations(db, document.conversations);
 
+  // ONE transaction for the WHOLE restore — conversations and memories commit
+  // together or not at all. The first version ran two separate transactions,
+  // so a memory failure (full disk, I/O error) after the conversations had
+  // committed left the store half-restored while the renderer reported that
+  // nothing was imported. `withTransaction` is not re-entrant, which is why
+  // the store functions expose non-transactional `...Into` cores for exactly
+  // this composition.
+  //
   // A v1 backup predates memory and carries none — zero added is the honest
   // report, not an error. The schema union already validated whichever version
   // this is, including that no v2 file smuggles a `never-send` fact.
-  const memoryResult =
-    document.formatVersion === 2 ? importMemories(db, document.memories) : { added: 0, skipped: 0 };
+  const { conversationResult, memoryResult } = withTransaction(db, () => ({
+    conversationResult: importConversationsInto(db, document.conversations),
+    memoryResult:
+      document.formatVersion === 2
+        ? importMemoriesInto(db, document.memories)
+        : { added: 0, skipped: 0 },
+  }));
 
   return {
     imported: true,
-    added,
-    skipped,
+    added: conversationResult.added,
+    skipped: conversationResult.skipped,
     memoriesAdded: memoryResult.added,
     memoriesSkipped: memoryResult.skipped,
   };

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { CSSProperties, JSX, KeyboardEvent, RefObject } from 'react';
 import type {
+  HistoryExportResult,
+  HistoryImportResult,
   AmplifierResult,
   AutomationPlan,
   ChatMessage,
@@ -97,18 +99,8 @@ export interface ConversationBridge {
   listConversations: () => Promise<{ conversations: SavedConversationMeta[] }>;
   getConversation: (id: string) => Promise<{ conversation: SavedConversation | null }>;
   deleteConversation: (id: string) => Promise<{ deleted: boolean }>;
-  exportHistory: () => Promise<{
-    exported: boolean;
-    conversationCount: number;
-    memoryCount: number;
-  }>;
-  importHistory: () => Promise<{
-    imported: boolean;
-    added: number;
-    skipped: number;
-    memoriesAdded: number;
-    memoriesSkipped: number;
-  }>;
+  exportHistory: () => Promise<HistoryExportResult>;
+  importHistory: () => Promise<HistoryImportResult>;
   describeModels: () => Promise<ModelDescription>;
   selectModel: (id: ProviderId) => Promise<ModelSelection>;
 }
@@ -645,15 +637,26 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
   const restoreHistory = useCallback(async (): Promise<void> => {
     if (bridge === null) return;
     try {
-      const { imported, added, skipped, memoriesAdded } = await bridge.importHistory();
+      const { imported, added, skipped, memoriesAdded, memoriesSkipped } =
+        await bridge.importHistory();
       setHistoryError(null);
+      // `memoriesSkipped` is RENDERED, not merely plumbed. It counts both
+      // already-present memories and credential-shaped facts the import door
+      // refused (ADR 0031) — and a backup of three refused facts must not be
+      // reported as "empty", which is what a counter nobody reads would allow.
+      const memoriesNotRestored =
+        memoriesSkipped > 0
+          ? ` · ${String(memoriesSkipped)} ${memoriesSkipped === 1 ? 'memory' : 'memories'} not restored`
+          : '';
       if (!imported) {
         setSaveNotice('Restore cancelled — nothing was changed');
       } else if (added === 0 && memoriesAdded === 0) {
         setSaveNotice(
-          skipped === 0
+          skipped === 0 && memoriesSkipped === 0
             ? 'That backup was empty — nothing to restore'
-            : `Already up to date — ${String(skipped)} already here`,
+            : `Already up to date` +
+                (skipped > 0 ? ` — ${String(skipped)} already here` : '') +
+                memoriesNotRestored,
         );
       } else {
         setSaveNotice(
@@ -661,7 +664,8 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
             (memoriesAdded > 0
               ? ` · ${String(memoriesAdded)} ${memoriesAdded === 1 ? 'memory' : 'memories'}`
               : '') +
-            (skipped > 0 ? ` · ${String(skipped)} already here` : ''),
+            (skipped > 0 ? ` · ${String(skipped)} already here` : '') +
+            memoriesNotRestored,
         );
       }
       window.setTimeout(() => {

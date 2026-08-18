@@ -63,3 +63,28 @@ export function parseEnvMap(text) {
   }
   return map;
 }
+
+/**
+ * The key names SAFE to print in a report, split from those that are not.
+ *
+ * "Names only, never values" turned out to be insufficient on its own: a
+ * multi-line credential's continuation line (`MIIEvQIB…SECRET…==`) parses as a
+ * perfectly VALID key named by its own base64 body — all alphanumerics — so a
+ * parser-level fix cannot make key material unprintable. The rule that can:
+ * only names the repository itself declares in `.env.example` (committed,
+ * value-free, canonical) are ever printed; anything else is a COUNT. A
+ * credential fragment cannot be in the example file, so it cannot be printed,
+ * by construction rather than by pattern-matching.
+ *
+ * @param {string} envText   the machine's real `.env` contents
+ * @param {string} exampleText the committed `.env.example` contents
+ * @returns {{ known: string[], unknownCount: number }}
+ */
+export function safeEnvNames(envText, exampleText) {
+  const declared = new Set(parseEnvText(exampleText).map(({ key }) => key));
+  const set = Object.keys(parseEnvMap(envText));
+  return {
+    known: set.filter((name) => declared.has(name)),
+    unknownCount: set.filter((name) => !declared.has(name)).length,
+  };
+}

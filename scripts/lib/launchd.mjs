@@ -44,6 +44,7 @@ const escapeXml = (value) =>
  * @param {string} spec.npmScript
  * @param {string} spec.repoDir
  * @param {string} spec.logPath
+ * @param {string} spec.nodeBinDir
  * @param {boolean} [spec.keepAlive]
  * @param {number} [spec.startIntervalSeconds]
  * @returns {string}
@@ -54,6 +55,7 @@ export function buildPlist({
   npmScript,
   repoDir,
   logPath,
+  nodeBinDir,
   keepAlive = false,
   startIntervalSeconds,
 }) {
@@ -70,6 +72,16 @@ export function buildPlist({
     `    <string>${escapeXml(npmScript)}</string>`,
     '  </array>',
     `  <key>WorkingDirectory</key><string>${escapeXml(repoDir)}</string>`,
+    // An explicit PATH, because the npm path alone is NOT enough — a critic
+    // proved it one process deeper: `dev:awake` spawns bare `npm` and
+    // `caffeinate` by NAME, and under launchd's minimal PATH those raise
+    // ENOENT even when ProgramArguments[0] itself is absolute. The node bin
+    // dir (where npm and node live for nvm/homebrew installs) is prepended to
+    // the system defaults.
+    '  <key>EnvironmentVariables</key>',
+    '  <dict>',
+    `    <key>PATH</key><string>${escapeXml(nodeBinDir)}:/usr/bin:/bin:/usr/sbin:/sbin</string>`,
+    '  </dict>',
     '  <key>RunAtLoad</key><true/>',
   ];
   if (keepAlive) lines.push('  <key>KeepAlive</key><true/>');
@@ -91,7 +103,7 @@ export function buildPlist({
  * environment — never a `~/path/to/` placeholder, per the standing rule that
  * placeholders get pasted literally.
  */
-export function buildAgents({ repoDir, npmPath, logsDir }) {
+export function buildAgents({ repoDir, npmPath, logsDir, nodeBinDir }) {
   return [
     {
       filename: 'com.jarvis.desktop.plist',
@@ -101,6 +113,7 @@ export function buildAgents({ repoDir, npmPath, logsDir }) {
         npmScript: 'dev:awake',
         repoDir,
         logPath: `${logsDir}/desktop.log`,
+        nodeBinDir,
         keepAlive: true,
       }),
     },
@@ -112,6 +125,7 @@ export function buildAgents({ repoDir, npmPath, logsDir }) {
         npmScript: 'health',
         repoDir,
         logPath: `${logsDir}/health.log`,
+        nodeBinDir,
         startIntervalSeconds: 1800,
       }),
     },

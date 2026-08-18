@@ -5,6 +5,7 @@ import { cpus, homedir, totalmem } from 'node:os';
 import { DatabaseSync } from 'node:sqlite';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseEnvText, safeEnvNames } from './lib/env-text.mjs';
 
 /**
  * Collect everything a remote session needs to help, into one pasteable block.
@@ -55,14 +56,25 @@ function cmd(/** @type {string} */ bin, /** @type {string[]} */ args) {
 function envFileKeys() {
   const path = join(root, '.env');
   if (!existsSync(path)) return [];
-  return readFileSync(path, 'utf8')
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line !== '' && !line.startsWith('#') && line.includes('='))
-    .map((line) => {
-      const eq = line.indexOf('=');
-      return { name: line.slice(0, eq).trim(), set: line.slice(eq + 1).trim() !== '' };
-    });
+  // THE pinned parser (`env-text.mjs`), not a hand-rolled one. The inline
+  // version this replaced had the same defect the health check shipped with:
+  // no key-shape validation, so a continuation line of a multi-line secret
+  // value ("MIIEow…==") was reported as a KEY NAME — raw key material, printed
+  // by the one script whose whole output is designed to be pasted into a chat.
+  // `parseEnvText` rejects any key failing /^[A-Za-z_][A-Za-z0-9_]*$/, which is
+  // exactly the guard that makes key material unprintable here.
+  // Names are FILTERED to those `.env.example` declares before anything is
+  // printed — see `safeEnvNames` for why a parser alone cannot make key
+  // material unprintable (a base64 continuation line is a valid identifier).
+  const example = join(root, '.env.example');
+  const { known } = safeEnvNames(
+    readFileSync(path, 'utf8'),
+    existsSync(example) ? readFileSync(example, 'utf8') : '',
+  );
+  const knownSet = new Set(known);
+  return parseEnvText(readFileSync(path, 'utf8'))
+    .filter(({ key }) => knownSet.has(key) || key === '')
+    .map(({ key, value }) => ({ name: key, set: value !== '' }));
 }
 
 /**

@@ -13,6 +13,7 @@ export interface PlistSpec {
   readonly npmScript: string;
   readonly repoDir: string;
   readonly logPath: string;
+  readonly nodeBinDir: string;
   readonly keepAlive?: boolean;
   readonly startIntervalSeconds?: number;
 }
@@ -28,4 +29,5 @@ export declare function buildAgents(spec: {
   readonly repoDir: string;
   readonly npmPath: string;
   readonly logsDir: string;
+  readonly nodeBinDir: string;
 }): readonly Agent[];

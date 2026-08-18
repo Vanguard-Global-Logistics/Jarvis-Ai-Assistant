@@ -66,6 +66,8 @@ export {
 } from './ipc/contracts.js';
 export type {
   AppInfo,
+  HistoryExportResult,
+  HistoryImportResult,
   IpcContract,
   ModelDescription,
   ModelSelection,
@@ -84,6 +86,7 @@ export {
 } from './history/contracts.js';
 export type {
   BackupDocument,
+  BackupDocumentV2,
   HistoryIdRequest,
   SaveConversationRequest,
   SavedAmplificationEntry,
@@ -138,6 +141,7 @@ export {
   MemorySourceSchema,
   NEVER_SEND,
   RememberRequestSchema,
+  sensitivityAllowsBackup,
   sensitivityAllowsSending,
 } from './memory/contracts.js';
 export type {

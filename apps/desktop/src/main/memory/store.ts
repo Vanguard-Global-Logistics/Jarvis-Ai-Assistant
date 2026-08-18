@@ -1,6 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import type { Memory, MemorySensitivity, MemorySource, RememberRequest } from '@jarvis/contracts';
-import { CREDENTIAL_REFUSED_MESSAGE, looksLikeCredential } from '@jarvis/contracts';
+import {
+  CREDENTIAL_REFUSED_MESSAGE,
+  looksLikeCredential,
+  sensitivityAllowsBackup,
+} from '@jarvis/contracts';
 import type { SqliteDatabase } from '@jarvis/database';
 import { withTransaction } from '@jarvis/database';
 import { UserFacingError } from '../user-facing-error.js';
@@ -188,7 +192,12 @@ export function forget(db: SqliteDatabase, id: string): boolean {
  * excluded fact is never in the document, rather than in it and redacted.
  */
 export function exportableMemories(db: SqliteDatabase): Memory[] {
-  return listMemories(db).filter((memory) => memory.sensitivity !== 'never-send');
+  // `sensitivityAllowsBackup` — THE backup travel predicate, shared with the
+  // schema's refine. A bare `!== 'never-send'` here was a second hand-written
+  // copy of a security rule, and it failed OPEN: a future tier would have been
+  // exported into a plaintext file by default. The predicate's exhaustive
+  // switch makes a new tier a compile error until someone decides.
+  return listMemories(db).filter((memory) => sensitivityAllowsBackup(memory.sensitivity));
 }
 
 /**
@@ -215,6 +224,23 @@ export function importMemories(
   db: SqliteDatabase,
   memories: readonly Memory[],
 ): { added: number; skipped: number } {
+  return withTransaction(db, () => importMemoriesInto(db, memories));
+}
+
+/**
+ * The NON-TRANSACTIONAL core of `importMemories`, exported so a whole-backup
+ * restore can compose it with the conversation import under ONE transaction.
+ *
+ * `withTransaction` is not re-entrant (`BEGIN` inside an open transaction
+ * throws), and the first version of the restore ran two separate transactions —
+ * so a memory failure after the conversations had committed left the store
+ * half-restored while the person was told nothing was imported. The composer in
+ * `backup.ts` owns the transaction; call THIS only from inside one.
+ */
+export function importMemoriesInto(
+  db: SqliteDatabase,
+  memories: readonly Memory[],
+): { added: number; skipped: number } {
   const exists = db.prepare('SELECT 1 FROM memory WHERE id = ?');
   const insert = db.prepare(
     `INSERT INTO memory (id, fact, sensitivity, learned_from, learned_at)
@@ -223,15 +249,13 @@ export function importMemories(
 
   let added = 0;
   let skipped = 0;
-  withTransaction(db, () => {
-    for (const memory of memories) {
-      if (exists.get(memory.id) !== undefined || looksLikeCredential(memory.fact)) {
-        skipped += 1;
-        continue;
-      }
-      insert.run(memory.id, memory.fact, memory.sensitivity, memory.learnedFrom, memory.learnedAt);
-      added += 1;
+  for (const memory of memories) {
+    if (exists.get(memory.id) !== undefined || looksLikeCredential(memory.fact)) {
+      skipped += 1;
+      continue;
     }
-  });
+    insert.run(memory.id, memory.fact, memory.sensitivity, memory.learnedFrom, memory.learnedAt);
+    added += 1;
+  }
   return { added, skipped };
 }

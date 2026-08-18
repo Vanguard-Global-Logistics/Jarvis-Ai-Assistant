@@ -24,10 +24,11 @@ import { execFileSync } from 'node:child_process';
  * the working directory, and this text is destined for a reviewer that may be a
  * third-party model.
  *
- * `findSecret` only knows six credential FORMATS. It does not know about a
- * database URL with a password in it, a bearer token, or a personal note. So the
- * sweep is an allowlist of source-shaped extensions, minus anything whose name
- * suggests it holds a secret — belt and braces, on the safe side.
+ * `findSecret` knows only the formats in `SECRET_PATTERNS` (a count deliberately
+ * not restated in prose — it went stale here once already). It does not know a
+ * bare password, an account number, or a personal note. So the sweep is an
+ * allowlist of source-shaped extensions, minus anything whose name suggests it
+ * holds a secret — belt and braces, on the safe side.
  */
 const REVIEWABLE = /\.(ts|tsx|d\.[cm]?ts|js|jsx|mjs|cjs|json|md|ya?ml|css|html|sh|sql|toml)$/i;
 const SUSPICIOUS_NAME =

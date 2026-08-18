@@ -53,6 +53,21 @@ const CORPUS: readonly (readonly [string, string])[] = [
     'a fixture beside a real key',
     `const fake = "${key('sk-', 'ant', '-PLANTED-0001')}";\nconst real = "${key('AIza', 'Sy', BODY)}";`,
   ],
+  // The 2026-08-18 widening. The connection-string case matters doubly: its
+  // match CONTAINS a human-chosen password, so the pattern is deliberately
+  // NOT exemptible — a password containing "Dummy" must still be caught,
+  // where a vendor key containing PLANTED is a fixture by definition.
+  ['an aws key id', key('AKIA', 'IOSFODNN7EXAMPL0')],
+  ['a slack token', key('xoxb-', '1234567890-', BODY.slice(0, 12))],
+  ['a jwt', key('eyJ', 'hbGciOiJIUzI1NiJ9', '.', 'eyJ', 'zdWIiOiIxMjMifQ', '.', 'sig')],
+  [
+    'a connection string with a real password',
+    key('postgres', '://jarvis:', 'hunter22hunter22', '@db:5432/x'),
+  ],
+  [
+    'a connection string whose password contains a fixture marker',
+    key('postgres', '://demo:', 'Dummy!Pass99x', '@prod-db/x'),
+  ],
 ];
 
 describe('the two copies of the credential scanner agree', () => {
@@ -66,6 +81,23 @@ describe('the two copies of the credential scanner agree', () => {
     const verdicts = CORPUS.map(([, text]) => repoFindSecret(text) !== null);
     expect(verdicts).toContain(true);
     expect(verdicts).toContain(false);
+  });
+
+  it('pins the pattern COUNT, so widening turns exactly one place red', () => {
+    // Counts stated in prose went stale five files at a time ("six credential
+    // FORMATS" survived a widening to ten in four places). This is the one
+    // assertion that turns red on the next widening and names the job: update
+    // the docs, then this number.
+    expect(repo.SECRET_PATTERNS.length).toBe(10);
+  });
+
+  it('a fixture marker inside a PASSWORD does not disarm the guard', () => {
+    // The reasoning that made the PEM block non-exemptible applies verbatim to
+    // any match containing free text a person chose. Red-green anchor: flip
+    // the connection-string entry to `exemptible: true` and this goes red.
+    const marked = key('postgres', '://demo:', 'Dummy!Pass99x', '@prod-db/x');
+    expect(repoFindSecret(marked)).not.toBeNull();
+    expect(skillFindSecret(marked)).not.toBeNull();
   });
 
   it('compares the LIVE rule sets, not scraped source text', () => {

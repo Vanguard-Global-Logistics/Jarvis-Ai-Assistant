@@ -63,6 +63,23 @@ sync surface to exclude it from." This is that surface.
 - **No memory-only export**, no sync, no shared family vault (§6 needs its own
   ADR).
 - **No re-tiering on import.** A fact restores at the tier it was saved with.
+- **No filtering of conversation transcripts.** They export unfiltered, and
+  `never-send` facts are recalled into prompts for on-machine brains — so a
+  local model's reply that restates one, once saved as a conversation, is in
+  the transcript half of this same file verbatim. The exclusion covers the
+  `memories` array only. Stated here because "never leaves this machine, under
+  any circumstance" is the tier's INTENT, and this is the one channel the
+  implementation does not close; closing it would mean scanning transcripts at
+  export, which is its own design with its own false-positive costs.
+
+## One transaction, stated because it briefly was not true
+
+The whole restore — conversations and memories — commits in ONE transaction.
+The first implementation ran two, so a memory failure after the conversation
+half had committed left the store half-restored while the renderer reported
+failure. `withTransaction` is not re-entrant, which is why the store functions
+expose non-transactional `importConversationsInto` / `importMemoriesInto`
+cores; `importHistoryFromFile` owns the single transaction and composes them.
 
 ## Honest ordering note
 

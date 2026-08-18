@@ -101,9 +101,10 @@ describe('gauntlet refuses to stage a credential', () => {
 });
 
 describe('gauntlet refuses the FILE CHOICE, not only the contents', () => {
-  // `findSecret` knows six credential FORMATS. It does not know a Postgres URL
-  // with a password, an AWS pair, a Slack token or a JWT — so the content scan
-  // alone left `--ours .env.local` wide open while a comment claimed otherwise.
+  // `findSecret` knows only the formats in `SECRET_PATTERNS` — since 2026-08-18
+  // that includes AWS pairs, Slack tokens, JWTs and passworded URLs, but still
+  // NOT a bare password or a personal note — so the content scan alone left
+  // `--ours .env.local` wide open while a comment claimed otherwise.
 
   it('refuses a credential-shaped FILENAME even when the contents look innocent', () => {
     init();

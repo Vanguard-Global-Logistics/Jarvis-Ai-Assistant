@@ -301,7 +301,10 @@ export const historyExportContract = defineContract({
        * Reported so the UI never claims a backup while silently including — or
        * silently omitting — the store that is replayed into every prompt.
        * `never-send` facts are excluded before assembly and are NOT in this
-       * count; the person is told so in the export copy.
+       * count. (An earlier draft claimed "the person is told so in the export
+       * copy" — the UI deliberately does not lecture about tiers in a toast, so
+       * the claim was false and is gone. The count states what the file holds;
+       * the exclusion rule lives in the tier's own description.)
        */
       memoryCount: z.number().int().min(0),
     })
@@ -339,6 +342,19 @@ export const historyImportContract = defineContract({
     })
     .strict(),
 });
+
+/**
+ * The export/import result shapes, INFERRED from the contracts (ADR 0031).
+ *
+ * These existed as five hand-written restatements — the Zod schema, main's
+ * result interfaces, the preload annotation, the preload cast, and the
+ * renderer's bridge type — and adding one field meant editing all five plus
+ * three test doubles. The annotation-vs-cast pair was checked by the compiler;
+ * the cast-vs-CONTRACT pair was checked by nothing. `z.infer` closes that: the
+ * schema is the source and every layer imports the type.
+ */
+export type HistoryExportResult = z.infer<typeof historyExportContract.response>;
+export type HistoryImportResult = z.infer<typeof historyImportContract.response>;
 
 // --- profile:* (ADR 0013) ---------------------------------------------------
 

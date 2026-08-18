@@ -277,8 +277,9 @@ function pair() {
   /**
    * GATE THE FILE CHOICE, not only the file contents.
    *
-   * `findSecret` knows six credential FORMATS. It does not know a Postgres URL
-   * with a password, an AWS key pair, a Slack token or a JWT — so `--ours
+   * `findSecret` knows only the formats in `SECRET_PATTERNS` (widened over
+   * time; the count is deliberately not restated). It does not know a bare
+   * password, an account number, or a personal note — so `--ours
    * .env.local`, the exact threat the first version of this comment named, sailed
    * straight through the content scan and was staged verbatim. A critic put it
    * precisely: the threat is a FILE CHOICE, and this repo already had the answer

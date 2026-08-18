@@ -145,9 +145,11 @@ describe('agreement with scripts/lib/secret-scan.mjs', () => {
 
   it('deliberately does NOT inherit the fixture exemption', () => {
     // The one intended difference, asserted rather than described. The scanner
-    // exempts marker-bearing fixtures for five of its six patterns; memory
-    // exempts nothing, because nobody types an example key as a durable fact and
-    // the exemption would be a one-word bypass.
+    // exempts marker-bearing fixtures for every pattern EXCEPT the PEM block
+    // and passworded connection strings (whose match spans contain free text a
+    // marker could hide in); memory exempts nothing at all, because nobody
+    // types an example key as a durable fact and the exemption would be a
+    // one-word bypass.
     expect(scanner.FIXTURE_MARKERS.test('EXAMPLE')).toBe(true);
     const markedAsFake = ['sk', 'ant', 'EXAMPLE123456789abcdef'].join('-');
     expect(scanner.findSecret(markedAsFake)).toBeNull();

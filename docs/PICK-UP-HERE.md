@@ -280,10 +280,12 @@ which breaks the single-operator assumption every rule in this repo relies on.
    Mac (ADR 0016). Until an installer is opened there, do not call it verified.
 2. **Accept one real task.** ADR 0006's definition of accepted. Nobody else can
    do this.
-3. **Choose the health-alert channel.** The Mac now writes a health log every
-   30 minutes, but a log is only read after something is noticed. ADR 0030 §1b
-   wants absence REPORTED — that needs a push channel (email? text? to whom?),
-   and only William can pick it. One sentence unblocks the remote half.
+3. **Choose the health-alert channel.** Once `npm run install:autostart` has
+   been run on the Mac — it has NOT been yet — the Mac will write a health log
+   every 30 minutes. A log is only read after something is noticed, though; ADR 0030 §1b
+   ADR 0030 §1b wants absence REPORTED — that needs a push channel (email?
+   text? to whom?), and only William can pick it. One sentence unblocks the
+   remote half.
 4. **Send the cross-vendor review packet.** `docs/review/review-memory.md` is
    written and paste-ready. `CLAUDE.md` §5 makes this **required**, not
    optional, for security-critical work. It has been recorded as outstanding

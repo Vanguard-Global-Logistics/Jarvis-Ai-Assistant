@@ -15,6 +15,7 @@ const SPEC = {
   repoDir: '/Users/amylavold/Jarvis-Ai-Assistant',
   npmPath: '/opt/homebrew/bin/npm',
   logsDir: '/Users/amylavold/Library/Logs/Jarvis',
+  nodeBinDir: '/opt/homebrew/bin',
 };
 
 describe('buildPlist', () => {
@@ -27,9 +28,30 @@ describe('buildPlist', () => {
       npmScript: 'dev:awake',
       repoDir: SPEC.repoDir,
       logPath: `${SPEC.logsDir}/desktop.log`,
+      nodeBinDir: SPEC.nodeBinDir,
     });
     expect(plist).toContain('<string>/opt/homebrew/bin/npm</string>');
     expect(plist).not.toContain('<string>npm</string>');
+  });
+
+  it('sets an explicit PATH carrying the node bin dir — for the CHILDREN', () => {
+    // The finding that forced this: even with an absolute ProgramArguments[0],
+    // `dev:awake` spawns bare `npm` and `caffeinate` by name one process
+    // deeper, and under launchd's minimal PATH those raise ENOENT — a crash
+    // that KeepAlive then restarts forever, silently. The agent must carry the
+    // PATH its whole process TREE needs, not just its first exec.
+    const plist = buildPlist({
+      label: 'com.jarvis.desktop',
+      npmPath: SPEC.npmPath,
+      npmScript: 'dev:awake',
+      repoDir: SPEC.repoDir,
+      logPath: `${SPEC.logsDir}/desktop.log`,
+      nodeBinDir: SPEC.nodeBinDir,
+    });
+    expect(plist).toContain('<key>EnvironmentVariables</key>');
+    expect(plist).toContain(
+      '<key>PATH</key><string>/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>',
+    );
   });
 
   it('escapes XML-significant characters instead of writing a corrupt plist', () => {
@@ -39,6 +61,7 @@ describe('buildPlist', () => {
       npmScript: 'health',
       repoDir: '/repo<dir>',
       logPath: '/log',
+      nodeBinDir: '/bin',
     });
     expect(plist).toContain('/a&amp;b/npm');
     expect(plist).toContain('/repo&lt;dir&gt;');
@@ -75,13 +98,16 @@ describe('buildAgents — the two agents the headless Mac needs', () => {
     expect(health?.content).not.toContain('<key>KeepAlive</key>');
   });
 
-  it('both agents carry REAL paths — no placeholder survives to a plist', () => {
-    // `~/path/to/...` was pasted literally, twice. A plist is even less
-    // forgiving than a terminal: launchd would fail silently at every login.
+  it('both agents interpolate the spec paths they were given', () => {
+    // An earlier version also asserted `not.toContain('path/to')` and
+    // `not.toContain('~')` — vacuous, a critic pointed out, because they
+    // asserted a property of the test's own SPEC constant, unfalsifiable by
+    // any implementation that interpolates its inputs. The placeholder risk
+    // lives in the INSTALLER, which passes real values from the running
+    // environment and validates the npm path at runtime.
     for (const agent of agents) {
-      expect(agent.content).not.toContain('path/to');
-      expect(agent.content).not.toContain('~');
       expect(agent.content).toContain(SPEC.repoDir);
+      expect(agent.content).toContain(SPEC.npmPath);
     }
   });
 });
