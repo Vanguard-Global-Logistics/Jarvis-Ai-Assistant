@@ -110,32 +110,45 @@ describe('swarm verdict — the exit code is the product', () => {
     // the lenses the closing hint prints, so it is the LIKELY wrong-file path.
     //
     // This test used to hand-write a two-line facsimile of a prompt, which a
-    // critic correctly called re-implementing the artifact under test: it passed
-    // against a detector that no longer matched real prompts at all. It now runs
-    // `prep` for real and feeds it the file that `prep` actually wrote.
-    // `--since HEAD~1` rather than the default scope. The default reviews the
-    // working tree, or `origin/main...HEAD` when the tree is clean — so in a
-    // FRESH CLONE with nothing modified this found no diff, refused, and the
-    // test failed on a machine that had done nothing wrong.
+    // critic correctly called re-implementing the artifact under test. It then
+    // ran prep with `--since HEAD~1` — and coupled itself to the CONTENT of
+    // whatever the last commit happened to be, which `verify:cold` caught the
+    // day a commit legitimately removed a credential-shaped documentation
+    // example: prep refused the deletion lines (the scanner working exactly as
+    // designed — the commit that removes a leaked key is the commit whose diff
+    // contains it), and this test went red for a defect in HISTORY, not in the
+    // code. Same lesson twice: a test that depends on ambient repo state is
+    // testing the checkout.
     //
-    // `npm run verify` never saw it: the tree it runs in always has changes.
-    // `npm run verify:cold` found it on its first full run, which is exactly the
-    // class of defect that command exists for. A test that depends on ambient
-    // repo state is testing the checkout, not the code.
-    const prep = spawnSync('node', [script, '--since', 'HEAD~1', '--lenses', 'correctness'], {
-      cwd: root,
-      encoding: 'utf8',
-    });
-    expect(prep.status, `swarm prep failed:\n${prep.stdout}${prep.stderr}`).toBe(0);
-    const promptPath = /(\S*docs\/swarm\/\S+correctness\.md)/.exec(prep.stdout)?.[1];
-    expect(promptPath).toBeDefined();
+    // Now it OWNS its diff: it writes a scratch untracked file, so prep's
+    // default working-tree scope always has at least this known-clean change to
+    // build a real prompt from, in a fresh clone and a dirty tree alike. (In a
+    // dirty tree the prompt also carries the real diff — fine: verdict must
+    // refuse ANY generated prompt, whatever diff it wraps. One stated sharp
+    // edge: if the dirty diff itself contains something credential-shaped,
+    // prep refuses BY DESIGN and this test fails until the tree is clean of
+    // it — that is the scanner's hard-stop doing its job, and the failure
+    // message names the value to remove.)
+    const scratchPath = join(root, `swarm-verdict-scratch-${String(process.pid)}.md`);
+    writeFileSync(scratchPath, 'A scratch change so the working-tree diff is never empty.\n');
+    try {
+      const prep = spawnSync('node', [script, '--lenses', 'correctness'], {
+        cwd: root,
+        encoding: 'utf8',
+      });
+      expect(prep.status, `swarm prep failed:\n${prep.stdout}${prep.stderr}`).toBe(0);
+      const promptPath = /(\S*docs\/swarm\/\S+correctness\.md)/.exec(prep.stdout)?.[1];
+      expect(promptPath).toBeDefined();
 
-    const result = spawnSync('node', [script, 'verdict', '--files', String(promptPath)], {
-      cwd: root,
-      encoding: 'utf8',
-    });
-    expect(result.status).toBe(1);
-    expect(result.stderr).toMatch(/generated PROMPT, not a review/i);
+      const result = spawnSync('node', [script, 'verdict', '--files', String(promptPath)], {
+        cwd: root,
+        encoding: 'utf8',
+      });
+      expect(result.status).toBe(1);
+      expect(result.stderr).toMatch(/generated PROMPT, not a review/i);
+    } finally {
+      rmSync(scratchPath, { force: true });
+    }
   });
 
   it('ACCEPTS a genuine review that quotes the prompt template', () => {

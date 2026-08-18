@@ -73,10 +73,14 @@ export const SECRET_PATTERNS = [
   {
     re: /[a-z][a-z0-9+.-]{1,20}:\/\/[^\s:@/]{1,64}:[^\s@/]{8,}@/i,
     // NOT exemptible, same reasoning as the PEM block: the match CONTAINS the
-    // password, and a password is human-chosen text — `postgres://demo:Dummy!Pass99@db`
-    // would exempt itself. The fixture-marker argument ("no real credential
-    // contains the word PLANTED") holds for vendor-issued keys and does not
-    // hold for anything a person typed.
+    // password, and a password is human-chosen text — a URL whose password is
+    // literally "Dummy!Pass99" would exempt itself. (That example is written
+    // WITHOUT the contiguous scheme://user:pass@ shape on purpose: this
+    // pattern takes no exemption, so a full example here would make the
+    // scanner refuse its own diff — the same trap the PEM fixture documents.)
+    // The fixture-marker argument ("no real credential contains the word
+    // PLANTED") holds for vendor-issued keys and does not hold for anything a
+    // person typed.
     exemptible: false,
   },
 ];
