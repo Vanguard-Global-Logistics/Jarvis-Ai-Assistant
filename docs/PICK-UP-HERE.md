@@ -36,7 +36,7 @@ checkout that was 18 commits behind.
 | Owner / sole operator | **William Lavold** (Vanguard Global Logistics)                                                 |
 | Repository            | `github.com/Vanguard-Global-Logistics/Jarvis-Ai-Assistant`                                     |
 | Working branch        | `claude/jarvis-migration-chatgpt-19f128` — **never commit to `main`**                          |
-| HEAD at handoff       | `a33e86c`                                                                                      |
+| HEAD at handoff       | `3b8a971` — punchlist §6-B all closed (ADR 0031–0033), three swarm rounds run                  |
 | The machine           | MacBook Air, headless, **only** runs Jarvis, never opened (ADR 0012, 0030)                     |
 | Path on that machine  | `/Users/amylavold/Jarvis-Ai-Assistant` (`amylavold` is an account name, not a second operator) |
 | Node                  | 22+ required                                                                                   |
