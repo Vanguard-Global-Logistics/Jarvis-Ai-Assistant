@@ -1,8 +1,9 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { BrowserWindow, dialog } from 'electron';
-import type { SavedConversation } from '@jarvis/contracts';
+import type { Memory, SavedConversation } from '@jarvis/contracts';
 import { BackupDocumentSchema } from '@jarvis/contracts';
 import type { SqliteDatabase } from '@jarvis/database';
+import { exportableMemories, importMemories } from '../memory/store.js';
 import { exportAllConversations, importConversations } from './store.js';
 
 /**
@@ -22,23 +23,38 @@ import { exportAllConversations, importConversations } from './store.js';
  *   - Cancelling is a normal outcome (`exported: false`), not an error.
  */
 
-/** The on-disk backup document. Versioned so a future restore can recognise it. */
+/**
+ * The on-disk backup document — VERSION 2 as of ADR 0031, which added memory.
+ *
+ * v1 carried conversations only, so "export, reinstall, import" returned every
+ * conversation and silently lost every memory. `parseBackupDocument` still
+ * accepts v1 files (the disaster path must not punish old backups); the
+ * application writes v2 only.
+ */
 export interface BackupDocument {
   readonly format: 'jarvis.conversation-backup';
-  readonly formatVersion: 1;
+  readonly formatVersion: 2;
   readonly exportedAt: string;
   readonly conversationCount: number;
   readonly conversations: readonly SavedConversation[];
+  readonly memoryCount: number;
+  /** Never contains a `never-send` fact — see `exportableMemories` (ADR 0031). */
+  readonly memories: readonly Memory[];
 }
 
 /** Build the backup document. Pure apart from the clock, so it is testable. */
-export function buildBackupDocument(conversations: readonly SavedConversation[]): BackupDocument {
+export function buildBackupDocument(
+  conversations: readonly SavedConversation[],
+  memories: readonly Memory[],
+): BackupDocument {
   return {
     format: 'jarvis.conversation-backup',
-    formatVersion: 1,
+    formatVersion: 2,
     exportedAt: new Date().toISOString(),
     conversationCount: conversations.length,
+    memoryCount: memories.length,
     conversations,
+    memories,
   };
 }
 
@@ -51,6 +67,7 @@ export function defaultBackupFilename(now: Date): string {
 export interface ExportResult {
   readonly exported: boolean;
   readonly conversationCount: number;
+  readonly memoryCount: number;
 }
 
 /**
@@ -63,6 +80,9 @@ export interface ExportResult {
  */
 export async function exportHistoryToFile(db: SqliteDatabase): Promise<ExportResult> {
   const conversations = exportAllConversations(db);
+  // Everything except `never-send`, filtered at assembly (ADR 0031) — the
+  // excluded fact is never in the document, not in it and redacted.
+  const memories = exportableMemories(db);
 
   // Parent the dialog to the focused window so it is a sheet on macOS rather
   // than a detached window the user might not notice.
@@ -80,19 +100,21 @@ export async function exportHistoryToFile(db: SqliteDatabase): Promise<ExportRes
 
   // `canceled` is the documented signal; an empty path is the same non-choice.
   if (result.canceled || result.filePath === '') {
-    return { exported: false, conversationCount: 0 };
+    return { exported: false, conversationCount: 0, memoryCount: 0 };
   }
 
-  const document = buildBackupDocument(conversations);
+  const document = buildBackupDocument(conversations, memories);
   await writeFile(result.filePath, `${JSON.stringify(document, null, 2)}\n`, 'utf8');
 
-  return { exported: true, conversationCount: conversations.length };
+  return { exported: true, conversationCount: conversations.length, memoryCount: memories.length };
 }
 
 export interface ImportResult {
   readonly imported: boolean;
   readonly added: number;
   readonly skipped: number;
+  readonly memoriesAdded: number;
+  readonly memoriesSkipped: number;
 }
 
 /**
@@ -146,11 +168,23 @@ export async function importHistoryFromFile(db: SqliteDatabase): Promise<ImportR
 
   const chosen = result.filePaths[0];
   if (result.canceled || chosen === undefined) {
-    return { imported: false, added: 0, skipped: 0 };
+    return { imported: false, added: 0, skipped: 0, memoriesAdded: 0, memoriesSkipped: 0 };
   }
 
   const document = parseBackupDocument(await readFile(chosen, 'utf8'));
   const { added, skipped } = importConversations(db, document.conversations);
 
-  return { imported: true, added, skipped };
+  // A v1 backup predates memory and carries none — zero added is the honest
+  // report, not an error. The schema union already validated whichever version
+  // this is, including that no v2 file smuggles a `never-send` fact.
+  const memoryResult =
+    document.formatVersion === 2 ? importMemories(db, document.memories) : { added: 0, skipped: 0 };
+
+  return {
+    imported: true,
+    added,
+    skipped,
+    memoriesAdded: memoryResult.added,
+    memoriesSkipped: memoryResult.skipped,
+  };
 }

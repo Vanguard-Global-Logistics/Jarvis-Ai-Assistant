@@ -280,37 +280,52 @@ which breaks the single-operator assumption every rule in this repo relies on.
    Mac (ADR 0016). Until an installer is opened there, do not call it verified.
 2. **Accept one real task.** ADR 0006's definition of accepted. Nobody else can
    do this.
-3. **Send the cross-vendor review packet.** `docs/review/review-memory.md` is
+3. **Choose the health-alert channel.** The Mac now writes a health log every
+   30 minutes, but a log is only read after something is noticed. ADR 0030 §1b
+   wants absence REPORTED — that needs a push channel (email? text? to whom?),
+   and only William can pick it. One sentence unblocks the remote half.
+4. **Send the cross-vendor review packet.** `docs/review/review-memory.md` is
    written and paste-ready. `CLAUDE.md` §5 makes this **required**, not
    optional, for security-critical work. It has been recorded as outstanding
    across several commits while work shipped anyway — that is a control this
    project does not actually have until it happens.
 
-### B. Ready to build now (no approval needed under the standing orders)
+### B. Ready to build now — **ALL SEVEN CLOSED on 2026-08-18** (ADR 0031–0033)
 
-4. **Health reporting for the headless Mac** — ADR 0030 §1b names it a
-   prerequisite for depending on that box, and nobody is sitting in front of it
-   to notice a crash, a stuck update, or a full disk. Absence must be reported,
-   not assumed benign. _Named as the next item in the last session._
-5. **Autostart on login + one-command install** — Section 2. A headless box
-   that needs a human to launch it is not headless.
-6. **Memory in the backup.** Export/reinstall/import currently returns every
-   conversation and **silently loses every memory**. Needs its own ADR including
-   the tier rule: a `never-send` fact must not be written into a portable file.
-7. **Audit memory deletions.** `forget()` issues a bare `DELETE`. `CLAUDE.md` §3
-   says audit logs are append-only _including memory deletions_ — that is the
-   intended end state, not today's behaviour.
-8. **Widen the credential guard.** It catches six vendor key formats
-   (`sk-ant-`, bare `sk-`, `AIza`, `xai-`, `ghp_`, PEM blocks) and nothing else.
-   It does **not** catch passwords, account or card numbers, AWS pairs, Slack
-   tokens, JWTs, or `postgres://user:pass@host`. The refusal copy says "API key
-   or password"; only the first half is enforced.
-9. **Give `never-send` real behaviour.** Today it and `private` are
-   behaviourally identical to the person using the app — both simply stay on the
-   machine. `never-send` earns its own behaviour when there is an export or sync
-   surface to exclude it from. (Item 6 creates exactly that surface.)
-10. **Re-run `npm run probe:packaged`.** The last packaged run was 2026-08-13
-    against sixteen channels; there are nineteen now.
+Kept with strikethrough rather than deleted, so the list stays checkable
+against the commits that closed it:
+
+4. ~~Health reporting for the headless Mac~~ — **DONE, local half.**
+   `npm run health`: six checks, non-zero exit on failure, never prints a
+   secret value. The launchd interval job appends to
+   `~/Library/Logs/Jarvis/health.log`. The REMOTE half — a report whose absence
+   a phone notices — is blocked on William choosing the channel (moved to §A).
+5. ~~Autostart on login~~ — **DONE as `npm run install:autostart`**
+   (`IMPLEMENTED, NOT YET VERIFIED` — no macOS machine has run it; plist
+   content is unit-tested). One manual step it cannot do: System Settings →
+   auto-login, or a reboot stops at the login screen. One-command _install_
+   (fresh machine → running Jarvis) remains open in Section 2.
+6. ~~Memory in the backup~~ — **DONE (ADR 0031).** Backup format v2 carries
+   memories; v1 files still restore; merge by id, never overwrite; the
+   credential guard runs at the import door; counts reported in the UI. Still
+   plain JSON, unencrypted.
+7. ~~Audit memory deletions~~ — **DONE (ADR 0032).** `memory_audit`
+   (migration 7), append-only by database trigger, same transaction as the
+   delete — and deliberately WITHOUT the fact text, because §8's real deletion
+   means the content is gone, not relocated.
+8. ~~Widen the credential guard~~ — **DONE (ADR 0033), honestly partial.** Ten
+   formats now: the six originals plus AWS key ids, Slack tokens, JWTs, and
+   passworded connection strings (8+ char passwords — the floor that keeps
+   `user:pass@host` documentation prose from tripping it). Widened in lockstep
+   in all three scanner copies. Still NOT caught: bare passwords, account and
+   card numbers.
+9. ~~Give `never-send` real behaviour~~ — **DONE at one surface (ADR 0031).**
+   `never-send` is excluded from backup files; `private` travels. Everywhere
+   else the two tiers still behave identically — one divergence exists, not a
+   full separation.
+10. ~~Re-run `npm run probe:packaged`~~ — **DONE 2026-08-18.** Real asar build,
+    `isPackaged: true`, all nineteen channels answering including `memory:*`
+    driven end to end.
 
 ### C. Needs a decision from William before it is built
 
@@ -381,7 +396,7 @@ These are recorded because each one actually happened.
    only place the channel count is stated.
 6. `docs/WINDOWS-ACCEPTANCE-TEST.md` — historical record; no longer the gate
    that matters, because the primary machine is a Mac.
-7. `docs/DECISIONS/` — ADRs 0001–0030. A decision here is not silently reversed.
+7. `docs/DECISIONS/` — ADRs 0001–0033. A decision here is not silently reversed.
 8. `docs/vision/` → `docs/foundation/` → `docs/architecture/` — intent and
    philosophy. **A document existing, even APPROVED, is never authorization to
    build its subsystem.**
@@ -418,6 +433,8 @@ npm run review         # build a paste-ready cross-vendor review packet
 npm run package:dir    # a REAL packaged app (unpacked)
 npm run probe:packaged # drive that packaged app — needs package:dir first
 npm run package:mac    # build the .dmg — only works on a Mac
+npm run health         # six machine checks, non-zero exit on failure, no secret values
+npm run install:autostart  # macOS only: launchd agents — Jarvis at login + health every 30m
 ```
 
 On Linux the probe needs Electron's GUI libraries once:

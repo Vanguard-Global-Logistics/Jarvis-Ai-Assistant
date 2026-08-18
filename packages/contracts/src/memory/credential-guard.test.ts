@@ -45,6 +45,15 @@ const fakePem =
   ['-----BEGIN', 'RSA', 'PRIVATE', 'KEY-----'].join(' ') +
   '\nMIIEowIBAAKCAQEAvxYZ0123456789abcdefGHIJKLMNOPqrstuvwxyz+/ABCDEFGH';
 
+// The 2026-08-18 widening (see the scanner for per-pattern reasoning). Same
+// fragment-assembly rule as above, for the same reason.
+const fakeAws = 'AKIA' + 'IOSFODNN7EXAMPL0';
+const fakeAwsTemporary = 'ASIA' + 'IOSFODNN7EXAMPL0';
+const fakeSlack = 'xoxb-' + '1234567890-abcdefghij';
+const fakeJwt = ['eyJ' + 'hbGciOiJIUzI1NiJ9', 'eyJ' + 'zdWIiOiIxMjM0NTY3ODkifQ', 'sig'].join('.');
+const fakeConnectionString =
+  'postgres' + '://jarvis:' + 'hunter22hunter22' + '@db.internal:5432/prod';
+
 describe('looksLikeCredential', () => {
   it.each([
     ['an Anthropic key', fakeAnthropic],
@@ -53,6 +62,11 @@ describe('looksLikeCredential', () => {
     ['an xAI key', fakeXai],
     ['a GitHub token', fakeGithub],
     ['a PEM private key', fakePem],
+    ['an AWS access key id', fakeAws],
+    ['a temporary AWS (STS) key id', fakeAwsTemporary],
+    ['a Slack token', fakeSlack],
+    ['a JWT', fakeJwt],
+    ['a connection string with a real password', fakeConnectionString],
   ])('refuses %s', (_label, value) => {
     expect(looksLikeCredential(value)).toBe(true);
   });
@@ -83,6 +97,18 @@ describe('looksLikeCredential', () => {
     ],
     ['a UUID', 'The load id was 8f14e45f-ceea-467a-9f5a-1d0b5f4c2a11.'],
     ['a phone number', 'Dispatch is reachable at 727-555-0139.'],
+    // The three non-matches that keep the widened patterns honest. Each is the
+    // nearest innocent neighbour of a new pattern — the string a false positive
+    // would actually fire on.
+    [
+      'the documentation placeholder for connection strings',
+      // The exact literal this repository's own gap list used to name the hole.
+      // The password is 4 characters; the pattern requires 8, deliberately, so
+      // prose ABOUT the guard does not trip the guard.
+      'The format is postgres' + '://user:pass@host and it was not caught before.',
+    ],
+    ['a URL with a port but no password', 'Ollama listens on http://127.0.0.1:11434 locally.'],
+    ['prose mentioning a JWT header prefix', 'Tokens that start with eyJ are JWTs, remember that.'],
   ])('accepts %s', (_label, value) => {
     expect(looksLikeCredential(value)).toBe(false);
   });

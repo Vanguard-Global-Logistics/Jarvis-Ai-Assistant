@@ -343,7 +343,7 @@ describe('backup → file → restore, on a different machine', () => {
     const before = exportAllConversations(db);
 
     // What actually lands on the thumb drive: text, not objects.
-    const fileContents = JSON.stringify(buildBackupDocument(before));
+    const fileContents = JSON.stringify(buildBackupDocument(before, []));
     const document = parseBackupDocument(fileContents);
 
     // The new machine — a genuinely separate database with the same migrations.
@@ -397,7 +397,7 @@ describe('backup → file → restore, on a different machine', () => {
     expect(new Set(listConversations(db).map((c) => c.savedAt)).size).toBe(1);
 
     const document = parseBackupDocument(
-      JSON.stringify(buildBackupDocument(exportAllConversations(db))),
+      JSON.stringify(buildBackupDocument(exportAllConversations(db), [])),
     );
     const fresh = openDatabase({ location: ':memory:' });
     migrate(fresh, migrations);
@@ -416,7 +416,7 @@ describe('backup → file → restore, on a different machine', () => {
     // round to the restore. Nothing you did in the meantime may be lost.
     const backedUp = saveConversation(db, TRANSCRIPT);
     const document = parseBackupDocument(
-      JSON.stringify(buildBackupDocument(exportAllConversations(db))),
+      JSON.stringify(buildBackupDocument(exportAllConversations(db), [])),
     );
 
     const other = openDatabase({ location: ':memory:' });
@@ -481,7 +481,7 @@ describe('automation plans survive a save and reopen (ADR 0024)', () => {
   it('carries plans through backup and restore', () => {
     const meta = saveConversation(db, [{ kind: 'plan', outcome: 'weekly invoices', result: PLAN }]);
     const document = parseBackupDocument(
-      JSON.stringify(buildBackupDocument(exportAllConversations(db))),
+      JSON.stringify(buildBackupDocument(exportAllConversations(db), [])),
     );
 
     const fresh = openDatabase({ location: ':memory:' });

@@ -296,6 +296,14 @@ export const historyExportContract = defineContract({
       exported: z.boolean(),
       /** How many conversations the backup contains. Zero when cancelled. */
       conversationCount: z.number().int().min(0),
+      /**
+       * How many memories the backup contains (ADR 0031). Zero when cancelled.
+       * Reported so the UI never claims a backup while silently including — or
+       * silently omitting — the store that is replayed into every prompt.
+       * `never-send` facts are excluded before assembly and are NOT in this
+       * count; the person is told so in the export copy.
+       */
+      memoryCount: z.number().int().min(0),
     })
     .strict(),
 });
@@ -320,6 +328,14 @@ export const historyImportContract = defineContract({
       added: z.number().int().min(0),
       /** Conversations already present by id, left untouched. */
       skipped: z.number().int().min(0),
+      /** Memories added (ADR 0031). Zero for a v1 backup, which carries none. */
+      memoriesAdded: z.number().int().min(0),
+      /**
+       * Memories NOT added: already present by id, or refused because the fact
+       * was credential-shaped — a backup file is foreign input, and the guard
+       * that runs at the typing door runs at this door too.
+       */
+      memoriesSkipped: z.number().int().min(0),
     })
     .strict(),
 });

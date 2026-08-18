@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { AmplifierResultSchema, AutomationPlanSchema } from '../model/contracts.js';
+import { MemorySchema } from '../memory/contracts.js';
 
 /**
  * Conversation-history schemas — the shapes stored and served by the Stage 1A
@@ -117,7 +118,7 @@ export type SaveConversationRequest = z.infer<typeof SaveConversationRequestSche
  * `format` and `formatVersion` are literals so a wrong file fails immediately
  * and legibly rather than half-importing.
  */
-export const BackupDocumentSchema = z
+const BackupDocumentV1Schema = z
   .object({
     format: z.literal('jarvis.conversation-backup'),
     formatVersion: z.literal(1),
@@ -127,7 +128,48 @@ export const BackupDocumentSchema = z
   })
   .strict();
 
+/**
+ * Version 2 (ADR 0031): the backup now carries MEMORY as well.
+ *
+ * Before this, "export, reinstall, import" returned every conversation and
+ * silently lost every memory — the one store that is replayed into every prompt
+ * was the one store the disaster-recovery path forgot.
+ *
+ * `memories` never contains a `never-send` fact. That exclusion happens at
+ * ASSEMBLY in `exportableMemories` (the same filter-before-assembly rule as
+ * recall), but it is also enforced HERE, at the schema, so a hand-built or
+ * tampered document cannot smuggle one in through the import door either:
+ * a backup file is portable, and `never-send` means never leaves the machine —
+ * including inside a file on a thumb drive. This is the first place the
+ * `private` / `never-send` tiers genuinely diverge in behaviour.
+ */
+const BackupDocumentV2Schema = z
+  .object({
+    format: z.literal('jarvis.conversation-backup'),
+    formatVersion: z.literal(2),
+    exportedAt: z.iso.datetime(),
+    conversationCount: z.number().int().min(0),
+    conversations: z.array(SavedConversationSchema),
+    memoryCount: z.number().int().min(0),
+    memories: z.array(
+      MemorySchema.refine((memory) => memory.sensitivity !== 'never-send', {
+        message: 'A never-send memory must not appear in a portable backup file.',
+      }),
+    ),
+  })
+  .strict();
+
+/**
+ * Both versions are accepted on READ, so a backup written before memory existed
+ * still restores — the disaster path must not punish old backups. On WRITE the
+ * application emits v2 only. (An older app given a v2 file refuses it whole,
+ * by its own strict v1 schema — a known, stated cost of both versioning
+ * strategies; refusing legibly beats half-importing.)
+ */
+export const BackupDocumentSchema = z.union([BackupDocumentV2Schema, BackupDocumentV1Schema]);
+
 export type BackupDocument = z.infer<typeof BackupDocumentSchema>;
+export type BackupDocumentV2 = z.infer<typeof BackupDocumentV2Schema>;
 
 /** The one-field id request shared by `history:get` and `history:delete`. */
 export const HistoryIdRequestSchema = z

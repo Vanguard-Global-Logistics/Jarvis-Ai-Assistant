@@ -63,6 +63,14 @@ export const SECRET_PATTERNS = [
     // one a leaker could add on purpose — must never disarm a private key.
     exemptible: false,
   },
+  // Widened 2026-08-18, in lockstep with the repository's
+  // `scripts/lib/secret-scan.mjs` — `secret-scan-agreement.test.ts` holds the
+  // two copies to the same verdicts, so widening one without the other is a red
+  // suite, not a silent drift. Per-pattern reasoning lives in the repo copy.
+  { re: /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/, exemptible: true },
+  { re: /xox[baprs]-[A-Za-z0-9-]{10,}/, exemptible: true },
+  { re: /eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}/, exemptible: true },
+  { re: /[a-z][a-z0-9+.-]{1,20}:\/\/[^\s:@/]{1,64}:[^\s@/]{8,}@/i, exemptible: true },
 ];
 
 /**
@@ -106,11 +114,12 @@ export function findSecret(text) {
 /**
  * Belt and braces for CHOOSING A FILE, as opposed to scanning its contents.
  *
- * `findSecret` knows six credential FORMATS. It does not know a Postgres URL
- * with a password in it, an AWS key pair, a Slack token, a JWT, or a personal
- * note — so a `.env.local` sails straight through a content scan. The threat is
- * a FILE CHOICE, and the answer is an allowlist of source-shaped extensions
- * minus anything whose NAME suggests it holds a secret.
+ * `findSecret` knows ten credential FORMATS (widened 2026-08-18 to cover AWS
+ * key ids, Slack tokens, JWTs, and passworded connection strings). It still
+ * does not know a bare password, an account number, or a personal note — so a
+ * `.env.local` can sail straight through a content scan. The threat is a FILE
+ * CHOICE, and the answer is an allowlist of source-shaped extensions minus
+ * anything whose NAME suggests it holds a secret.
  *
  * Lives here so the content gate and the name gate are one rule in one place;
  * `scripts/lib/diff-scope.mjs` had these inline and the Gauntlet staging path

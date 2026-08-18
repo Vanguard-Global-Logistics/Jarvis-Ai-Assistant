@@ -61,8 +61,16 @@ function fakeBridge(overrides: Partial<ConversationBridge> = {}): ConversationBr
     listConversations: vi.fn().mockResolvedValue({ conversations: [] }),
     getConversation: vi.fn().mockResolvedValue({ conversation: null }),
     deleteConversation: vi.fn().mockResolvedValue({ deleted: true }),
-    exportHistory: vi.fn().mockResolvedValue({ exported: true, conversationCount: 1 }),
-    importHistory: vi.fn().mockResolvedValue({ imported: true, added: 2, skipped: 0 }),
+    exportHistory: vi
+      .fn()
+      .mockResolvedValue({ exported: true, conversationCount: 1, memoryCount: 0 }),
+    importHistory: vi.fn().mockResolvedValue({
+      imported: true,
+      added: 2,
+      skipped: 0,
+      memoriesAdded: 0,
+      memoriesSkipped: 0,
+    }),
     describeModels: vi.fn().mockResolvedValue(MODELS),
     selectModel: vi
       .fn()
@@ -467,7 +475,9 @@ describe('Conversation', () => {
   });
 
   it('backs up all sessions and reports what happened, including cancellation (ADR 0011)', async () => {
-    const exportHistory = vi.fn().mockResolvedValue({ exported: true, conversationCount: 4 });
+    const exportHistory = vi
+      .fn()
+      .mockResolvedValue({ exported: true, conversationCount: 4, memoryCount: 3 });
     const bridge = fakeBridge({
       listConversations: vi.fn().mockResolvedValue({ conversations: [SAVED_META] }),
       exportHistory,
@@ -479,10 +489,14 @@ describe('Conversation', () => {
 
     // No argument crosses: main picks the destination via the OS dialog.
     expect(exportHistory).toHaveBeenCalledWith();
-    expect((await screen.findByRole('status')).textContent).toContain('Backed up 4 sessions');
+    // Both counts, said out loud (ADR 0031). A backup that quietly includes —
+    // or omits — the store replayed into every prompt is a lie of omission.
+    const backupNotice = (await screen.findByRole('status')).textContent;
+    expect(backupNotice).toContain('Backed up 4 sessions');
+    expect(backupNotice).toContain('3 memories');
 
     // Cancelling is stated, never mistaken for success.
-    exportHistory.mockResolvedValue({ exported: false, conversationCount: 0 });
+    exportHistory.mockResolvedValue({ exported: false, conversationCount: 0, memoryCount: 0 });
     fireEvent.click(screen.getByRole('button', { name: /back up all/i }));
     expect((await screen.findByRole('status')).textContent).toContain('Backup cancelled');
   });
@@ -505,7 +519,13 @@ describe('Conversation', () => {
   });
 
   it('restores a backup and reports every outcome plainly (ADR 0014)', async () => {
-    const importHistory = vi.fn().mockResolvedValue({ imported: true, added: 3, skipped: 1 });
+    const importHistory = vi.fn().mockResolvedValue({
+      imported: true,
+      added: 3,
+      skipped: 1,
+      memoriesAdded: 2,
+      memoriesSkipped: 0,
+    });
     const bridge = fakeBridge({ importHistory });
     render(<Conversation bridge={bridge} />);
 
@@ -515,16 +535,30 @@ describe('Conversation', () => {
     fireEvent.click(await screen.findByRole('button', { name: /restore/i }));
 
     expect(importHistory).toHaveBeenCalledWith();
-    expect((await screen.findByRole('status')).textContent).toContain('Restored 3 sessions');
+    const restoreNotice = (await screen.findByRole('status')).textContent;
+    expect(restoreNotice).toContain('Restored 3 sessions');
+    expect(restoreNotice).toContain('2 memories');
     // Refreshed so the restored sessions appear without reopening the panel.
     expect(bridge.listConversations).toHaveBeenCalledTimes(2);
 
     // "Nothing added" is a success, not a silent no-op.
-    importHistory.mockResolvedValue({ imported: true, added: 0, skipped: 4 });
+    importHistory.mockResolvedValue({
+      imported: true,
+      added: 0,
+      skipped: 4,
+      memoriesAdded: 0,
+      memoriesSkipped: 0,
+    });
     fireEvent.click(screen.getByRole('button', { name: /restore/i }));
     expect((await screen.findByRole('status')).textContent).toContain('Already up to date');
 
-    importHistory.mockResolvedValue({ imported: false, added: 0, skipped: 0 });
+    importHistory.mockResolvedValue({
+      imported: false,
+      added: 0,
+      skipped: 0,
+      memoriesAdded: 0,
+      memoriesSkipped: 0,
+    });
     fireEvent.click(screen.getByRole('button', { name: /restore/i }));
     expect((await screen.findByRole('status')).textContent).toContain('Restore cancelled');
   });

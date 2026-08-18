@@ -126,8 +126,16 @@ function stubBridge(overrides: Partial<JarvisBridge> = {}): void {
     listConversations: vi.fn().mockResolvedValue({ conversations: [] }),
     getConversation: vi.fn().mockResolvedValue({ conversation: null }),
     deleteConversation: vi.fn().mockResolvedValue({ deleted: true }),
-    exportHistory: vi.fn().mockResolvedValue({ exported: false, conversationCount: 0 }),
-    importHistory: vi.fn().mockResolvedValue({ imported: false, added: 0, skipped: 0 }),
+    exportHistory: vi
+      .fn()
+      .mockResolvedValue({ exported: false, conversationCount: 0, memoryCount: 0 }),
+    importHistory: vi.fn().mockResolvedValue({
+      imported: false,
+      added: 0,
+      skipped: 0,
+      memoriesAdded: 0,
+      memoriesSkipped: 0,
+    }),
     getProfile: vi.fn().mockResolvedValue(DEFAULT_PROFILE),
     setProfile: vi.fn().mockResolvedValue(DEFAULT_PROFILE),
     // Memory (ADR 0029). `listMemories` resolving to `[]` is the honest default

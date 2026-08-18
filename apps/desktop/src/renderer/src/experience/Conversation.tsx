@@ -97,8 +97,18 @@ export interface ConversationBridge {
   listConversations: () => Promise<{ conversations: SavedConversationMeta[] }>;
   getConversation: (id: string) => Promise<{ conversation: SavedConversation | null }>;
   deleteConversation: (id: string) => Promise<{ deleted: boolean }>;
-  exportHistory: () => Promise<{ exported: boolean; conversationCount: number }>;
-  importHistory: () => Promise<{ imported: boolean; added: number; skipped: number }>;
+  exportHistory: () => Promise<{
+    exported: boolean;
+    conversationCount: number;
+    memoryCount: number;
+  }>;
+  importHistory: () => Promise<{
+    imported: boolean;
+    added: number;
+    skipped: number;
+    memoriesAdded: number;
+    memoriesSkipped: number;
+  }>;
   describeModels: () => Promise<ModelDescription>;
   selectModel: (id: ProviderId) => Promise<ModelSelection>;
 }
@@ -602,11 +612,17 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
   const backupHistory = useCallback(async (): Promise<void> => {
     if (bridge === null) return;
     try {
-      const { exported, conversationCount } = await bridge.exportHistory();
+      const { exported, conversationCount, memoryCount } = await bridge.exportHistory();
       setHistoryError(null);
+      // The memory count is SAID, not implied (ADR 0031). A backup that quietly
+      // includes the store replayed into every prompt — or quietly omits it —
+      // is a lie of omission either way. "Never send" facts stay home and the
+      // person deserves to know that too, but a toast is the wrong place for a
+      // tier lecture; the count states what the file holds.
       setSaveNotice(
         exported
-          ? `Backed up ${String(conversationCount)} ${conversationCount === 1 ? 'session' : 'sessions'}`
+          ? `Backed up ${String(conversationCount)} ${conversationCount === 1 ? 'session' : 'sessions'}` +
+              ` · ${String(memoryCount)} ${memoryCount === 1 ? 'memory' : 'memories'}`
           : 'Backup cancelled — nothing was written',
       );
       window.setTimeout(() => {
@@ -629,11 +645,11 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
   const restoreHistory = useCallback(async (): Promise<void> => {
     if (bridge === null) return;
     try {
-      const { imported, added, skipped } = await bridge.importHistory();
+      const { imported, added, skipped, memoriesAdded } = await bridge.importHistory();
       setHistoryError(null);
       if (!imported) {
         setSaveNotice('Restore cancelled — nothing was changed');
-      } else if (added === 0) {
+      } else if (added === 0 && memoriesAdded === 0) {
         setSaveNotice(
           skipped === 0
             ? 'That backup was empty — nothing to restore'
@@ -642,6 +658,9 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
       } else {
         setSaveNotice(
           `Restored ${String(added)} ${added === 1 ? 'session' : 'sessions'}` +
+            (memoriesAdded > 0
+              ? ` · ${String(memoriesAdded)} ${memoriesAdded === 1 ? 'memory' : 'memories'}`
+              : '') +
             (skipped > 0 ? ` · ${String(skipped)} already here` : ''),
         );
       }

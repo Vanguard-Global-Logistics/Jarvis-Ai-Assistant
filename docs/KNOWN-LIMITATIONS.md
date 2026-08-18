@@ -35,26 +35,36 @@ cards (ADR 0009), so an Amplifier-only session is savable. What this is **not**:
   promoted from repetition (§9). And the `private` travel rule is enforced by the recall
   filter, **not by AEGIS** — do not describe memory as AEGIS-protected.
 
-  Four further gaps, named rather than implied:
+  Of the four gaps this section used to name, three closed on 2026-08-18
+  (ADR 0031–0033) and one narrowed. Honest current state:
 
-  - **The credential guard catches SIX vendor key formats and nothing else** —
-    `sk-ant-`, bare `sk-`, `AIza`, `xai-`, `ghp_`, and PEM private-key blocks. It does
-    **NOT** detect passwords, account numbers, card numbers, AWS key pairs, Slack tokens,
-    JWTs, or `postgres://user:pass@host` connection strings. A password typed as a memory
-    is stored, and at the `open` tier it is sent to whatever brain is answering. The
-    refusal copy says "API key or password"; only the first half is enforced.
-  - **Memory is NOT in the `history:export` backup.** `BackupDocument` carries
-    `conversations` only. Export, reinstall, import — every conversation returns and every
-    memory is gone, silently. Adding it is a change to `BackupDocument` and needs its own
-    ADR, including the tier rule (a `never-send` fact must not be written into a portable
-    file).
-  - **Memory deletions are NOT audited.** `forget()` issues a bare `DELETE`. CLAUDE.md §3's
-    "audit logs are append-only — including memory deletions" describes the intended end
-    state, not today's behaviour.
-  - **`private` and `never-send` behave identically today.** Both return `false` from
-    `sensitivityAllowsSending`, and nothing else reads the tier, so the UI offers three
-    levels of protection where the system implements two. `never-send` earns its own
-    behaviour when there is an export or sync surface to exclude it from.
+  - **The credential guard catches TEN credential formats and nothing else** —
+    the original six (`sk-ant-`, bare `sk-`, `AIza`, `xai-`, `ghp_`, PEM
+    private-key blocks) plus AWS access key ids (`AKIA`/`ASIA`), Slack tokens,
+    JWTs, and connection strings carrying an 8+ character password (ADR 0033).
+    It still does **NOT** detect a bare password, an account number, a card
+    number, or a short/placeholder connection-string password. A bare password
+    typed as a memory is stored, and at the `open` tier it is sent to whatever
+    brain is answering. The refusal copy says "API key or password"; the
+    password half is now PARTIALLY enforced, not fully — do not describe it as
+    closed.
+  - **Memory IS in the `history:export` backup as of ADR 0031** (backup format
+    v2; v1 files still restore, carrying no memories). `never-send` facts are
+    excluded from the file — at assembly and again at the schema — which is the
+    first place the `private`/`never-send` tiers genuinely diverge. What
+    remains true: the backup is **plain JSON, unencrypted** — a `private` fact
+    in the file is protected only by where the person puts the file. Encrypted
+    backup is still open (punchlist §2).
+  - **Memory deletions ARE audited as of ADR 0032** — `memory_audit` records
+    that a deletion happened (ids and timestamps), append-only enforced by
+    database triggers, same transaction as the delete. Deliberately WITHOUT the
+    fact text or tier: §8's real deletion means the content is gone, not
+    relocated to a table the UI never shows. No IPC channel reads this table;
+    there is no viewer yet.
+  - **`private` and `never-send` now differ at exactly ONE surface: the backup
+    file.** Everywhere else — recall, prompts, providers — they still behave
+    identically (both stay on the machine). Do not describe the tiers as fully
+    distinct; one divergence is what exists.
 
 - **Resume forks, it does not mutate.** Opening a saved session is read-only, but
   **Continue** (ADR 0010) loads it back into the live composer to keep working.
@@ -192,12 +202,13 @@ exists as a step at all: there is no native module. The remaining honest caveats
 - `node:sqlite` is labeled **experimental on Node 22**, the runtime vitest uses. The
   app itself runs on Electron 43's embedded Node 24, where it is stable. If Node 22
   changes the API under the tests, the tests will say so loudly.
-- There are exactly **six** migrations (`conversation-history`,
+- There are exactly **seven** migrations (`conversation-history`,
   `conversation-amplifications` ADR 0009, `conversation-plans` ADR 0024 — automation
   plans, so a plan survives a save rather than evaporating, `profile` ADR 0013 — a single
   row holding a display name and an accent — and `window-state` ADR 0017, a single row holding where
-  the window was, and `memory` ADR 0029 — short human-confirmed facts, deliberately with
-  **no owner column**, because ADR 0012 makes data separation the OS user account). No
+  the window was, `memory` ADR 0029 — short human-confirmed facts, deliberately with
+  **no owner column**, because ADR 0012 makes data separation the OS user account — and
+  `memory-audit` ADR 0032, append-only by trigger, recording deletions without content). No
   tables exist for projects, tasks, or the audit log — those are feature design work and
   are not approved. AEGIS keeps its own hash-chained log outside this database.
 - `window_state` is **not** reached over IPC. Main owns both the window and the database,

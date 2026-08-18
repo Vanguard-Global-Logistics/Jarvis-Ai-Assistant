@@ -52,6 +52,29 @@ export const SECRET_PATTERNS = [
     // one a leaker could add on purpose — must never disarm a private key.
     exemptible: false,
   },
+  // --- Widened 2026-08-18 (ADR 0031's review of the memory guard) ------------
+  // The gap list said it plainly: the guard caught six vendor key formats "and
+  // nothing else", while its refusal copy claimed "API key or password". These
+  // four close the most common shapes that were falling through. Each is added
+  // HERE first because credential-guard.ts is pinned to this list structurally —
+  // widening one without the other turns CI red, which is the point.
+  //
+  // AWS access key ids: AKIA (long-lived) and ASIA (temporary/STS).
+  { re: /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/, exemptible: true },
+  // Slack tokens: bot, app, personal, refresh, session.
+  { re: /xox[baprs]-[A-Za-z0-9-]{10,}/, exemptible: true },
+  // A JWT: two base64url segments each starting with the {"... header/payload
+  // prefix, joined by a dot. Requiring BOTH segments keeps prose mentioning
+  // "eyJ" from matching — and keeps this regex from matching its own source,
+  // since `[` follows the literal `eyJ` there.
+  { re: /eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}/, exemptible: true },
+  // A connection string carrying a real password: scheme://user:secret@host.
+  // The password must be 8+ characters, which deliberately excludes the
+  // documentation placeholder `user:pass@host` — the exact literal this
+  // repository's own gap list used to describe this hole. Requiring a
+  // plausible password keeps the guard from firing on prose ABOUT the guard,
+  // the failure mode that would get it routed around.
+  { re: /[a-z][a-z0-9+.-]{1,20}:\/\/[^\s:@/]{1,64}:[^\s@/]{8,}@/i, exemptible: true },
 ];
 
 /**
@@ -95,11 +118,12 @@ export function findSecret(text) {
 /**
  * Belt and braces for CHOOSING A FILE, as opposed to scanning its contents.
  *
- * `findSecret` knows six credential FORMATS. It does not know a Postgres URL
- * with a password in it, an AWS key pair, a Slack token, a JWT, or a personal
- * note — so a `.env.local` sails straight through a content scan. The threat is
- * a FILE CHOICE, and the answer is an allowlist of source-shaped extensions
- * minus anything whose NAME suggests it holds a secret.
+ * `findSecret` knows ten credential FORMATS (widened 2026-08-18 to cover AWS
+ * key ids, Slack tokens, JWTs, and passworded connection strings). It still
+ * does not know a bare password, an account number, or a personal note — so a
+ * `.env.local` can sail straight through a content scan. The threat is a FILE
+ * CHOICE, and the answer is an allowlist of source-shaped extensions minus
+ * anything whose NAME suggests it holds a secret.
  *
  * Lives here so the content gate and the name gate are one rule in one place;
  * `scripts/lib/diff-scope.mjs` had these inline and the Gauntlet staging path

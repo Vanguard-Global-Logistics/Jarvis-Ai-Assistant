@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { Memory, MemorySensitivity, MemorySource, RememberRequest } from '@jarvis/contracts';
 import { CREDENTIAL_REFUSED_MESSAGE, looksLikeCredential } from '@jarvis/contracts';
 import type { SqliteDatabase } from '@jarvis/database';
+import { withTransaction } from '@jarvis/database';
 import { UserFacingError } from '../user-facing-error.js';
 
 /**
@@ -151,6 +152,86 @@ export function remember(db: SqliteDatabase, request: RememberRequest): Memory {
  * cannot be reported to the UI as success (CLAUDE.md §8 rule 1).
  */
 export function forget(db: SqliteDatabase, id: string): boolean {
-  const result = db.prepare('DELETE FROM memory WHERE id = ?').run(id);
-  return Number(result.changes) > 0;
+  return withTransaction(db, () => {
+    // Read `learned_at` BEFORE the delete — after it there is nothing to read,
+    // and the audit row must carry the provenance of the event.
+    const row = db.prepare('SELECT learned_at FROM memory WHERE id = ?').get(id) as
+      { learned_at: string } | undefined;
+    if (row === undefined) return false;
+
+    db.prepare('DELETE FROM memory WHERE id = ?').run(id);
+
+    // The audit row (ADR 0032; CLAUDE.md §3 "including memory deletions").
+    // Records THAT a deletion happened and its timestamps — never the fact
+    // text and never the tier, because §8's real deletion means the content is
+    // GONE, not relocated to a table the UI never shows. Same transaction as
+    // the delete: an unaudited deletion and an audited non-deletion are both
+    // states this store must not be able to reach.
+    db.prepare(
+      `INSERT INTO memory_audit (id, memory_id, learned_at, deleted_at)
+       VALUES (?, ?, ?, ?)`,
+    ).run(randomUUID(), id, row.learned_at, new Date().toISOString());
+
+    return true;
+  });
+}
+
+/**
+ * The memories a portable backup file may carry (ADR 0031).
+ *
+ * Everything EXCEPT `never-send`. This is the first place the two restrictive
+ * tiers genuinely diverge in behaviour: `private` means "local brains only",
+ * and a backup restored onto the person's next machine is still their machine —
+ * so `private` travels in the file. `never-send` means "never leaves this
+ * machine, under any circumstance", and a backup file on a thumb drive or in a
+ * cloud folder has left. Filtered at ASSEMBLY, the same rule as recall: the
+ * excluded fact is never in the document, rather than in it and redacted.
+ */
+export function exportableMemories(db: SqliteDatabase): Memory[] {
+  return listMemories(db).filter((memory) => memory.sensitivity !== 'never-send');
+}
+
+/**
+ * Restore memories from a backup (ADR 0031). Merge, never overwrite.
+ *
+ * Same contract as `importConversations`: an id already present is skipped and
+ * the existing row is untouched, so a restore is idempotent and cannot destroy
+ * a memory the person still has.
+ *
+ * Two doors, one guard: a backup file is foreign input — possibly written
+ * before the credential guard was widened, possibly hand-edited — so
+ * `looksLikeCredential` runs here exactly as it runs when a person types. A
+ * credential-shaped fact is SKIPPED (counted, not stored, not echoed), because
+ * a fact that would be refused at the front door must not walk in through the
+ * back one and be replayed into every future prompt.
+ *
+ * Order does not need the reversal dance `importConversations` performs:
+ * `listMemories` orders by `learned_at DESC, rowid DESC`, and imported rows
+ * carry their original `learned_at`, so recency ordering survives; only exact
+ * same-millisecond ties across an import may tiebreak by insertion. A memory
+ * list has no "same conversation, byte-identical list" contract to preserve.
+ */
+export function importMemories(
+  db: SqliteDatabase,
+  memories: readonly Memory[],
+): { added: number; skipped: number } {
+  const exists = db.prepare('SELECT 1 FROM memory WHERE id = ?');
+  const insert = db.prepare(
+    `INSERT INTO memory (id, fact, sensitivity, learned_from, learned_at)
+     VALUES (?, ?, ?, ?, ?)`,
+  );
+
+  let added = 0;
+  let skipped = 0;
+  withTransaction(db, () => {
+    for (const memory of memories) {
+      if (exists.get(memory.id) !== undefined || looksLikeCredential(memory.fact)) {
+        skipped += 1;
+        continue;
+      }
+      insert.run(memory.id, memory.fact, memory.sensitivity, memory.learnedFrom, memory.learnedAt);
+      added += 1;
+    }
+  });
+  return { added, skipped };
 }

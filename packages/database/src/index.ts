@@ -4,7 +4,7 @@
  * STATUS: PARTIAL.
  *   - Connection ownership and the migration runner: IMPLEMENTED AND VERIFIED
  *     (unit tests, in-memory).
- *   - Feature schema: SIX migrations — see the `migrations` array below, which
+ *   - Feature schema: SEVEN migrations — see the `migrations` array below, which
  *     is the single list. It now includes `memory` (ADR 0029), deliberately with
  *     no owner column because ADR 0012 makes data separation the OS user
  *     account. No projects, tasks, or audit-log tables exist; those are feature
@@ -25,6 +25,7 @@ import { profileMigration } from './migrations/0003-profile.js';
 import { windowStateMigration } from './migrations/0004-window-state.js';
 import { conversationPlansMigration } from './migrations/0005-conversation-plans.js';
 import { memoryMigration } from './migrations/0006-memory.js';
+import { memoryAuditMigration } from './migrations/0007-memory-audit.js';
 
 export { openDatabase, withTransaction } from './connection.js';
 export type { OpenDatabaseOptions, SqliteDatabase } from './connection.js';
@@ -45,4 +46,5 @@ export const migrations: readonly Migration[] = [
   windowStateMigration,
   conversationPlansMigration,
   memoryMigration,
+  memoryAuditMigration,
 ];

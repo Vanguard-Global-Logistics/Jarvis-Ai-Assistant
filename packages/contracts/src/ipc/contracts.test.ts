@@ -249,17 +249,31 @@ describe('history contracts (Stage 1A persistence, ADR 0008; amplifications ADR 
     expect(historyExportContract.request.safeParse('/tmp/x.json').success).toBe(false);
 
     expect(
-      historyExportContract.response.safeParse({ exported: true, conversationCount: 3 }).success,
+      historyExportContract.response.safeParse({
+        exported: true,
+        conversationCount: 3,
+        memoryCount: 2,
+      }).success,
     ).toBe(true);
     // Cancelled is a value, not an error.
     expect(
-      historyExportContract.response.safeParse({ exported: false, conversationCount: 0 }).success,
+      historyExportContract.response.safeParse({
+        exported: false,
+        conversationCount: 0,
+        memoryCount: 0,
+      }).success,
     ).toBe(true);
+    // memoryCount is REQUIRED (ADR 0031) — a response without it is a build
+    // that silently stopped reporting what the backup holds.
+    expect(
+      historyExportContract.response.safeParse({ exported: true, conversationCount: 3 }).success,
+    ).toBe(false);
     // And the response must never carry a path back to the renderer.
     expect(
       historyExportContract.response.safeParse({
         exported: true,
         conversationCount: 1,
+        memoryCount: 0,
         path: '/Users/someone/backup.json',
       }).success,
     ).toBe(false);

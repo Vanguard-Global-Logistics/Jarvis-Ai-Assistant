@@ -59,6 +59,16 @@ export const MEMORY_CREDENTIAL_PATTERNS: readonly RegExp[] = [
   // JSON service-account key, while still requiring 40 contiguous base64
   // characters — which prose about PEM files does not contain.
   /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]{0,400}?[A-Za-z0-9+/]{40}/,
+  // Widened 2026-08-18, in lockstep with `secret-scan.mjs` (the agreement test
+  // compares the live regex sources, so the two lists cannot drift). The gap
+  // list had named what fell through — AWS pairs, Slack tokens, JWTs,
+  // `postgres://user:pass@host` — while the refusal copy claimed "API key or
+  // password". These close the named shapes; see the scanner for the
+  // per-pattern reasoning, which lives once, there.
+  /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/,
+  /xox[baprs]-[A-Za-z0-9-]{10,}/,
+  /eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}/,
+  /[a-z][a-z0-9+.-]{1,20}:\/\/[^\s:@/]{1,64}:[^\s@/]{8,}@/i,
 ];
 
 /**

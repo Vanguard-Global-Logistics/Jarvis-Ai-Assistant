@@ -261,29 +261,35 @@ asserts the history list is still empty, which is the runtime proof behind the U
 
 ### `history:export`
 
-|                       |                                                                                                                                                               |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Status**            | IMPLEMENTED, NOT YET VERIFIED — the dialog-and-write path has no automated coverage (modal dialog); unit-tested document builder + manual acceptance pending. |
-| **Renderer call**     | `window.jarvis.exportHistory(): Promise<{ exported: boolean, conversationCount: number }>`                                                                    |
-| **Request**           | `z.undefined()` — **no path**. The bridge takes no argument; a smuggled one never reaches `invoke`.                                                           |
-| **Response**          | `{ exported, conversationCount }`, `.strict()` — **no path back**. A response carrying one fails validation (tested).                                         |
-| **Handler**           | `registerHistoryHandlers(db)` → `exportHistoryToFile` in `apps/desktop/src/main/history/backup.ts`                                                            |
-| **Contract**          | `historyExportContract`                                                                                                                                       |
-| **Side effects**      | Reads every conversation; writes ONE file to a path chosen by a human in the native save dialog. The only filesystem write in the application.                |
-| **Authority granted** | Write a backup where the user just pointed. Nothing else: no configurable default path, no renderer-supplied destination, no read of any other file.          |
+|                       |                                                                                                                                                                            |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Status**            | IMPLEMENTED, NOT YET VERIFIED — the dialog-and-write path has no automated coverage (modal dialog); unit-tested document builder + manual acceptance pending.              |
+| **Renderer call**     | `window.jarvis.exportHistory(): Promise<{ exported: boolean, conversationCount: number, memoryCount: number }>`                                                            |
+| **Request**           | `z.undefined()` — **no path**. The bridge takes no argument; a smuggled one never reaches `invoke`.                                                                        |
+| **Response**          | `{ exported, conversationCount, memoryCount }`, `.strict()` — **no path back**. A response carrying one fails validation (tested).                                         |
+| **Handler**           | `registerHistoryHandlers(db)` → `exportHistoryToFile` in `apps/desktop/src/main/history/backup.ts`                                                                         |
+| **Contract**          | `historyExportContract`                                                                                                                                                    |
+| **Side effects**      | Reads every conversation and every exportable memory; writes ONE file to a path chosen by a human in the native save dialog. The only filesystem write in the application. |
+| **Authority granted** | Write a backup where the user just pointed. Nothing else: no configurable default path, no renderer-supplied destination, no read of any other file.                       |
 
 Cancelling the dialog returns `exported: false` — a normal outcome, not an error. A real
 write failure throws, so the UI can state it: a backup that silently did nothing is the
 worst possible failure for this feature.
+
+**The backup carries memory as of ADR 0031** (format v2; v1 files still restore).
+`never-send` facts are excluded — filtered at assembly in `exportableMemories` and
+refused again by the schema on read — which is the one surface where the `private` and
+`never-send` tiers genuinely diverge. The file is plain JSON, unencrypted: a `private`
+fact in it is protected only by where the person puts the file.
 
 ### `history:import`
 
 |                       |                                                                                                                                            |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | **Status**            | IMPLEMENTED, NOT YET VERIFIED — the dialog-and-read path has no automated coverage (modal dialog); parsing and merge are unit-tested.      |
-| **Renderer call**     | `window.jarvis.importHistory(): Promise<{ imported, added, skipped }>`                                                                     |
+| **Renderer call**     | `window.jarvis.importHistory(): Promise<{ imported, added, skipped, memoriesAdded, memoriesSkipped }>`                                     |
 | **Request**           | `z.undefined()` — **no path**. Main opens the native OPEN dialog.                                                                          |
-| **Response**          | `{ imported, added, skipped }`, `.strict()` — **no path back**.                                                                            |
+| **Response**          | `{ imported, added, skipped, memoriesAdded, memoriesSkipped }`, `.strict()` — **no path back**.                                            |
 | **Handler**           | `registerHistoryHandlers(db)` → `importHistoryFromFile` in `apps/desktop/src/main/history/backup.ts`                                       |
 | **Contract**          | `historyImportContract`                                                                                                                    |
 | **Side effects**      | Reads ONE user-chosen file; inserts conversations that are not already present, in a single transaction.                                   |

@@ -1,8 +1,16 @@
 import { migrate, migrations, openDatabase } from '@jarvis/database';
 import type { SqliteDatabase } from '@jarvis/database';
 import { MEMORY_MAX_LENGTH } from '@jarvis/contracts';
+import type { Memory } from '@jarvis/contracts';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { MemoryRefusedError, forget, listMemories, remember } from './store.js';
+import {
+  MemoryRefusedError,
+  exportableMemories,
+  forget,
+  importMemories,
+  listMemories,
+  remember,
+} from './store.js';
 
 /**
  * The memory store, against a REAL SQLite database with the real migrations
@@ -248,5 +256,135 @@ describe('forget', () => {
     const remaining = listMemories(db);
     expect(remaining).toHaveLength(1);
     expect(remaining[0]?.id).toBe(keep.id);
+  });
+});
+
+describe('forget is AUDITED (ADR 0032; CLAUDE.md §3)', () => {
+  const auditRows = (): { memory_id: string; learned_at: string; deleted_at: string }[] =>
+    db.prepare('SELECT memory_id, learned_at, deleted_at FROM memory_audit').all() as unknown as {
+      memory_id: string;
+      learned_at: string;
+      deleted_at: string;
+    }[];
+
+  it('records THAT a deletion happened, in the same transaction as the delete', () => {
+    // The mutation this kills: remove the `INSERT INTO memory_audit` from
+    // `forget`. The delete would still work and every pre-existing test would
+    // stay green — CLAUDE.md §3's "including memory deletions" was exactly that
+    // unenforced for the feature's first four days.
+    const memory = told('Something to unsay.');
+    expect(forget(db, memory.id)).toBe(true);
+
+    const rows = auditRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.memory_id).toBe(memory.id);
+    expect(rows[0]?.learned_at).toBe(memory.learnedAt);
+    expect(() => new Date(rows[0]?.deleted_at ?? '').toISOString()).not.toThrow();
+  });
+
+  it('records NEITHER the fact text NOR the tier — deletion stays real (§8)', () => {
+    // The design tension, resolved: an audit row holding the deleted text would
+    // repeal §8 quietly — the fact would live on in a table the UI never shows,
+    // which is worse than a tombstone because nobody would know to ask. The
+    // event is auditable; the content is gone.
+    const memory = told('SECRET-SAUCE the family recipe uses cardamom.', 'never-send');
+    forget(db, memory.id);
+
+    const dump = JSON.stringify(db.prepare('SELECT * FROM memory_audit').all());
+    expect(dump).not.toContain('SECRET-SAUCE');
+    expect(dump).not.toContain('cardamom');
+    expect(dump).not.toContain('never-send');
+  });
+
+  it('writes NO audit row for a delete that matched nothing', () => {
+    // "Deleted" in the audit log must correspond to a deletion that happened —
+    // the same rule the `{ forgotten }` flag enforces one layer up.
+    expect(forget(db, '44444444-4444-4444-8444-444444444444')).toBe(false);
+    expect(auditRows()).toHaveLength(0);
+  });
+
+  it('the audit table refuses UPDATE and DELETE at the DATABASE level', () => {
+    // Append-only enforced by triggers, not by the absence of application code.
+    // Red-green anchor: drop the two triggers from migration 7 and these throw
+    // assertions go green-to-red in reverse — the statements would succeed.
+    const memory = told('A fact.');
+    forget(db, memory.id);
+
+    expect(() => db.prepare('DELETE FROM memory_audit').run()).toThrow(/append-only/);
+    expect(() =>
+      db.prepare("UPDATE memory_audit SET deleted_at = '1999-01-01T00:00:00.000Z'").run(),
+    ).toThrow(/append-only/);
+  });
+});
+
+describe('exportableMemories — what a portable file may carry (ADR 0031)', () => {
+  it('includes open and private, and NEVER includes never-send', () => {
+    // The first genuine behavioural difference between the two restrictive
+    // tiers. `private` = local brains only, and the person's next machine is
+    // still their machine, so it travels in the file. `never-send` = never
+    // leaves this machine — and a backup file on a thumb drive has left.
+    told('An open fact.', 'open');
+    told('A private fact.', 'private');
+    told('HOME-CANARY stays on this machine under all circumstances.', 'never-send');
+
+    const exportable = exportableMemories(db);
+    const facts = exportable.map((m) => m.fact);
+
+    expect(facts).toContain('An open fact.');
+    expect(facts).toContain('A private fact.');
+    expect(JSON.stringify(exportable)).not.toContain('HOME-CANARY');
+  });
+
+  it('exports nothing from an empty store', () => {
+    expect(exportableMemories(db)).toEqual([]);
+  });
+});
+
+describe('importMemories — restore merges and never overwrites (ADR 0031)', () => {
+  const incoming = (over: Partial<Memory> = {}): Memory => ({
+    id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    fact: 'Restored from a backup.',
+    sensitivity: 'open',
+    learnedFrom: 'told',
+    learnedAt: '2026-08-01T12:00:00.000Z',
+    ...over,
+  });
+
+  it('adds a memory that is not there, preserving id, timestamp, and provenance', () => {
+    // A restored memory is the SAME memory, not a new one — same rule as
+    // conversations (ADR 0014).
+    const result = importMemories(db, [incoming()]);
+    expect(result).toEqual({ added: 1, skipped: 0 });
+
+    const [stored] = listMemories(db);
+    expect(stored).toEqual(incoming());
+  });
+
+  it('skips an id that already exists and leaves the stored row UNTOUCHED', () => {
+    importMemories(db, [incoming()]);
+    const result = importMemories(db, [incoming({ fact: 'A tampered replacement.' })]);
+
+    expect(result).toEqual({ added: 0, skipped: 1 });
+    expect(listMemories(db)[0]?.fact).toBe('Restored from a backup.');
+  });
+
+  it('is idempotent — importing the same backup twice adds nothing the second time', () => {
+    importMemories(db, [incoming()]);
+    expect(importMemories(db, [incoming()])).toEqual({ added: 0, skipped: 1 });
+    expect(listMemories(db)).toHaveLength(1);
+  });
+
+  it('REFUSES a credential-shaped fact at the import door too', () => {
+    // Two doors, one guard. A backup written before the guard was widened — or
+    // hand-edited — must not walk a credential into the store that replays its
+    // rows into every prompt. Skipped and counted, never stored, never echoed.
+    const fakeKey = ['sk', 'ant', 'B2c3D4e5F6g7H8j9K0l1M2n3'].join('-');
+    const result = importMemories(db, [
+      incoming(),
+      incoming({ id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', fact: `my key is ${fakeKey}` }),
+    ]);
+
+    expect(result).toEqual({ added: 1, skipped: 1 });
+    expect(JSON.stringify(listMemories(db))).not.toContain(fakeKey);
   });
 });

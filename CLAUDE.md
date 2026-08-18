@@ -101,9 +101,10 @@ Repository: `github.com/Vanguard-Global-Logistics/Jarvis-Ai-Assistant`.
   against a genuinely packaged build — `isPackaged: true`, loaded from `app.asar`, every
   channel that existed on that date (sixteen; there are nineteen now) answering, renderer
   isolated, console clean. That closes ADR 0004's packaging gate for the pipeline.
-  **The count is left at sixteen deliberately**: it is a record of a run that happened on a
-  named date, and raising it to nineteen would claim a verification nobody performed
-  (§8 rule 2). `npm run probe:packaged` has not been re-run since `memory:*` landed. What is still NOT verified is the **macOS `.dmg` on
+  **Re-run on 2026-08-18** against a freshly packaged build: `isPackaged: true`, loaded
+  from `app.asar`, all NINETEEN channels answering including `memory:*` store/refuse/
+  forget driven end to end, renderer isolated, console clean (ADR 0033). The 2026-08-13
+  sixteen-channel record stands as history; the current claim is the current run. What is still NOT verified is the **macOS `.dmg` on
   William's own Mac**: `npm run package:mac` only runs on a Mac (ADR 0016), and no
   installer has been opened there. Do not call the Mac installer verified until it is.
 - `reference/design-handoff/*.dc.html` and `support.js` are **design prototypes, not
@@ -274,8 +275,8 @@ services/aegis         AEGIS engine — independent, no GenAI        PARTIAL —
 packages/contracts     Zod schemas + shared types                  PARTIAL — IPC (19 channels), model, history, profile, automation, memory, experience
 packages/ui            Design-system components                    PARTIAL — tokens, motion, Orb + glass primitives
 packages/config        Env validation + structured logging         IMPLEMENTED, unit-tested
-packages/database      SQLite (node:sqlite) + migration runner     PARTIAL — wired to Electron main, 6 migrations: history, amplifications, profile, window-state, plans, memory (ADR 0008, 0009, 0013, 0017, 0024, 0029)
-docs/DECISIONS/        ADRs                                        0001–0030
+packages/database      SQLite (node:sqlite) + migration runner     PARTIAL — wired to Electron main, 7 migrations: history, amplifications, profile, window-state, plans, memory, memory-audit (ADR 0008, 0009, 0013, 0017, 0024, 0029, 0032)
+docs/DECISIONS/        ADRs                                        0001–0033
 docs/foundation/       Layer 2 foundation documents (ADR 0005)     PARTIAL — 01 APPROVED; 02, 07, 09 DRAFT; rest CONCEPTUAL
 ```
 
@@ -300,6 +301,8 @@ npm run probe:packaged  # drive that packaged app — needs package:dir first
 npm run check:model  # ask the configured provider, for real, what is wrong
 npm run review       # build a paste-ready packet for ChatGPT/Gemini/Grok to review
 npm run package:mac  # build the .dmg — only works on a Mac (ADR 0016)
+npm run health       # is this machine able to run Jarvis right now? (ADR 0033)
+npm run install:autostart  # macOS: launchd agents — Jarvis at login, health on an interval
 ```
 
 **`npm run verify` cannot tell you whether the app runs, and twice it did not.** It was
