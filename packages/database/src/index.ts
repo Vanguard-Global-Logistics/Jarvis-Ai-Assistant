@@ -4,7 +4,7 @@
  * STATUS: PARTIAL.
  *   - Connection ownership and the migration runner: IMPLEMENTED AND VERIFIED
  *     (unit tests, in-memory).
- *   - Feature schema: NINE migrations — see the `migrations` array below, which
+ *   - Feature schema: TEN migrations — see the `migrations` array below, which
  *     is the single list. It includes `memory` (ADR 0029), deliberately with
  *     no owner column because ADR 0012 makes data separation the OS user
  *     account; `forge_items` (`docs/architecture/forge-architecture.md`), the
@@ -31,6 +31,7 @@ import { memoryMigration } from './migrations/0006-memory.js';
 import { memoryAuditMigration } from './migrations/0007-memory-audit.js';
 import { forgeMigration } from './migrations/0008-forge.js';
 import { ledgerMigration } from './migrations/0009-ledger.js';
+import { ledgerArchivedConfidenceMigration } from './migrations/0010-ledger-archived-confidence.js';
 
 export { openDatabase, withTransaction } from './connection.js';
 export type { OpenDatabaseOptions, SqliteDatabase } from './connection.js';
@@ -54,4 +55,5 @@ export const migrations: readonly Migration[] = [
   memoryAuditMigration,
   forgeMigration,
   ledgerMigration,
+  ledgerArchivedConfidenceMigration,
 ];

@@ -125,8 +125,18 @@ export const LedgerInputsSchema = z
     commitments: DeductionFigureSchema,
     /** Tax owed but not yet paid. Spending it is borrowing from the IRS. */
     taxSetAside: DeductionFigureSchema,
-    /** ISO-8601, minted in main on every write. */
-    updatedAt: z.iso.datetime(),
+    /**
+     * ISO-8601, minted in main on every write — `null` when nobody has ever
+     * entered figures.
+     *
+     * Nullable rather than defaulted, for the module's own reason: an earlier
+     * version returned `new Date(0).toISOString()` for a store that had never
+     * been written, so the one field that answers "how current is this?"
+     * fabricated a confident 1 January 1970. In a module built on the
+     * difference between MISSING and a number, the timestamp does not get to
+     * make something up.
+     */
+    updatedAt: z.iso.datetime().nullable(),
   })
   .strict();
 
@@ -139,17 +149,38 @@ export const SetLedgerInputsRequestSchema = LedgerInputsSchema.omit({
 
 export type SetLedgerInputsRequest = z.infer<typeof SetLedgerInputsRequestSchema>;
 
-/** The six deduction terms, by name — one list, so no caller re-types them. */
-export const DEDUCTION_TERMS = [
-  'pending',
-  'bills30d',
-  'debtMinimums',
-  'emergencyReserve',
-  'commitments',
-  'taxSetAside',
-] as const;
+/**
+ * Every term SUBTRACTED from cash — derived from the schema's own key set, so
+ * it cannot drift from it.
+ *
+ * ## Why this is a typed Record and not a hand-written array
+ *
+ * The first version was a literal `['pending', 'bills30d', …]`, and a swarm
+ * critic found the fail-open it created: adding an eighth deduction to
+ * `LedgerInputsSchema` compiled clean everywhere while `safeToSpend` silently
+ * never subtracted it, its MISSING state never triggered the refusal, and the
+ * store never persisted it. Safe-to-Spend would come out HIGHER than the
+ * truth — the one outcome this module exists to prevent — reachable by an
+ * edit that left the whole suite green.
+ *
+ * `Record<Exclude<keyof SetLedgerInputsRequest, 'cash'>, true>` makes that a
+ * COMPILE ERROR: a new term in the schema is a missing key here until a human
+ * decides whether it is a deduction. Same fail-closed idiom as
+ * `requiresJustification` below and `sensitivityAllowsBackup` in the memory
+ * contracts.
+ */
+export type DeductionTerm = Exclude<keyof SetLedgerInputsRequest, 'cash'>;
 
-export type DeductionTerm = (typeof DEDUCTION_TERMS)[number];
+const DEDUCTION_TERM_SET: Record<DeductionTerm, true> = {
+  pending: true,
+  bills30d: true,
+  debtMinimums: true,
+  emergencyReserve: true,
+  commitments: true,
+  taxSetAside: true,
+};
+
+export const DEDUCTION_TERMS = Object.keys(DEDUCTION_TERM_SET) as readonly DeductionTerm[];
 
 /**
  * The result of computing Safe-to-Spend — a DISCRIMINATED union, because
@@ -262,20 +293,34 @@ export type CostGovernorStatus = z.infer<typeof CostGovernorStatusSchema>;
  * that has started spending is exactly the case that should be loud.
  */
 export function costGovernorStatus(spentCents: number, budgetCents: number): CostGovernorStatus {
-  const utilizationPercent =
-    budgetCents <= 0 ? (spentCents > 0 ? 100 : 0) : Math.floor((spentCents / budgetCents) * 100);
+  // Clamped and truncated, so the function is TOTAL over its own declared
+  // return type. An earlier version took the raw arguments: a negative spend
+  // produced `utilizationPercent: -10, spentCents: -100`, which
+  // `CostGovernorStatusSchema` — the schema of the same name, `.min(0)` on
+  // both — rejects. A producer whose output its own schema calls invalid is a
+  // contradiction that survived only because nothing exercised the branch.
+  const spent = Math.max(0, Math.trunc(spentCents));
+  const budget = Math.max(0, Math.trunc(budgetCents));
 
-  // The `ok` band's threshold is 0 and utilization is never below it in
-  // practice, so `find` always matches — the fallback is for the compiler and
-  // for a negative spend figure, which lands in `ok` rather than crashing.
+  // INTEGER numerator first. `Math.floor((spent / budget) * 100)` was a real
+  // bug, not a style point: `(2900 / 10000) * 100` is 28.999999999999996 in
+  // binary floating point, so a project at exactly 29% reported 28 — in the
+  // one module whose header promises money is never a float. Multiplying into
+  // integer space before dividing is exact for every value in range.
+  const utilizationPercent =
+    budget <= 0 ? (spent > 0 ? 100 : 0) : Math.floor((spent * 100) / budget);
+
+  // With the clamp, utilization is never negative and the `ok` band's
+  // threshold is 0, so `find` always matches. The `??` is unreachable and kept
+  // only so the compiler does not have to be argued with.
   const match = COST_GOVERNOR_BANDS.find((b) => utilizationPercent >= b.atPercent) ?? OK_BAND;
 
   return {
     band: match.band,
     effect: match.effect,
     utilizationPercent,
-    spentCents,
-    budgetCents,
+    spentCents: spent,
+    budgetCents: budget,
   };
 }
 
@@ -323,6 +368,32 @@ export function requiresJustification(classification: ExpenseClassification): bo
   }
 }
 
+/**
+ * What a person decided about a purchase.
+ *
+ * Three values, not two. The governing architecture document and the archived
+ * handoff both specify **accept / override**, and the first implementation
+ * shipped `accepted | declined` without recording the deviation — a swarm
+ * critic caught the governing document and four artifacts disagreeing inside
+ * one commit.
+ *
+ * `overridden` is the row that matters most in a years-long record: it says
+ * "I proceeded even though the classification told me to challenge this." A
+ * `declined` cannot express it, and because a decision is deliberately not
+ * overwritable, the distinction is unrecoverable once the wrong one is stored.
+ */
+export const PURCHASE_DECISIONS = [
+  /** Bought it, with the review's own posture agreeing or not objecting. */
+  'accepted',
+  /** Decided against it. A "no" is a record worth keeping. */
+  'declined',
+  /** Proceeded AGAINST the challenge posture the classification carries. */
+  'overridden',
+] as const;
+
+export type PurchaseDecision = (typeof PURCHASE_DECISIONS)[number];
+export const PurchaseDecisionSchema = z.enum(PURCHASE_DECISIONS);
+
 /** Free-text caps. A review is a record someone reads, not an essay. */
 export const REVIEW_TEXT_MAX_LENGTH = 2000;
 export const REVIEW_LABEL_MAX_LENGTH = 200;
@@ -359,16 +430,30 @@ export const PurchaseReviewSchema = z
     /** Does approving this create an ongoing obligation someone must cancel later? */
     cancellationRequired: z.boolean(),
     /**
-     * Safe-to-Spend BEFORE this purchase, in cents, captured when the review
-     * was created — null when it was not computable at the time. Stored rather
-     * than recomputed because it is a record of what was known at the moment
-     * of the decision, not a live figure.
+     * Safe-to-Spend BEFORE this purchase, captured when the review was created
+     * — `null` when it was not computable at the time.
+     *
+     * **Cents and confidence travel together**, as one nullable object rather
+     * than two independent fields, so the archived figure can never be shown
+     * bare. An earlier version stored the cents alone and threw the confidence
+     * away: an `ASSUMED` total became an unqualified "$750.00" in a permanent
+     * record, which is the module's own §2 rule ("a number displayed without
+     * its state is a number displayed as more certain than it is") violated on
+     * the one figure a person re-reads years later. Same shape as
+     * `FigureSchema` above, for the same reason.
+     *
+     * Stored rather than recomputed because it records what was known at the
+     * moment of the decision; recomputing later would make a reckless purchase
+     * look prudent in hindsight.
      */
-    safeToSpendBeforeCents: z.number().int().nullable(),
+    safeToSpendBefore: z
+      .object({ cents: z.number().int(), confidence: DataStateSchema })
+      .strict()
+      .nullable(),
     createdAt: z.iso.datetime(),
     /** Set only by the separate decide channel. Null until a person decides. */
     decidedAt: z.iso.datetime().nullable(),
-    decision: z.enum(['accepted', 'declined']).nullable(),
+    decision: PurchaseDecisionSchema.nullable(),
     decidedBy: z.string().trim().max(REVIEW_LABEL_MAX_LENGTH).nullable(),
   })
   .strict();
@@ -386,7 +471,7 @@ export type PurchaseReview = z.infer<typeof PurchaseReviewSchema>;
 export const CreatePurchaseReviewRequestSchema = PurchaseReviewSchema.omit({
   id: true,
   createdAt: true,
-  safeToSpendBeforeCents: true,
+  safeToSpendBefore: true,
   decidedAt: true,
   decision: true,
   decidedBy: true,
@@ -405,7 +490,7 @@ export type CreatePurchaseReviewRequest = z.infer<typeof CreatePurchaseReviewReq
 export const DecidePurchaseReviewRequestSchema = z
   .object({
     id: z.uuid(),
-    decision: z.enum(['accepted', 'declined']),
+    decision: PurchaseDecisionSchema,
     decidedBy: z.string().trim().min(1).max(REVIEW_LABEL_MAX_LENGTH),
   })
   .strict();

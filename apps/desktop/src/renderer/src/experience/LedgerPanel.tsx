@@ -1,8 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { JSX } from 'react';
-import type { DataState, LedgerInputs, PurchaseReview, SafeToSpend } from '@jarvis/contracts';
+import type {
+  DataState,
+  LedgerInputs,
+  PurchaseDecision,
+  PurchaseReview,
+  SafeToSpend,
+} from '@jarvis/contracts';
 import { CENTS_PER_DOLLAR, DATA_STATES, EXPENSE_CLASSIFICATIONS } from '@jarvis/contracts';
-import { fontFamily, letterSpacing, surface, text } from '@jarvis/ui';
+import { accent, fontFamily, letterSpacing, surface, text } from '@jarvis/ui';
 import { bridgeMember } from './bridge.js';
 
 /**
@@ -28,17 +34,32 @@ function formatCents(cents: number): string {
   const abs = Math.abs(cents);
   const dollars = Math.floor(abs / CENTS_PER_DOLLAR);
   const remainder = String(abs % CENTS_PER_DOLLAR).padStart(2, '0');
-  return `${negative ? '-' : ''}$${dollars.toLocaleString()}.${remainder}`;
+  // 'en-US' is PINNED, not ambient. `toLocaleString()` with no locale groups
+  // by the host's setting while the decimal point below is a hard-coded `.` —
+  // under de-DE that renders "$1.250.50", which mixes a period group separator
+  // with a period decimal separator and is unparseable by the reader it was
+  // localised for. Half-localised money is worse than unlocalised money.
+  return `${negative ? '-' : ''}$${dollars.toLocaleString('en-US')}.${remainder}`;
 }
 
 /** How loudly a state should read. MISSING and ASSUMED are the weak ones. */
 const STATE_COLOR: Record<DataState, string> = {
-  POSTED: '#5ad18a',
-  PENDING: '#5ad1ff',
-  CONFIRMED: '#5ad1ff',
-  ESTIMATED: '#ffb84d',
-  ASSUMED: '#ffb84d',
-  MISSING: '#ff5a5a',
+  POSTED: accent.success,
+  PENDING: accent.jarvisBlue,
+  CONFIRMED: accent.jarvisBlue,
+  ESTIMATED: accent.warning,
+  ASSUMED: accent.warning,
+  MISSING: accent.danger,
+};
+
+/** Undecided is amber; a decision made against advice reads differently from a plain no. */
+const DECISION_COLOR: Record<'accepted' | 'declined' | 'overridden' | 'undecided', string> = {
+  accepted: accent.success,
+  declined: accent.danger,
+  // Not red: overriding is a legitimate choice a person is entitled to make.
+  // It is marked so the record can be found later, not to scold.
+  overridden: accent.warning,
+  undecided: accent.warning,
 };
 
 const TERM_LABELS: { key: keyof Omit<LedgerInputs, 'updatedAt'>; label: string }[] = [
@@ -51,6 +72,11 @@ const TERM_LABELS: { key: keyof Omit<LedgerInputs, 'updatedAt'>; label: string }
   { key: 'taxSetAside', label: 'Tax set-aside' },
 ];
 
+/** Property key -> the label the panel already shows for that row. */
+const LABEL_BY_KEY: Record<string, string> = Object.fromEntries(
+  TERM_LABELS.map(({ key, label }) => [key, label]),
+);
+
 export function LedgerPanel(): JSX.Element {
   const [inputs, setInputs] = useState<LedgerInputs | null>(null);
   const [computed, setComputed] = useState<SafeToSpend | null>(null);
@@ -59,13 +85,15 @@ export function LedgerPanel(): JSX.Element {
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
   const [deciding, setDeciding] = useState<string | null>(null);
   const [deciderName, setDeciderName] = useState('');
+  /** The review id whose decision is in flight, so a double-click cannot resend. */
+  const [submitting, setSubmitting] = useState<string | null>(null);
 
-  const refresh = useCallback(async (): Promise<boolean> => {
+  const refresh = useCallback(async (): Promise<void> => {
     const getLedgerInputs = bridgeMember('getLedgerInputs');
     const listPurchaseReviews = bridgeMember('listPurchaseReviews');
     if (getLedgerInputs === null || listPurchaseReviews === null) {
       setLoadError('Ledger is unavailable in this build — the preload does not provide it.');
-      return false;
+      return;
     }
     try {
       const [state, list] = await Promise.all([getLedgerInputs(), listPurchaseReviews()]);
@@ -73,11 +101,9 @@ export function LedgerPanel(): JSX.Element {
       setComputed(state.safeToSpend);
       setReviews(list);
       setLoadError(null);
-      return true;
     } catch (cause: unknown) {
       console.error('[ledger] read failed:', cause);
       setLoadError('Ledger could not read its figures. What is shown below may be out of date.');
-      return false;
     }
   }, []);
 
@@ -86,10 +112,27 @@ export function LedgerPanel(): JSX.Element {
   }, [refresh]);
 
   const submitDecision = useCallback(
-    async (id: string, decision: 'accepted' | 'declined'): Promise<void> => {
+    async (id: string, decision: PurchaseDecision): Promise<void> => {
       const decidePurchaseReview = bridgeMember('decidePurchaseReview');
       const decidedBy = deciderName.trim();
-      if (decidePurchaseReview === null || decidedBy.length === 0) return;
+      // Split deliberately. Collapsing these into one bare `return` meant the
+      // ONLY case reachable at runtime — a stale preload that has no decide
+      // channel — was swallowed with no message, on the one control in this
+      // module that records a financial decision. The empty-name case is
+      // already handled by the buttons' `disabled`.
+      if (decidePurchaseReview === null) {
+        setRowErrors((previous) => ({
+          ...previous,
+          [id]: 'Ledger cannot record a decision in this build — the preload does not provide it.',
+        }));
+        return;
+      }
+      if (decidedBy.length === 0) return;
+      // In-flight guard: without it a double-click sends the decision twice,
+      // the second call hits the not-overwritable rule, and the person is told
+      // "already been decided" about the decision they just successfully made.
+      if (submitting !== null) return;
+      setSubmitting(id);
       try {
         await decidePurchaseReview({ id, decision, decidedBy });
         setDeciding(null);
@@ -104,9 +147,11 @@ export function LedgerPanel(): JSX.Element {
           ...previous,
           [id]: cause instanceof Error ? cause.message : 'Ledger could not record that decision.',
         }));
+      } finally {
+        setSubmitting(null);
       }
     },
-    [deciderName, refresh],
+    [deciderName, refresh, submitting],
   );
 
   return (
@@ -165,7 +210,9 @@ export function LedgerPanel(): JSX.Element {
               color: text.faint,
             }}
           >
-            Reading…
+            {/* An unread store must not sit on a progress message that is no
+                longer true — the same lesson the MEMORY chip already learned. */}
+            {loadError === null ? 'Reading…' : 'Not available — see the message above.'}
           </p>
         ) : computed.computable ? (
           <>
@@ -174,7 +221,7 @@ export function LedgerPanel(): JSX.Element {
                 margin: '4px 0 0',
                 fontFamily: fontFamily.display,
                 fontSize: 26,
-                color: computed.cents < 0 ? '#ff5a5a' : text.body,
+                color: computed.cents < 0 ? accent.danger : text.body,
               }}
             >
               {formatCents(computed.cents)}
@@ -189,6 +236,21 @@ export function LedgerPanel(): JSX.Element {
             >
               CONFIDENCE: {computed.confidence}
             </span>
+            {/* How OLD the figures are. A confidence tag says how well a number
+                was known when it was entered; it says nothing about whether
+                that was this morning or in March. */}
+            <span
+              style={{
+                display: 'block',
+                fontFamily: fontFamily.body,
+                fontSize: 10,
+                color: text.faint,
+              }}
+            >
+              {inputs?.updatedAt == null
+                ? 'Figures never entered.'
+                : `Figures as of ${new Date(inputs.updatedAt).toLocaleDateString('en-US')}.`}
+            </span>
           </>
         ) : (
           <>
@@ -199,13 +261,13 @@ export function LedgerPanel(): JSX.Element {
                 margin: '4px 0 0',
                 fontFamily: fontFamily.body,
                 fontSize: 12,
-                color: '#ffb84d',
+                color: accent.warning,
               }}
             >
               Not enough is known to say.
             </p>
             <span style={{ fontFamily: fontFamily.body, fontSize: 11, color: text.faint }}>
-              Still needed: {computed.missing.join(', ')}
+              Still needed: {computed.missing.map((key) => LABEL_BY_KEY[key] ?? key).join(', ')}
             </span>
           </>
         )}
@@ -275,7 +337,7 @@ export function LedgerPanel(): JSX.Element {
             style={{
               padding: 8,
               border: `1px solid ${surface.hairline}`,
-              borderLeft: `2px solid ${review.decision === 'accepted' ? '#5ad18a' : review.decision === 'declined' ? '#ff5a5a' : '#ffb84d'}`,
+              borderLeft: `2px solid ${DECISION_COLOR[review.decision ?? 'undecided']}`,
               borderRadius: surface.radiusMin,
               background: 'rgba(255,255,255,0.03)',
               display: 'flex',
@@ -291,15 +353,29 @@ export function LedgerPanel(): JSX.Element {
               {EXPENSE_CLASSIFICATIONS[review.classification].posture}
             </span>
             {review.cancellationRequired && (
-              <span style={{ fontFamily: fontFamily.body, fontSize: 10, color: '#ffb84d' }}>
+              <span style={{ fontFamily: fontFamily.body, fontSize: 10, color: accent.warning }}>
                 Creates an ongoing obligation someone must cancel later.
               </span>
             )}
             <span style={{ fontFamily: fontFamily.body, fontSize: 10, color: text.faint }}>
               Safe to Spend when opened:{' '}
-              {review.safeToSpendBeforeCents === null
-                ? 'not known at the time'
-                : formatCents(review.safeToSpendBeforeCents)}
+              {review.safeToSpendBefore === null ? (
+                'not known at the time'
+              ) : (
+                <>
+                  {formatCents(review.safeToSpendBefore.cents)}{' '}
+                  <span
+                    style={{
+                      fontFamily: fontFamily.mono,
+                      fontSize: 8,
+                      letterSpacing: letterSpacing.label,
+                      color: STATE_COLOR[review.safeToSpendBefore.confidence],
+                    }}
+                  >
+                    {review.safeToSpendBefore.confidence}
+                  </span>
+                </>
+              )}
             </span>
 
             {review.decidedAt !== null ? (
@@ -308,11 +384,11 @@ export function LedgerPanel(): JSX.Element {
                   fontFamily: fontFamily.mono,
                   fontSize: 9,
                   letterSpacing: letterSpacing.label,
-                  color: review.decision === 'accepted' ? '#5ad18a' : '#ff5a5a',
+                  color: review.decision === 'accepted' ? accent.success : accent.danger,
                 }}
               >
                 {review.decision?.toUpperCase()} BY {review.decidedBy?.toUpperCase()} ·{' '}
-                {new Date(review.decidedAt).toLocaleDateString()}
+                {new Date(review.decidedAt).toLocaleDateString('en-US')}
               </span>
             ) : deciding === review.id ? (
               <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -335,23 +411,34 @@ export function LedgerPanel(): JSX.Element {
                 />
                 <button
                   type="button"
-                  disabled={deciderName.trim().length === 0}
+                  disabled={deciderName.trim().length === 0 || submitting !== null}
                   onClick={() => {
                     void submitDecision(review.id, 'accepted');
                   }}
-                  style={smallButton('#5ad18a')}
+                  style={smallButton(accent.success)}
                 >
                   ACCEPT
                 </button>
                 <button
                   type="button"
-                  disabled={deciderName.trim().length === 0}
+                  disabled={deciderName.trim().length === 0 || submitting !== null}
                   onClick={() => {
                     void submitDecision(review.id, 'declined');
                   }}
-                  style={smallButton('#ff5a5a')}
+                  style={smallButton(accent.danger)}
                 >
                   DECLINE
+                </button>
+                <button
+                  type="button"
+                  disabled={deciderName.trim().length === 0 || submitting !== null}
+                  onClick={() => {
+                    void submitDecision(review.id, 'overridden');
+                  }}
+                  title="Proceeding even though this classification says to challenge it."
+                  style={smallButton(accent.warning)}
+                >
+                  OVERRIDE
                 </button>
                 <button
                   type="button"
@@ -370,7 +457,7 @@ export function LedgerPanel(): JSX.Element {
                 onClick={() => {
                   setDeciding(review.id);
                 }}
-                style={smallButton('#5ad1ff')}
+                style={smallButton(accent.jarvisBlue)}
               >
                 DECIDE
               </button>
@@ -400,7 +487,7 @@ function alertBox(padding = 8): React.CSSProperties {
     padding,
     fontFamily: fontFamily.body,
     fontSize: 11,
-    color: '#ffb84d',
+    color: accent.warning,
     border: '1px solid rgba(255,184,77,0.4)',
     borderRadius: surface.radiusMin,
     background: 'rgba(255,184,77,0.08)',

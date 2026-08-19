@@ -452,10 +452,17 @@ real-if-configured shape as the model providers.
 | **Authority granted** | Store person-typed figures, compute one formula, keep a written purchase record. **Nothing else.**                                                                                                                                                                                        |
 
 **No channel here moves money, and none ever will.** There is no `pay`, `transfer`,
-`send`, `subscribe`, `openCredit`, or `connectBank`, and no request field anywhere that
-could carry an account number, a routing number, or a credential. FINANCIAL-SURVIVAL-RULES
-rule 10 is held by **absence**: the capability was never built, so no bug, injection, or
-careless edit can reach it. Adding one is a new ADR with its own independent review.
+`send`, `subscribe`, `openCredit`, or `connectBank`. FINANCIAL-SURVIVAL-RULES rule 10 is
+held by **absence**: that capability was never built, so no bug, injection, or careless
+edit can reach it. Adding one is a new ADR with its own independent review.
+
+**Credentials are a WEAKER claim, and the distinction matters.** An earlier version of
+this section said no field could carry an account number or a credential. That was false:
+a purchase review has ten free-text fields of up to 2,000 characters, and a 2,000-character
+`whyNow` holds a routing number perfectly well. What is true is that they are **guarded** —
+`looksLikeCredential`, the same check `memory:remember` and `forge:*` use, runs on every
+free-text field before the insert and on `decidedBy` before the update, refusing with a
+message that quotes nothing back. Guarded, not impossible.
 
 **`safeToSpend` refuses rather than guesses.** It is a discriminated union. When any of
 the seven terms is `MISSING` it returns `{ computable: false, missing: [...] }` and the UI

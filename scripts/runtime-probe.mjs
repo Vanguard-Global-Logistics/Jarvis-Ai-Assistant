@@ -567,7 +567,11 @@ async function runChecks(page, mode, stub = null) {
     'createPurchaseReview',
     'decidePurchaseReview',
   ];
-  const keysOk = JSON.stringify(keys.value) === JSON.stringify(EXPECTED_KEYS);
+  // Sorted on both sides: the preload test compares sorted, and comparing
+  // insertion order here made reordering the preload object a no-op that
+  // nonetheless turned the runtime job red.
+  const keysOk =
+    JSON.stringify([...(keys.value ?? [])].sort()) === JSON.stringify([...EXPECTED_KEYS].sort());
   add(
     `Object.keys is exactly ${JSON.stringify(EXPECTED_KEYS)}`,
     keysOk,
@@ -1324,12 +1328,50 @@ async function runChecks(page, mode, stub = null) {
        emergencyReserve: { cents: 0, state: 'POSTED' },
        commitments: { cents: 0, state: 'POSTED' },
        taxSetAside: { cents: 0, state: 'POSTED' }
-     }).then(() => 'ACCEPTED').catch((e) => 'refused') : null`,
+     }).then(() => 'ACCEPTED').catch((e) => 'refused:' + e.message) : null`,
   );
   add(
-    'a NEGATIVE deduction is refused at the boundary — it would invent money',
-    ledgerNegative.value === 'refused',
-    String(ledgerNegative.value),
+    // Asserts on the SPECIFIC refusal, not merely that something rejected.
+    // `.catch(() => 'refused')` passed for any failure at all — an unregistered
+    // channel, a response-validation bug, an unrelated throw — so it could not
+    // see the fail-open it exists to catch. `handleContract` throws this exact
+    // constant on schema rejection.
+    'a NEGATIVE deduction is refused BY THE SCHEMA — it would invent money',
+    String(ledgerNegative.value).includes('Invalid request for ledger:set-inputs'),
+    String(ledgerNegative.value).slice(0, 120),
+  );
+
+  // And nothing partial landed: the figures are still the ones set above.
+  const ledgerAfterRefusal = await page.evaluate(
+    'window.jarvis ? await window.jarvis.getLedgerInputs() : null',
+  );
+  add(
+    'the refused write changed nothing — the previous figures survive intact',
+    ledgerAfterRefusal.value?.inputs?.cash?.cents === 500000 &&
+      ledgerAfterRefusal.value?.inputs?.pending?.cents === 20000,
+    JSON.stringify(ledgerAfterRefusal.value?.inputs?.pending),
+  );
+
+  // A credential pasted into a review's free text is refused, and stored nowhere.
+  const plantedLedgerKey = ['sk', 'ant', 'PROBE0123456789abcdefghij'].join('-');
+  const ledgerCredential = await page.evaluate(
+    `window.jarvis ? await window.jarvis.createPurchaseReview({
+       outcome: 'PROBE: credential', whyNow: 'key is ${plantedLedgerKey}',
+       alternatives: 'x', lowestCostOption: 'x', premiumOption: 'x',
+       costCents: 100, projectPaying: 'Jarvis', classification: 'convenience',
+       benefit: 'x', risk: 'x', delayConsequence: 'x', cancellationRequired: false
+     }).then(() => 'ACCEPTED').catch((e) => 'refused:' + e.message) : null`,
+  );
+  add(
+    'a credential pasted into a purchase review is REFUSED, with the message a person needs',
+    String(ledgerCredential.value).includes('will not store it') &&
+      String(ledgerCredential.value).includes('.env'),
+    String(ledgerCredential.value).slice(0, 140),
+  );
+  add(
+    'the refusal never echoes the credential back',
+    !String(ledgerCredential.value).includes('PROBE0123456789'),
+    String(ledgerCredential.value).includes('PROBE0123456789') ? 'LEAKED THE KEY' : 'clean',
   );
 
   const reviewCreated = await page.evaluate(
@@ -1342,10 +1384,11 @@ async function runChecks(page, mode, stub = null) {
      }) : null`,
   );
   add(
-    'ledger:create-review opens UNDECIDED and captures Safe-to-Spend as it was',
+    'ledger:create-review opens UNDECIDED and captures Safe-to-Spend WITH its confidence',
     reviewCreated.value?.decision === null &&
       reviewCreated.value?.decidedAt === null &&
-      reviewCreated.value?.safeToSpendBeforeCents === 75000,
+      reviewCreated.value?.safeToSpendBefore?.cents === 75000 &&
+      reviewCreated.value?.safeToSpendBefore?.confidence === 'ASSUMED',
     reviewCreated.error
       ? `THREW: ${String(reviewCreated.error).split('\n')[0]}`
       : JSON.stringify(reviewCreated.value),
@@ -1371,10 +1414,34 @@ async function runChecks(page, mode, stub = null) {
      }).then(() => 'OVERWROTE').catch((e) => 'refused:' + e.message) : null`,
   );
   add(
-    'a decision is NOT overwritable — the record survives a second attempt',
+    'a decision is NOT overwritable — the second attempt is refused',
     String(reDecided.value).startsWith('refused:') &&
       String(reDecided.value).includes('already been decided'),
     String(reDecided.value).slice(0, 120),
+  );
+
+  // `ledger:list-reviews` driven for real. It was previously named only in the
+  // bridge-key allowlist, which proves a function exists — not that it works —
+  // while the ADR claimed the probe drove all five channels. This also gives
+  // "the record survives" something to stand on: the check above only read the
+  // rejection message and never looked at the row it said survived.
+  const ledgerList = await page.evaluate(
+    'window.jarvis ? await window.jarvis.listPurchaseReviews() : null',
+  );
+  const listed = Array.isArray(ledgerList.value)
+    ? ledgerList.value.find((r) => r.id === reviewId)
+    : undefined;
+  add(
+    'ledger:list-reviews returns the record, and the refused overwrite left it INTACT',
+    listed?.decision === 'accepted' &&
+      listed?.decidedBy === 'PROBE-William' &&
+      listed?.decidedAt === decided.value?.decidedAt &&
+      listed?.safeToSpendBefore?.cents === 75000,
+    JSON.stringify({
+      decision: listed?.decision,
+      decidedBy: listed?.decidedBy,
+      before: listed?.safeToSpendBefore,
+    }),
   );
 
   // E2: the Experience Shell mounts the Orb. Assert the real component is

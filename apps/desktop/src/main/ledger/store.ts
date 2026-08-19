@@ -2,13 +2,14 @@ import { randomUUID } from 'node:crypto';
 import type {
   CreatePurchaseReviewRequest,
   DataState,
+  PurchaseDecision,
   DecidePurchaseReviewRequest,
   ExpenseClassification,
   LedgerInputs,
   PurchaseReview,
   SetLedgerInputsRequest,
 } from '@jarvis/contracts';
-import { safeToSpend } from '@jarvis/contracts';
+import { looksLikeCredential, safeToSpend } from '@jarvis/contracts';
 import type { SqliteDatabase } from '@jarvis/database';
 import { UserFacingError } from '../user-facing-error.js';
 
@@ -67,9 +68,10 @@ interface PurchaseReviewRow {
   delay_consequence: string;
   cancellation_required: number;
   safe_to_spend_before_cents: number | null;
+  safe_to_spend_before_confidence: DataState | null;
   created_at: string;
   decided_at: string | null;
-  decision: 'accepted' | 'declined' | null;
+  decision: PurchaseDecision | null;
   decided_by: string | null;
 }
 
@@ -89,7 +91,8 @@ const EMPTY_INPUTS: LedgerInputs = {
   emergencyReserve: { cents: 0, state: 'MISSING' },
   commitments: { cents: 0, state: 'MISSING' },
   taxSetAside: { cents: 0, state: 'MISSING' },
-  updatedAt: new Date(0).toISOString(),
+  // Never written. NOT the epoch — see the schema's note.
+  updatedAt: null,
 };
 
 const toLedgerInputs = (row: LedgerInputsRow): LedgerInputs => ({
@@ -117,12 +120,58 @@ const toPurchaseReview = (row: PurchaseReviewRow): PurchaseReview => ({
   risk: row.risk,
   delayConsequence: row.delay_consequence,
   cancellationRequired: row.cancellation_required === 1,
-  safeToSpendBeforeCents: row.safe_to_spend_before_cents,
+  // Cents and confidence travel together or not at all — migration 10 makes
+  // the half-populated pair impossible at the disk, and this mapping keeps it
+  // impossible in memory.
+  safeToSpendBefore:
+    row.safe_to_spend_before_cents === null || row.safe_to_spend_before_confidence === null
+      ? null
+      : {
+          cents: row.safe_to_spend_before_cents,
+          confidence: row.safe_to_spend_before_confidence,
+        },
   createdAt: row.created_at,
   decidedAt: row.decided_at,
   decision: row.decision,
   decidedBy: row.decided_by,
 });
+
+/**
+ * What a person is told when Ledger refuses credential-shaped text.
+ *
+ * A swarm critic found the hole this closes, and six documents had claimed it
+ * was impossible: a purchase review carries TEN free-text fields, each up to
+ * 2,000 characters, and "the schema has nowhere to put a credential" was only
+ * ever true of the field NAMES. A 2,000-character `whyNow` holds a routing
+ * number or an API key perfectly well, and it is written to disk in plaintext
+ * and read back into the renderer on every list.
+ *
+ * Memory guards this. Forge guards this. Ledger's own store comments claimed
+ * to mirror `approveForgeItem` and mirrored only the function separation.
+ * Quotes nothing back, for the reason `MemoryRefusedError` does not: a
+ * rejection that echoed the matched text would write the secret into the very
+ * message meant to explain the refusal.
+ */
+const LEDGER_CREDENTIAL_REFUSED_MESSAGE =
+  'That looks like an API key, password, or account number, so Ledger will not ' +
+  'store it. A purchase review is kept for years and is shown again every time ' +
+  'the list is opened. Describe the account, never its numbers — and keys belong ' +
+  'in the .env file on this computer.';
+
+export class LedgerRefusedError extends UserFacingError {
+  public constructor() {
+    super(LEDGER_CREDENTIAL_REFUSED_MESSAGE);
+    this.name = 'LedgerRefusedError';
+  }
+}
+
+function refuseIfCredential(...texts: (string | null | undefined)[]): void {
+  for (const text of texts) {
+    if (text !== null && text !== undefined && looksLikeCredential(text)) {
+      throw new LedgerRefusedError();
+    }
+  }
+}
 
 /** Thrown when an id names no review. `handleContract` shows this verbatim. */
 export class PurchaseReviewNotFoundError extends UserFacingError {
@@ -220,8 +269,8 @@ export function setLedgerInputs(db: SqliteDatabase, request: SetLedgerInputsRequ
 
 const REVIEW_COLUMNS = `id, outcome, why_now, alternatives, lowest_cost_option, premium_option,
        cost_cents, project_paying, classification, benefit, risk, delay_consequence,
-       cancellation_required, safe_to_spend_before_cents, created_at,
-       decided_at, decision, decided_by`;
+       cancellation_required, safe_to_spend_before_cents, safe_to_spend_before_confidence,
+       created_at, decided_at, decision, decided_by`;
 
 /** Every review, newest first. */
 export function listPurchaseReviews(db: SqliteDatabase): PurchaseReview[] {
@@ -254,43 +303,64 @@ export function createPurchaseReview(
   db: SqliteDatabase,
   request: CreatePurchaseReviewRequest,
 ): PurchaseReview {
+  // Every free-text field, before anything is written. A purchase review is
+  // kept for years and re-rendered on every list, so it is exactly the wrong
+  // place for a pasted key or account number.
+  refuseIfCredential(
+    request.outcome,
+    request.whyNow,
+    request.alternatives,
+    request.lowestCostOption,
+    request.premiumOption,
+    request.projectPaying,
+    request.benefit,
+    request.risk,
+    request.delayConsequence,
+  );
+
   const computed = safeToSpend(getLedgerInputs(db));
-  const review: PurchaseReview = {
-    id: randomUUID(),
-    ...request,
-    safeToSpendBeforeCents: computed.computable ? computed.cents : null,
-    createdAt: new Date().toISOString(),
-    decidedAt: null,
-    decision: null,
-    decidedBy: null,
-  };
+  const id = randomUUID();
+  const createdAt = new Date().toISOString();
+  // Cents AND confidence, or neither. Storing the amount alone would replay a
+  // weakly-known total as a certain one, forever.
+  const before = computed.computable
+    ? { cents: computed.cents, confidence: computed.confidence }
+    : null;
 
   db.prepare(
     `INSERT INTO purchase_reviews (
        ${REVIEW_COLUMNS}
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
-    review.id,
-    review.outcome,
-    review.whyNow,
-    review.alternatives,
-    review.lowestCostOption,
-    review.premiumOption,
-    review.costCents,
-    review.projectPaying,
-    review.classification,
-    review.benefit,
-    review.risk,
-    review.delayConsequence,
-    review.cancellationRequired ? 1 : 0,
-    review.safeToSpendBeforeCents,
-    review.createdAt,
+    id,
+    request.outcome,
+    request.whyNow,
+    request.alternatives,
+    request.lowestCostOption,
+    request.premiumOption,
+    request.costCents,
+    request.projectPaying,
+    request.classification,
+    request.benefit,
+    request.risk,
+    request.delayConsequence,
+    request.cancellationRequired ? 1 : 0,
+    before?.cents ?? null,
+    before?.confidence ?? null,
+    createdAt,
     null,
     null,
     null,
   );
 
-  return review;
+  // Returned from the DISK, not from the object just assembled. The sibling
+  // writer `setLedgerInputs` already ends `return getLedgerInputs(db)` for
+  // this reason, and a swarm critic caught the inconsistency: returning the
+  // echo leaves the boolean -> INTEGER -> boolean conversion and every
+  // CHECK-driven coercion unverified on the create path.
+  const stored = readReview(db, id);
+  if (stored === null) throw new PurchaseReviewNotFoundError();
+  return stored;
 }
 
 /**
@@ -308,17 +378,23 @@ export function recordDecision(
   db: SqliteDatabase,
   request: DecidePurchaseReviewRequest,
 ): PurchaseReview {
+  refuseIfCredential(request.decidedBy);
+
   const existing = readReview(db, request.id);
   if (existing === null) throw new PurchaseReviewNotFoundError();
   if (existing.decidedAt !== null) throw new PurchaseReviewAlreadyDecidedError();
 
+  const decidedAt = new Date().toISOString();
   db.prepare(
     `UPDATE purchase_reviews
         SET decided_at = ?, decision = ?, decided_by = ?
       WHERE id = ?`,
-  ).run(new Date().toISOString(), request.decision, request.decidedBy, request.id);
+  ).run(decidedAt, request.decision, request.decidedBy, request.id);
 
-  const updated = readReview(db, request.id);
-  if (updated === null) throw new PurchaseReviewNotFoundError();
-  return updated;
+  // Built from the row just confirmed to exist plus the three values just
+  // written. The previous version re-read and threw `NotFound` on null — a
+  // state unreachable in a single-writer, synchronous process with no delete
+  // channel, and one that would have told a person "no longer exists" about a
+  // review that had just been updated successfully.
+  return { ...existing, decidedAt, decision: request.decision, decidedBy: request.decidedBy };
 }

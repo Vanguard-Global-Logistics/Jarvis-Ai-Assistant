@@ -44,10 +44,13 @@ Repository: `github.com/Vanguard-Global-Logistics/Jarvis-Ai-Assistant`.
   `approved_at`/`approved_by`. Forge v1 makes **zero** real GitHub or Vercel network
   calls — every fact is a person pasting evidence; real reads are a later, separately
   scoped ADR gated on a configured token. As of ADR 0035 it also has **Ledger v1** — a
-  read-only advisory Safe-to-Spend calculator, Cost Governor, and purchase-review record,
-  governed by `docs/architecture/ledger-architecture.md`. It holds **zero lines of
-  bank-API code** and cannot move money, open credit, or store a credential — the
-  capability is ABSENT, not guarded. Its defining property: when any figure is MISSING it
+  read-only advisory Safe-to-Spend store and purchase-review record, governed by
+  `docs/architecture/ledger-architecture.md`. It holds **zero lines of bank-API code** and
+  cannot move money or open credit — that capability is ABSENT, not guarded. Storing a
+  credential is a different claim and a weaker one: the free-text review fields are
+  GUARDED (the same `looksLikeCredential` check memory and Forge use), not incapable. The
+  Cost Governor and `requiresJustification` are implemented and tested but **wired to
+  nothing** — no budget is stored and no screen calls them. Its defining property: when any figure is MISSING it
   **refuses to compute** rather than treating unknown as zero, because zero would report
   more spending room than exists. **Ledger v1's independent review (CLAUDE.md §5,
   mandatory for finance-critical work) is still OUTSTANDING — do not describe it as
@@ -92,9 +95,9 @@ Repository: `github.com/Vanguard-Global-Logistics/Jarvis-Ai-Assistant`.
   may ever set `approvedAt`/`approvedBy`, separated at the schema (no `fact` value can
   even name "approved") and again at the store (a distinct function is the sole writer of
   those two columns). `ledger:*` (ADR 0035) is read-only and advisory: it stores figures
-  a PERSON typed (there is no bank connection and no schema field that could hold an
-  account number or a credential), computes one formula over them, and keeps a written
-  purchase record. `ledger:decide` is the ONLY channel that may record a decision, and
+  a PERSON typed (there is no bank connection, and credential-shaped text is REFUSED at
+  the boundary rather than being impossible to express), computes one formula over them,
+  and keeps a written purchase record. `ledger:decide` is the ONLY channel that may record a decision, and
   the enum has no value meaning "Ledger decided". **No channel here moves money, and
   none ever will** — the capability is absent rather than guarded. These twenty-nine are the whole of
   what `window.jarvis` exposes. `docs/IPC-SURFACE.md` is the
@@ -308,7 +311,7 @@ services/aegis         AEGIS engine — independent, no GenAI        PARTIAL —
 packages/contracts     Zod schemas + shared types                  PARTIAL — IPC (29 channels), model, history, profile, automation, memory, forge, ledger, experience
 packages/ui            Design-system components                    PARTIAL — tokens, motion, Orb + glass primitives
 packages/config        Env validation + structured logging         IMPLEMENTED, unit-tested
-packages/database      SQLite (node:sqlite) + migration runner     PARTIAL — wired to Electron main, 9 migrations: history, amplifications, profile, window-state, plans, memory, memory-audit, forge, ledger (ADR 0008, 0009, 0013, 0017, 0024, 0029, 0032, 0034, 0035)
+packages/database      SQLite (node:sqlite) + migration runner     PARTIAL — wired to Electron main, 10 migrations: history, amplifications, profile, window-state, plans, memory, memory-audit, forge, ledger, ledger-archived-confidence (ADR 0008, 0009, 0013, 0017, 0024, 0029, 0032, 0034, 0035)
 docs/DECISIONS/        ADRs                                        0001–0035
 docs/foundation/       Layer 2 foundation documents (ADR 0005)     PARTIAL — 01 APPROVED; 02, 07, 09 DRAFT; rest CONCEPTUAL
 docs/architecture/     Layer 3 architecture documents (ADR 0005)   PARTIAL — forge-architecture.md, ledger-architecture.md; Chief Architect gate (08) itself undrafted, see each doc's §0
@@ -718,7 +721,7 @@ to a design.
 | **Memory** | Long-term memory; repository/state files are the production source of truth, **not** conversational memory | Real CRUD in Phase 1. Sensitivity level + approval/review workflow is a **new Phase 1 design decision** — the handoff docs do not define one. |
 | **Drive Mode** | Separate personality profile; safety override always-on (humor forced to 0 during maneuvers/hazards/emergencies/"quiet") | State UI only. **Waze coordination is conceptual — Jarvis must never claim to control Waze internally.** |
 | **Forge** | Build/dev watchtower. Non-negotiable five-fact model: **claimed ≠ committed ≠ tested ≠ previewed ≠ approved** | **v1 IMPLEMENTED (ADR 0034).** Manual Task Bridge only — no real GitHub/Vercel calls, no automated repair. |
-| **Ledger** | Read-only advisory personal CFO. Safe-to-Spend, Cost Governor, purchase review | **v1 IMPLEMENTED (ADR 0035).** No real banking — zero bank-API code. Independent review still OUTSTANDING. |
+| **Ledger** | Read-only advisory personal CFO. Safe-to-Spend, Cost Governor, purchase review | **v1 IMPLEMENTED (ADR 0035)** — Safe-to-Spend store + purchase-review record, main-process and IPC only. No real banking. The panel is READ-ONLY (no entry form, no way to open a review) and the Cost Governor is unwired. Independent review OUTSTANDING. |
 | **AEGIS** | Independent security/containment runtime | **Real state engine in Phase 1** — with proof Jarvis cannot self-lower restrictions. |
 
 ### Official long-term modules of the Jarvis ecosystem
@@ -733,7 +736,7 @@ except Forge (ADR 0034) and Ledger (ADR 0035), which have v1s** — see its row 
 | **Throne OS** | The **parent AI operating platform** — the ecosystem within which Jarvis, Forge, Ledger, and AEGIS operate | The platform layer | **NOT IMPLEMENTED** |
 | **Jarvis** | The **personal AI** — assistant and orchestrator for William | Orchestration, personality, conversation, memory | **NOT IMPLEMENTED** (Phase 1 builds the foundation) |
 | **Forge** | The **software engineering system** | Build/dev pipeline state and approval evidence | **v1 IMPLEMENTED (ADR 0034)** — five-fact tracking, manual Task Bridge, no real GitHub/Vercel |
-| **Ledger** | **Manages finances** — read-only, advisory | Financial advisory state | **v1 IMPLEMENTED (ADR 0035)** — Safe-to-Spend, Cost Governor, purchase reviews; cannot move money |
+| **Ledger** | **Manages finances** — read-only, advisory | Financial advisory state | **v1 IMPLEMENTED (ADR 0035)** — Safe-to-Spend store + purchase reviews; cannot move money. Read-only panel; Cost Governor unwired; review OUTSTANDING |
 | **AEGIS** | **Manages security, independently** of Jarvis | Security level, capability grants, audit log | **NOT IMPLEMENTED** (Phase 1 builds the real state engine) |
 | **BCI Agent** | **Internal AV project management AI** | AV project management | **NOT IMPLEMENTED** |
 | **Sophisticated Sips** | **Business operating system for Amy Lavold's coffee business**, including **Menu OS** | Coffee business operations; Menu OS | **NOT IMPLEMENTED** |

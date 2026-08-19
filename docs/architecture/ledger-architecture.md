@@ -6,8 +6,8 @@
   header; a companion ADR records what actually shipped).
 - **Design status:** APPROVED — William, 2026-08-18 ("I'm building JARVIS and the Hive
   are we confused. Perfect build it exactly that way with forge and ledger").
-- **Implementation status:** NOT IMPLEMENTED as of this document. See the Ledger v1 ADR
-  once code lands.
+- **Implementation status:** v1 IMPLEMENTED — see ADR 0035. **Independent review
+  OUTSTANDING**, which by §10 below means Ledger v1 is not done.
 - **Governs:** the Ledger module's v1 scope, data model, and boundaries.
 - **References:** `reference/design-handoff/Ledger-Claude-Code-Handoff.md` (authoritative
   spec — archived, immutable), `reference/design-handoff/FINANCIAL-SURVIVAL-RULES.md`
@@ -153,8 +153,13 @@ PurchaseReview:
   cancellationRequired  boolean — does approving this create an ongoing obligation
   createdAt             timestamp, main-minted
   decidedAt             timestamp | null
-  decision              "accepted" | "overridden" | null
-  decidedBy             "William" (only value in v1)
+  decision              "accepted" | "declined" | "overridden" | null
+                        — three, not two: `declined` is "decided against it" and
+                        `overridden` is "proceeded against the classification's
+                        challenge posture". The implementation first shipped
+                        accepted|declined, dropping the override case this
+                        document specifies; ADR 0035 records the reconciliation.
+  decidedBy             free text, 1-200 chars — not restricted to a literal value
 ```
 
 Ledger may **prepare** this record and flag where it sits against the Cost Governor

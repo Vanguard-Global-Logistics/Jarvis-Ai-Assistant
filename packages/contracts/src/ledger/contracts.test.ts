@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   CreatePurchaseReviewRequestSchema,
+  CostGovernorStatusSchema,
+  DEDUCTION_TERMS,
   DecidePurchaseReviewRequestSchema,
   EXPENSE_CLASSIFICATIONS,
   LedgerInputsSchema,
@@ -8,7 +10,7 @@ import {
   requiresJustification,
   safeToSpend,
 } from './contracts.js';
-import type { ExpenseClassification, Figure, LedgerInputs } from './contracts.js';
+import type { DataState, ExpenseClassification, Figure, LedgerInputs } from './contracts.js';
 
 /**
  * Ledger's contracts are where its safety properties live, so this is where
@@ -50,14 +52,10 @@ describe('safeToSpend — the arithmetic', () => {
     const base = safeToSpend(inputs());
     if (!base.computable) throw new Error('base must be computable');
 
-    for (const term of [
-      'pending',
-      'bills30d',
-      'debtMinimums',
-      'emergencyReserve',
-      'commitments',
-      'taxSetAside',
-    ] as const) {
+    // Iterates DEDUCTION_TERMS rather than re-typing the six names. The
+    // previous version restated them, so it drifted in lockstep with the very
+    // list it was supposed to police.
+    for (const term of DEDUCTION_TERMS) {
       const bumped = safeToSpend(inputs({ [term]: posted(inputs()[term].cents + 1_000) }));
       if (!bumped.computable) throw new Error(`${term} must be computable`);
       expect(bumped.cents, `${term} is not subtracted`).toBe(base.cents - 1_000);
@@ -90,6 +88,13 @@ describe('safeToSpend — MISSING refuses, it never counts as zero', () => {
     if (!result.computable) expect(result.missing).toEqual(['bills30d', 'taxSetAside']);
   });
 
+  it.each(['cash', ...DEDUCTION_TERMS])('refuses when %s is MISSING', (term) => {
+    // Every position, not a sample. The ADR claims "MISSING refuses in every
+    // position"; four hand-written cases could not support that sentence.
+    const result = safeToSpend(inputs({ [term]: { cents: 0, state: 'MISSING' } }));
+    expect(result).toEqual({ computable: false, missing: [term] });
+  });
+
   it('a MISSING term carrying a nonzero amount is STILL refused', () => {
     // The state decides, never the number sitting next to it. A stale figure
     // marked MISSING is not evidence.
@@ -118,18 +123,33 @@ describe('safeToSpend — confidence is the WEAKEST link', () => {
   });
 });
 
+describe('safeToSpend — the whole confidence ladder, not just its bottom rung', () => {
+  // Both original tests put ASSUMED in the mix, and ASSUMED is the weakest, so
+  // they only ever pinned "ASSUMED loses". Re-rank PENDING or ESTIMATED and
+  // they stayed green while a total built on an ESTIMATED figure reported
+  // POSTED — overstating certainty, the direction that matters.
+  it.each([
+    ['POSTED', 'PENDING', 'PENDING'],
+    ['PENDING', 'CONFIRMED', 'CONFIRMED'],
+    ['CONFIRMED', 'ESTIMATED', 'ESTIMATED'],
+    ['ESTIMATED', 'ASSUMED', 'ASSUMED'],
+  ])('%s beside %s reports %s — the weaker of the pair', (strong, weak, expected) => {
+    const result = safeToSpend(
+      inputs({
+        cash: { cents: 500_000, state: strong as DataState },
+        pending: { cents: 20_000, state: weak as DataState },
+      }),
+    );
+    expect(result.computable).toBe(true);
+    if (result.computable) expect(result.confidence).toBe(expected);
+  });
+});
+
 describe('LedgerInputsSchema — the fail-open a negative deduction would create', () => {
   it('REFUSES a negative deduction term', () => {
     // "Bills due: -$4,000" would ADD four thousand dollars of imaginary
     // spending room. The schema is what makes that unrepresentable.
-    for (const term of [
-      'pending',
-      'bills30d',
-      'debtMinimums',
-      'emergencyReserve',
-      'commitments',
-      'taxSetAside',
-    ] as const) {
+    for (const term of DEDUCTION_TERMS) {
       const result = LedgerInputsSchema.safeParse(inputs({ [term]: posted(-1) }));
       expect(result.success, `${term} accepted a negative amount`).toBe(false);
     }
@@ -173,10 +193,40 @@ describe('costGovernorStatus — thresholds, never judgment', () => {
     expect(costGovernorStatus(percent * 100, 100 * 100).band).toBe(band);
   });
 
+  it('computes the percentage in INTEGER space — the float bug, pinned', () => {
+    // `Math.floor((2900 / 10000) * 100)` is 28, not 29, because 0.29 * 100 is
+    // 28.999999999999996 in binary floating point. A real defect in the one
+    // division in a module whose header promises money is never a float.
+    expect(costGovernorStatus(2_900, 10_000).utilizationPercent).toBe(29);
+    expect(costGovernorStatus(5_700, 10_000).utilizationPercent).toBe(57);
+    expect(costGovernorStatus(870, 3_000).utilizationPercent).toBe(29);
+  });
+
+  it('always returns a value its OWN schema accepts, including for a negative spend', () => {
+    // The function and the schema of the same name disagreed: a negative spend
+    // produced `utilizationPercent: -10`, which `.min(0)` rejects.
+    const cases: [number, number][] = [
+      [-100, 1_000],
+      [0, 0],
+      [1, 0],
+      [50_000, 10_000],
+    ];
+    for (const [spent, budget] of cases) {
+      expect(() => CostGovernorStatusSchema.parse(costGovernorStatus(spent, budget))).not.toThrow();
+    }
+  });
+
   it('rounds utilization DOWN, so a band is never entered early', () => {
     // 49.9% must still read as 49 and stay in "ok".
     const status = costGovernorStatus(499, 1_000);
     expect(status.utilizationPercent).toBe(49);
+    expect(status.band).toBe('ok');
+  });
+
+  it('clamps a negative spend to zero rather than reporting negative utilization', () => {
+    const status = costGovernorStatus(-100, 1_000);
+    expect(status.utilizationPercent).toBe(0);
+    expect(status.spentCents).toBe(0);
     expect(status.band).toBe('ok');
   });
 
@@ -278,9 +328,21 @@ describe('DecidePurchaseReviewRequestSchema — the only decision-shaped request
     );
   });
 
-  it('has no third outcome — there is no "approved by Ledger"', () => {
+  it("accepts OVERRIDDEN — proceeding against the classification's advice", () => {
+    // The governing architecture document specifies accept/override, and the
+    // first implementation shipped accepted|declined without recording the
+    // deviation. `overridden` is the most valuable row in a years-long record.
     expect(
-      DecidePurchaseReviewRequestSchema.safeParse({ ...valid, decision: 'auto-approved' }).success,
-    ).toBe(false);
+      DecidePurchaseReviewRequestSchema.safeParse({ ...valid, decision: 'overridden' }).success,
+    ).toBe(true);
+  });
+
+  it("has no outcome meaning LEDGER decided — every value is a person's", () => {
+    for (const decision of ['auto-approved', 'recommended', 'approved', '']) {
+      expect(
+        DecidePurchaseReviewRequestSchema.safeParse({ ...valid, decision }).success,
+        decision,
+      ).toBe(false);
+    }
   });
 });

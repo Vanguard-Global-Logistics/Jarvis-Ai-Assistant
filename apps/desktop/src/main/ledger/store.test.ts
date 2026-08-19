@@ -4,6 +4,7 @@ import { safeToSpend } from '@jarvis/contracts';
 import type { CreatePurchaseReviewRequest, SetLedgerInputsRequest } from '@jarvis/contracts';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
+  LedgerRefusedError,
   PurchaseReviewAlreadyDecidedError,
   PurchaseReviewNotFoundError,
   createPurchaseReview,
@@ -81,18 +82,32 @@ describe('a fresh install knows nothing, and says so', () => {
 });
 
 describe('setLedgerInputs', () => {
-  it('round-trips every term and mints updatedAt in main', () => {
+  it('round-trips EVERY term with a distinct value — no bind may be swapped', () => {
+    // Seven distinct amounts, all seven compared. The previous version asserted
+    // two of seven, so swapping any two of the sixteen positional binds in the
+    // INSERT (or in `toLedgerInputs`) left the whole suite AND the probe green
+    // while the panel showed two figures reversed forever.
+    const distinct = {
+      cash: { cents: 111_11, state: 'POSTED' as const },
+      pending: { cents: 222_22, state: 'PENDING' as const },
+      bills30d: { cents: 333_33, state: 'CONFIRMED' as const },
+      debtMinimums: { cents: 444_44, state: 'ESTIMATED' as const },
+      emergencyReserve: { cents: 555_55, state: 'ASSUMED' as const },
+      commitments: { cents: 666_66, state: 'POSTED' as const },
+      taxSetAside: { cents: 777_77, state: 'PENDING' as const },
+    };
     const before = Date.now();
-    const stored = setLedgerInputs(db, fullInputs());
+    const stored = setLedgerInputs(db, distinct);
 
-    expect(stored.cash).toEqual(posted(500_000));
-    expect(stored.taxSetAside).toEqual(posted(75_000));
-    expect(new Date(stored.updatedAt).getTime()).toBeGreaterThanOrEqual(before);
+    expect(stored).toEqual({ ...distinct, updatedAt: stored.updatedAt });
+    expect(getLedgerInputs(db)).toEqual(stored);
+    const { updatedAt } = stored;
+    if (updatedAt === null) throw new Error('expected setLedgerInputs to mint updatedAt');
+    expect(new Date(updatedAt).getTime()).toBeGreaterThanOrEqual(before);
   });
 
-  it('returns what is now STORED, not an echo of the request', () => {
-    const returned = setLedgerInputs(db, fullInputs());
-    expect(getLedgerInputs(db)).toEqual(returned);
+  it('starts with a NULL updatedAt — never a fabricated 1970', () => {
+    expect(getLedgerInputs(db).updatedAt).toBeNull();
   });
 
   it('stays a SINGLE row across repeated writes', () => {
@@ -111,6 +126,76 @@ describe('setLedgerInputs', () => {
 });
 
 describe('the schema is the last line of defence', () => {
+  const rawInsert = (over: Record<string, string> = {}) => {
+    const cols: Record<string, string> = {
+      cash_cents: '100',
+      cash_state: "'POSTED'",
+      pending_cents: '0',
+      pending_state: "'POSTED'",
+      bills30d_cents: '0',
+      bills30d_state: "'POSTED'",
+      debt_minimums_cents: '0',
+      debt_minimums_state: "'POSTED'",
+      emergency_reserve_cents: '0',
+      emergency_reserve_state: "'POSTED'",
+      commitments_cents: '0',
+      commitments_state: "'POSTED'",
+      tax_set_aside_cents: '0',
+      tax_set_aside_state: "'POSTED'",
+      ...over,
+    };
+    const names = Object.keys(cols).join(', ');
+    const values = Object.values(cols).join(', ');
+    return () =>
+      db
+        .prepare(`INSERT INTO ledger_inputs (id, ${names}, updated_at) VALUES (1, ${values}, ?)`)
+        .run(new Date().toISOString());
+  };
+
+  it.each([
+    'pending_cents',
+    'bills30d_cents',
+    'debt_minimums_cents',
+    'emergency_reserve_cents',
+    'commitments_cents',
+    'tax_set_aside_cents',
+  ])('REFUSES a negative %s at the DATABASE level', (column) => {
+    // Every deduction column, not one of six. Deleting any single CHECK from
+    // migration 9 previously left the suite green for the other five.
+    expect(rawInsert({ [column]: '-1' })).toThrow(/CHECK constraint failed/);
+  });
+
+  it.each([
+    'cash_state',
+    'pending_state',
+    'bills30d_state',
+    'debt_minimums_state',
+    'emergency_reserve_state',
+    'commitments_state',
+    'tax_set_aside_state',
+  ])('REFUSES an unknown %s at the DATABASE level', (column) => {
+    expect(rawInsert({ [column]: "'PROBABLY'" })).toThrow(/CHECK constraint failed/);
+  });
+
+  it('REFUSES a half-decided review — the decision columns are all-or-nothing', () => {
+    // ADR 0035 decision 7 (not overwritable) was enforced in application code
+    // only; the schema accepted `decision='accepted', decided_at=NULL`, a row
+    // in which the panel shows DECIDE again and recordDecision re-decides.
+    const review = createPurchaseReview(db, reviewRequest());
+    expect(() =>
+      db.prepare(`UPDATE purchase_reviews SET decision = 'accepted' WHERE id = ?`).run(review.id),
+    ).toThrow(/CHECK constraint failed/);
+  });
+
+  it('REFUSES an archived amount with no confidence beside it', () => {
+    const review = createPurchaseReview(db, reviewRequest());
+    expect(() =>
+      db
+        .prepare(`UPDATE purchase_reviews SET safe_to_spend_before_cents = 100 WHERE id = ?`)
+        .run(review.id),
+    ).toThrow(/CHECK constraint failed/);
+  });
+
   it('REFUSES a negative deduction at the DATABASE level', () => {
     // Bypassing Zod deliberately. A negative deduction would INCREASE
     // Safe-to-Spend — inventing money that does not exist — so the database
@@ -199,10 +284,20 @@ describe('createPurchaseReview', () => {
     expect(review.decidedBy).toBeNull();
   });
 
-  it('captures Safe-to-Spend AS IT WAS when the review was opened', () => {
+  it('captures Safe-to-Spend AS IT WAS, WITH its confidence', () => {
     setLedgerInputs(db, fullInputs());
     const review = createPurchaseReview(db, reviewRequest());
-    expect(review.safeToSpendBeforeCents).toBe(75_000);
+    expect(review.safeToSpendBefore).toEqual({ cents: 75_000, confidence: 'POSTED' });
+  });
+
+  it('archives a WEAK total as weak — never replays an assumed figure as certain', () => {
+    // The blocking finding: cents were stored and the confidence thrown away,
+    // so an ASSUMED total became an unqualified "$750.00" on a permanent
+    // record — this module's own rule broken on the one figure a person
+    // re-reads years later.
+    setLedgerInputs(db, fullInputs({ taxSetAside: { cents: 75_000, state: 'ASSUMED' } }));
+    const review = createPurchaseReview(db, reviewRequest());
+    expect(review.safeToSpendBefore).toEqual({ cents: 75_000, confidence: 'ASSUMED' });
   });
 
   it('does NOT rewrite that figure when the inputs later change', () => {
@@ -215,15 +310,15 @@ describe('createPurchaseReview', () => {
     setLedgerInputs(db, fullInputs({ cash: posted(5_000_000) }));
 
     const [readBack] = listPurchaseReviews(db);
-    expect(readBack?.safeToSpendBeforeCents).toBe(review.safeToSpendBeforeCents);
-    expect(readBack?.safeToSpendBeforeCents).toBe(75_000);
+    expect(readBack?.safeToSpendBefore).toEqual(review.safeToSpendBefore);
+    expect(readBack?.safeToSpendBefore?.cents).toBe(75_000);
   });
 
   it('records null rather than zero when Safe-to-Spend was not computable', () => {
     // Nothing entered yet, so the figure is unknown — and "unknown" must not
     // be stored as "$0.00 of room", which reads as a deliberate, dire number.
     const review = createPurchaseReview(db, reviewRequest());
-    expect(review.safeToSpendBeforeCents).toBeNull();
+    expect(review.safeToSpendBefore).toBeNull();
   });
 
   it('round-trips the whole record through the database', () => {
@@ -246,6 +341,16 @@ describe('recordDecision — the only path to a decision', () => {
     expect(decided.decision).toBe('accepted');
     expect(decided.decidedBy).toBe('William');
     expect(decided.decidedAt).not.toBeNull();
+  });
+
+  it('records OVERRIDDEN — proceeding against the advice, which is its own fact', () => {
+    const review = createPurchaseReview(db, reviewRequest());
+    const decided = recordDecision(db, {
+      id: review.id,
+      decision: 'overridden',
+      decidedBy: 'William',
+    });
+    expect(decided.decision).toBe('overridden');
   });
 
   it('records decline just as fully — a "no" is a record worth keeping', () => {
@@ -320,7 +425,7 @@ describe('recordDecision — the only path to a decision', () => {
     expect(decided.costCents).toBe(review.costCents);
     expect(decided.outcome).toBe(review.outcome);
     expect(decided.classification).toBe(review.classification);
-    expect(decided.safeToSpendBeforeCents).toBe(review.safeToSpendBeforeCents);
+    expect(decided.safeToSpendBefore).toEqual(review.safeToSpendBefore);
     expect(decided.createdAt).toBe(review.createdAt);
   });
 });
@@ -331,5 +436,63 @@ describe('listPurchaseReviews', () => {
     const b = createPurchaseReview(db, reviewRequest({ outcome: 'Second' }));
 
     expect(listPurchaseReviews(db).map((r) => r.id)).toEqual([b.id, a.id]);
+  });
+
+  it('orders by created_at FIRST, and only falls back to insert order on a tie', () => {
+    // The test above creates both rows in the same millisecond, so created_at
+    // ties and only the rowid tiebreak is exercised — flipping the ORDER BY to
+    // `created_at ASC` left it green while a real list spanning days rendered
+    // oldest-first. This one writes the rows in the opposite order to their
+    // dates, so created_at has to win.
+    const older = createPurchaseReview(db, reviewRequest({ outcome: 'Written first, dated last' }));
+    const newer = createPurchaseReview(db, reviewRequest({ outcome: 'Written last, dated first' }));
+    db.prepare('UPDATE purchase_reviews SET created_at = ? WHERE id = ?').run(
+      '2020-01-01T00:00:00.000Z',
+      older.id,
+    );
+    db.prepare('UPDATE purchase_reviews SET created_at = ? WHERE id = ?').run(
+      '2030-01-01T00:00:00.000Z',
+      newer.id,
+    );
+
+    expect(listPurchaseReviews(db).map((r) => r.id)).toEqual([newer.id, older.id]);
+  });
+});
+
+describe('the credential guard — ten free-text fields, all of them checked', () => {
+  const plantedKey = ['sk', 'ant', 'TEST0123456789abcdefghij'].join('-');
+
+  it.each([
+    'outcome',
+    'whyNow',
+    'alternatives',
+    'lowestCostOption',
+    'premiumOption',
+    'projectPaying',
+    'benefit',
+    'risk',
+    'delayConsequence',
+  ])('refuses a credential pasted into %s, and stores nothing', (field) => {
+    expect(() => createPurchaseReview(db, reviewRequest({ [field]: `see ${plantedKey}` }))).toThrow(
+      LedgerRefusedError,
+    );
+    expect(listPurchaseReviews(db)).toHaveLength(0);
+  });
+
+  it('refuses a credential-shaped decidedBy, leaving the review undecided', () => {
+    const review = createPurchaseReview(db, reviewRequest());
+    expect(() =>
+      recordDecision(db, { id: review.id, decision: 'accepted', decidedBy: plantedKey }),
+    ).toThrow(LedgerRefusedError);
+    expect(listPurchaseReviews(db)[0]?.decidedAt).toBeNull();
+  });
+
+  it('never echoes the refused text back in the message', () => {
+    try {
+      createPurchaseReview(db, reviewRequest({ whyNow: `see ${plantedKey}` }));
+      throw new Error('expected a refusal');
+    } catch (cause) {
+      expect((cause as Error).message).not.toContain('TEST0123456789');
+    }
   });
 });

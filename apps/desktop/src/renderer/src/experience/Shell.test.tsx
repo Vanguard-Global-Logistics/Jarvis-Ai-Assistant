@@ -84,7 +84,7 @@ const EMPTY_LEDGER_INPUTS: LedgerInputs = {
   emergencyReserve: { cents: 0, state: 'MISSING' },
   commitments: { cents: 0, state: 'MISSING' },
   taxSetAside: { cents: 0, state: 'MISSING' },
-  updatedAt: '1970-01-01T00:00:00.000Z',
+  updatedAt: null,
 };
 
 const NOT_COMPUTABLE: SafeToSpend = { computable: false, missing: ['cash'] };
@@ -103,7 +103,7 @@ const PURCHASE_REVIEW: PurchaseReview = {
   risk: 'Might not help much',
   delayConsequence: 'Nothing breaks; it waits',
   cancellationRequired: false,
-  safeToSpendBeforeCents: null,
+  safeToSpendBefore: null,
   createdAt: '2026-08-19T00:00:00.000Z',
   decidedAt: null,
   decision: null,

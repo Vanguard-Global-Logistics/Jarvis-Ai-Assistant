@@ -52,25 +52,51 @@ because a wrong number here is a person spending money they owe.
 
 6. **`ledger:decide` is the only path to a decision**, on its own channel, with its own
    schema, calling its own store function. `ledger:create-review` has no field that could
-   carry a decision. There is no enum value meaning "Ledger decided" — the outcomes are
-   `accepted` and `declined`, both a person's.
+   carry a decision. There is no enum value meaning "Ledger decided" — every outcome is a
+   person's (see 9).
 
 7. **A decision is not overwritable.** Re-deciding a decided review is refused with an
    explanation. The record's value is that it says what was chosen and what was known at
    the time; silently replacing it would destroy the history that makes it worth keeping
-   for years. Changing your mind is a new review. `safeToSpendBeforeCents` is captured at
+   for years. Changing your mind is a new review. `safeToSpendBefore` is captured at
    creation and never recomputed, for the same reason — recomputing later would make a
    reckless purchase look prudent in hindsight.
 
-8. **`safeToSpendBeforeCents` is nullable rather than defaulted to zero**, because "we
-   did not know at the time" is itself a fact worth preserving.
+8. **`safeToSpendBefore` is nullable rather than defaulted to zero**, because "we did not
+   know at the time" is itself a fact worth preserving — and it carries its CONFIDENCE
+   alongside its cents, as one object. The first version stored the amount alone, so an
+   `ASSUMED` total was replayed forever as an unqualified "$750.00" on a permanent record,
+   breaking decision 4 on the one figure a person re-reads years later. Migration 10 adds
+   the column and a CHECK making the half-populated pair impossible.
 
-## The boundary is held by ABSENCE
+9. **The decision enum is `accepted | declined | overridden`.** The governing architecture
+   document and the archived handoff both specify accept/**override**; the first
+   implementation shipped `accepted | declined` and recorded no deviation, so the closed
+   set four artifacts enforced disagreed with the one document that defines it.
+   `overridden` — "I proceeded even though the classification said to challenge this" — is
+   the most valuable row in a years-long record, and because a decision is deliberately
+   not overwritable, storing the wrong one loses it permanently.
+
+## The boundary is held by ABSENCE — for money movement, and only for that
 
 Ledger v1 contains **zero lines** of bank-API client code. No Plaid, no OAuth to a bank,
-no HTTP client imported in the store, no account number, routing number, institution, or
-access token in any schema or column. The preload exposes no `pay`, `transfer`, `send`,
+no HTTP client imported in the store. The preload exposes no `pay`, `transfer`, `send`,
 `subscribe`, `openCredit`, or `connectBank`.
+
+**A correction this ADR must carry, because its first version overstated the claim in
+six documents at once.** It said there was no "account number, routing number,
+institution, or access token in any schema or column." That was false. A purchase review
+has ten free-text fields of up to 2,000 characters, and a 2,000-character `whyNow` holds
+a routing number or an API key perfectly well — written to disk in plaintext and read
+back into the renderer on every list. The absence argument was verified against field
+NAMES and never against what the field TYPES admit. Memory and Forge had both already
+conceded exactly this and shipped a content guard; Ledger's own store comments claimed to
+mirror `approveForgeItem` and mirrored only the function separation.
+
+Fixed: `looksLikeCredential` now runs on all nine free-text create fields and on
+`decidedBy`, refusing before the write with a message that quotes nothing back. **The
+honest statement is that credentials are GUARDED, not impossible** — and the guard catches
+ten formats, not a bare account number typed as digits.
 
 This is the same idiom AEGIS's Jarvis-facing type uses — no lowering method exists to
 call. A capability that was never coded cannot be exercised by a bug, a prompt injection,
@@ -91,11 +117,17 @@ independent review, never a quiet extension of this surface.
   rendered number looks.
 - **No project table.** `projectPaying` is a free label in v1; per-project budgets and
   the Cost Governor's UI surface are not wired to stored projects yet — the function
-  exists and is tested, but nothing calls it from a screen.
+  exists and is tested, but nothing calls it from a screen. Because
+  `requiresJustification` is likewise unwired, a `premature-scale` purchase can currently
+  be recorded with every justification field empty.
+- **No entry form, and no way to open a review.** The shipped panel READS. Both write
+  channels work and are probe-verified, but no renderer surface calls them, so in a build
+  a person launches, every figure stays MISSING and the review list stays empty. This is
+  the largest gap in v1 and `docs/KNOWN-LIMITATIONS.md` §12 states it plainly.
 
 ## Verification
 
-`npm run verify` — 946 tests / 63 files green. Contract tests prove the arithmetic
+`npm run verify` — 1001 tests / 65 files green. Contract tests prove the arithmetic
 subtracts every term (each raised by $10 must lower the total by exactly $10, so a
 silently dropped term fails), that MISSING refuses in every position including when it
 carries a stale nonzero amount, that confidence reports the weakest state, that negative
@@ -108,11 +140,43 @@ review leaves a sibling byte-for-byte unchanged.
 
 `npm run probe:runtime` drives all five channels against the real app over the real IPC
 boundary and a real SQLite file: a fresh store reports `computable: false`; setting
-figures computes $750.00 at `ASSUMED` confidence; a negative deduction is refused at the
-boundary; a review opens undecided with Safe-to-Spend captured; `ledger:decide` records
-it; and a second decide attempt is refused with the record intact.
+figures computes $750.00 at `ASSUMED` confidence; a negative deduction is refused **with
+the specific schema-rejection message** and the previous figures are re-read to prove
+nothing partial landed; a credential pasted into a review is refused and never echoed; a
+review opens undecided with Safe-to-Spend and its confidence captured; `ledger:decide`
+records it; a second decide attempt is refused; and `ledger:list-reviews` is then read
+back to prove the record really did survive intact.
 
 `npm run build` green, artifact assertion passed.
+
+## What the swarm caught, and what it says about the first version
+
+Five read-only critics reviewed the shipped commit. **Every one returned FIX**, and five
+findings were blocking. They are recorded here rather than quietly fixed, because the
+pattern matters more than any single defect:
+
+- **No credential guard** — the same hole Forge had, in the module with ten free-text
+  fields, while six documents asserted it was impossible. (Above.)
+- **A float bug in the one division.** `Math.floor((spentCents / budgetCents) * 100)`
+  returns 28 for 2,900/10,000 — `0.29 * 100` is `28.999999999999996` — in a module whose
+  header promises money is never a float. Now `Math.floor((spent * 100) / budget)`, exact.
+- **`DEDUCTION_TERMS` was a hand-typed duplicate** of the schema's field set. Adding an
+  eighth deduction would have compiled clean while `safeToSpend` silently never subtracted
+  it — Safe-to-Spend reading HIGHER than the truth, the exact fail-open decision 2 claims
+  is impossible. Now a typed `Record` over the schema's own keys, so it is a compile error.
+- **The archived confidence was discarded** (above).
+- **The shipped panel cannot be used.** No form enters figures; no form opens a review. Two
+  of five channels have no human caller. `docs/KNOWN-LIMITATIONS.md` §12 now states this
+  plainly; the earlier entry disclosed half of it.
+
+And three claims in this ADR's own first version were weaker than written: "drives all five
+channels" (`ledger:list-reviews` was never invoked), "with the record intact" (the probe
+read the error string and never re-read the row), and "MISSING refuses in every position"
+(four of seven positions were tested). All three are now true as written.
+
+**A green suite and a green probe were not enough**, which is the whole argument for the
+swarm gate. `npm run verify` was 946/946 and `probe:runtime` passed when these five
+blocking defects were live.
 
 ## Review — OUTSTANDING, and this ADR does not claim otherwise
 

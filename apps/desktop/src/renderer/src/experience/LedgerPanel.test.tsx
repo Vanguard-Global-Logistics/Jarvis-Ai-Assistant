@@ -54,7 +54,7 @@ const review = (over: Partial<PurchaseReview> = {}): PurchaseReview => ({
   risk: 'Might not help much',
   delayConsequence: 'Nothing breaks; it waits',
   cancellationRequired: false,
-  safeToSpendBeforeCents: null,
+  safeToSpendBefore: null,
   createdAt: '2026-08-19T00:00:00.000Z',
   decidedAt: null,
   decision: null,
@@ -101,7 +101,8 @@ describe('LedgerPanel — never states a number it cannot stand behind', () => {
     });
     render(<LedgerPanel />);
 
-    expect(await screen.findByText(/cash, bills30d/)).toBeTruthy();
+    // Human labels, not property keys — the refusal is the thing a person acts on.
+    expect(await screen.findByText(/Cash, Bills \(30d\)/)).toBeTruthy();
   });
 
   it('renders a MISSING term as a dash, never as $0.00', async () => {
@@ -122,18 +123,41 @@ describe('LedgerPanel — never states a number it cannot stand behind', () => {
 
 describe('LedgerPanel — a figure is never shown without its confidence', () => {
   it('shows the computed total AND the weakest confidence behind it', async () => {
-    // 88_800 cents deliberately collides with none of the seven term amounts,
-    // so this assertion can only be satisfied by the total itself.
+    // The total AGREES with the seven figures beside it: 500000 − (20000 +
+    // 150000 + 30000 + 100000 + 50000 + 75000) = 75000, and one ASSUMED term
+    // makes the whole total ASSUMED. The previous fixture paired seven POSTED
+    // figures with an 88_800/ASSUMED total — a pairing the inputs cannot
+    // produce — and asserted the UI rendered it, which is the drift this
+    // module exists to prevent, demonstrated in its own test.
     stubJarvis({
       getLedgerInputs: vi.fn().mockResolvedValue({
-        inputs: fullInputs(),
-        safeToSpend: { computable: true, cents: 88_800, confidence: 'ASSUMED' },
+        inputs: fullInputs({ taxSetAside: { cents: 75_000, state: 'ASSUMED' } }),
+        safeToSpend: { computable: true, cents: 75_000, confidence: 'ASSUMED' },
       }),
     });
     render(<LedgerPanel />);
 
-    expect(await screen.findByText('$888.00')).toBeTruthy();
-    expect(screen.getByText(/CONFIDENCE: ASSUMED/)).toBeTruthy();
+    expect(await screen.findByText(/CONFIDENCE: ASSUMED/)).toBeTruthy();
+  });
+
+  it('renders every KNOWN figure with its amount and its confidence tag', async () => {
+    // The only prior term-row assertion counted seven dashes against
+    // all-MISSING inputs — a state in which "renders the figure" and "renders
+    // a dash unconditionally" are indistinguishable. This exercises the other
+    // side, where the two genuinely differ.
+    stubJarvis({
+      getLedgerInputs: vi.fn().mockResolvedValue({
+        inputs: fullInputs({ taxSetAside: { cents: 75_000, state: 'ASSUMED' } }),
+        safeToSpend: { computable: true, cents: 75_000, confidence: 'ASSUMED' },
+      }),
+    });
+    render(<LedgerPanel />);
+
+    expect(await screen.findByText('$5,000.00')).toBeTruthy(); // cash
+    expect(screen.getByText('$1,500.00')).toBeTruthy(); // bills30d
+    expect(screen.queryByText('—')).toBeNull(); // nothing is MISSING here
+    expect(screen.getAllByText('POSTED').length).toBe(6);
+    expect(screen.getAllByText('ASSUMED').length).toBeGreaterThanOrEqual(1);
   });
 
   it('formats cents correctly, including the negative case', async () => {
@@ -149,14 +173,65 @@ describe('LedgerPanel — a figure is never shown without its confidence', () =>
   });
 });
 
+describe('LedgerPanel — the archived Safe-to-Spend', () => {
+  it('says "not known at the time" rather than rendering $0.00', async () => {
+    // `formatCents(null)` does not throw (`Math.abs(null) === 0`), so swapping
+    // the branches would silently print $0.00 for an unknown figure — the
+    // single most dangerous output this module could produce, on a permanent
+    // record. Neither side of this branch had an assertion.
+    stubJarvis({ listPurchaseReviews: vi.fn().mockResolvedValue([review()]) });
+    render(<LedgerPanel />);
+
+    expect(await screen.findByText(/not known at the time/i)).toBeTruthy();
+    expect(screen.queryByText('$0.00')).toBeNull();
+  });
+
+  it('renders a captured figure WITH the confidence it was captured at', async () => {
+    stubJarvis({
+      listPurchaseReviews: vi
+        .fn()
+        .mockResolvedValue([
+          review({ safeToSpendBefore: { cents: 75_000, confidence: 'ASSUMED' } }),
+        ]),
+    });
+    render(<LedgerPanel />);
+
+    // `findAllByText` because the text spans the amount and its confidence
+    // span, so every ancestor matches too — the point is that the pairing
+    // renders at all, not which element owns it.
+    expect(
+      (
+        await screen.findAllByText((_, el) =>
+          (el?.textContent ?? '').includes('Safe to Spend when opened: $750.00'),
+        )
+      ).length,
+    ).toBeGreaterThan(0);
+    expect(screen.getAllByText('ASSUMED').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('warns when a purchase creates an ongoing obligation', async () => {
+    stubJarvis({
+      listPurchaseReviews: vi.fn().mockResolvedValue([review({ cancellationRequired: true })]),
+    });
+    render(<LedgerPanel />);
+
+    expect(await screen.findByText(/ongoing obligation someone must cancel/i)).toBeTruthy();
+  });
+
+  it('shows the classification and its posture', async () => {
+    stubJarvis({ listPurchaseReviews: vi.fn().mockResolvedValue([review()]) });
+    render(<LedgerPanel />);
+
+    expect(await screen.findByText(/EFFICIENCY UPGRADE · Justify it\./)).toBeTruthy();
+  });
+});
+
 describe('LedgerPanel — deciding a review', () => {
   it('requires a name, then calls the SEPARATE decide channel', async () => {
     const decidePurchaseReview = vi.fn().mockResolvedValue(review({ decision: 'accepted' }));
-    const createPurchaseReview = vi.fn();
     stubJarvis({
       listPurchaseReviews: vi.fn().mockResolvedValue([review()]),
       decidePurchaseReview,
-      createPurchaseReview,
     });
     render(<LedgerPanel />);
 
@@ -177,8 +252,48 @@ describe('LedgerPanel — deciding a review', () => {
         decidedBy: 'William',
       });
     });
-    // Drafting is a different channel and must not have been touched.
-    expect(createPurchaseReview).not.toHaveBeenCalled();
+    // Exactly one call, one argument. (An earlier version asserted
+    // `createPurchaseReview` was untouched — unfalsifiable, since the panel has
+    // no drafting UI that could ever call it.)
+    expect(decidePurchaseReview).toHaveBeenCalledTimes(1);
+  });
+
+  it('SAYS SO when the build has no decide channel, instead of doing nothing', async () => {
+    // The only case this branch reaches at runtime is a stale preload, and it
+    // used to be swallowed by a bare `return` — a click on the one control
+    // that records a financial decision, with no message of any kind.
+    stubJarvis({ listPurchaseReviews: vi.fn().mockResolvedValue([review()]) });
+    Reflect.deleteProperty(window.jarvis as object, 'decidePurchaseReview');
+    render(<LedgerPanel />);
+
+    fireEvent.click(await screen.findByText('DECIDE'));
+    fireEvent.change(screen.getByLabelText('Decided by'), { target: { value: 'William' } });
+    act(() => {
+      fireEvent.click(screen.getByText('ACCEPT'));
+    });
+
+    expect((await screen.findByRole('alert')).textContent).toMatch(/cannot record a decision/i);
+  });
+
+  it('offers OVERRIDE, and sends it as its own decision', async () => {
+    const decidePurchaseReview = vi.fn().mockResolvedValue(review({ decision: 'overridden' }));
+    stubJarvis({
+      listPurchaseReviews: vi.fn().mockResolvedValue([review()]),
+      decidePurchaseReview,
+    });
+    render(<LedgerPanel />);
+
+    fireEvent.click(await screen.findByText('DECIDE'));
+    fireEvent.change(screen.getByLabelText('Decided by'), { target: { value: 'William' } });
+    act(() => {
+      fireEvent.click(screen.getByText('OVERRIDE'));
+    });
+
+    await waitFor(() => {
+      expect(decidePurchaseReview).toHaveBeenCalledWith(
+        expect.objectContaining({ decision: 'overridden' }),
+      );
+    });
   });
 
   it('shows a decided review as decided, with no way back to DECIDE', async () => {
@@ -216,6 +331,30 @@ describe('LedgerPanel — deciding a review', () => {
   });
 });
 
+describe('LedgerPanel — how old the figures are', () => {
+  it('says figures were never entered rather than dating them to 1970', async () => {
+    stubJarvis({
+      getLedgerInputs: vi.fn().mockResolvedValue({
+        inputs: { ...emptyInputs, updatedAt: null },
+        safeToSpend: { computable: false, missing: ['cash'] },
+      }),
+    });
+    render(<LedgerPanel />);
+    expect(await screen.findByText(/not enough is known to say/i)).toBeTruthy();
+  });
+
+  it('dates the figures when they exist — a confidence tag is not a freshness tag', async () => {
+    stubJarvis({
+      getLedgerInputs: vi.fn().mockResolvedValue({
+        inputs: fullInputs({ updatedAt: '2026-03-04T00:00:00.000Z' }),
+        safeToSpend: { computable: true, cents: 75_000, confidence: 'POSTED' },
+      }),
+    });
+    render(<LedgerPanel />);
+    expect(await screen.findByText(/Figures as of 3\/4\/2026/)).toBeTruthy();
+  });
+});
+
 describe('LedgerPanel — says what it is', () => {
   it('states on the surface that it never moves money and is not connected to a bank', async () => {
     // Not buried in a doc nobody opens. A person looking at a financial
@@ -239,5 +378,25 @@ describe('LedgerPanel — says what it is', () => {
     render(<LedgerPanel />);
 
     expect((await screen.findByRole('alert')).textContent).toMatch(/could not read its figures/i);
+  });
+
+  it('does not sit on "Reading…" after a failed read', async () => {
+    stubJarvis({ getLedgerInputs: vi.fn().mockRejectedValue(new Error('db locked')) });
+    render(<LedgerPanel />);
+
+    expect(await screen.findByText(/Not available — see the message above/i)).toBeTruthy();
+    expect(screen.queryByText('Reading…')).toBeNull();
+  });
+
+  it('names the missing figures in HUMAN labels, not property keys', async () => {
+    stubJarvis({
+      getLedgerInputs: vi.fn().mockResolvedValue({
+        inputs: emptyInputs,
+        safeToSpend: { computable: false, missing: ['bills30d', 'taxSetAside'] },
+      }),
+    });
+    render(<LedgerPanel />);
+
+    expect(await screen.findByText(/Bills \(30d\), Tax set-aside/)).toBeTruthy();
   });
 });

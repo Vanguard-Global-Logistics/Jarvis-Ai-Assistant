@@ -485,18 +485,34 @@ Ledger v1 is not done until that review has happened and its findings are addres
 not been sent. Ledger must not be described as complete or accepted until it is.
 
 **No bank connection, and no code that could become one.** Every figure is typed by a
-person. There is no Plaid, no OAuth to a bank, no HTTP client in the store, and no schema
-field or database column that could hold an account number, a routing number, or an access
-token. Ledger cannot transfer, pay, send, open credit, trade, change bank details, or
-approve a subscription — held by ABSENCE, not by a guard.
+person. There is no Plaid, no OAuth to a bank, and no HTTP client in the store. Ledger
+cannot transfer, pay, send, open credit, trade, change bank details, or approve a
+subscription — held by ABSENCE, not by a guard.
 
-**Also not built:** the Cost Governor's function is implemented and tested but **nothing
-calls it from a screen** — there is no project table, so `projectPaying` is a free text
-label and per-project budgets are not stored. There is no editing UI for the seven
-Safe-to-Spend figures yet: the panel READS them, and `ledger:set-inputs` exists, but no
-form is wired to it, so in the shipped UI every figure stays MISSING and Safe-to-Spend
-correctly refuses to compute. There is no burn-rate, runway, anomaly detection, or
-recurring-charge tracking.
+**A correction to an earlier version of this entry, because it overstated the guarantee.**
+It said there was "no schema field or database column that could hold an account number, a
+routing number, or an access token." That was false, and a swarm critic caught it: a
+purchase review has ten free-text fields of up to 2,000 characters each, and a
+2,000-character `whyNow` holds a routing number perfectly well. What is true — as of the
+fix — is that those fields are **guarded**: `looksLikeCredential`, the same check
+`memory:remember` and Forge use, runs on every one of them before the insert and on
+`decidedBy` before the update, refusing with a message that quotes nothing back. **Guarded
+is a weaker claim than impossible, and it is the accurate one.** The guard catches ten
+credential formats and does not catch a bare account number typed as digits.
+
+**THE SHIPPED PANEL IS READ-ONLY, and this is the biggest gap.** There is no form to enter
+the seven Safe-to-Spend figures and **no form to open a purchase review**. `ledger:set-inputs`
+and `ledger:create-review` exist and work, but nothing in the renderer calls them. So in a
+build a person actually launches: every figure stays MISSING, Safe-to-Spend permanently
+reads "Not enough is known to say", the review list is permanently empty, and the whole
+decide flow — ACCEPT / DECLINE / OVERRIDE, the not-overwritable rule, the captured
+Safe-to-Spend — is unreachable. Two of the five channels have no human path to them.
+
+**Also not built:** the Cost Governor and `requiresJustification` are implemented and
+tested but **called from nothing** — no budget is stored anywhere, there is no project
+table, so `projectPaying` is a free text label. Because `requiresJustification` is unwired,
+a `premature-scale` purchase can be recorded with every justification field empty. There is
+no burn-rate, runway, anomaly detection, or recurring-charge tracking.
 
 **What IS proven:** that unknown figures produce a refusal rather than an inflated number;
 that a negative deduction is refused at the boundary and again by a database CHECK; that
