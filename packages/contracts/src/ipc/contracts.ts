@@ -27,6 +27,14 @@ import {
   MemorySchema,
   RememberRequestSchema,
 } from '../memory/contracts.js';
+import {
+  ApproveForgeItemRequestSchema,
+  CreateForgeItemRequestSchema,
+  ForgeIdRequestSchema,
+  ForgeItemListSchema,
+  ForgeItemSchema,
+  RecordEvidenceRequestSchema,
+} from '../forge/contracts.js';
 
 /**
  * IPC contracts — the single definition of every message that crosses the
@@ -421,6 +429,52 @@ export const memoryForgetContract = defineContract({
   response: z.object({ forgotten: z.boolean() }).strict(),
 });
 
+// --- forge:* (docs/architecture/forge-architecture.md) ----------------------
+
+/** `forge:list` — every tracked item, flat, newest-created first. */
+export const forgeListContract = defineContract({
+  channel: CHANNELS.forgeList,
+  request: z.undefined(),
+  response: ForgeItemListSchema,
+});
+
+/** `forge:get` — one item by id, or `null` when the id names nothing. */
+export const forgeGetContract = defineContract({
+  channel: CHANNELS.forgeGet,
+  request: ForgeIdRequestSchema,
+  response: z.object({ item: ForgeItemSchema.nullable() }).strict(),
+});
+
+/** `forge:create` — start tracking a new item. Title only; every fact starts unset. */
+export const forgeCreateContract = defineContract({
+  channel: CHANNELS.forgeCreate,
+  request: CreateForgeItemRequestSchema,
+  response: ForgeItemSchema,
+});
+
+/**
+ * `forge:recordEvidence` — set one of claimed/committed/testsPassed/previewed.
+ * Never `approved` — the request schema has no field for it (§6 of the
+ * architecture doc), so a caller cannot reach approval through this channel
+ * even by accident.
+ */
+export const forgeRecordEvidenceContract = defineContract({
+  channel: CHANNELS.forgeRecordEvidence,
+  request: RecordEvidenceRequestSchema,
+  response: ForgeItemSchema,
+});
+
+/**
+ * `forge:approve` — the ONLY path that may set `approvedAt`/`approvedBy`.
+ * Kept on its own channel so approval can never be bundled with a call that
+ * also happens to touch the other four facts.
+ */
+export const forgeApproveContract = defineContract({
+  channel: CHANNELS.forgeApprove,
+  request: ApproveForgeItemRequestSchema,
+  response: ForgeItemSchema,
+});
+
 // --- model:* (ADR 0022) -----------------------------------------------------
 
 /**
@@ -518,4 +572,9 @@ export const IPC_CONTRACTS = {
   [CHANNELS.memoryRemember]: memoryRememberContract,
   [CHANNELS.memoryList]: memoryListContract,
   [CHANNELS.memoryForget]: memoryForgetContract,
+  [CHANNELS.forgeList]: forgeListContract,
+  [CHANNELS.forgeGet]: forgeGetContract,
+  [CHANNELS.forgeCreate]: forgeCreateContract,
+  [CHANNELS.forgeRecordEvidence]: forgeRecordEvidenceContract,
+  [CHANNELS.forgeApprove]: forgeApproveContract,
 } as const;

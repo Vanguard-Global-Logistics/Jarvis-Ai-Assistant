@@ -8,17 +8,23 @@ import type {
   AegisStatus,
   AmplifierResult,
   AmplifyRequest,
+  ApproveForgeItemRequest,
   AutomationPlan,
   AutomationPlanRequest,
   AppInfo,
   ChatReply,
   ChatRequest,
+  CreateForgeItemRequest,
+  ForgeIdRequest,
+  ForgeItem,
+  ForgeItemList,
   ForgetRequest,
   HistoryIdRequest,
   Memory,
   ModelDescription,
   ModelSelection,
   Profile,
+  RecordEvidenceRequest,
   RememberRequest,
   ProviderId,
   SaveConversationRequest,
@@ -218,6 +224,32 @@ const api = {
     ipcRenderer.invoke(CHANNELS.memoryForget, { id } satisfies ForgetRequest) as Promise<{
       forgotten: boolean;
     }>,
+
+  /**
+   * Forge v1 (`docs/architecture/forge-architecture.md`) — the five-fact
+   * build/dev watchtower.
+   *
+   * `approve` is a SEPARATE function from `recordEvidence`, invoking a
+   * SEPARATE channel, because the whole point of Forge is that "approved" is
+   * always its own human decision — never bundled with claimed/committed/
+   * tested/previewed.
+   */
+  listForgeItems: (): Promise<ForgeItemList> =>
+    ipcRenderer.invoke(CHANNELS.forgeList) as Promise<ForgeItemList>,
+
+  getForgeItem: (id: string): Promise<{ item: ForgeItem | null }> =>
+    ipcRenderer.invoke(CHANNELS.forgeGet, { id } satisfies ForgeIdRequest) as Promise<{
+      item: ForgeItem | null;
+    }>,
+
+  createForgeItem: (request: CreateForgeItemRequest): Promise<ForgeItem> =>
+    ipcRenderer.invoke(CHANNELS.forgeCreate, request) as Promise<ForgeItem>,
+
+  recordForgeEvidence: (request: RecordEvidenceRequest): Promise<ForgeItem> =>
+    ipcRenderer.invoke(CHANNELS.forgeRecordEvidence, request) as Promise<ForgeItem>,
+
+  approveForgeItem: (request: ApproveForgeItemRequest): Promise<ForgeItem> =>
+    ipcRenderer.invoke(CHANNELS.forgeApprove, request) as Promise<ForgeItem>,
 } as const;
 
 export type JarvisApi = typeof api;

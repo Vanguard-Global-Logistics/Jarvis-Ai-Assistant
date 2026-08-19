@@ -161,6 +161,24 @@ export const CHANNELS = {
 
   /** Delete one memory by id. Real deletion, not a tombstone (§8). */
   memoryForget: 'memory:forget',
+
+  /**
+   * Forge v1 — the five-fact build/dev watchtower
+   * (`docs/architecture/forge-architecture.md`).
+   *
+   * `forge:recordEvidence` is the shared write path for the first four facts
+   * (claimed/committed/tested/previewed) — a person telling Forge one fact
+   * happened, one call at a time. `forge:approve` is deliberately its OWN
+   * channel: the handoff spec is explicit that production approval is "always
+   * a separate human decision," never bundled with the other four.
+   */
+  forgeList: 'forge:list',
+  forgeGet: 'forge:get',
+  forgeCreate: 'forge:create',
+  forgeRecordEvidence: 'forge:record-evidence',
+
+  /** The ONLY channel that may set `approvedAt`/`approvedBy`. */
+  forgeApprove: 'forge:approve',
 } as const;
 
 export type ChannelName = (typeof CHANNELS)[keyof typeof CHANNELS];

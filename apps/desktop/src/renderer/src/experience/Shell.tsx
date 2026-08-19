@@ -32,6 +32,7 @@ import {
 import { Conversation } from './Conversation.js';
 import type { ConversationBridge } from './Conversation.js';
 import { MemoryPanel } from './MemoryPanel.js';
+import { ForgePanel } from './ForgePanel.js';
 
 /**
  * The Experience Shell (task E2, visual correction pass): cinematic ambient
@@ -243,6 +244,15 @@ export function Shell({ devStateSwitcher = import.meta.env.DEV }: ShellProps): J
    */
   const [memories, setMemories] = useState<readonly Memory[]>([]);
   const [memoryOpen, setMemoryOpen] = useState(false);
+
+  /**
+   * Forge v1 (`docs/architecture/forge-architecture.md`) — the five-fact
+   * build/dev watchtower. Unlike Memory, `ForgePanel` owns its own IPC reads
+   * and writes: Forge's contents are not replayed into a prompt, so there is
+   * no correctness reason for Shell to hold the list, only a toggle for
+   * whether the panel is open.
+   */
+  const [forgeOpen, setForgeOpen] = useState(false);
 
   /**
    * Set when `memory:list` could not be read.
@@ -849,6 +859,58 @@ export function Shell({ devStateSwitcher = import.meta.env.DEV }: ShellProps): J
                 Both of the first tests for that alert opened the panel before
                 asserting anything, so neither could ever see this. */}
             MEMORY · {memoryError !== null ? '—' : memories.length} {memoryOpen ? '▾' : '▸'}
+          </button>
+        </section>
+      )}
+
+      {!cinematic && (
+        <section
+          aria-label="Forge"
+          style={{
+            position: 'absolute',
+            right: 14,
+            bottom: 96,
+            zIndex: 2,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 6,
+            alignItems: 'flex-end',
+          }}
+        >
+          {forgeOpen && (
+            <div
+              style={{
+                maxHeight: '60vh',
+                overflowY: 'auto',
+                padding: 10,
+                border: `1px solid ${surface.hairline}`,
+                borderRadius: surface.radiusMin,
+                background: 'rgba(5,7,10,0.92)',
+              }}
+            >
+              <ForgePanel />
+            </div>
+          )}
+          <button
+            type="button"
+            aria-expanded={forgeOpen}
+            onClick={() => {
+              setForgeOpen((value) => !value);
+            }}
+            style={{
+              minHeight: 30,
+              padding: '5px 10px',
+              fontFamily: fontFamily.mono,
+              fontSize: 10,
+              letterSpacing: letterSpacing.label,
+              color: text.faint,
+              background: 'transparent',
+              border: `1px solid ${surface.hairline}`,
+              borderRadius: surface.radiusMin,
+              cursor: 'pointer',
+            }}
+          >
+            FORGE {forgeOpen ? '▾' : '▸'}
           </button>
         </section>
       )}

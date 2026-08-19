@@ -4,12 +4,13 @@
  * STATUS: PARTIAL.
  *   - Connection ownership and the migration runner: IMPLEMENTED AND VERIFIED
  *     (unit tests, in-memory).
- *   - Feature schema: SEVEN migrations — see the `migrations` array below, which
- *     is the single list. It now includes `memory` (ADR 0029), deliberately with
+ *   - Feature schema: EIGHT migrations — see the `migrations` array below, which
+ *     is the single list. It includes `memory` (ADR 0029), deliberately with
  *     no owner column because ADR 0012 makes data separation the OS user
- *     account. No projects, tasks, or audit-log tables exist; those are feature
- *     design work that is not approved. AEGIS keeps its own hash-chained log
- *     outside this database.
+ *     account, and `forge_items` (`docs/architecture/forge-architecture.md`),
+ *     the build/dev watchtower's five-fact table. No purchase-review or
+ *     ledger-input tables exist yet; those are Ledger's own migration. AEGIS
+ *     keeps its own hash-chained log outside this database.
  *
  * Wired to Electron by ADR 0008: the main process — and only the main process —
  * opens the database and applies `migrations` at startup. The driver is Node's
@@ -26,6 +27,7 @@ import { windowStateMigration } from './migrations/0004-window-state.js';
 import { conversationPlansMigration } from './migrations/0005-conversation-plans.js';
 import { memoryMigration } from './migrations/0006-memory.js';
 import { memoryAuditMigration } from './migrations/0007-memory-audit.js';
+import { forgeMigration } from './migrations/0008-forge.js';
 
 export { openDatabase, withTransaction } from './connection.js';
 export type { OpenDatabaseOptions, SqliteDatabase } from './connection.js';
@@ -47,4 +49,5 @@ export const migrations: readonly Migration[] = [
   conversationPlansMigration,
   memoryMigration,
   memoryAuditMigration,
+  forgeMigration,
 ];

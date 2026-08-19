@@ -31,15 +31,15 @@ npm run dev:desktop                          # or: npm run dev:awake  (keeps the
 rule in `CLAUDE.md` §5 and it exists because a day was lost to guessing at a
 checkout that was 18 commits behind.
 
-| Fact                  | Value                                                                                          |
-| --------------------- | ---------------------------------------------------------------------------------------------- |
-| Owner / sole operator | **William Lavold** (Vanguard Global Logistics)                                                 |
-| Repository            | `github.com/Vanguard-Global-Logistics/Jarvis-Ai-Assistant`                                     |
-| Working branch        | `claude/jarvis-migration-chatgpt-19f128` — **never commit to `main`**                          |
-| HEAD at handoff       | `3b8a971` — punchlist §6-B all closed (ADR 0031–0033), three swarm rounds run                  |
-| The machine           | MacBook Air, headless, **only** runs Jarvis, never opened (ADR 0012, 0030)                     |
-| Path on that machine  | `/Users/amylavold/Jarvis-Ai-Assistant` (`amylavold` is an account name, not a second operator) |
-| Node                  | 22+ required                                                                                   |
+| Fact                  | Value                                                                                                                                                                                                                                      |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Owner / sole operator | **William Lavold** (Vanguard Global Logistics)                                                                                                                                                                                             |
+| Repository            | `github.com/Vanguard-Global-Logistics/Jarvis-Ai-Assistant`                                                                                                                                                                                 |
+| Working branch        | `claude/jarvis-migration-chatgpt-19f128` — **never commit to `main`**                                                                                                                                                                      |
+| HEAD at handoff       | Forge v1 shipped (ADR 0034) — five-fact watchtower, twenty-four IPC channels, eight migrations. Ledger v1 is next (`docs/architecture/ledger-architecture.md` written, finance-critical — CLAUDE.md §5 review is mandatory before "done"). |
+| The machine           | MacBook Air, headless, **only** runs Jarvis, never opened (ADR 0012, 0030)                                                                                                                                                                 |
+| Path on that machine  | `/Users/amylavold/Jarvis-Ai-Assistant` (`amylavold` is an account name, not a second operator)                                                                                                                                             |
+| Node                  | 22+ required                                                                                                                                                                                                                               |
 
 ---
 
@@ -118,25 +118,26 @@ is opt-in per app. Do not build a roadmap that assumes otherwise.
 
 ## 4. What actually exists today
 
-Nineteen typed IPC channels, six migrations, thirty ADRs, six model providers,
-a real AEGIS state engine, and real memory. Precisely:
+Twenty-four typed IPC channels, eight migrations, thirty-four ADRs, six model providers,
+a real AEGIS state engine, real memory, and a Forge v1 watchtower. Precisely:
 
-| Subsystem                                                                                                            | Status                                                                                                                                                       |
-| -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Conversation** — chat + Thought Amplifier v1                                                                       | IMPLEMENTED AND VERIFIED (ADR 0007), mock-default                                                                                                            |
-| **Persistence** — explicit Save Session / History / read-only reopen / Continue / confirmed delete                   | IMPLEMENTED AND VERIFIED (ADR 0008–0010). No autosave; unsaved chats are discarded on close and the probe proves it                                          |
-| **Backup / restore** — `history:export`, `history:import` (merges by id, never overwrites)                           | IMPLEMENTED, **NOT YET VERIFIED** — the dialog path would hang a headless probe                                                                              |
-| **Per-person orb identity**                                                                                          | IMPLEMENTED AND VERIFIED (ADR 0013)                                                                                                                          |
-| **Local model** (loopback-only, refuses to start on a non-loopback URL)                                              | IMPLEMENTED, NOT YET VERIFIED (ADR 0015)                                                                                                                     |
-| **Brain picker** — switch providers live, by identifier from a closed enum                                           | IMPLEMENTED AND VERIFIED (ADR 0022), proven to re-route messages red-green                                                                                   |
-| **Automate** — writes a PLAN, performs nothing                                                                       | IMPLEMENTED AND VERIFIED (ADR 0024)                                                                                                                          |
-| **AEGIS v1** — four levels, capability matrix, append-only SHA-256 hash-chained audit log the level is replayed from | Engine IMPLEMENTED AND VERIFIED (ADR 0025). **Enforces exactly 1 capability of 11** — `sending` (ADR 0026)                                                   |
-| **Memory v1** — short human-confirmed facts, recalled into every `jarvis:chat` turn                                  | IMPLEMENTED AND VERIFIED (ADR 0029)                                                                                                                          |
-| **Packaged app**                                                                                                     | Pipeline VERIFIED on 2026-08-13 (`package:dir` + `probe:packaged`, 16 channels at the time). **The macOS `.dmg` has never been built or opened on the Mac.** |
+| Subsystem                                                                                                             | Status                                                                                                                                                                                                     |
+| --------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Conversation** — chat + Thought Amplifier v1                                                                        | IMPLEMENTED AND VERIFIED (ADR 0007), mock-default                                                                                                                                                          |
+| **Persistence** — explicit Save Session / History / read-only reopen / Continue / confirmed delete                    | IMPLEMENTED AND VERIFIED (ADR 0008–0010). No autosave; unsaved chats are discarded on close and the probe proves it                                                                                        |
+| **Backup / restore** — `history:export`, `history:import` (merges by id, never overwrites)                            | IMPLEMENTED, **NOT YET VERIFIED** — the dialog path would hang a headless probe                                                                                                                            |
+| **Per-person orb identity**                                                                                           | IMPLEMENTED AND VERIFIED (ADR 0013)                                                                                                                                                                        |
+| **Local model** (loopback-only, refuses to start on a non-loopback URL)                                               | IMPLEMENTED, NOT YET VERIFIED (ADR 0015)                                                                                                                                                                   |
+| **Brain picker** — switch providers live, by identifier from a closed enum                                            | IMPLEMENTED AND VERIFIED (ADR 0022), proven to re-route messages red-green                                                                                                                                 |
+| **Automate** — writes a PLAN, performs nothing                                                                        | IMPLEMENTED AND VERIFIED (ADR 0024)                                                                                                                                                                        |
+| **AEGIS v1** — four levels, capability matrix, append-only SHA-256 hash-chained audit log the level is replayed from  | Engine IMPLEMENTED AND VERIFIED (ADR 0025). **Enforces exactly 1 capability of 11** — `sending` (ADR 0026)                                                                                                 |
+| **Memory v1** — short human-confirmed facts, recalled into every `jarvis:chat` turn                                   | IMPLEMENTED AND VERIFIED (ADR 0029)                                                                                                                                                                        |
+| **Forge v1** — five INDEPENDENT facts per item; approval on its own channel, unreachable from the shared evidence one | IMPLEMENTED AND VERIFIED on `probe:runtime` (ADR 0034). Zero real GitHub/Vercel calls — every fact is person-entered.                                                                                      |
+| **Packaged app**                                                                                                      | Pipeline VERIFIED on 2026-08-13 (`package:dir` + `probe:packaged`, 16 channels at the time — **stale, re-run needed** after Forge's five). **The macOS `.dmg` has never been built or opened on the Mac.** |
 
-**Gates at handoff:** `npm run verify` 770 tests / 54 files green ·
-`npm run build` green · `npm run probe:runtime` green ·
-`npm run verify:cold` green on a fresh clone.
+**Gates at handoff:** `npm run verify` 861 tests / 60 files green ·
+`npm run build` green · `npm run probe:runtime` green (includes the Forge
+create→record-evidence→approve→list loop) · `npm run verify:cold` green on a fresh clone.
 
 ### The six brains, in startup precedence
 
@@ -163,7 +164,8 @@ Three things that must never be softened:
 ### What Jarvis still does NOT do
 
 - **No orchestrator.** A single stateless model call, nothing more.
-- **No Forge, no Ledger, no Throne OS.** Names and charters only.
+- **No Ledger, no Throne OS.** Names and charters only. **Forge has a v1** (ADR 0034) —
+  see the table above; it is a manual watchtower, not a GitHub/Vercel integration.
 - **No voice, no vision.** State machines and UI only; no capture.
 - **Memory does not learn on its own** — every write is a person pressing a
   button. It does **not** recall by meaning (recall is lexical and small), does

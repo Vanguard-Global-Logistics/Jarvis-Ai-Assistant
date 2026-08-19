@@ -53,6 +53,11 @@ export {
   memoryForgetContract,
   memoryListContract,
   memoryRememberContract,
+  forgeApproveContract,
+  forgeCreateContract,
+  forgeGetContract,
+  forgeListContract,
+  forgeRecordEvidenceContract,
   aegisRequestRestrictionContract,
   aegisStatusContract,
   jarvisAmplifyContract,
@@ -73,6 +78,28 @@ export type {
   ModelSelection,
   ProviderOption,
 } from './ipc/contracts.js';
+
+export {
+  ApproveForgeItemRequestSchema,
+  CreateForgeItemRequestSchema,
+  FORGE_DETAIL_MAX_LENGTH,
+  FORGE_FACTS,
+  FORGE_TITLE_MAX_LENGTH,
+  ForgeFactSchema,
+  ForgeIdRequestSchema,
+  ForgeItemListSchema,
+  ForgeItemSchema,
+  RecordEvidenceRequestSchema,
+} from './forge/contracts.js';
+export type {
+  ApproveForgeItemRequest,
+  CreateForgeItemRequest,
+  ForgeFact,
+  ForgeIdRequest,
+  ForgeItem,
+  ForgeItemList,
+  RecordEvidenceRequest,
+} from './forge/contracts.js';
 
 export {
   BackupDocumentSchema,

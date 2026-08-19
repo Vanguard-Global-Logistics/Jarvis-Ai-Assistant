@@ -1,7 +1,12 @@
 # The IPC Surface
 
-Date: 2026-08-16
-Status: **NINETEEN channels.** `memory:remember`/`memory:list`/`memory:forget` (ADR 0029)
+Date: 2026-08-19
+Status: **TWENTY-FOUR channels.** `forge:list`/`forge:get`/`forge:create`/
+`forge:record-evidence`/`forge:approve` (`docs/architecture/forge-architecture.md`) are
+IMPLEMENTED AND VERIFIED on the Linux runtime probe — an item is created with every fact
+unset, evidence is recorded on exactly the requested fact, and `forge:approve` is proven
+to be the only call that ever sets `approvedAt`/`approvedBy`, against a real SQLite.
+`memory:remember`/`memory:list`/`memory:forget` (ADR 0029)
 are IMPLEMENTED AND VERIFIED on the Linux runtime probe — a fact is stored, listed, and
 really deleted against a real SQLite, and a credential-shaped fact is refused at the
 boundary with the message a person is meant to read.
@@ -405,6 +410,35 @@ driving the real handler across every member of `PROVIDER_IDS` — every provide
 `ChatRequest` the provider actually received, with `OPEN-FACT` as the negative control so a
 filter that returned `[]` unconditionally cannot pass.
 
+### `forge:list` / `forge:get` / `forge:create` / `forge:record-evidence` / `forge:approve`
+
+|                       |                                                                                                                                                                                                                                                                                         |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Status**            | IMPLEMENTED AND VERIFIED on the Linux runtime probe (create → record-evidence → approve → list driven against a real SQLite, `approvedAt` proven set by exactly one path), 2026-08-19.                                                                                                  |
+| **Renderer call**     | `window.jarvis.listForgeItems(): Promise<ForgeItem[]>` · `getForgeItem(id): Promise<{item}>` · `createForgeItem({title}): Promise<ForgeItem>` · `recordForgeEvidence({id, fact, detail?}): Promise<ForgeItem>` · `approveForgeItem({id, approvedBy}): Promise<ForgeItem>`               |
+| **Request**           | create: `{ title (1–200) }`, `.strict()`. record-evidence: `{ id (uuid), fact (closed enum: claimed/committed/testsPassed/previewed), detail? }`, `.strict()` — **no field can name `approved`**. approve: `{ id, approvedBy }`, `.strict()` — the ONLY request shape with either field |
+| **Response**          | `ForgeItemSchema`, `.strict()` — five independent fact pairs (`…At`/detail), never inferred from one another                                                                                                                                                                            |
+| **Handler**           | `registerForgeHandlers(db)` in `apps/desktop/src/main/handlers/forge.ts`, over the store in `apps/desktop/src/main/forge/store.ts`                                                                                                                                                      |
+| **Contract**          | `forgeListContract` / `forgeGetContract` / `forgeCreateContract` / `forgeRecordEvidenceContract` / `forgeApproveContract`                                                                                                                                                               |
+| **Side effects**      | create: one insert into `forge_items` (migration 8). record-evidence: updates exactly the two columns for the named fact. approve: updates `approved_at`/`approved_by` ONLY — no other function in the store ever writes those two columns. list/get: read-only.                        |
+| **Authority granted** | Track and report build/dev status. No filesystem, no shell, no GitHub/Vercel network call in v1 (`docs/architecture/forge-architecture.md` §4), no AEGIS.                                                                                                                               |
+
+**Approval is structurally unreachable from evidence recording — twice over.** The
+schema has no field for it (`RecordEvidenceRequestSchema` cannot name `approved` as a
+`fact`, and carries no `approvedBy`), and even if it could, `recordEvidence` in the store
+calls a lookup table (`FACT_COLUMNS`) that only ever contains the other four columns —
+`approveForgeItem` is a **separate exported function** that is the only caller of the
+`approved_at`/`approved_by` UPDATE. The runtime probe drives all three calls against a
+real item and asserts `approvedAt`/`approvedBy` are `null` after `record-evidence` and
+non-null only after `approve`.
+
+`docs/architecture/forge-architecture.md` records the smaller scope of this v1 versus the
+handoff's "Recommended Phase 1": no GitHub App, no Vercel API client, no automated
+Claude-in-the-loop repair. Every fact is entered by a person pasting evidence — the
+"manual Task Bridge" the architecture doc names in §5. Real GitHub/Vercel reads are a
+later, separately-scoped ADR gated on a configured token, in the same mock-default /
+real-if-configured shape as the model providers.
+
 ---
 
 ## Adding a channel
@@ -494,8 +528,8 @@ JavaScript. SQLite needs no external at all — the driver is Node's builtin
   (`packages/contracts/src/ipc/contracts.test.ts`).
 - The `AppInfo` schema rejects unknown platforms, missing fields, empty strings, and
   extra keys; the request schema rejects any payload.
-- The bridge exposes exactly one namespace (`jarvis`) and exactly the nineteen allowlisted
-  functions, all values are functions, and no generic passthrough exists
+- The bridge exposes exactly one namespace (`jarvis`) and exactly the twenty-four
+  allowlisted functions, all values are functions, and no generic passthrough exists
   (`apps/desktop/src/preload/index.test.ts`). This test was verified red-green: it fails
   when a generic `invoke` is added to the bridge.
 - The history request schemas reject smuggled titles/ids on save and reject any non-UUID

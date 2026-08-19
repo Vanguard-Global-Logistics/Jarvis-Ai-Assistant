@@ -159,19 +159,25 @@ storage, separate credentials. Phase 1 will not deliver OS-level enforcement. Wh
 state engine ships, this gap must be restated wherever AEGIS is described — not quietly
 dropped once the UI looks convincing.
 
-## 3. The IPC bridge exposes exactly nineteen narrow channels
+## 3. The IPC bridge exposes exactly twenty-four narrow channels
 
 **Status: PARTIAL — intended for this stage.**
 
-`window.jarvis` exposes exactly nineteen purpose-named functions: `getAppInfo` (host
+`window.jarvis` exposes exactly twenty-four purpose-named functions: `getAppInfo` (host
 facts), `sendChat` and `amplify` (model calls, ADR 0007), the four history
 operations (ADR 0008), `exportHistory` (ADR 0011), `importHistory` (ADR 0014),
 `describeModels`/`selectModel` (ADR 0022 — which brain is answering, and switching it
 without a restart), `planAutomation` (ADR 0024 — writes a plan, performs nothing),
 `aegisStatus`/`aegisRequestRestriction` (ADR 0025 — read the security level, or RAISE it;
-there is deliberately no way to lower one), and `getProfile`/`setProfile`
-(ADR 0013 — the orb's name and colour, which grant nothing). The authority envelope remains
-deliberately small: a model call, a conversation store, and one backup write whose
+there is deliberately no way to lower one), `getProfile`/`setProfile`
+(ADR 0013 — the orb's name and colour, which grant nothing),
+`remember`/`listMemories`/`forget` (ADR 0029 — human-driven writes, credential-shaped
+text refused at the boundary), and `listForgeItems`/`getForgeItem`/`createForgeItem`/
+`recordForgeEvidence`/`approveForgeItem` (ADR 0034 — a build/dev watchtower;
+`approveForgeItem` is the only one of the five that may ever set an item's approval
+fields). The authority envelope remains
+deliberately small: a model call, a conversation store, a memory store, a build-status
+store, and one backup write whose
 destination the renderer can neither name nor learn — main opens the native save
 dialog, so only a human picks the path. No shell, no arbitrary filesystem paths, no
 SQL, no env, no AEGIS.
@@ -398,7 +404,7 @@ Four jobs, and the distinctions matter:
   did not.
 - **`runtime`** — installs Electron's GUI libraries and Xvfb, builds, then runs
   `npm run probe:runtime`: launches the real app (packaged path **and** `dev:desktop`) and
-  asserts React mounts, the bridge exposes exactly the nineteen allowlisted functions, a
+  asserts React mounts, the bridge exposes exactly the twenty-four allowlisted functions, a
   brain switch really re-routes messages in both directions (ADR 0022), a
   chat/amplify round-trip works, the full history save/list/get/delete loop works against
   a real SQLite (including that an unsaved chat never persists), the renderer has no Node
@@ -441,3 +447,26 @@ is not built. Until then the flags are **reviewed, not proven**.
 
 Claimed to settle the workspace layout. Out of scope for Phase 1, which targets Windows
 desktop only.
+
+## 11. Forge v1 makes zero real GitHub or Vercel calls
+
+**Status: IMPLEMENTED AND VERIFIED on the Linux runtime probe (ADR 0034), for exactly what
+it claims — nothing more.**
+
+Every one of Forge's five facts is entered by a person pasting evidence. There is no
+GitHub App, no Vercel API client, not even an unauthenticated stub — building one would
+have invented a connector that does not exist, `GITHUB_TOKEN`/`VERCEL_TOKEN` are read
+nowhere in this codebase today. `docs/architecture/forge-architecture.md` §4 records real
+reads as a later, separately-scoped ADR gated on William actually having a token to hand
+main.
+
+Also not built: any automated Claude-in-the-loop repair suggestion, production deploy
+automation, or a dependency graph between tracked items — v1 is a flat list. None of these
+is implied by anything the UI currently renders.
+
+**What IS proven:** the five-fact separation itself. `approveForgeItem` is the only
+function in `apps/desktop/src/main/forge/store.ts` that writes `approved_at`/
+`approved_by`, `RecordEvidenceRequestSchema` has no field that can name approval at all,
+and the runtime probe drives create → record-evidence → approve → list against a real
+SQLite file and asserts the approval fields are null until, and only until, the separate
+approve call.

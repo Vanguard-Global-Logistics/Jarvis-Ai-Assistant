@@ -32,18 +32,26 @@ Repository: `github.com/Vanguard-Global-Logistics/Jarvis-Ai-Assistant`.
   sessions; what it does NOT do is learn on its own (every write is a person pressing a
   button, §4), recall by meaning (recall is lexical and small, §10), or promote anything
   from repetition (§9). It still has no orchestrator beyond a single stateless model call,
-  no Forge, no Ledger, no voice, and no vision. **The only thing AEGIS protects today is
+  no Ledger, no voice, and no vision. **The only thing AEGIS protects today is
   that conversations stop leaving the machine when restricted** — do not describe anything
   else as protected by it. Memory's own travel rule (`private` never reaches a provider
   that leaves the machine) is enforced by the recall filter, NOT by AEGIS, and the two must
-  not be conflated. **`docs/KNOWN-LIMITATIONS.md` is the authoritative list of what does not
-  exist — read it before claiming anything works.**
-- **Nineteen IPC channels exist: `app:get-info`, `jarvis:chat`, `jarvis:amplify`,
+  not be conflated. As of ADR 0034 it also has **Forge v1** — a build/dev watchtower that
+  tracks five INDEPENDENT facts per item (claimed / committed / tested / previewed /
+  approved), governed by `docs/architecture/forge-architecture.md`. Approval is
+  structurally unreachable from the shared evidence channel: its own IPC channel, its own
+  request schema, its own store function, the only one that ever writes
+  `approved_at`/`approved_by`. Forge v1 makes **zero** real GitHub or Vercel network
+  calls — every fact is a person pasting evidence; real reads are a later, separately
+  scoped ADR gated on a configured token. **`docs/KNOWN-LIMITATIONS.md` is the authoritative
+  list of what does not exist — read it before claiming anything works.**
+- **Twenty-four IPC channels exist: `app:get-info`, `jarvis:chat`, `jarvis:amplify`,
   `jarvis:plan-automation`,
   `history:save`/`list`/`get`/`delete`, `history:export`, `history:import`,
   `model:describe`/`model:select`, `aegis:status`/`aegis:request-restriction`,
-  `profile:get`/`profile:set`, and
-  `memory:remember`/`memory:list`/`memory:forget`.** `app:get-info` returns static host facts.
+  `profile:get`/`profile:set`,
+  `memory:remember`/`memory:list`/`memory:forget`, and
+  `forge:list`/`get`/`create`/`record-evidence`/`approve`.** `app:get-info` returns static host facts.
   `jarvis:chat` and `jarvis:amplify` (ADR 0007) are narrow model calls: a transcript or
   an idea in, a reply or the five amplifier fields out. The `history:*` four (ADR 0008)
   are narrow calls against the main-owned conversation store: `history:save` is the only
@@ -67,7 +75,12 @@ Repository: `github.com/Vanguard-Global-Logistics/Jarvis-Ai-Assistant`.
   decides what to remember), main mints the id and the timestamp so the renderer can neither
   overwrite a memory nor forge its provenance, credential-shaped text is REFUSED at the
   boundary rather than stored, and a `private` fact is never assembled into a prompt bound
-  for a brain that leaves the machine. These nineteen are the whole of
+  for a brain that leaves the machine. `forge:*` (ADR 0034) is a build/dev watchtower:
+  `forge:record-evidence` shares one channel for claimed/committed/tested/previewed —
+  a person telling Forge one fact happened — and `forge:approve` is the ONLY channel that
+  may ever set `approvedAt`/`approvedBy`, separated at the schema (no `fact` value can
+  even name "approved") and again at the store (a distinct function is the sole writer of
+  those two columns). These twenty-four are the whole of
   what `window.jarvis` exposes. `docs/IPC-SURFACE.md` is the
   authoritative inventory; adding a channel is a boundary change (ADR 0002), not a
   routine edit.
@@ -272,16 +285,17 @@ The directories exist and the toolchain runs. **Most of them are empty**, and th
 column is the part that matters:
 
 ```
-apps/desktop           Electron shell (main / preload / renderer)  PARTIAL — hardened, 19 IPC channels, conversation + history + profile + brain-picker + memory UI, owns SQLite
+apps/desktop           Electron shell (main / preload / renderer)  PARTIAL — hardened, 24 IPC channels, conversation + history + profile + brain-picker + memory UI + Forge panel, owns SQLite
 apps/pwa               PWA shell                                   NOT IMPLEMENTED — empty, out of scope
 services/jarvis-core   Orchestration, isolated from renderer       PARTIAL — 6 model providers + amplifier, wired via chat/amplify/model (ADR 0007, 0022)
 services/aegis         AEGIS engine — independent, no GenAI        PARTIAL — real state engine + hash-chained audit log (ADR 0025); enforces 1 of 11 capabilities (ADR 0026)
-packages/contracts     Zod schemas + shared types                  PARTIAL — IPC (19 channels), model, history, profile, automation, memory, experience
+packages/contracts     Zod schemas + shared types                  PARTIAL — IPC (24 channels), model, history, profile, automation, memory, forge, experience
 packages/ui            Design-system components                    PARTIAL — tokens, motion, Orb + glass primitives
 packages/config        Env validation + structured logging         IMPLEMENTED, unit-tested
-packages/database      SQLite (node:sqlite) + migration runner     PARTIAL — wired to Electron main, 7 migrations: history, amplifications, profile, window-state, plans, memory, memory-audit (ADR 0008, 0009, 0013, 0017, 0024, 0029, 0032)
-docs/DECISIONS/        ADRs                                        0001–0033
+packages/database      SQLite (node:sqlite) + migration runner     PARTIAL — wired to Electron main, 8 migrations: history, amplifications, profile, window-state, plans, memory, memory-audit, forge (ADR 0008, 0009, 0013, 0017, 0024, 0029, 0032, 0034)
+docs/DECISIONS/        ADRs                                        0001–0034
 docs/foundation/       Layer 2 foundation documents (ADR 0005)     PARTIAL — 01 APPROVED; 02, 07, 09 DRAFT; rest CONCEPTUAL
+docs/architecture/     Layer 3 architecture documents (ADR 0005)   PARTIAL — forge-architecture.md, ledger-architecture.md; Chief Architect gate (08) itself undrafted, see each doc's §0
 ```
 
 An empty package is a deliberate state, not an unfinished one. `services/aegis` was empty
@@ -316,7 +330,7 @@ React Refresh preamble). Both reached William before anyone noticed.
 
 **`npm run probe:runtime` is the check that catches those.** It launches the real app —
 built HTML and `dev:desktop` — drives it over the DevTools protocol, and asserts React
-mounts, `window.jarvis` exposes exactly the nineteen allowlisted functions, a chat/amplify
+mounts, `window.jarvis` exposes exactly the twenty-four allowlisted functions, a chat/amplify
 round-trip answers, the full history save/list/get/delete loop works against a real
 SQLite (including that an unsaved chat never persists), the profile round-trips and
 rejects an invalid accent, the brain picker lists every provider, refuses an
@@ -324,7 +338,9 @@ unconfigured one with a reason, and — against a loopback stub provider it star
 proves an accepted switch **actually re-routes messages** in both directions rather than
 just relabeling them (ADR 0022), a repo-root `.env` actually reaches the
 provider (ADR 0021), a non-loopback local model URL refuses to start the app
-(ADR 0015), the window reopens at its stored size (ADR 0017), the renderer has no Node
+(ADR 0015), the window reopens at its stored size (ADR 0017), Forge's create →
+record-evidence → approve → list loop proves `approvedAt`/`approvedBy` are set by exactly
+one call (ADR 0034), the renderer has no Node
 globals, and the console is clean. **Run it before
 claiming any runtime behaviour.** On Linux it needs Electron's GUI libraries once:
 `bash scripts/install-electron-runtime-deps.sh`.
@@ -685,20 +701,22 @@ to a design.
 | **Vision** | Screen Vision / screen context | State machine + UI only. **No real capture.** Must never retain screenshots by default and must never hide that it is active (viewport border + "VIEWING ACTIVE WINDOW" + elapsed timer + Stop). |
 | **Memory** | Long-term memory; repository/state files are the production source of truth, **not** conversational memory | Real CRUD in Phase 1. Sensitivity level + approval/review workflow is a **new Phase 1 design decision** — the handoff docs do not define one. |
 | **Drive Mode** | Separate personality profile; safety override always-on (humor forced to 0 during maneuvers/hazards/emergencies/"quiet") | State UI only. **Waze coordination is conceptual — Jarvis must never claim to control Waze internally.** |
-| **Forge** | Build/dev watchtower. Non-negotiable five-fact model: **claimed ≠ committed ≠ tested ≠ previewed ≠ approved** | Foundation shell. No real GitHub/Vercel. Task Bridge stays manual copy/paste. |
+| **Forge** | Build/dev watchtower. Non-negotiable five-fact model: **claimed ≠ committed ≠ tested ≠ previewed ≠ approved** | **v1 IMPLEMENTED (ADR 0034).** Manual Task Bridge only — no real GitHub/Vercel calls, no automated repair. |
 | **Ledger** | Read-only advisory personal CFO. Safe-to-Spend, Cost Governor, purchase review | Read-only shell. No real banking. |
 | **AEGIS** | Independent security/containment runtime | **Real state engine in Phase 1** — with proof Jarvis cannot self-lower restrictions. |
 
 ### Official long-term modules of the Jarvis ecosystem
 
 These are **not placeholders**. They are official, named architectural components of the
-Jarvis / Throne OS ecosystem with defined purpose and ownership. **All are NOT IMPLEMENTED.**
+Jarvis / Throne OS ecosystem with defined purpose and ownership. **All are NOT IMPLEMENTED,
+except Forge, which has a v1 as of ADR 0034** — see its row below and
+`docs/architecture/forge-architecture.md`.
 
 | Module | Architectural purpose | Owns | Status |
 |---|---|---|---|
 | **Throne OS** | The **parent AI operating platform** — the ecosystem within which Jarvis, Forge, Ledger, and AEGIS operate | The platform layer | **NOT IMPLEMENTED** |
 | **Jarvis** | The **personal AI** — assistant and orchestrator for William | Orchestration, personality, conversation, memory | **NOT IMPLEMENTED** (Phase 1 builds the foundation) |
-| **Forge** | The **software engineering system** | Build/dev pipeline state and approval evidence | **NOT IMPLEMENTED** (Phase 1 ships a shell) |
+| **Forge** | The **software engineering system** | Build/dev pipeline state and approval evidence | **v1 IMPLEMENTED (ADR 0034)** — five-fact tracking, manual Task Bridge, no real GitHub/Vercel |
 | **Ledger** | **Manages finances** — read-only, advisory | Financial advisory state | **NOT IMPLEMENTED** (Phase 1 ships a shell) |
 | **AEGIS** | **Manages security, independently** of Jarvis | Security level, capability grants, audit log | **NOT IMPLEMENTED** (Phase 1 builds the real state engine) |
 | **BCI Agent** | **Internal AV project management AI** | AV project management | **NOT IMPLEMENTED** |
@@ -826,7 +844,7 @@ A session that has read this file should already know, without being told:
 - Which model to reach for, and that a builder never solely approves its own work.
 - What Jarvis looks like — orb, dark navy, blue holographic, glass, hexagons.
 - Which modules are official components of the ecosystem, what each is for, and that
-  every one of them is currently NOT IMPLEMENTED.
+  every one of them is currently NOT IMPLEMENTED except Forge, which has a v1.
 - That faking implementations and claiming untested work are the cardinal sins.
 - That GitHub is the source of truth and the repo is currently documentation-only.
 

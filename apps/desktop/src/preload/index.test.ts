@@ -84,6 +84,19 @@ const ALLOWED_API = [
   'remember',
   'listMemories',
   'forget',
+  // Forge v1 (`docs/architecture/forge-architecture.md`). Five narrow calls
+  // against the main-owned `forge_items` table, in the same shape as
+  // `history:*`/`memory:*`: no SQL, no path, no column name crosses.
+  //
+  // `approveForgeItem` is a SEPARATE function invoking a SEPARATE channel from
+  // `recordForgeEvidence` — the architecture doc's whole point is that
+  // production approval is always its own human decision, never bundled with
+  // the other four facts a Task Bridge paste could otherwise touch in one call.
+  'listForgeItems',
+  'getForgeItem',
+  'createForgeItem',
+  'recordForgeEvidence',
+  'approveForgeItem',
 ] as const;
 
 /** Load the bridge fresh and return what it handed to `exposeInMainWorld`. */

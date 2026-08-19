@@ -15,6 +15,7 @@ import { registerAppInfoHandler } from './handlers/app-info.js';
 import { registerChatHandler } from './handlers/chat.js';
 import { registerHistoryHandlers } from './handlers/history.js';
 import { registerMemoryHandlers } from './handlers/memory.js';
+import { registerForgeHandlers } from './handlers/forge.js';
 import { registerProfileHandlers } from './handlers/profile.js';
 import { applyContentSecurityPolicy, denyAllPermissions, lockNavigation } from './security.js';
 import {
@@ -361,6 +362,7 @@ void app
     registerHistoryHandlers(db);
     registerProfileHandlers(db);
     registerMemoryHandlers(db);
+    registerForgeHandlers(db);
 
     // AEGIS is constructed HERE, in main, and the admin surface never leaves
     // this scope. The two channels registered below expose reading the status

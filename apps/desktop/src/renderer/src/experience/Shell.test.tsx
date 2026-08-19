@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { AppInfo, Memory } from '@jarvis/contracts';
+import type { AppInfo, ForgeItem, Memory } from '@jarvis/contracts';
 import { AEGIS_CAPABILITIES, DEFAULT_PROFILE, ORB_STATES } from '@jarvis/contracts';
 
 import { orbTiming } from '@jarvis/ui';
@@ -66,6 +66,24 @@ const MEMORY: Memory = {
   sensitivity: 'open',
   learnedFrom: 'told',
   learnedAt: '2026-08-16T12:00:00.000Z',
+};
+
+/** One tracked item, for the default Forge bridge stub. */
+const FORGE_ITEM: ForgeItem = {
+  id: '22222222-2222-4222-8222-222222222222',
+  title: 'Ship the punchlist',
+  claimedAt: null,
+  claimedDetail: null,
+  committedAt: null,
+  committedRef: null,
+  testsPassedAt: null,
+  testsDetail: null,
+  previewedAt: null,
+  previewUrl: null,
+  approvedAt: null,
+  approvedBy: null,
+  createdAt: '2026-08-18T12:00:00.000Z',
+  updatedAt: '2026-08-18T12:00:00.000Z',
 };
 
 /**
@@ -143,6 +161,13 @@ function stubBridge(overrides: Partial<JarvisBridge> = {}): void {
     remember: vi.fn().mockResolvedValue(MEMORY),
     listMemories: vi.fn().mockResolvedValue([]),
     forget: vi.fn().mockResolvedValue({ forgotten: true }),
+    // Forge v1 (`docs/architecture/forge-architecture.md`). `listForgeItems`
+    // resolving to `[]` is the honest default: nothing tracked yet.
+    listForgeItems: vi.fn().mockResolvedValue([]),
+    getForgeItem: vi.fn().mockResolvedValue({ item: null }),
+    createForgeItem: vi.fn().mockResolvedValue(FORGE_ITEM),
+    recordForgeEvidence: vi.fn().mockResolvedValue(FORGE_ITEM),
+    approveForgeItem: vi.fn().mockResolvedValue(FORGE_ITEM),
     ...overrides,
   };
   vi.stubGlobal('jarvis', bridge);

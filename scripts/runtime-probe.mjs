@@ -550,6 +550,14 @@ async function runChecks(page, mode, stub = null) {
     'remember',
     'listMemories',
     'forget',
+    // Forge v1 (docs/architecture/forge-architecture.md) — five-fact
+    // watchtower. `approveForgeItem` is its own function on its own channel,
+    // never reachable through `recordForgeEvidence`.
+    'listForgeItems',
+    'getForgeItem',
+    'createForgeItem',
+    'recordForgeEvidence',
+    'approveForgeItem',
   ];
   const keysOk = JSON.stringify(keys.value) === JSON.stringify(EXPECTED_KEYS);
   add(
@@ -1209,6 +1217,57 @@ async function runChecks(page, mode, stub = null) {
     'the forgotten memory is really gone',
     !JSON.stringify(memoriesFinal.value).includes('PRIVATE-CANARY'),
     `${String(memoriesFinal.value?.length)} memories remain`,
+  );
+
+  // Forge v1 (docs/architecture/forge-architecture.md), driven over the real
+  // IPC boundary against the real SQLite file — the same reasoning as the
+  // memory block above: the unit tests prove the store functions behave, not
+  // that the wired application does.
+
+  const forgeCreated = await page.evaluate(
+    'window.jarvis ? await window.jarvis.createForgeItem({ title: "PROBE: ship the punchlist" }) : null',
+  );
+  const forgeCreateOk =
+    typeof forgeCreated.value?.id === 'string' &&
+    /^[0-9a-f-]{36}$/.test(forgeCreated.value.id) &&
+    forgeCreated.value.approvedAt === null;
+  add(
+    'forge:create mints an id in MAIN, with every fact unset',
+    forgeCreateOk,
+    forgeCreated.error
+      ? `THREW: ${String(forgeCreated.error).split('\n')[0]}`
+      : JSON.stringify(forgeCreated.value),
+  );
+  const forgeId = forgeCreated.value?.id;
+
+  const forgeCommitted = await page.evaluate(
+    `window.jarvis ? await window.jarvis.recordForgeEvidence({ id: ${JSON.stringify(String(forgeId))}, fact: "committed", detail: "abc1234" }) : null`,
+  );
+  add(
+    'forge:record-evidence sets exactly the requested fact',
+    typeof forgeCommitted.value?.committedAt === 'string' &&
+      forgeCommitted.value.testsPassedAt === null &&
+      forgeCommitted.value.approvedAt === null,
+    JSON.stringify(forgeCommitted.value),
+  );
+
+  const forgeApproved = await page.evaluate(
+    `window.jarvis ? await window.jarvis.approveForgeItem({ id: ${JSON.stringify(String(forgeId))}, approvedBy: "PROBE-William" }) : null`,
+  );
+  add(
+    'forge:approve is the ONLY call that sets approvedAt/approvedBy',
+    typeof forgeApproved.value?.approvedAt === 'string' &&
+      forgeApproved.value.approvedBy === 'PROBE-William',
+    JSON.stringify(forgeApproved.value),
+  );
+
+  const forgeList = await page.evaluate(
+    'window.jarvis ? await window.jarvis.listForgeItems() : null',
+  );
+  add(
+    'forge:list shows the tracked item, newest first',
+    Array.isArray(forgeList.value) && forgeList.value[0]?.id === forgeId,
+    `${String(forgeList.value?.length)} items`,
   );
 
   // E2: the Experience Shell mounts the Orb. Assert the real component is
