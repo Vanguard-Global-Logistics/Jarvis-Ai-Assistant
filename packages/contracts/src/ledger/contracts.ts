@@ -9,12 +9,24 @@ import { z } from 'zod';
  * ## The rule this file exists to make structural
  *
  * FINANCIAL-SURVIVAL-RULES rule 10: **Ledger is advisory and read-only.** It
- * may never transfer, pay, or send money, open credit, trade, change bank
- * details, approve a subscription, or store a banking credential. That is not
- * enforced by a guard in this file — it is enforced by ABSENCE: there is no
- * schema here that could describe a payment, no field that could hold an
- * account or routing number, and no channel in `ipc/contracts.ts` that could
- * carry one. A capability never coded cannot be reached by a bug.
+ * may never transfer, pay, or send money, open credit, trade, or change bank
+ * details.
+ *
+ * That much is enforced by ABSENCE, and the claim is exact: there is no schema
+ * in this file that could describe a payment, and no channel in
+ * `ipc/channels.ts` that could carry one. A capability never coded cannot be
+ * reached by a bug, a prompt injection, or a careless future edit.
+ *
+ * **The credential half of rule 10 is a GUARD, not an absence, and an earlier
+ * version of this comment claimed otherwise.** It said no field here could
+ * hold an account or routing number. That was false: `reviewText` below is
+ * 2,000 characters of free text, ten times over, and a routing number or an
+ * API key fits in it perfectly well. The absence argument had been checked
+ * against field NAMES and never against what the field TYPES admit. What is
+ * true is that `refuseIfCredential` in `apps/desktop/src/main/ledger/store.ts`
+ * rejects credential-shaped text before the write, and that it catches ten
+ * known formats rather than every possible one — a bare account number typed
+ * as digits is indistinguishable from an amount.
  *
  * ## Money is integer CENTS, everywhere, with no exceptions
  *
@@ -501,3 +513,138 @@ export type DecidePurchaseReviewRequest = z.infer<typeof DecidePurchaseReviewReq
 export const PurchaseReviewListSchema = z.array(PurchaseReviewSchema);
 
 export type PurchaseReviewList = z.infer<typeof PurchaseReviewListSchema>;
+
+/**
+ * The largest amount a person may type, in cents — ten billion dollars.
+ *
+ * Not a guess at William's finances; a guard on the arithmetic. Every figure
+ * here is a JavaScript number, exact only below `Number.MAX_SAFE_INTEGER`
+ * (about $90 trillion in cents). Refusing five orders of magnitude below that
+ * keeps every sum, difference and Cost Governor product exact with room to
+ * spare, and turns a pasted-by-accident digit string into a message rather
+ * than a silently rounded total.
+ */
+export const MAX_ENTRY_CENTS = 1_000_000_000_000;
+
+/**
+ * The result of reading a typed dollar amount — a discriminated union, for the
+ * same reason `SafeToSpend` is one: "that is not a number" is a real outcome
+ * and must not be expressible AS a number.
+ */
+export type CentsParse = { ok: true; cents: number } | { ok: false; reason: string };
+
+/**
+ * Parse a typed dollar string into integer cents, EXACTLY.
+ *
+ * ## Why this is not `Math.round(parseFloat(input) * 100)`
+ *
+ * Because that is a float path, in the one module whose header promises money
+ * is never a float, at the exact point where a person's real balance enters the
+ * system. `parseFloat('1234.56') * 100` is `123456.00000000001`; rounding
+ * rescues that particular value and the habit is what shipped
+ * `Math.floor((2900 / 10000) * 100) === 28` one function away from here. This
+ * reads the digits as digits — the integer part and the fractional part are
+ * separate integers, combined with a multiply and an add, so no value is ever
+ * held in a binary fraction.
+ *
+ * ## Why more than two decimal places is REFUSED, not rounded
+ *
+ * `12.345` silently becoming `$12.34` (or `$12.35`) is money the person typed
+ * that Ledger decided about on their behalf. Half a cent does not matter; a
+ * system that quietly edits typed figures does. It is also the shape of a
+ * mis-paste, which is worth surfacing rather than absorbing.
+ *
+ * Accepts a leading `$`, comma group separators, surrounding whitespace, and a
+ * leading `-`. Rejects everything else — including the empty string, which the
+ * caller should be treating as MISSING rather than as an amount.
+ */
+export function parseDollarsToCents(input: string): CentsParse {
+  const cleaned = input.trim().replace(/^\$/, '').replace(/,/g, '').trim();
+  if (cleaned.length === 0) return { ok: false, reason: 'Enter an amount, or mark it MISSING.' };
+
+  // The rejected text is TRUNCATED before it goes into the message, and this
+  // is a security property rather than tidiness. A refusal reason is rendered
+  // into the panel and may be logged; quoting an arbitrary-length input back
+  // in full means a mis-pasted API key travels straight into both. The store's
+  // credential guard already refuses to echo — a parser that echoes anyway
+  // would reopen the hole one layer up. 24 characters is enough to recognise
+  // your own typo and not enough to carry a secret.
+  const quoted = cleaned.length > 24 ? `${cleaned.slice(0, 24)}…` : cleaned;
+
+  const match = /^(-?)(\d*)(?:\.(\d*))?$/.exec(cleaned);
+  if (match === null) return { ok: false, reason: `"${quoted}" is not an amount.` };
+
+  const [, sign, whole = '', fraction] = match;
+  if (whole.length === 0 && (fraction === undefined || fraction.length === 0)) {
+    return { ok: false, reason: `"${quoted}" is not an amount.` };
+  }
+  if (fraction !== undefined && fraction.length > 2) {
+    return { ok: false, reason: 'Amounts have at most two decimal places (cents).' };
+  }
+
+  const wholeCents = (whole.length === 0 ? 0 : Number(whole)) * CENTS_PER_DOLLAR;
+  const fractionCents = fraction === undefined ? 0 : Number(fraction.padEnd(2, '0'));
+  const magnitude = wholeCents + fractionCents;
+
+  if (!Number.isSafeInteger(magnitude) || magnitude > MAX_ENTRY_CENTS) {
+    return { ok: false, reason: 'That amount is too large to record.' };
+  }
+
+  return { ok: true, cents: sign === '-' ? -magnitude : magnitude };
+}
+
+/**
+ * Cents back to the plain string a text input should hold — `-1234.56`.
+ *
+ * Deliberately NOT the display format: no `$`, no thousands separators, so
+ * `parseDollarsToCents(formatCentsForInput(c)) === c` for every value in range.
+ * A form that renders `$1,234.56` into the box a person then edits is a form
+ * that fights its own parser.
+ */
+export function formatCentsForInput(cents: number): string {
+  const negative = cents < 0;
+  const abs = Math.abs(cents);
+  const whole = Math.floor(abs / CENTS_PER_DOLLAR);
+  const remainder = String(abs % CENTS_PER_DOLLAR).padStart(2, '0');
+  return `${negative ? '-' : ''}${String(whole)}.${remainder}`;
+}
+
+/**
+ * The fields a challenge-posture classification expects to be filled in.
+ *
+ * Why these three: `whyNow` is the question that kills most impulse buys,
+ * `alternatives` is the evidence that anything else was considered, and
+ * `benefit` is the claim the purchase is being made on. A review missing all
+ * three is a receipt, not a review.
+ */
+export const JUSTIFICATION_FIELDS = ['whyNow', 'alternatives', 'benefit'] as const;
+
+export type JustificationField = (typeof JUSTIFICATION_FIELDS)[number];
+
+/**
+ * Which justification fields a review leaves empty that its own classification
+ * asks for — `[]` when the classification does not ask, or when all are filled.
+ *
+ * ## This REPORTS; it does not refuse
+ *
+ * `requiresJustification` existed and was tested for a whole version with
+ * nothing calling it, which `docs/DECISIONS/0035` records as a gap: a
+ * `premature-scale` purchase could be recorded with every justification field
+ * empty and nothing anywhere said so. This closes that — as a WARNING the UI
+ * must surface, not as a rejection at the boundary.
+ *
+ * The distinction is deliberate and is the module's charter. Ledger advises;
+ * a person decides. Refusing to store an unjustified purchase would not stop
+ * the purchase — it would only stop the RECORD of it, leaving the years-long
+ * history missing exactly the entries most worth reading later. The friction
+ * belongs in front of the person, not in front of the truth.
+ */
+export function missingJustification(review: {
+  classification: ExpenseClassification;
+  whyNow: string;
+  alternatives: string;
+  benefit: string;
+}): readonly JustificationField[] {
+  if (!requiresJustification(review.classification)) return [];
+  return JUSTIFICATION_FIELDS.filter((field) => review[field].trim().length === 0);
+}

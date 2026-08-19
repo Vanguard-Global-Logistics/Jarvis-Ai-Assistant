@@ -49,8 +49,13 @@ Repository: `github.com/Vanguard-Global-Logistics/Jarvis-Ai-Assistant`.
   cannot move money or open credit — that capability is ABSENT, not guarded. Storing a
   credential is a different claim and a weaker one: the free-text review fields are
   GUARDED (the same `looksLikeCredential` check memory and Forge use), not incapable. The
-  Cost Governor and `requiresJustification` are implemented and tested but **wired to
-  nothing** — no budget is stored and no screen calls them. Its defining property: when any figure is MISSING it
+  Cost Governor is implemented and tested but **wired to nothing** — no budget is stored
+  and no screen calls it. `requiresJustification` IS wired now, as a warning on the review
+  form that names the empty justification fields and renames the submit button to RECORD
+  ANYWAY; it deliberately does not block, because refusing would not stop a purchase, only
+  the record of one. The panel WRITES as of the ADR 0035 amendment — ENTER FIGURES and
+  OPEN A REVIEW give both write channels a human caller, which they lacked when Ledger v1
+  first shipped. Its defining property: when any figure is MISSING it
   **refuses to compute** rather than treating unknown as zero, because zero would report
   more spending room than exists. **Ledger v1's independent review (CLAUDE.md §5,
   mandatory for finance-critical work) is still OUTSTANDING — do not describe it as

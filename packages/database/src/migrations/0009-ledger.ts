@@ -6,12 +6,20 @@ import type { Migration } from '../migrator.js';
  * Two tables: the single-row Safe-to-Spend input set, and the purchase-review
  * record. Nothing else — and what is ABSENT is the security property:
  *
- * **There is no account number, no routing number, no institution, no access
- * token, no balance feed, and no transaction table.** Ledger v1 has no bank
- * connection at all (FINANCIAL-SURVIVAL-RULES rule 10 — advisory and
- * read-only), so the schema has nowhere to put a credential even if some
- * future code path tried. A column that does not exist cannot be filled by a
+ * **There is no account-number column, no routing-number column, no
+ * institution, no access token, no balance feed, and no transaction table.**
+ * Ledger v1 has no bank connection at all (FINANCIAL-SURVIVAL-RULES rule 10 —
+ * advisory and read-only). A column that does not exist cannot be filled by a
  * bug. Adding one is a new ADR with its own review, never a quiet extension.
+ *
+ * **What that does NOT mean, and an earlier version of this comment implied:**
+ * that the schema "has nowhere to put a credential". It has ten places — the
+ * free-text `TEXT` columns of `purchase_reviews`, each up to 2,000 characters,
+ * which hold a routing number or an API key as happily as they hold a
+ * sentence. Named columns are absent; free text is free text. Credential
+ * CONTENT is refused one layer up, by `refuseIfCredential` in the store,
+ * before any of these columns is written — a guard over ten known formats, not
+ * a proof.
  *
  * ## Money is INTEGER CENTS
  *

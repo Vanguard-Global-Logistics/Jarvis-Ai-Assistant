@@ -117,13 +117,7 @@ independent review, never a quiet extension of this surface.
   rendered number looks.
 - **No project table.** `projectPaying` is a free label in v1; per-project budgets and
   the Cost Governor's UI surface are not wired to stored projects yet — the function
-  exists and is tested, but nothing calls it from a screen. Because
-  `requiresJustification` is likewise unwired, a `premature-scale` purchase can currently
-  be recorded with every justification field empty.
-- **No entry form, and no way to open a review.** The shipped panel READS. Both write
-  channels work and are probe-verified, but no renderer surface calls them, so in a build
-  a person launches, every figure stays MISSING and the review list stays empty. This is
-  the largest gap in v1 and `docs/KNOWN-LIMITATIONS.md` §12 states it plainly.
+  exists and is tested, but nothing calls it from a screen.
 
 ## Verification
 
@@ -166,8 +160,9 @@ pattern matters more than any single defect:
   is impossible. Now a typed `Record` over the schema's own keys, so it is a compile error.
 - **The archived confidence was discarded** (above).
 - **The shipped panel cannot be used.** No form enters figures; no form opens a review. Two
-  of five channels have no human caller. `docs/KNOWN-LIMITATIONS.md` §12 now states this
-  plainly; the earlier entry disclosed half of it.
+  of five channels have no human caller. Disclosed at the time in
+  `docs/KNOWN-LIMITATIONS.md` §12 rather than fixed, and **closed since** — see the
+  amendment below.
 
 And three claims in this ADR's own first version were weaker than written: "drives all five
 channels" (`ledger:list-reviews` was never invoked), "with the record intact" (the probe
@@ -177,6 +172,54 @@ read the error string and never re-read the row), and "MISSING refuses in every 
 **A green suite and a green probe were not enough**, which is the whole argument for the
 swarm gate. `npm run verify` was 946/946 and `probe:runtime` passed when these five
 blocking defects were live.
+
+## Amendment — the panel writes, and `requiresJustification` is wired
+
+The fifth blocking finding above was disclosed rather than fixed. It is now fixed.
+
+10. **`LedgerFiguresForm` and `LedgerReviewForm` give both write channels a human
+    caller.** ENTER FIGURES opens the seven-term editor; OPEN A REVIEW opens the draft
+    form. `probe:runtime` asserts both controls exist in the REAL rendered DOM and that
+    the entry form opens with all seven terms — clicking the collapsed LEDGER toggle the
+    way a person does. Every prior Ledger probe assertion drove `window.jarvis` directly,
+    which proves the IPC works and says nothing about whether the app has a surface that
+    calls it; Ledger v1 shipped in exactly that state, so asserting through the DOM is
+    what closes the gap rather than restating it.
+
+11. **`parseDollarsToCents` is the only path a typed amount takes into the system**, and
+    it reads digits as digits. Not `Math.round(parseFloat(x) * 100)` — that is a float
+    path at the exact point a person's real balance enters, in the module whose header
+    promises money is never a float, and the habit is what shipped finding 2. More than
+    two decimal places is REFUSED rather than rounded, because `12.345` quietly becoming
+    `$12.34` is Ledger editing a figure a person typed.
+
+    Its own test found a defect while being written: the refusal reason echoed the entire
+    input verbatim, so a mis-pasted API key would have travelled straight into a rendered
+    error and any log carrying it. The quoted text is now capped at 24 characters.
+
+12. **`requiresJustification` is wired — as a WARNING, not a refusal.** It existed, was
+    tested, and was called by nothing, so a `premature-scale` purchase could be recorded
+    with every justification field empty and no artifact said so. `missingJustification`
+    now names the gaps and the submit button renames itself RECORD ANYWAY.
+
+    **It deliberately does not block**, and the reason is the module's charter rather
+    than convenience: refusing would not stop the purchase, only the RECORD of the
+    purchase, leaving the years-long history missing precisely the entries most worth
+    reading later. Ledger advises; a person decides. The friction belongs in front of the
+    person, not in front of the truth.
+
+**Red-green on the three new guards**, per CLAUDE.md's instrument for correctness work.
+Each was deliberately broken and the suite confirmed red before restoring:
+
+| Break                                            | Checks turned red    |
+| ------------------------------------------------ | -------------------- |
+| `parseDollarsToCents` reverted to the float path | 2 (contract + form)  |
+| the form's negative-deduction guard disabled     | 2 (both in the form) |
+| the refusal reason echoes its full input         | 1 (contract)         |
+
+Verification after the amendment: `npm run verify` 1038 tests / 65 files green (was
+1001); `npm run build` green with the artifact assertion; `npm run probe:runtime` green
+including the two new DOM assertions.
 
 ## Review — OUTSTANDING, and this ADR does not claim otherwise
 

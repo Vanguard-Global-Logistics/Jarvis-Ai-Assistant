@@ -10,6 +10,9 @@ import type {
 import { CENTS_PER_DOLLAR, DATA_STATES, EXPENSE_CLASSIFICATIONS } from '@jarvis/contracts';
 import { accent, fontFamily, letterSpacing, surface, text } from '@jarvis/ui';
 import { bridgeMember } from './bridge.js';
+import { LedgerFiguresForm } from './LedgerFiguresForm.js';
+import { LedgerReviewForm } from './LedgerReviewForm.js';
+import { alertBox, smallButton } from './panelStyles.js';
 
 /**
  * Ledger v1 — read-only, advisory (`docs/architecture/ledger-architecture.md`).
@@ -87,6 +90,14 @@ export function LedgerPanel(): JSX.Element {
   const [deciderName, setDeciderName] = useState('');
   /** The review id whose decision is in flight, so a double-click cannot resend. */
   const [submitting, setSubmitting] = useState<string | null>(null);
+  /**
+   * Which write form is open, if any — one at a time.
+   *
+   * Not two independent booleans: both forms are tall, this is a side panel,
+   * and two open at once would push the figures they are about off the screen
+   * a person is checking them against.
+   */
+  const [openForm, setOpenForm] = useState<'figures' | 'review' | null>(null);
 
   const refresh = useCallback(async (): Promise<void> => {
     const getLedgerInputs = bridgeMember('getLedgerInputs');
@@ -273,9 +284,11 @@ export function LedgerPanel(): JSX.Element {
         )}
       </div>
 
-      {/* The seven terms, each with its state shown. Read-only in v1 — entry
-          is a separate surface, and a figure nobody typed stays MISSING. */}
-      {inputs !== null && (
+      {/* The seven terms, each with its state shown. Editing is the separate
+          form below, so the reading surface and the writing surface are never
+          the same pixels — a figure cannot be changed by a mis-click on the
+          number a person came here to read. */}
+      {inputs !== null && openForm !== 'figures' && (
         <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 3 }}>
           {TERM_LABELS.map(({ key, label }) => {
             const figure = inputs[key];
@@ -313,6 +326,29 @@ export function LedgerPanel(): JSX.Element {
         </ul>
       )}
 
+      {openForm === 'figures' ? (
+        <LedgerFiguresForm
+          inputs={inputs}
+          onSaved={async () => {
+            setOpenForm(null);
+            await refresh();
+          }}
+          onCancel={() => {
+            setOpenForm(null);
+          }}
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => {
+            setOpenForm('figures');
+          }}
+          style={smallButton(accent.jarvisBlue)}
+        >
+          ENTER FIGURES
+        </button>
+      )}
+
       <span
         style={{
           fontFamily: fontFamily.mono,
@@ -324,6 +360,28 @@ export function LedgerPanel(): JSX.Element {
       >
         PURCHASE REVIEWS
       </span>
+
+      {openForm === 'review' ? (
+        <LedgerReviewForm
+          onCreated={async () => {
+            setOpenForm(null);
+            await refresh();
+          }}
+          onCancel={() => {
+            setOpenForm(null);
+          }}
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => {
+            setOpenForm('review');
+          }}
+          style={smallButton(accent.jarvisBlue)}
+        >
+          OPEN A REVIEW
+        </button>
+      )}
 
       <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 8 }}>
         {reviews.length === 0 && loadError === null && (
@@ -479,32 +537,4 @@ export function LedgerPanel(): JSX.Element {
       </span>
     </section>
   );
-}
-
-function alertBox(padding = 8): React.CSSProperties {
-  return {
-    margin: 0,
-    padding,
-    fontFamily: fontFamily.body,
-    fontSize: 11,
-    color: accent.warning,
-    border: '1px solid rgba(255,184,77,0.4)',
-    borderRadius: surface.radiusMin,
-    background: 'rgba(255,184,77,0.08)',
-  };
-}
-
-function smallButton(color: string): React.CSSProperties {
-  return {
-    minHeight: 24,
-    padding: '2px 8px',
-    fontFamily: fontFamily.mono,
-    fontSize: 9,
-    letterSpacing: letterSpacing.label,
-    color,
-    background: 'transparent',
-    border: `1px solid ${color}`,
-    borderRadius: 5,
-    cursor: 'pointer',
-  };
 }

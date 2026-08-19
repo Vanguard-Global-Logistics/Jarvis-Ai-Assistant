@@ -8,6 +8,7 @@ import {
   NEVER_SEND,
 } from '@jarvis/contracts';
 import { background, fontFamily, letterSpacing, surface, text } from '@jarvis/ui';
+import { alertBox, smallButton as deleteButton } from './panelStyles.js';
 
 /**
  * "What Jarvis knows" — the memory surface (ADR 0029).
@@ -419,40 +420,4 @@ export function MemoryPanel({
       </ul>
     </section>
   );
-}
-
-/**
- * The one warning-alert treatment, used by all three alert sites.
- *
- * It was written out three times with a near-identical inline object and three
- * hardcoded copies of `#ffb84d` — so any contrast fix or token migration would
- * have been applied to whichever ones the author scrolled to, and the panel
- * would render two different "something went wrong" styles on one screen.
- */
-function alertBox(padding = 8): React.CSSProperties {
-  return {
-    margin: 0,
-    padding,
-    fontFamily: fontFamily.body,
-    fontSize: 11,
-    color: '#ffb84d',
-    border: '1px solid rgba(255,184,77,0.4)',
-    borderRadius: surface.radiusMin,
-    background: 'rgba(255,184,77,0.08)',
-  };
-}
-
-function deleteButton(color: string): React.CSSProperties {
-  return {
-    minHeight: 24,
-    padding: '2px 8px',
-    fontFamily: fontFamily.mono,
-    fontSize: 9,
-    letterSpacing: letterSpacing.label,
-    color,
-    background: 'transparent',
-    border: `1px solid ${color}`,
-    borderRadius: 5,
-    cursor: 'pointer',
-  };
 }

@@ -4,6 +4,7 @@ import type { ForgeFact, ForgeItem } from '@jarvis/contracts';
 import { FORGE_TITLE_MAX_LENGTH } from '@jarvis/contracts';
 import { background, fontFamily, letterSpacing, surface, text } from '@jarvis/ui';
 import { bridgeMember } from './bridge.js';
+import { alertBox, smallButton as deleteButton } from './panelStyles.js';
 
 /**
  * Forge v1 — the five-fact build/dev watchtower
@@ -406,34 +407,6 @@ export function ForgePanel(): JSX.Element {
       </ul>
     </section>
   );
-}
-
-function alertBox(padding = 8): React.CSSProperties {
-  return {
-    margin: 0,
-    padding,
-    fontFamily: fontFamily.body,
-    fontSize: 11,
-    color: '#ffb84d',
-    border: '1px solid rgba(255,184,77,0.4)',
-    borderRadius: surface.radiusMin,
-    background: 'rgba(255,184,77,0.08)',
-  };
-}
-
-function deleteButton(color: string): React.CSSProperties {
-  return {
-    minHeight: 24,
-    padding: '2px 8px',
-    fontFamily: fontFamily.mono,
-    fontSize: 9,
-    letterSpacing: letterSpacing.label,
-    color,
-    background: 'transparent',
-    border: `1px solid ${color}`,
-    borderRadius: 5,
-    cursor: 'pointer',
-  };
 }
 
 function actionButton(color: string, enabled: boolean): React.CSSProperties {

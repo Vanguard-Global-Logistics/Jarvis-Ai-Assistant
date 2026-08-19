@@ -500,19 +500,34 @@ fix — is that those fields are **guarded**: `looksLikeCredential`, the same ch
 is a weaker claim than impossible, and it is the accurate one.** The guard catches ten
 credential formats and does not catch a bare account number typed as digits.
 
-**THE SHIPPED PANEL IS READ-ONLY, and this is the biggest gap.** There is no form to enter
-the seven Safe-to-Spend figures and **no form to open a purchase review**. `ledger:set-inputs`
-and `ledger:create-review` exist and work, but nothing in the renderer calls them. So in a
-build a person actually launches: every figure stays MISSING, Safe-to-Spend permanently
-reads "Not enough is known to say", the review list is permanently empty, and the whole
-decide flow — ACCEPT / DECLINE / OVERRIDE, the not-overwritable rule, the captured
-Safe-to-Spend — is unreachable. Two of the five channels have no human path to them.
+**The panel is now WRITABLE — this entry previously recorded the opposite and the gap it
+described is closed.** It said there was no form to enter the seven figures and no form to
+open a purchase review, so two of the five channels had no human path to them and a build
+a person launched showed MISSING forever. `LedgerFiguresForm` and `LedgerReviewForm` now
+exist behind ENTER FIGURES and OPEN A REVIEW, and the runtime probe asserts both controls
+are present in the real rendered DOM and that the entry form really opens with all seven
+terms — deliberately clicking the collapsed LEDGER toggle the way a person does, rather
+than reaching into React state, because a check that bypasses the UI to see the UI proves
+something else.
 
-**Also not built:** the Cost Governor and `requiresJustification` are implemented and
-tested but **called from nothing** — no budget is stored anywhere, there is no project
-table, so `projectPaying` is a free text label. Because `requiresJustification` is unwired,
-a `premature-scale` purchase can be recorded with every justification field empty. There is
-no burn-rate, runway, anomaly detection, or recurring-charge tracking.
+**What the entry form does NOT relax.** MISSING is an explicit choice per term rather than
+an empty box, so clearing a figure is a decision rather than a blank the form guesses
+about. A negative deduction is refused with the row named, and nothing at all is sent —
+never a partial save, because half-updated figures compute a Safe-to-Spend that was never
+true of any moment. Amounts are read by `parseDollarsToCents`, which reads digits as digits
+and never multiplies a decimal by 100; a third decimal place is REFUSED rather than
+rounded, because rounding is Ledger silently editing a figure a person typed.
+
+**`requiresJustification` is now wired — as a WARNING, not a refusal.** The review form
+names the empty justification fields a challenge-posture classification asks for and
+renames its own submit button to RECORD ANYWAY. It deliberately still lets the record
+through: refusing would not stop the purchase, only the RECORD of it, leaving the
+years-long history missing exactly the entries most worth reading later.
+
+**Still not built:** the Cost Governor is implemented and tested but **called from
+nothing** — no budget is stored anywhere and there is no project table, so `projectPaying`
+remains a free text label. There is no burn-rate, runway, anomaly detection, or
+recurring-charge tracking.
 
 **What IS proven:** that unknown figures produce a refusal rather than an inflated number;
 that a negative deduction is refused at the boundary and again by a database CHECK; that

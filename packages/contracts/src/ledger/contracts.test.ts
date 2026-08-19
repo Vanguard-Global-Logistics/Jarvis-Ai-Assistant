@@ -5,8 +5,13 @@ import {
   DEDUCTION_TERMS,
   DecidePurchaseReviewRequestSchema,
   EXPENSE_CLASSIFICATIONS,
+  JUSTIFICATION_FIELDS,
   LedgerInputsSchema,
+  MAX_ENTRY_CENTS,
   costGovernorStatus,
+  formatCentsForInput,
+  missingJustification,
+  parseDollarsToCents,
   requiresJustification,
   safeToSpend,
 } from './contracts.js';
@@ -343,6 +348,147 @@ describe('DecidePurchaseReviewRequestSchema — the only decision-shaped request
         DecidePurchaseReviewRequestSchema.safeParse({ ...valid, decision }).success,
         decision,
       ).toBe(false);
+    }
+  });
+});
+
+describe('parseDollarsToCents — the only path a typed amount takes into the system', () => {
+  it('reads ordinary amounts exactly', () => {
+    const cases: [string, number][] = [
+      ['0', 0],
+      ['0.00', 0],
+      ['1', 100],
+      ['1.5', 150],
+      ['1.05', 105],
+      ['12.34', 1234],
+      ['1234.56', 123456],
+      ['0.01', 1],
+      ['.5', 50],
+      ['.05', 5],
+      ['7.', 700],
+    ];
+    for (const [input, cents] of cases) {
+      expect(parseDollarsToCents(input), input).toStrictEqual({ ok: true, cents });
+    }
+  });
+
+  it('is EXACT where the float path is not — the bug this function exists to avoid', () => {
+    // `parseFloat('1234.56') * 100` is 123456.00000000001. The whole point of
+    // reading digits as digits is that no value here is ever a binary fraction.
+    // These are the classic offenders; every one must land on the integer.
+    for (const dollars of ['0.07', '0.29', '1.10', '2.90', '8.20', '29.00', '1.005'.slice(0, 4)]) {
+      const parsed = parseDollarsToCents(dollars);
+      expect(parsed.ok, dollars).toBe(true);
+      if (parsed.ok) expect(Number.isInteger(parsed.cents), dollars).toBe(true);
+    }
+    expect(parseDollarsToCents('0.29')).toStrictEqual({ ok: true, cents: 29 });
+    expect(parseDollarsToCents('8.20')).toStrictEqual({ ok: true, cents: 820 });
+  });
+
+  it('accepts a dollar sign, commas, and surrounding whitespace', () => {
+    expect(parseDollarsToCents('  $1,234.56 ')).toStrictEqual({ ok: true, cents: 123456 });
+    expect(parseDollarsToCents('$1,000,000')).toStrictEqual({ ok: true, cents: 100000000 });
+  });
+
+  it('carries a minus sign through — cash may be negative', () => {
+    expect(parseDollarsToCents('-1234.56')).toStrictEqual({ ok: true, cents: -123456 });
+    expect(parseDollarsToCents('-0.01')).toStrictEqual({ ok: true, cents: -1 });
+    // The sign must apply to the WHOLE magnitude, not just the dollars part.
+    expect(parseDollarsToCents('-0.50')).toStrictEqual({ ok: true, cents: -50 });
+  });
+
+  it('REFUSES more than two decimal places rather than rounding them away', () => {
+    // Rounding would be Ledger silently editing a figure a person typed. That
+    // is the behaviour this module exists to not have.
+    for (const input of ['12.345', '0.001', '1.5555']) {
+      const parsed = parseDollarsToCents(input);
+      expect(parsed.ok, input).toBe(false);
+      if (!parsed.ok) expect(parsed.reason).toContain('two decimal places');
+    }
+  });
+
+  it('refuses text, symbols, and the empty string', () => {
+    for (const input of ['', '   ', 'abc', '1.2.3', '1-2', '12e3', '--5', '$', '.', '1,2.3.4']) {
+      expect(parseDollarsToCents(input).ok, JSON.stringify(input)).toBe(false);
+    }
+  });
+
+  it('refuses an amount too large to stay exact', () => {
+    const parsed = parseDollarsToCents('99999999999999999999');
+    expect(parsed.ok).toBe(false);
+    if (!parsed.ok) expect(parsed.reason).toContain('too large');
+    // And the boundary itself is inclusive on the safe side.
+    expect(parseDollarsToCents(String(MAX_ENTRY_CENTS / 100)).ok).toBe(true);
+  });
+
+  it('never quotes a huge input back in full — a reason is not an echo', () => {
+    const parsed = parseDollarsToCents('x'.repeat(5000));
+    expect(parsed.ok).toBe(false);
+    if (!parsed.ok) expect(parsed.reason.length).toBeLessThan(200);
+  });
+
+  it('round-trips through formatCentsForInput for every value it produced', () => {
+    // The form seeds its boxes with `formatCentsForInput` and reads them back
+    // with `parseDollarsToCents`. If those two disagree anywhere, editing one
+    // row silently changes another.
+    for (const cents of [0, 1, 5, 99, 100, 105, 150, 123456, -1, -50, -123456, 999999999]) {
+      const text = formatCentsForInput(cents);
+      expect(parseDollarsToCents(text), text).toStrictEqual({ ok: true, cents });
+    }
+  });
+
+  it('formats for an INPUT box, not for display — no $, no separators', () => {
+    // A form that renders "$1,234.56" into the box a person then edits is a
+    // form fighting its own parser.
+    expect(formatCentsForInput(123456)).toBe('1234.56');
+    expect(formatCentsForInput(-5)).toBe('-0.05');
+    expect(formatCentsForInput(0)).toBe('0.00');
+  });
+});
+
+describe('missingJustification — reports gaps, never refuses the record', () => {
+  const filled = { whyNow: 'a', alternatives: 'b', benefit: 'c' };
+
+  it('asks for nothing when the classification does not demand justification', () => {
+    for (const classification of ['essential', 'milestone-enabling'] as const) {
+      const blank = { classification, whyNow: '', alternatives: '', benefit: '' };
+      expect(missingJustification(blank), classification).toStrictEqual([]);
+    }
+  });
+
+  it('names every empty field for a classification that demands justification', () => {
+    for (const classification of [
+      'efficiency-upgrade',
+      'growth-experiment',
+      'convenience',
+      'premature-scale',
+    ] as const) {
+      const blank = { classification, whyNow: '', alternatives: '', benefit: '' };
+      expect(missingJustification(blank), classification).toStrictEqual([...JUSTIFICATION_FIELDS]);
+    }
+  });
+
+  it('treats whitespace as empty — a space is not a justification', () => {
+    expect(
+      missingJustification({ classification: 'convenience', ...filled, whyNow: '   ' }),
+    ).toStrictEqual(['whyNow']);
+  });
+
+  it('is satisfied when all three are filled', () => {
+    expect(missingJustification({ classification: 'premature-scale', ...filled })).toStrictEqual(
+      [],
+    );
+  });
+
+  it('agrees with requiresJustification for every classification, with no third answer', () => {
+    // The two functions must never disagree: a classification that requires
+    // justification and reports no gaps when blank would be the warning
+    // silently switched off for that category.
+    for (const classification of Object.keys(EXPENSE_CLASSIFICATIONS) as ExpenseClassification[]) {
+      const blank = { classification, whyNow: '', alternatives: '', benefit: '' };
+      expect(missingJustification(blank).length > 0, classification).toBe(
+        requiresJustification(classification),
+      );
     }
   });
 });

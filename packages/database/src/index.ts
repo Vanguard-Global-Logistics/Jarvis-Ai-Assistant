@@ -10,9 +10,12 @@
  *     account; `forge_items` (`docs/architecture/forge-architecture.md`), the
  *     build/dev watchtower's five-fact table; and `ledger_inputs` /
  *     `purchase_reviews` (`docs/architecture/ledger-architecture.md`), which
- *     carry NO account number, routing number, institution, or access token —
- *     Ledger has no bank connection, so the schema has nowhere to put a
- *     credential. AEGIS keeps its own hash-chained log outside this database.
+ *     have NO account-number, routing-number, institution, or access-token
+ *     COLUMN — Ledger has no bank connection. They do carry ten free-text
+ *     columns that would hold a credential if one were typed, which is why the
+ *     store refuses credential-shaped text before writing rather than relying
+ *     on the schema. AEGIS keeps its own hash-chained log outside this
+ *     database.
  *
  * Wired to Electron by ADR 0008: the main process — and only the main process —
  * opens the database and applies `migrations` at startup. The driver is Node's

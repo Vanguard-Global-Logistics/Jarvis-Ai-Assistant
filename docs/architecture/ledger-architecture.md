@@ -185,8 +185,17 @@ AEGIS capability.
 
 ## 9. What v1 deliberately does not do
 
-- **No bank integration of any kind** — no Plaid, no OAuth, no stored account or routing
-  number, no balance read from a live source. Every figure in §3 is person-entered.
+- **No bank integration of any kind** — no Plaid, no OAuth, no account-number or
+  routing-number COLUMN, no balance read from a live source. Every figure in §3 is
+  person-entered.
+
+  Stated precisely, because an earlier version of this bullet was not: what is absent is
+  the bank connection and every named credential field. What is NOT absent is somewhere a
+  credential could be typed — a purchase review carries ten free-text fields of up to
+  2,000 characters, and a routing number fits in one. Those are **guarded** by
+  `refuseIfCredential` in the store, over ten known formats. Guarded is a weaker claim
+  than impossible and it is the accurate one.
+
 - **No money movement, ever, in any version this document authorizes.** A future version
   that moves money is not an extension of Ledger v1 — it is a different system requiring
   its own William-level authorization, its own AEGIS capability, and its own review, per

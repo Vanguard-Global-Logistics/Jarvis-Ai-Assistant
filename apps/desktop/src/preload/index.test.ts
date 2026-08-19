@@ -102,11 +102,16 @@ const ALLOWED_API = [
   // record, and nothing more.
   //
   // What is NOT here is the security property. There is no `pay`, `transfer`,
-  // `send`, `subscribe`, `openCredit`, or `connectBank` on this bridge, and no
-  // function that accepts an account number, a routing number, or any
-  // credential. FINANCIAL-SURVIVAL-RULES rule 10 is held by ABSENCE — the
-  // capability was never built, so no bug can reach it. Adding one is a new
-  // ADR with its own independent review, never an edit to this list.
+  // `send`, `subscribe`, `openCredit`, or `connectBank` on this bridge.
+  // FINANCIAL-SURVIVAL-RULES rule 10's money-MOVEMENT half is held by ABSENCE
+  // — the capability was never built, so no bug can reach it. Adding one is a
+  // new ADR with its own independent review, never an edit to this list.
+  //
+  // Its credential half is NOT held by absence, and this comment used to say
+  // it was: `createPurchaseReview` takes nine free-text fields that would each
+  // hold an account number fine. Those are refused by a guard in the store,
+  // over ten known formats. Absence and a guard are different strengths of
+  // claim and this file should not blur them.
   //
   // `decidePurchaseReview` is separate from `createPurchaseReview` for the
   // same reason `approveForgeItem` is separate from `recordForgeEvidence`: a

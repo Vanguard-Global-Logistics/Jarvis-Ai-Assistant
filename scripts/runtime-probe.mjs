@@ -1444,6 +1444,66 @@ async function runChecks(page, mode, stub = null) {
     }),
   );
 
+  // A PERSON can reach both write channels. Every assertion above drives
+  // `window.jarvis` directly, which proves the IPC works and says nothing at
+  // all about whether the app has a surface that calls it — and Ledger v1
+  // shipped in exactly that state: two working, probe-verified channels with
+  // no human caller, so a launched build showed MISSING forever. Asserting the
+  // controls exist in the REAL rendered DOM is what closes that gap.
+  //
+  // The panel itself is behind a collapsed LEDGER toggle, which is deliberate —
+  // it is a side panel on an orb-centred screen, not a dashboard. So the probe
+  // opens it the way a person does, by clicking, rather than by reaching into
+  // React state. A check that had to bypass the UI to see the UI would be
+  // proving something else.
+  await page.evaluate(
+    `(() => {
+       const toggle = [...document.querySelectorAll('button')].find((b) =>
+         b.textContent.trim().startsWith('LEDGER'),
+       );
+       if (toggle && toggle.getAttribute('aria-expanded') === 'false') toggle.click();
+       return null;
+     })()`,
+  );
+  await new Promise((resolve) => setTimeout(resolve, 250));
+
+  const ledgerControls = await page.evaluate(
+    `(() => {
+       const labels = [...document.querySelectorAll('button')].map((b) => b.textContent.trim());
+       return { figures: labels.includes('ENTER FIGURES'), review: labels.includes('OPEN A REVIEW') };
+     })()`,
+  );
+  add(
+    'the Ledger panel offers a human BOTH write paths — not just the IPC',
+    ledgerControls.value?.figures === true && ledgerControls.value?.review === true,
+    JSON.stringify(ledgerControls.value),
+  );
+
+  // And the entry form really opens, with all seven terms in it. A button that
+  // renders is not a form that works; this is the difference between the two.
+  await page.evaluate(
+    `(() => {
+       const button = [...document.querySelectorAll('button')].find(
+         (b) => b.textContent.trim() === 'ENTER FIGURES',
+       );
+       if (button) button.click();
+       return null;
+     })()`,
+  );
+  await new Promise((resolve) => setTimeout(resolve, 250));
+  const ledgerFormFields = await page.evaluate(
+    `(() => {
+       const form = document.querySelector('form[aria-label="Enter figures"]');
+       if (!form) return { present: false, rows: 0 };
+       return { present: true, rows: form.querySelectorAll('input[inputmode="decimal"]').length };
+     })()`,
+  );
+  add(
+    'ENTER FIGURES opens the seven-term form in the real app',
+    ledgerFormFields.value?.present === true && ledgerFormFields.value?.rows === 7,
+    JSON.stringify(ledgerFormFields.value),
+  );
+
   // E2: the Experience Shell mounts the Orb. Assert the real component is
   // live — state, ARIA meaning, and its canvas — not merely that React
   // produced markup.

@@ -186,11 +186,18 @@ export const CHANNELS = {
    *
    * **Nothing on this boundary moves money, and nothing ever will.** There is
    * no channel here that transfers, pays, sends, opens credit, trades, changes
-   * bank details, or approves a subscription — and none that accepts an
-   * account number, a routing number, or any credential. That is
-   * FINANCIAL-SURVIVAL-RULES rule 10 held by ABSENCE: the capability was never
-   * built, so no bug, prompt injection, or careless edit can reach it. Adding
-   * one is a new ADR with its own independent review, never a quiet widening.
+   * bank details, or approves a subscription. That is FINANCIAL-SURVIVAL-RULES
+   * rule 10 held by ABSENCE: the capability was never built, so no bug, prompt
+   * injection, or careless edit can reach it. Adding one is a new ADR with its
+   * own independent review, never a quiet widening.
+   *
+   * A correction the first version of this comment needed: it also claimed no
+   * channel here accepts "an account number, a routing number, or any
+   * credential", which was not true of the TYPES. `ledger:create-review`
+   * carries nine free-text fields of up to 2,000 characters and any of them
+   * holds a credential fine. Credential CONTENT is refused by a guard in the
+   * store (`refuseIfCredential`), not by absence, and that guard knows ten
+   * formats rather than all of them.
    *
    * `ledger:get-inputs`/`set-inputs` carry the seven person-entered
    * Safe-to-Spend terms — figures a human types, never a bank feed.
