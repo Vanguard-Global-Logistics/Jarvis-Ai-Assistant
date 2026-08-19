@@ -1,13 +1,38 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import type { AmplifierResult, AutomationPlan, ChatReply, ChatRequest } from '@jarvis/contracts';
-import { AmplifierResultSchema, AutomationPlanSchema } from '@jarvis/contracts';
+import { AmplifierResultSchema, AutomationPlanSchema, findModel } from '@jarvis/contracts';
 import { AMPLIFIER_SYSTEM_PROMPT, buildAmplifierUserMessage } from '../amplifier/prompt.js';
 import { AUTOMATION_SYSTEM_PROMPT, buildAutomationUserMessage } from '../automation/prompt.js';
 import type { JarvisModelProvider } from './provider.js';
 
 /** Verified against the claude-api skill, 2026-07-17 (CLAUDE.md §5). */
 export const DEFAULT_MODEL = 'claude-opus-4-8';
+
+/**
+ * Build the per-request knobs that depend on WHICH model is answering.
+ *
+ * Two things are decided here, and both fail SOFT on purpose:
+ *
+ * - **`output_config.effort`** is sent only when the catalog says the model
+ *   takes it. Haiku 4.5 predates the parameter and returns an error for it, so
+ *   an unconditional effort would turn a cost saving into an outage. A model
+ *   the catalog has never heard of is assumed NOT to support it — the
+ *   conservative direction, because the cost of guessing wrong is a failed
+ *   call rather than a slightly dearer one.
+ * - **`cache_control`** marks the conversation prefix as cacheable. Caching is
+ *   a prefix match, so this is worth roughly 90% off the resent transcript —
+ *   which is the dominant cost in any conversation past a few turns.
+ *
+ * An unknown model gets neither, and still answers. That is the catalog's
+ * advisory rule (see `packages/contracts/src/model/catalog.ts`): a stale
+ * catalog must never stop Jarvis working.
+ */
+function knobsFor(model: string, effort: string | undefined): Record<string, unknown> {
+  const known = findModel(model);
+  if (known === undefined || effort === undefined || !known.supportsEffort) return {};
+  return { output_config: { effort } };
+}
 
 const MAX_TOKENS = 16000;
 
@@ -49,10 +74,21 @@ export class AnthropicProvider implements JarvisModelProvider {
   }
 
   public async chat(request: ChatRequest): Promise<ChatReply> {
+    const known = findModel(this.model);
     const response = await this.client.messages.create({
       model: this.model,
       max_tokens: MAX_TOKENS,
       thinking: { type: 'adaptive' },
+      ...knobsFor(this.model, request.effort),
+      // Cache the conversation prefix. The transcript is resent in full on
+      // every turn (there is no cap), so without this the cost of a
+      // conversation grows QUADRATICALLY — turn 50 pays for turns 1..50 again.
+      // Cached reads bill at roughly a tenth, which flattens that curve.
+      //
+      // Sent only when the catalog says the model supports it, and harmless
+      // when the catalog is wrong in the other direction: a model that ignores
+      // `cache_control` simply bills normally.
+      ...(known?.supportsCaching === true ? { cache_control: { type: 'ephemeral' } } : {}),
       messages: request.messages.map((m) => ({ role: m.role, content: m.content })),
     });
 

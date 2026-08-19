@@ -25,6 +25,22 @@ const EnvSchema = z.object({
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
 
   /**
+   * Which Claude model to ask for, e.g. `claude-sonnet-5`.
+   *
+   * Every other provider already had this; Anthropic alone was hardcoded to
+   * `claude-opus-4-8` — the dearest tier — with no way out but a code change,
+   * a rebuild, a repackage and a reinstall. That matters most on the day the id
+   * is RETIRED: CLAUDE.md §5 warns that "a stale ID in a permanent file is
+   * worse than no ID", and this repository has already lost a day to exactly
+   * that when Gemini's default was withdrawn for new accounts.
+   *
+   * Deliberately NOT validated against the model catalog. A new model id must
+   * work the moment Anthropic ships it, without waiting for this repo to
+   * learn about it.
+   */
+  JARVIS_ANTHROPIC_MODEL: z.string().min(1).optional(),
+
+  /**
    * A model running on this machine, exposed over an OpenAI-compatible
    * `/v1/chat/completions` endpoint — Ollama, LM Studio, llama.cpp server
    * (ADR 0015). Set this and Jarvis answers for free, offline, unlimited.

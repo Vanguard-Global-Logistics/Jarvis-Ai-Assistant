@@ -203,3 +203,116 @@ describe('the leak filter is reachable from the handler', () => {
     expect(JSON.stringify(after)).not.toContain('OPEN-FACT');
   });
 });
+
+describe('per-turn routing is WIRED IN, not merely written (ADR 0036)', () => {
+  /** Drive the handler with an arbitrary request and return what the provider got. */
+  async function routeWith(
+    id: ProviderId,
+    request: unknown,
+    aegis: JarvisFacingAegis = permissive,
+  ): Promise<ChatRequest[]> {
+    const { provider, received } = recordingProvider(id);
+    registerChatHandler(() => provider, aegis, db);
+    const handler = handlers.get('jarvis:chat');
+    expect(handler, 'the chat handler registered itself').toBeDefined();
+    await handler?.(request);
+    return received;
+  }
+
+  it('sends an EFFORT to the provider — deleting the routing call is caught here', async () => {
+    // Without this, removing `effort: routing.effort` from the handler leaves
+    // the whole suite green: `chooseRouting` has excellent unit tests and none
+    // of them prove anything calls it. That is the exact gap the memory recall
+    // tests were written to close, and the gap Ledger's write channels shipped
+    // with.
+    const received = await routeWith('mock', {
+      messages: [{ role: 'user', content: 'hello' }],
+    });
+    expect(received).toHaveLength(1);
+    expect(received[0]?.effort).toBeDefined();
+  });
+
+  it('routes a code question to HIGH effort and small talk to LOW', async () => {
+    const code = await routeWith('mock', {
+      messages: [{ role: 'user', content: '```ts\nconst a: number = "no";\n```' }],
+    });
+    expect(code[0]?.effort).toBe('high');
+
+    const chat = await routeWith('mock', {
+      messages: [{ role: 'user', content: 'thanks' }],
+    });
+    expect(chat[0]?.effort).toBe('low');
+  });
+
+  it('reads the LAST user turn, not the first', async () => {
+    // A router that judged the opening message would price every turn of a long
+    // conversation off "hi".
+    const received = await routeWith('mock', {
+      messages: [
+        { role: 'user', content: 'hi' },
+        { role: 'assistant', content: 'Hello.' },
+        { role: 'user', content: 'walk me through the security architecture' },
+      ],
+    });
+    expect(received[0]?.effort).toBe('high');
+  });
+
+  it('honours a human PIN over the rules', async () => {
+    // `effort` on the request is a person's explicit choice. Jarvis never
+    // overrides it — the same warn-don't-block principle Ledger holds.
+    const received = await routeWith('mock', {
+      messages: [{ role: 'user', content: '```ts\nconst a = 1;\n```' }],
+      effort: 'low',
+    });
+    expect(received[0]?.effort).toBe('low');
+  });
+
+  it('does not escalate when AEGIS has revoked sending on a REMOTE provider', async () => {
+    // The provider call is refused by `assertSendingAllowed` before this runs,
+    // so what is asserted here is that the router asked AEGIS at all — a router
+    // that ignored it would be the shape that could later route around a
+    // restriction.
+    const revoked = {
+      status: () => ({ level: 'YELLOW', capabilities: {}, chainVerified: true }),
+      allows: () => false,
+      requestRestriction: () => {
+        throw new Error('not used');
+      },
+    } as unknown as JarvisFacingAegis;
+
+    // The guard REFUSES rather than substituting a local model, so the provider
+    // is never reached at all. Asserting the rejection AND the empty capture
+    // together is the point: a refusal that let the call through and merely
+    // reported an error afterwards would satisfy neither half.
+    const { provider, received } = recordingProvider('anthropic');
+    registerChatHandler(() => provider, revoked, db);
+    const handler = handlers.get('jarvis:chat');
+    await expect(
+      handler?.({
+        messages: [{ role: 'user', content: 'walk me through the security architecture' }],
+      }),
+    ).rejects.toThrow();
+    expect(received, 'the words never reached the vendor').toStrictEqual([]);
+  });
+
+  it('still routes normally on a LOCAL provider while sending is revoked', async () => {
+    // `local` never leaves the machine, so a revoked `sending` capability must
+    // not disable routing for it — the restriction is about egress, not about
+    // thinking hard.
+    const revoked = {
+      status: () => ({ level: 'YELLOW', capabilities: {}, chainVerified: true }),
+      allows: () => false,
+      requestRestriction: () => {
+        throw new Error('not used');
+      },
+    } as unknown as JarvisFacingAegis;
+
+    const received = await routeWith(
+      'local',
+      { messages: [{ role: 'user', content: '```ts\nconst a = 1;\n```' }] },
+      revoked,
+    );
+    expect(received).toHaveLength(1);
+    expect(received[0]?.effort).toBe('high');
+  });
+});

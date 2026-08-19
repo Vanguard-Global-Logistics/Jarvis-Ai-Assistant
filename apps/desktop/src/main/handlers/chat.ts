@@ -1,5 +1,5 @@
 import type { ChatReply } from '@jarvis/contracts';
-import { jarvisChatContract } from '@jarvis/contracts';
+import { chooseRouting, jarvisChatContract, providerLeavesMachine } from '@jarvis/contracts';
 import type { JarvisModelProvider } from '@jarvis/jarvis-core';
 import type { JarvisFacingAegis } from '@jarvis/aegis';
 import type { SqliteDatabase } from '@jarvis/database';
@@ -52,7 +52,28 @@ export function registerChatHandler(
       // sent, rather than existing and being redacted on the way out.
       const messages = withRecall(request.messages, listMemories(db), provider.id);
 
-      return await provider.chat({ messages });
+      // Per-turn routing (ADR 0036). DETERMINISTIC — rules over the text, never
+      // a model call, for the same reason AEGIS forbids generative AI in its
+      // enforcement path and the Cost Governor is arithmetic rather than
+      // judgment: a classifier that decides spending would cost the very call
+      // it is trying to save, and would drift upward without explaining itself.
+      //
+      // It chooses TIER and EFFORT only, never a PROVIDER. The provider is the
+      // person's choice, and AEGIS's refusal above is untouched — this runs
+      // after `assertSendingAllowed` precisely so it can never be mistaken for
+      // a way around it.
+      //
+      // `request.effort` is a human PIN and wins outright; the rules only run
+      // when nobody has chosen.
+      const lastUserTurn = [...request.messages].reverse().find((m) => m.role === 'user');
+      const routing = chooseRouting({
+        prompt: lastUserTurn?.content ?? '',
+        turnCount: request.messages.length,
+        remoteAllowed: !providerLeavesMachine(provider.id) || aegis.allows('sending'),
+        ...(request.effort === undefined ? {} : { pinnedEffort: request.effort }),
+      });
+
+      return await provider.chat({ messages, effort: routing.effort });
     } catch (cause) {
       throw toSafeModelError(cause);
     }

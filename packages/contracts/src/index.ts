@@ -203,6 +203,29 @@ export type {
 } from './model/contracts.js';
 
 export {
+  CATALOG_VERIFIED_ON,
+  CatalogModelSchema,
+  MODEL_CATALOG,
+  estimateCostCents,
+  findModel,
+  modelsForProvider,
+} from './model/catalog.js';
+export type { CatalogModel } from './model/catalog.js';
+
+export {
+  EFFORT_LEVELS,
+  EFFORT_RANK,
+  EffortLevelSchema,
+  MODEL_TIERS,
+  ModelTierSchema,
+  TIER_RANK,
+} from './model/levels.js';
+export type { EffortLevel, ModelTier } from './model/levels.js';
+
+export { ROUTING_SOURCES, RoutingDecisionSchema, chooseRouting } from './model/routing.js';
+export type { RoutingDecision, RoutingInput, RoutingSource } from './model/routing.js';
+
+export {
   DEFAULT_PROFILE,
   PROFILE_ACCENTS,
   ProfileAccentSchema,

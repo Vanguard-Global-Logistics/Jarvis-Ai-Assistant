@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { EffortLevelSchema } from './levels.js';
 
 /**
  * Model contracts — the shapes that cross between the UI, the IPC boundary
@@ -61,6 +62,16 @@ export type ChatMessage = z.infer<typeof ChatMessageSchema>;
 export const ChatRequestSchema = z
   .object({
     messages: z.array(ChatMessageSchema).min(1),
+    /**
+     * How hard to think about THIS turn — the API's `output_config.effort`.
+     *
+     * Optional, and a provider that does not support it ignores it rather than
+     * failing: effort is an optimisation, and a model refusing to answer
+     * because a hint was unwelcome would be a worse outcome than a slightly
+     * dearer answer. Chosen per prompt by `chooseRouting`, or pinned by a
+     * person; either way the choice is SHOWN, never silent.
+     */
+    effort: EffortLevelSchema.optional(),
   })
   .strict();
 

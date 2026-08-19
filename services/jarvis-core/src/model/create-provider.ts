@@ -172,7 +172,7 @@ export function createProvider(env: Env): JarvisModelProvider {
 
   if (env.ANTHROPIC_API_KEY !== undefined && env.ANTHROPIC_API_KEY !== '') {
     log.info('model provider selected', { provider: 'anthropic' });
-    return new AnthropicProvider({ apiKey: env.ANTHROPIC_API_KEY });
+    return buildAnthropic(env);
   }
 
   // Gemini before the paid remotes: it is the only one that can answer for free,
@@ -209,7 +209,10 @@ function buildAnthropic(env: Env): JarvisModelProvider {
       'The anthropic provider was selected but ANTHROPIC_API_KEY is not set.',
     );
   }
-  return new AnthropicProvider({ apiKey });
+  return new AnthropicProvider({
+    apiKey,
+    ...(env.JARVIS_ANTHROPIC_MODEL === undefined ? {} : { model: env.JARVIS_ANTHROPIC_MODEL }),
+  });
 }
 
 /** How one provider looks to a UI that may offer it. */
