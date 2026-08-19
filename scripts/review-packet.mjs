@@ -114,6 +114,32 @@ const TOPICS = {
     ],
   },
 
+  ledger: {
+    label: 'Ledger v1 — the only module whose output a person spends money against',
+    paths: [
+      'apps/desktop/src/main/ledger',
+      'apps/desktop/src/main/handlers/ledger.ts',
+      'packages/contracts/src/ledger',
+      'packages/database/src/migrations/0009-ledger.ts',
+      'apps/desktop/src/renderer/src/experience/LedgerPanel.tsx',
+    ],
+    rules: [
+      'docs/architecture/ledger-architecture.md',
+      'reference/design-handoff/FINANCIAL-SURVIVAL-RULES.md',
+      'docs/DECISIONS/0035-ledger-v1-advisory-and-unable-to-move-money.md',
+    ],
+    questions: [
+      // The load-bearing one. If this is wrong, a person overdraws.
+      'Safe-to-Spend must NEVER read higher than the truth. Find any path — a rounding choice, a sign error, a term dropped from the formula, a state that should refuse but does not, a stale figure, a value that bypasses the schema, an integer overflow — by which the displayed figure could come out LARGER than the real available money.',
+      'The design claims MISSING refuses rather than counting as zero. Is that true on EVERY path, including the renderer? Could a person ever see a confident number built from a figure nobody supplied?',
+      'Deduction terms are constrained `>= 0` in Zod and in a database CHECK, because a negative deduction would add imaginary money. Find a way to get a negative deduction — or a negative-equivalent effect — into the stored row anyway.',
+      'Money is integer cents everywhere. Find any place a float, a string coercion, a JSON round-trip, or a locale-dependent format could corrupt an amount or display the wrong one.',
+      'The central claim is that Ledger CANNOT move money because the capability is absent rather than guarded. Try to falsify it: is there any code path, dependency, IPC channel, or piece of stored state that could be composed into a payment, a credential store, or a bank connection without new code?',
+      'A decision is not overwritable and `safeToSpendBeforeCents` is captured once. Is there a path that mutates a decided review, or that makes the historical figure misleading — a re-import, a migration, a direct write, a timestamp assumption?',
+      'This module gives financial advice to a family. Where could it be confidently WRONG in a way a non-expert would not catch — and what should it refuse to say that it currently says?',
+    ],
+  },
+
   model: {
     label: 'The model provider layer and credential handling',
     paths: [
