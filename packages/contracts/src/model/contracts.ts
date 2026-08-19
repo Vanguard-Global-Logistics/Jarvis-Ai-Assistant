@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { EffortLevelSchema } from './levels.js';
+import { EffortLevelSchema, ModelTierSchema } from './levels.js';
+import { RoutingDecisionSchema } from './routing.js';
 
 /**
  * Model contracts — the shapes that cross between the UI, the IPC boundary
@@ -72,6 +73,15 @@ export const ChatRequestSchema = z
      * person; either way the choice is SHOWN, never silent.
      */
     effort: EffortLevelSchema.optional(),
+    /**
+     * Which tier of the ACTIVE provider should answer — routed or pinned.
+     *
+     * Optional, and a provider with only one model ignores it. This is what
+     * makes `tier` real rather than decorative: the first version computed a
+     * tier, schema-validated it, rank-ordered it and asserted it across dozens
+     * of cases, then never read it, because the handler passed only `effort`.
+     */
+    tier: ModelTierSchema.optional(),
   })
   .strict();
 
@@ -85,6 +95,21 @@ export const ChatReplySchema = z
   .object({
     text: z.string().min(1),
     provider: z.enum(PROVIDER_IDS),
+    /**
+     * What the router decided for this turn, and why.
+     *
+     * Returned so the claim "the choice is SHOWN, never silent" is TRUE rather
+     * than aspirational. It was not: the first version computed a `why` on
+     * every turn and dropped it on the floor, while three comments and an ADR
+     * decision asserted accountability as the justification for the whole
+     * design. A router that silently changes what you pay for is a mocked
+     * feature by CLAUDE.md §8's definition, and the reply chip already exists
+     * to answer "which brain answered" — cost is the same entitlement.
+     *
+     * Optional because a provider may answer without routing (amplify and
+     * plan-automation do).
+     */
+    routing: RoutingDecisionSchema.optional(),
   })
   .strict();
 

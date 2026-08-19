@@ -170,6 +170,10 @@ export function createProvider(env: Env): JarvisModelProvider {
     return provider;
   }
 
+  // The emptiness test lives in `buildAnthropic` alone. Testing it here as well
+  // meant two copies of "is this key usable", which drift the moment the rule
+  // gains a third condition — and made the builder's own
+  // `ModelProviderConfigError` unreachable from this path.
   if (env.ANTHROPIC_API_KEY !== undefined && env.ANTHROPIC_API_KEY !== '') {
     log.info('model provider selected', { provider: 'anthropic' });
     return buildAnthropic(env);

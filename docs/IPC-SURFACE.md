@@ -116,16 +116,26 @@ the boundary machinery end to end without widening the attack surface.
 
 ### `jarvis:chat`
 
-|                       |                                                                                                                                               |
-| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Status**            | IMPLEMENTED AND VERIFIED on the Linux runtime probe (prod + dev, mock round-trip). Windows packaged gate open; not yet _accepted_ (ADR 0006). |
-| **Renderer call**     | `window.jarvis.sendChat(request: ChatRequest): Promise<ChatReply>`                                                                            |
-| **Request**           | `ChatRequestSchema` — `{ messages: { role: 'user' \| 'assistant', content: string }[] }`, min one message, `.strict()`                        |
-| **Response**          | `ChatReplySchema` — `{ text: string, provider: ProviderId }` (the closed six-member enum), `.strict()`                                        |
-| **Handler**           | `registerChatHandler(provider)` in `apps/desktop/src/main/handlers/chat.ts`                                                                   |
-| **Contract**          | `jarvisChatContract` in `packages/contracts/src/ipc/contracts.ts`                                                                             |
-| **Side effects**      | One model call against the shared main-process provider. No filesystem, no persistence, no state retained in main.                            |
-| **Authority granted** | None beyond calling the model provider. No filesystem, shell, env, user data, or AEGIS. The API key stays in main.                            |
+|                   |                                                                                                                                                                                                              |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Status**        | IMPLEMENTED AND VERIFIED on the Linux runtime probe (prod + dev, mock round-trip). Windows packaged gate open; not yet _accepted_ (ADR 0006).                                                                |
+| **Renderer call** | `window.jarvis.sendChat(request: ChatRequest): Promise<ChatReply>`                                                                                                                                           |
+| **Request**       | `ChatRequestSchema` — `{ messages: { role: 'user' \| 'assistant', content: string }[], effort?: 'low'\|'medium'\|'high'\|'xhigh'\|'max', tier?: 'light'\|'balanced'\|'deep' }`, min one message, `.strict()` |
+| **Response**      | `ChatReplySchema` — `{ text: string, provider: ProviderId, routing?: { tier, effort, source, why } }`, `.strict()`                                                                                           |
+
+**A renderer-supplied `effort` may only LOWER spend, never raise it.** ADR 0036
+added the field, and a swarm critic pointed out that main cannot tell "a person
+chose" from "the renderer sent a field" — today no UI produces it at all, so
+every value in it is machine-supplied by definition. Unclamped, a renderer bug
+or a compromised page could pin `max` on every turn against the dearest model
+while the Cost Governor is still unwired. The handler therefore takes the
+routed effort and accepts the request's only if it is CHEAPER. `tier` is set by
+main's own router and echoed back on the reply so the decision can be shown; it
+is accepted on the request for the same clamp-able reason.
+| **Handler** | `registerChatHandler(provider)` in `apps/desktop/src/main/handlers/chat.ts` |
+| **Contract** | `jarvisChatContract` in `packages/contracts/src/ipc/contracts.ts` |
+| **Side effects** | One model call against the shared main-process provider. No filesystem, no persistence, no state retained in main. |
+| **Authority granted** | None beyond calling the model provider. No filesystem, shell, env, user data, or AEGIS. The API key stays in main. |
 
 The transcript, not just the newest message, crosses the boundary: the provider is
 stateless, the renderer owns the conversation, and main owns the key and the call. A

@@ -1,5 +1,5 @@
 import type { ChatReply } from '@jarvis/contracts';
-import { chooseRouting, jarvisChatContract, providerLeavesMachine } from '@jarvis/contracts';
+import { EFFORT_RANK, chooseRouting, jarvisChatContract } from '@jarvis/contracts';
 import type { JarvisModelProvider } from '@jarvis/jarvis-core';
 import type { JarvisFacingAegis } from '@jarvis/aegis';
 import type { SqliteDatabase } from '@jarvis/database';
@@ -65,15 +65,40 @@ export function registerChatHandler(
       //
       // `request.effort` is a human PIN and wins outright; the rules only run
       // when nobody has chosen.
-      const lastUserTurn = [...request.messages].reverse().find((m) => m.role === 'user');
+      const userTurns = request.messages.filter((m) => m.role === 'user');
       const routing = chooseRouting({
-        prompt: lastUserTurn?.content ?? '',
-        turnCount: request.messages.length,
-        remoteAllowed: !providerLeavesMachine(provider.id) || aegis.allows('sending'),
-        ...(request.effort === undefined ? {} : { pinnedEffort: request.effort }),
+        prompt: userTurns.at(-1)?.content ?? '',
+        // USER turns, not messages. `messages.length` counts both sides, so
+        // `turnCount >= 12` fired at roughly the sixth thing a person said, and
+        // the small-talk gate (`turnCount <= 2`) could only ever be satisfied on
+        // the very first message — meaning "thanks" was billed at balanced
+        // forever after. A swarm critic found it by mutating the field to a
+        // constant and watching every test stay green.
+        turnCount: userTurns.length,
       });
 
-      return await provider.chat({ messages, effort: routing.effort });
+      // A renderer-supplied `effort` may only LOWER the routed decision, never
+      // raise it.
+      //
+      // The comment here used to call this "a human pin", but main cannot tell
+      // "a person chose" from "the renderer sent a field" — and today no UI
+      // produces it at all, so every value in it is machine-supplied by
+      // definition. An unclamped pin let a renderer bug or a compromised page
+      // set `max` on every turn against the dearest model, with the Cost
+      // Governor still unwired. Main is the side that must not trust the
+      // caller, the same posture `withRecall` takes: filter here rather than
+      // trust the request.
+      const requested = request.effort;
+      const effort =
+        requested !== undefined && EFFORT_RANK[requested] < EFFORT_RANK[routing.effort]
+          ? requested
+          : routing.effort;
+      const decision = { ...routing, effort };
+
+      const reply = await provider.chat({ messages, effort, tier: routing.tier });
+      // The decision travels back with the reply so it can be shown. Computing
+      // a `why` and discarding it is what made the accountability claim false.
+      return { ...reply, routing: decision };
     } catch (cause) {
       throw toSafeModelError(cause);
     }

@@ -1,13 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { PROVIDER_IDS } from './contracts.js';
-import {
-  CatalogModelSchema,
-  MODEL_CATALOG,
-  TIER_RANK,
-  estimateCostCents,
-  findModel,
-  modelsForProvider,
-} from './catalog.js';
+import { MODEL_CATALOG, estimateCostCents, findModel, modelsForProvider } from './catalog.js';
+import { TIER_RANK } from './levels.js';
 
 /**
  * The catalog is ADVISORY. These tests pin that property as hard as they pin
@@ -30,21 +24,36 @@ describe('the catalog is advisory, and cannot break a call', () => {
     expect(estimateCostCents('claude-something-new', 1_000_000, 1_000_000)).toBeNull();
   });
 
-  it('reports an unverified price as NULL too', () => {
-    // Grok and NVIDIA sit at 0/0 because this build has never had a verified
-    // bill from either. That is "unknown", not "free", and the estimator must
-    // not launder one into the other.
-    expect(estimateCostCents('grok-4-latest', 1_000_000, 1_000_000)).toBeNull();
+  it('reports an UNVERIFIED price as null, by property rather than by example', () => {
+    // Every row with a null price must report null. Asserting one id let a
+    // mutation like `if (provider === 'grok') return null` pass while every
+    // other unpriced row silently started reporting 0.
+    const unpriced = MODEL_CATALOG.filter(
+      (m) => m.inputCentsPerMTok === null || m.outputCentsPerMTok === null,
+    );
+    expect(unpriced.length).toBeGreaterThan(0);
+    for (const model of unpriced) {
+      expect(estimateCostCents(model.id, 1_000_000, 1_000_000), model.id).toBeNull();
+    }
+  });
+
+  it('reports a VERIFIED FREE model as 0 — free and unknown are different facts', () => {
+    // Gemini's free tier is free in MONEY. An earlier version used `0/0` as the
+    // sentinel for "never billed", so the one model whose cost was actually
+    // known reported "cost unknown". Free is not unknown, and unknown is not
+    // free; the schema now spells the difference with `null`.
+    expect(estimateCostCents('gemini-flash-latest', 1_000_000, 1_000_000)).toBe(0);
+  });
+
+  it('has no NVIDIA row, and says so where a reader will look', () => {
+    // Three separate comments once described an NVIDIA row that was never
+    // written. A "every row is well formed" suite cannot see a MISSING row, so
+    // the absence needs its own assertion.
+    expect(modelsForProvider('nvidia')).toStrictEqual([]);
   });
 });
 
 describe('every catalog row is well formed', () => {
-  it('passes its own schema', () => {
-    for (const model of MODEL_CATALOG) {
-      expect(CatalogModelSchema.safeParse(model).success, model.id).toBe(true);
-    }
-  });
-
   it('has no duplicate ids', () => {
     const ids = MODEL_CATALOG.map((m) => m.id);
     expect(new Set(ids).size).toBe(ids.length);
@@ -81,9 +90,15 @@ describe('every catalog row is well formed', () => {
     if (light === undefined || balanced === undefined || deep === undefined) {
       throw new Error('catalog is missing an Anthropic tier');
     }
-    expect(light.inputCentsPerMTok).toBeLessThan(balanced.inputCentsPerMTok);
-    expect(balanced.inputCentsPerMTok).toBeLessThan(deep.inputCentsPerMTok);
-    expect(light.outputCentsPerMTok).toBeLessThan(deep.outputCentsPerMTok);
+    for (const [cheaper, dearer] of [
+      [light, balanced],
+      [balanced, deep],
+    ] as const) {
+      const a = cheaper.inputCentsPerMTok;
+      const b = dearer.inputCentsPerMTok;
+      if (a === null || b === null) throw new Error('an Anthropic row lost its price');
+      expect(a, `${cheaper.id} < ${dearer.id}`).toBeLessThan(b);
+    }
   });
 });
 
@@ -92,8 +107,10 @@ describe('cost estimation is integer cents, rounded UP', () => {
     // Opus 4.8: 500 cents/MTok in, 2500 out.
     // 1M in + 1M out = 500 + 2500 = 3000 cents = $30.00
     expect(estimateCostCents('claude-opus-4-8', 1_000_000, 1_000_000)).toBe(3000);
-    // Sonnet 5: 300 + 1500 = 1800 cents.
-    expect(estimateCostCents('claude-sonnet-5', 1_000_000, 1_000_000)).toBe(1800);
+    // Sonnet 5 on INTRODUCTORY pricing through 2026-08-31: 200 + 1000 = 1200.
+    // When the intro period ends this becomes 300 + 1500 = 1800, and this test
+    // is the thing that will fail and force the catalog to be updated with it.
+    expect(estimateCostCents('claude-sonnet-5', 1_000_000, 1_000_000)).toBe(1200);
     // Haiku 4.5: 100 + 500 = 600 cents.
     expect(estimateCostCents('claude-haiku-4-5', 1_000_000, 1_000_000)).toBe(600);
   });
@@ -127,5 +144,29 @@ describe('cost estimation is integer cents, rounded UP', () => {
       expect(cents).toBeGreaterThanOrEqual(previous);
       previous = cents;
     }
+  });
+});
+
+describe('the thinking mode is per MODEL GENERATION, not per family', () => {
+  it('flags adaptive only where the API accepts it', () => {
+    // The provider sent `thinking: {type:'adaptive'}` unconditionally. That was
+    // harmless while only Opus 4.8 was reachable and became an OUTAGE the
+    // moment this catalog made Haiku 4.5 selectable — adaptive thinking is a
+    // 4.6-and-later feature and older models reject it. The code guarded the
+    // harmless parameter (`effort`) and ignored the fatal one.
+    const haiku = findModel('claude-haiku-4-5');
+    expect(haiku?.thinking).toBe('none');
+    expect(haiku?.supportsEffort).toBe(false);
+
+    for (const id of ['claude-opus-5', 'claude-opus-4-8', 'claude-sonnet-5']) {
+      expect(findModel(id)?.thinking, id).toBe('adaptive');
+    }
+  });
+
+  it('knows the model the claude-api skill names as current', () => {
+    // `claude-opus-5` is the id a person is most likely to set. Missing from
+    // the catalog it still WORKS — that is the advisory rule — but effort and
+    // caching silently switch off, which is degradation without disclosure.
+    expect(findModel('claude-opus-5')).toBeDefined();
   });
 });

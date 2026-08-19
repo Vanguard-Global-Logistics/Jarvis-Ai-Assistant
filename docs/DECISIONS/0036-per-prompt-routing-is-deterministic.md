@@ -52,39 +52,55 @@ token spend on the SAME model. It is orthogonal to which model answers.
    dangerous thing this module could produce"). A router that spends money is the
    same class of decision.
 
-5. **Every decision carries a `why`, and the schema requires it.** A router that
-   silently changes what you are paying for is a mocked feature by CLAUDE.md §8's
-   definition: it looks like intelligence and is unaccountable. If it cannot say
-   why, it does not get to choose.
+5. **Every decision carries a `why`, the schema requires it, and it is RETURNED
+   ON THE REPLY.** A router that silently changes what you are paying for is a
+   mocked feature by CLAUDE.md §8's definition: it looks like intelligence and
+   is unaccountable.
+
+   The first version computed a `why` on every turn and dropped it on the floor
+   — `ChatReplySchema` was `{ text, provider }` — while three separate comments
+   and this decision asserted accountability as the justification for the whole
+   design. Three critics caught it independently. `ChatReply` now carries the
+   decision. **What is still true: no renderer surface RENDERS it yet.** The
+   channel carries it; the chip does not show it. That is a UI gap, not a
+   fabricated claim, and it is listed below.
 
 6. **A human pin always wins.** `effort` on the request is a person's explicit
    choice and the rules do not run. Same principle as Ledger's warn-don't-block:
    Jarvis advises about someone's own money; it does not overrule them.
 
-7. **The router chooses TIER and EFFORT — never a PROVIDER.** This is what keeps
-   it out of AEGIS's way, and the distinction was nearly lost. An earlier draft
-   had the AEGIS clamp "downgrade to what can run on this machine", which is
-   precisely the substitution `sending-guard.ts` refuses to make: _"someone who
-   believes they are restricted, and is quietly answered anyway, has been told a
-   comfortable lie by the one subsystem that exists to not tell them."_ The
-   refusal still happens where it always did, at the provider boundary,
+7. **The router chooses TIER and EFFORT — never a PROVIDER.** The provider is
+   the person's choice, and AEGIS's refusal at the provider boundary is
    untouched. The router runs AFTER `assertSendingAllowed` so it can never be
    mistaken for a way around it.
 
-8. **The AEGIS clamp is ONE-WAY, and exists before the capability it guards.**
-   When sending is revoked the clamp can only lower a decision, never raise one,
-   and there is no override flag. Today that mostly saves pointless effort on a
-   call about to be refused. It is written and tested now so that if a future
-   version ever does let the router pick among providers, the shape that could
-   route around a restriction is already closed. `chooseRouting` takes
-   `remoteAllowed` as a caller-supplied boolean rather than reading AEGIS itself,
-   because `packages/contracts` must not depend on the security engine
-   (CLAUDE.md §2, enforced by ESLint).
+8. **There is NO AEGIS clamp in the router, and the first version's was dead
+   code dressed as a security control.** `chooseRouting` took a `remoteAllowed`
+   flag and lowered every decision when it was false. At the only call site that
+   flag was UNCONDITIONALLY TRUE — `assertSendingAllowed` throws first for
+   exactly the inputs that would have made it false — so the branch was
+   unreachable and the handler test claiming to exercise it passed because the
+   guard threw. Hardcoding `remoteAllowed: true` left all 18 tests green, which
+   is how it was proven rather than argued.
 
-9. **Prompt caching is on for models that support it.** The transcript is resent
-   in full every turn — `ChatRequestSchema` has no cap — so cost grows
-   QUADRATICALLY. Cached reads bill at roughly a tenth, which flattens the curve
-   without changing a single answer.
+   Worse, computing the flag wrote the security predicate
+   `providerLeavesMachine(id) && !aegis.allows('sending')` out a SECOND time, in
+   a second file, where nothing could catch it drifting from `sending-guard.ts`.
+   A duplicated security rule whose false branch no test can reach is worse than
+   no rule. Both are gone. **The previous version of this ADR argued at length
+   for keeping the clamp "before the capability exists"; that argument was
+   wrong, and the mechanism it defended protected nothing.**
+
+9. **A renderer-supplied `effort` may only LOWER spend.** Decision 6 above
+   called it "a human pin", and main cannot tell a person from a renderer —
+   today no UI produces the field at all, so every value in it is
+   machine-supplied. It is now clamped: the request's effort is accepted only
+   when it is cheaper than the routed one.
+
+10. **Prompt caching is on for models that support it.** The transcript is resent
+    in full every turn — `ChatRequestSchema` has no cap — so cost grows
+    QUADRATICALLY. Cached reads bill at roughly a tenth, which flattens the curve
+    without changing a single answer.
 
 ## The signals, and their deliberate asymmetry
 
@@ -113,28 +129,86 @@ early AND chatty — all three.
 - **It does not feed the Cost Governor yet.** `estimateCostCents` exists and is
   tested; nothing calls it from a screen. Wiring real spend to the Governor is
   the obvious next step and is NOT claimed here.
+- **No UI shows the routing decision, and no UI can pin one.** The reply now
+  carries `routing`, and nothing renders it; `effort` is accepted on the request
+  and no renderer sends it. Both are wired end to end in main and untouched by
+  the renderer.
+- **`npm run check:model` cannot test Anthropic.** Its provider table assumes an
+  OpenAI-compatible `/chat/completions`; Anthropic uses a different endpoint,
+  auth header and body shape. A row there would report wrongly, which is worse
+  than no row. Declined deliberately, not overlooked.
 
 ## Verification
 
-`npm run verify` — 1091 tests / 67 files green (was 1055). `npm run build` green
-with the artifact assertion. `npm run probe:runtime` green.
+`npm run verify` — **1114 tests / 67 files green** (1055 before this work).
+`npm run build` green with the artifact assertion. `npm run probe:runtime` green.
 
-**Red-green, each mutant named** (CLAUDE.md's instrument for correctness work):
+**Red-green, each mutant named.** The first version of this table listed five
+mutants; two of them were against code that no longer exists, because the swarm
+proved that code unreachable.
 
-| Break                                               | Checks red |
-| --------------------------------------------------- | ---------- |
-| AEGIS clamp removed from the pinned path            | 1          |
-| `restrict()` allowed to RAISE instead of only lower | 3          |
-| unknown cost reported as `0` instead of `null`      | 1          |
-| handler stops passing `effort` to the provider      | 5          |
-| handler stops honouring the human pin               | 1          |
+| Break                                              | Checks red |
+| -------------------------------------------------- | ---------- |
+| handler stops passing `effort` to the provider     | 5          |
+| handler stops honouring a request's cheaper effort | 1          |
+| unknown cost reported as `0` instead of `null`     | 1          |
+| tier no longer selects a model in the provider     | 1          |
+| adaptive thinking sent to a pre-4.6 model          | 1          |
+| `effort` sent to a model that rejects it           | 1          |
+| the small-talk rule deleted                        | 1          |
+| the long-conversation rule deleted                 | 2          |
+| the turn-count threshold moved from 12             | 1          |
+| substring matching restored on either signal list  | 2          |
 
-The fourth row is the one that matters most. `chooseRouting` has thorough unit
-tests and **not one of them proves anything calls it** — deleting the wiring
-would have left the router a beautifully tested function with no caller, which
-is the exact defect Ledger's write channels shipped with and Memory's recall
-shipped with before that. The handler tests assert on the `ChatRequest` the
-provider ACTUALLY RECEIVED, which is the closest this layer gets to the wire.
+## What five read-only critics found, and what it says about the first version
+
+All five returned FIX. Recording them because the pattern matters more than any
+one defect, and because two of them were false claims this ADR itself made.
+
+- **A dead AEGIS clamp presented as a security control** (decision 8 above).
+  Proven unreachable by hardcoding the flag and watching 18 tests stay green.
+- **"The choice is SHOWN, never silent" was false** in three comments and one
+  decision, while `ChatReply` carried no routing at all (decision 5).
+- **`tier` was computed, schema-validated, rank-ordered, asserted across dozens
+  of cases — and read by nothing.** The ADR named that exact defect ("a
+  beautifully tested function with no caller… Ledger's write channels… Memory's
+  recall") in one paragraph and shipped a fresh instance of it in the next. Tier
+  now selects the model, with a provider test asserting the id on the wire.
+- **An outage introduced by the catalog itself.** `thinking: {type:'adaptive'}`
+  was sent unconditionally — harmless while only Opus 4.8 was reachable, and
+  fatal the moment Haiku 4.5 became selectable, because adaptive thinking is
+  4.6-and-later. The code carefully guarded the harmless parameter (`effort`)
+  and ignored the fatal one. `thinking` is now a per-row catalog capability.
+- **Both signal lists matched substrings.** `tax` fired inside "syntax", so a
+  routine question paid the dearest tier; `no` fired inside "cannot" and `ok`
+  inside "broke", so _"The build broke and I cannot tell what happened"_ — ten
+  words, a real failure report — routed to the CHEAPEST model. Both directions
+  verified in a REPL before fixing. Now word-boundary matched, with negative
+  tests in both directions.
+- **`turnCount` was `messages.length`**, counting both sides. `turnCount >= 12`
+  fired at roughly the sixth thing a person said, and the small-talk gate could
+  only ever be met on the very first message. Now user turns, with a
+  23-message/12-turn handler test.
+- **Three routing branches could be deleted with a green suite**, because their
+  tests asserted a `tier` value the neighbouring branch also returned. Now every
+  rule has a prompt only it can satisfy and asserts on `why`.
+- **The provider had no tests for anything this change added.** The existing
+  `objectContaining` matcher is structurally blind to a key being added or
+  removed.
+- **Sonnet 5 was priced at its sticker $3/$15** while introductory $2/$10 is in
+  effect through 2026-08-31 — a 50% overstatement, in a table whose header said
+  "verified" on the day it was written.
+- **`claude-opus-5` was missing** — the id a person is most likely to set, which
+  silently disabled effort and caching rather than failing loudly.
+- **`.env.example` never mentioned `JARVIS_ANTHROPIC_MODEL`**, so the
+  retirement-day escape hatch this whole ADR is justified by was undiscoverable
+  in the file people actually read.
+
+**Declined, with reasons.** `npm run check:model` gets no Anthropic row: its
+table assumes an OpenAI-compatible `/chat/completions`, and Anthropic differs in
+endpoint, auth header and body shape, so a row there would report wrongly. The
+Haiku price of $1/$5 was challenged as unsourced; it is in the `claude-api`
+skill's table and stands.
 
 ## Review — OUTSTANDING
 

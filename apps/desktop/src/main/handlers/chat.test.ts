@@ -257,14 +257,51 @@ describe('per-turn routing is WIRED IN, not merely written (ADR 0036)', () => {
     expect(received[0]?.effort).toBe('high');
   });
 
-  it('honours a human PIN over the rules', async () => {
-    // `effort` on the request is a person's explicit choice. Jarvis never
-    // overrides it — the same warn-don't-block principle Ledger holds.
+  it('lets a request LOWER the effort', async () => {
     const received = await routeWith('mock', {
       messages: [{ role: 'user', content: '```ts\nconst a = 1;\n```' }],
       effort: 'low',
     });
     expect(received[0]?.effort).toBe('low');
+  });
+
+  it('REFUSES to let a request RAISE the effort — main does not trust the caller', async () => {
+    // Not "a human pin": main cannot distinguish a person from the renderer,
+    // and today no UI produces this field at all, so every value in it is
+    // machine-supplied. Unclamped, a renderer bug or a compromised page could
+    // set `max` on every turn against the dearest model with no budget wired.
+    const received = await routeWith('mock', {
+      messages: [{ role: 'user', content: 'thanks' }],
+      effort: 'max',
+    });
+    expect(received[0]?.effort).toBe('low');
+  });
+
+  it('returns the routing decision so it can be SHOWN, not silently applied', async () => {
+    const { provider } = recordingProvider('mock');
+    registerChatHandler(() => provider, permissive, db);
+    const handler = handlers.get('jarvis:chat');
+    const reply = (await handler?.({
+      messages: [{ role: 'user', content: '```ts\nconst a = 1;\n```' }],
+    })) as { routing?: { why: string; effort: string } };
+    expect(reply.routing?.why).toBe('Contains code or a stack trace.');
+    expect(reply.routing?.effort).toBe('high');
+  });
+
+  it('routes a long conversation by USER turns, not by message count', async () => {
+    // `messages.length` counted both sides, so `turnCount >= 12` fired at the
+    // sixth thing a person said and the small-talk gate could only ever be met
+    // on the very first message. Twelve user turns interleaved with eleven
+    // assistant replies is 23 messages but 12 turns.
+    const messages: { role: 'user' | 'assistant'; content: string }[] = [];
+    for (let i = 0; i < 11; i += 1) {
+      messages.push({ role: 'user', content: `q${String(i)}` });
+      messages.push({ role: 'assistant', content: `a${String(i)}` });
+    }
+    messages.push({ role: 'user', content: 'and the other one?' });
+    const received = await routeWith('mock', { messages });
+    expect(received[0]?.effort).toBe('medium');
+    expect(received[0]?.tier).toBe('balanced');
   });
 
   it('does not escalate when AEGIS has revoked sending on a REMOTE provider', async () => {

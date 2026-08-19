@@ -3,16 +3,6 @@ import { PROVIDER_IDS } from './contracts.js';
 import type { ProviderId } from './contracts.js';
 import { ModelTierSchema, TIER_RANK } from './levels.js';
 
-export {
-  EFFORT_LEVELS,
-  EFFORT_RANK,
-  EffortLevelSchema,
-  MODEL_TIERS,
-  ModelTierSchema,
-  TIER_RANK,
-} from './levels.js';
-export type { EffortLevel, ModelTier } from './levels.js';
-
 /**
  * The model catalog — every model Jarvis knows how to name, what it costs, and
  * how hard it can be asked to think.
@@ -40,7 +30,13 @@ export type { EffortLevel, ModelTier } from './levels.js';
  * worse failure than an out-of-date price.
  */
 
-/** Prices verified against the `claude-api` skill on 2026-08-19. */
+/**
+ * Prices and model ids taken from the `claude-api` skill on 2026-08-19.
+ *
+ * Read by nothing — deliberately kept as a comment-adjacent constant so a
+ * reader can date the table. If it ever becomes load-bearing it needs a test
+ * that fails when a price changes without it.
+ */
 export const CATALOG_VERIFIED_ON = '2026-08-19';
 
 /**
@@ -58,14 +54,40 @@ export const CatalogModelSchema = z
     /** What a person calls it. */
     label: z.string().min(1),
     tier: ModelTierSchema,
-    /** Integer cents per million input tokens. */
-    inputCentsPerMTok: z.number().int().min(0),
-    /** Integer cents per million output tokens. */
-    outputCentsPerMTok: z.number().int().min(0),
+    /**
+     * Integer cents per million input tokens — `null` when NOBODY KNOWS.
+     *
+     * Nullable rather than sentinel-zero, because an earlier version made `0`
+     * mean two contradictory things in one array: Gemini is genuinely free in
+     * money, while Grok and NVIDIA are merely unbilled-so-far. The estimator
+     * then reported "cost unknown" for the one model whose cost was known.
+     * `safeToSpend`'s rule, applied to the data model rather than to a comment
+     * above a row: unknown is not zero, and it must not be spellable as zero.
+     */
+    inputCentsPerMTok: z.number().int().min(0).nullable(),
+    /** Integer cents per million output tokens. `null` when nobody knows. */
+    outputCentsPerMTok: z.number().int().min(0).nullable(),
     /** Whether `output_config.effort` is accepted. Unknown models: assumed false. */
     supportsEffort: z.boolean(),
     /** Whether prompt caching is available on this model. */
     supportsCaching: z.boolean(),
+    /**
+     * How this model wants to be asked to think — the one request field that
+     * varies by model GENERATION, and the one nothing described.
+     *
+     * `adaptive` is 4.6-and-later. Older models take
+     * `{type:'enabled', budget_tokens}` and **400 on adaptive**. The provider
+     * sent `thinking: {type:'adaptive'}` unconditionally, which was harmless
+     * while only Opus 4.8 was reachable — and became an outage the moment this
+     * catalog made Haiku 4.5 selectable. A swarm critic caught it by noticing
+     * the code carefully guarded the harmless parameter (`effort`) and ignored
+     * the fatal one.
+     *
+     * `none` means: send no `thinking` field at all. That is also what an
+     * UNKNOWN model gets, because omitting a field is the fail-soft direction —
+     * a slightly less thoughtful answer beats a rejected request.
+     */
+    thinking: z.enum(['adaptive', 'none']),
   })
   .strict();
 
@@ -84,6 +106,17 @@ export type CatalogModel = z.infer<typeof CatalogModelSchema>;
 export const MODEL_CATALOG: readonly CatalogModel[] = [
   // ---- Anthropic. Usage-billed; conversations leave the machine.
   {
+    id: 'claude-opus-5',
+    provider: 'anthropic',
+    label: 'Opus 5',
+    tier: 'deep',
+    inputCentsPerMTok: 500,
+    outputCentsPerMTok: 2500,
+    supportsEffort: true,
+    supportsCaching: true,
+    thinking: 'adaptive',
+  },
+  {
     id: 'claude-opus-4-8',
     provider: 'anthropic',
     label: 'Opus 4.8',
@@ -92,16 +125,24 @@ export const MODEL_CATALOG: readonly CatalogModel[] = [
     outputCentsPerMTok: 2500,
     supportsEffort: true,
     supportsCaching: true,
+    thinking: 'adaptive',
   },
   {
     id: 'claude-sonnet-5',
     provider: 'anthropic',
     label: 'Sonnet 5',
     tier: 'balanced',
-    inputCentsPerMTok: 300,
-    outputCentsPerMTok: 1500,
+    // INTRODUCTORY pricing, $2/$10 per MTok, through 2026-08-31. The sticker
+    // price is $3/$15 and these numbers must be raised to 300/1500 when the
+    // intro period ends — an estimate that is 50% low is the wrong direction
+    // for a figure a person budgets against, so this row has an expiry a human
+    // has to honour. First written as the sticker price and caught by a swarm
+    // critic reading the pricing source rather than the table.
+    inputCentsPerMTok: 200,
+    outputCentsPerMTok: 1000,
     supportsEffort: true,
     supportsCaching: true,
+    thinking: 'adaptive',
   },
   {
     id: 'claude-haiku-4-5',
@@ -110,9 +151,12 @@ export const MODEL_CATALOG: readonly CatalogModel[] = [
     tier: 'light',
     inputCentsPerMTok: 100,
     outputCentsPerMTok: 500,
-    // Haiku 4.5 predates the effort parameter; sending it returns an error.
+    // Haiku 4.5 predates BOTH the effort parameter and adaptive thinking.
+    // Sending either returns an error, which is why both are flagged off here
+    // rather than assumed from the family name.
     supportsEffort: false,
     supportsCaching: true,
+    thinking: 'none',
   },
 
   // ---- Gemini. Free in MONEY only — never describe it as private
@@ -123,25 +167,32 @@ export const MODEL_CATALOG: readonly CatalogModel[] = [
     provider: 'gemini',
     label: 'Gemini Flash',
     tier: 'light',
+    // Genuinely free in MONEY — a verified zero, not an unknown. Never
+    // "private": free-tier traffic to consumer AI APIs is commonly used to
+    // improve the provider's products (CLAUDE.md §5).
     inputCentsPerMTok: 0,
     outputCentsPerMTok: 0,
     supportsEffort: false,
     supportsCaching: false,
+    thinking: 'none',
   },
 
-  // ---- xAI and NVIDIA: usage-billed and fixed-pool respectively. Priced at 0
-  // because this build has never had a verified bill from either, and inventing
-  // a number would be exactly the fabrication this repo forbids. The UI reports
-  // "cost unknown" rather than "free".
+  // ---- xAI. Usage-billed, and priced `null` because this build has never had
+  // a verified bill from it — inventing a number would be the fabrication
+  // CLAUDE.md §8 forbids, and reporting `0` would launder "unknown" into
+  // "free". NVIDIA has no row at all: an earlier version of this comment
+  // claimed one, which is why `modelsForProvider('nvidia')` returning `[]` now
+  // has its own test.
   {
     id: 'grok-4-latest',
     provider: 'grok',
     label: 'Grok 4',
     tier: 'balanced',
-    inputCentsPerMTok: 0,
-    outputCentsPerMTok: 0,
+    inputCentsPerMTok: null,
+    outputCentsPerMTok: null,
     supportsEffort: false,
     supportsCaching: false,
+    thinking: 'none',
   },
 ];
 
@@ -183,9 +234,11 @@ export function estimateCostCents(
 ): number | null {
   const model = findModel(modelId);
   if (model === undefined) return null;
-  // A priced-at-zero row means "we have never verified a bill for this", which
-  // is also not a claim that it is free.
-  if (model.inputCentsPerMTok === 0 && model.outputCentsPerMTok === 0) return null;
+  // `null` on either side means nobody has verified a bill for this model. Zero
+  // is a real price and is reported as such — Gemini's free tier is free in
+  // MONEY, and saying "unknown" about it would be as wrong as saying "free"
+  // about Grok.
+  if (model.inputCentsPerMTok === null || model.outputCentsPerMTok === null) return null;
 
   const input = Math.max(0, Math.trunc(inputTokens));
   const output = Math.max(0, Math.trunc(outputTokens));

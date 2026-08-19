@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { EFFORT_LEVELS, EFFORT_RANK, MODEL_TIERS, TIER_RANK } from './catalog.js';
-import { RoutingDecisionSchema, chooseRouting } from './routing.js';
+import { EFFORT_LEVELS, EFFORT_RANK, MODEL_TIERS, TIER_RANK } from './levels.js';
+import { RoutingDecisionSchema, chooseRouting, effortFor } from './routing.js';
 
 /**
  * The router spends money on a person's behalf, so the tests that matter are
@@ -24,11 +24,9 @@ describe('chooseRouting — every decision is explainable', () => {
     ];
     for (const prompt of prompts) {
       for (const turnCount of [0, 1, 5, 12, 100]) {
-        for (const remoteAllowed of [true, false]) {
-          const decision = chooseRouting({ prompt, turnCount, remoteAllowed });
-          expect(RoutingDecisionSchema.safeParse(decision).success, prompt).toBe(true);
-          expect(decision.why.length, prompt).toBeGreaterThan(0);
-        }
+        const decision = chooseRouting({ prompt, turnCount });
+        expect(RoutingDecisionSchema.safeParse(decision).success, prompt).toBe(true);
+        expect(decision.why.length, prompt).toBeGreaterThan(0);
       }
     }
   });
@@ -38,7 +36,7 @@ describe('chooseRouting — every decision is explainable', () => {
     // unaccountable, which is the thing that separates this from a mocked
     // feature that looks like intelligence.
     for (const prompt of ['hi', 'design a schema', 'x'.repeat(900)]) {
-      const { why } = chooseRouting({ prompt, turnCount: 1, remoteAllowed: true });
+      const { why } = chooseRouting({ prompt, turnCount: 1 });
       expect(why.trim().length).toBeGreaterThan(8);
       expect(why).not.toBe('Default.');
     }
@@ -53,7 +51,7 @@ describe('the rules read cheap, honest signals', () => {
       'why does contracts.ts throw here',
       '--- a/file.ts\n+++ b/file.ts',
     ]) {
-      const decision = chooseRouting({ prompt, turnCount: 1, remoteAllowed: true });
+      const decision = chooseRouting({ prompt, turnCount: 1 });
       expect(decision.tier, prompt).toBe('deep');
       expect(EFFORT_RANK[decision.effort], prompt).toBeGreaterThanOrEqual(EFFORT_RANK.high);
     }
@@ -63,7 +61,6 @@ describe('the rules read cheap, honest signals', () => {
     const decision = chooseRouting({
       prompt: 'Walk me through the security boundary here',
       turnCount: 1,
-      remoteAllowed: true,
     });
     expect(decision.tier).toBe('deep');
     expect(decision.why).toContain('security');
@@ -71,9 +68,7 @@ describe('the rules read cheap, honest signals', () => {
 
   it('keeps small talk on the light tier', () => {
     for (const prompt of ['thanks!', 'hey', 'good morning', 'ok']) {
-      expect(chooseRouting({ prompt, turnCount: 1, remoteAllowed: true }).tier, prompt).toBe(
-        'light',
-      );
+      expect(chooseRouting({ prompt, turnCount: 1 }).tier, prompt).toBe('light');
     }
   });
 
@@ -81,7 +76,7 @@ describe('the rules read cheap, honest signals', () => {
     // The same word means something different deep in a debugging session, and
     // routing it to the cheapest model there is how an assistant feels stupid
     // exactly when it matters.
-    const late = chooseRouting({ prompt: 'thanks', turnCount: 40, remoteAllowed: true });
+    const late = chooseRouting({ prompt: 'thanks', turnCount: 40 });
     expect(late.tier).not.toBe('light');
   });
 
@@ -89,7 +84,6 @@ describe('the rules read cheap, honest signals', () => {
     const decision = chooseRouting({
       prompt: 'word '.repeat(150),
       turnCount: 1,
-      remoteAllowed: true,
     });
     expect(decision.tier).toBe('deep');
   });
@@ -101,7 +95,6 @@ describe('the rules read cheap, honest signals', () => {
     const decision = chooseRouting({
       prompt: 'and what about the other one?',
       turnCount: 20,
-      remoteAllowed: true,
     });
     expect(decision.tier).toBe('balanced');
   });
@@ -113,7 +106,6 @@ describe('a human pin ALWAYS wins', () => {
       // Would otherwise be forced to `deep` by the code signal.
       prompt: '```ts\nconst a = 1;\n```',
       turnCount: 1,
-      remoteAllowed: true,
       pinnedTier: 'light',
     });
     expect(decision.tier).toBe('light');
@@ -124,7 +116,6 @@ describe('a human pin ALWAYS wins', () => {
     const decision = chooseRouting({
       prompt: 'Explain the security architecture',
       turnCount: 1,
-      remoteAllowed: true,
       pinnedEffort: 'low',
     });
     expect(decision.effort).toBe('low');
@@ -135,78 +126,9 @@ describe('a human pin ALWAYS wins', () => {
     const decision = chooseRouting({
       prompt: 'anything',
       turnCount: 1,
-      remoteAllowed: true,
       pinnedTier: 'deep',
     });
     expect(decision.why.toLowerCase()).toContain('you chose');
-  });
-});
-
-describe('AEGIS has the last word, and it only makes the answer SMALLER', () => {
-  it('refuses to route to a remote tier when sending is revoked', () => {
-    // The property that matters most in this file. A router that could pick a
-    // hosted model while AEGIS forbids sending would be routing AROUND a
-    // restriction — the boundary violation CLAUDE.md §2 exists to forbid.
-    for (const prompt of [
-      '```ts\nconst a = 1;\n```',
-      'Explain the security architecture',
-      'word '.repeat(200),
-      'thanks',
-    ]) {
-      const decision = chooseRouting({ prompt, turnCount: 30, remoteAllowed: false });
-      expect(decision.tier, prompt).toBe('light');
-      expect(decision.effort, prompt).toBe('low');
-      expect(decision.source, prompt).toBe('aegis-restricted');
-    }
-  });
-
-  it('overrides even an explicit human pin — a pin is not an AEGIS override', () => {
-    // A person may choose their model. Nobody may choose to leave the machine
-    // while AEGIS says no, and there is deliberately no flag that permits it.
-    const decision = chooseRouting({
-      prompt: 'anything',
-      turnCount: 1,
-      remoteAllowed: false,
-      pinnedTier: 'deep',
-      pinnedEffort: 'max',
-    });
-    expect(decision.tier).toBe('light');
-    expect(decision.effort).toBe('low');
-    expect(decision.source).toBe('aegis-restricted');
-  });
-
-  it('names AEGIS, and does NOT claim to have answered locally instead', () => {
-    // `sending-guard.ts` refuses a revoked remote call rather than substituting
-    // the local model, because being quietly answered while believing you are
-    // restricted is the one lie the security subsystem must never tell. This
-    // router picks tier and effort only — never a provider — so its reason must
-    // not imply a substitution it did not make.
-    const decision = chooseRouting({
-      prompt: 'Explain the security architecture',
-      turnCount: 1,
-      remoteAllowed: false,
-    });
-    expect(decision.why.toUpperCase()).toContain('AEGIS');
-    expect(decision.why.toLowerCase()).not.toContain('stays on your machine');
-    expect(decision.why.toLowerCase()).not.toContain('answered locally');
-  });
-
-  it('can never RAISE a tier — no input produces more than the rules allow', () => {
-    // The one-way property, checked exhaustively rather than argued: for every
-    // prompt, the restricted decision is never larger than the unrestricted one.
-    const prompts = ['hi', 'thanks', 'design a schema', '```ts\n1\n```', 'word '.repeat(200)];
-    for (const prompt of prompts) {
-      for (const turnCount of [0, 1, 12, 40]) {
-        const open = chooseRouting({ prompt, turnCount, remoteAllowed: true });
-        const shut = chooseRouting({ prompt, turnCount, remoteAllowed: false });
-        expect(TIER_RANK[shut.tier], `${prompt}@${String(turnCount)}`).toBeLessThanOrEqual(
-          TIER_RANK[open.tier],
-        );
-        expect(EFFORT_RANK[shut.effort], `${prompt}@${String(turnCount)}`).toBeLessThanOrEqual(
-          EFFORT_RANK[open.effort],
-        );
-      }
-    }
   });
 });
 
@@ -216,5 +138,152 @@ describe('the scales themselves', () => {
     expect(Object.keys(EFFORT_RANK).sort()).toStrictEqual([...EFFORT_LEVELS].sort());
     expect(new Set(Object.values(TIER_RANK)).size).toBe(MODEL_TIERS.length);
     expect(new Set(Object.values(EFFORT_RANK)).size).toBe(EFFORT_LEVELS.length);
+  });
+});
+
+describe('effort is derived from tier in exactly ONE place', () => {
+  it('every RULES decision uses the table, so the mapping cannot drift', () => {
+    // This is the test that would have caught the defect this file shipped
+    // with: `balanced` meant `high` from the turn-count rule and `medium` from
+    // the pinned path — the same tier costing different amounts depending on
+    // who chose it, sixty lines apart. A swarm critic found it by reading; this
+    // makes it mechanical.
+    const prompts = [
+      'hi',
+      'thanks',
+      'ok',
+      'and what about the other one?',
+      'design a schema for this',
+      '```ts\nconst a = 1;\n```',
+      'word '.repeat(200),
+      'What is on my calendar?',
+    ];
+    for (const prompt of prompts) {
+      for (const turnCount of [0, 1, 2, 5, 12, 40]) {
+        const decision = chooseRouting({ prompt, turnCount });
+        if (decision.source !== 'rules') continue;
+        expect(decision.effort, `${prompt}@${String(turnCount)}`).toBe(effortFor(decision.tier));
+      }
+    }
+  });
+
+  it('a pinned tier costs the same as a routed one of that tier', () => {
+    const routed = chooseRouting({ prompt: 'and what about the other one?', turnCount: 20 });
+    const pinned = chooseRouting({ prompt: 'anything', turnCount: 1, pinnedTier: routed.tier });
+    expect(pinned.effort).toBe(routed.effort);
+  });
+
+  it('maps every tier, and a new tier would be a compile error', () => {
+    for (const tier of MODEL_TIERS) {
+      expect(EFFORT_LEVELS as readonly string[]).toContain(effortFor(tier));
+    }
+  });
+});
+
+describe('each rule is pinned by a prompt only IT can satisfy', () => {
+  // Every test above asserted a `tier` value. Three of the five branches return
+  // a tier the neighbouring branch also returns, so deleting them left the
+  // suite green — a swarm critic proved it by mutation. `why` names the branch,
+  // so these assertions identify the decision rather than its outcome.
+
+  it('the small-talk rule fires on its own, not via the short-message rule', () => {
+    // 8 words: too long for `words <= 6`, so only LIGHT_SIGNALS can catch it.
+    const d = chooseRouting({
+      prompt: 'thanks, that was exactly what I needed today',
+      turnCount: 1,
+    });
+    expect(d.why).toBe('Short conversational message.');
+    expect(d.tier).toBe('light');
+  });
+
+  it('the long-conversation rule fires on its own, not via the default', () => {
+    // Both return `balanced`, so tier cannot tell them apart — only `why` can.
+    const deep = chooseRouting({ prompt: 'and what about the other one?', turnCount: 20 });
+    expect(deep.why).toBe('Well into a long conversation.');
+    const shallow = chooseRouting({ prompt: 'and what about the other one?', turnCount: 3 });
+    expect(shallow.why).toBe('An ordinary question.');
+  });
+
+  it('pins the turn-count threshold itself', () => {
+    // Changing 12 to 50 previously left everything green.
+    expect(chooseRouting({ prompt: 'and the other one?', turnCount: 11 }).why).toBe(
+      'An ordinary question.',
+    );
+    expect(chooseRouting({ prompt: 'and the other one?', turnCount: 12 }).why).toBe(
+      'Well into a long conversation.',
+    );
+  });
+
+  it('pins the default branch, which prices most real traffic', () => {
+    expect(
+      chooseRouting({
+        prompt: 'What would you recommend for the trip we discussed?',
+        turnCount: 3,
+      }),
+    ).toStrictEqual({
+      tier: 'balanced',
+      effort: 'medium',
+      source: 'rules',
+      why: 'An ordinary question.',
+    });
+  });
+
+  it('detects a stack frame with NO filename in it', () => {
+    // `/\bat \w+ \(/` did not match `at Object.<anonymous> (` — `\w+` stops at
+    // the dot. Every test that claimed to cover stack frames passed on the
+    // FILENAME pattern instead, because the sample happened to contain
+    // `index.js`. These prompts contain no filename at all.
+    for (const frame of ['at handleRequest (native)', 'at Object.<anonymous> (native)']) {
+      expect(chooseRouting({ prompt: frame, turnCount: 1 }).why, frame).toBe(
+        'Contains code or a stack trace.',
+      );
+    }
+  });
+
+  it('detects a diff header with no source filename', () => {
+    expect(chooseRouting({ prompt: '--- a/Makefile\n+++ b/Makefile', turnCount: 1 }).why).toBe(
+      'Contains code or a stack trace.',
+    );
+  });
+
+  it('detects four-space indented code', () => {
+    expect(chooseRouting({ prompt: 'look:\n    const a = 1', turnCount: 1 }).why).toBe(
+      'Contains code or a stack trace.',
+    );
+  });
+});
+
+describe('the signal lists match WORDS, not substrings', () => {
+  it('does not route "syntax" to the deep tier because it contains "tax"', () => {
+    // The expensive direction: a routine question billed at the dearest tier.
+    const d = chooseRouting({ prompt: "What's the syntax for a cron expression?", turnCount: 1 });
+    expect(d.tier).not.toBe('deep');
+  });
+
+  it('does not route a real problem to the cheapest model via "no" or "ok"', () => {
+    // The direction that hurts more. "cannot" contains `no`; "broke" contains
+    // `ok`. Ten words, a genuine failure report, previously routed light/low.
+    for (const prompt of [
+      'The build broke and I cannot tell what happened here',
+      'Can you check whether this token is broken or not?',
+      'Should they look at my notes about this?',
+    ]) {
+      expect(chooseRouting({ prompt, turnCount: 1 }).tier, prompt).not.toBe('light');
+    }
+  });
+
+  it('still catches the real small talk it was written for', () => {
+    // The negative controls above must not have been bought by breaking the
+    // rule outright.
+    for (const prompt of ['thanks!', 'hey', 'good morning', 'ok', 'yes']) {
+      expect(chooseRouting({ prompt, turnCount: 1 }).tier, prompt).toBe('light');
+    }
+  });
+
+  it('names what was pinned — an effort pin is not a model choice', () => {
+    expect(chooseRouting({ prompt: 'x', turnCount: 1, pinnedEffort: 'low' }).why).toContain(
+      'effort level',
+    );
+    expect(chooseRouting({ prompt: 'x', turnCount: 1, pinnedTier: 'deep' }).why).toContain('model');
   });
 });
