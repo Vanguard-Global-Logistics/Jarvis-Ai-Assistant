@@ -14,10 +14,12 @@ Config lives in `apps/desktop/electron-builder.yml`.
 
 `npm run package:dir` produces a real packaged app — asar archive, collected
 `node_modules`, `isPackaged: true` — and `npm run probe:packaged` launches **that
-app** and asserts React mounts, the bridge exposes exactly the eleven allowlisted
-functions, chat and amplify round-trip, the full history save/list/get/delete
-loop works against a real SQLite inside the packaged app, the renderer has no
-Node globals, and the console is clean.
+app** and asserts React mounts, the bridge exposes exactly the allowlisted
+functions and no others (**twenty-nine** as of ADR 0035 — this line said
+"eleven" for six ADRs after that stopped being true), chat and amplify
+round-trip, the full history save/list/get/delete loop works against a real
+SQLite inside the packaged app, Forge's five facts and Ledger's five channels
+answer, the renderer has no Node globals, and the console is clean.
 
 That matters because packaging has its own failure mode, and it is the same
 shape as the two that have already reached William: a dependency electron-builder
