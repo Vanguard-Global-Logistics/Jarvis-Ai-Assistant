@@ -1060,3 +1060,47 @@ describe('choosing which brain answers (ADR 0022)', () => {
     expect(screen.queryByRole('button', { name: /brain ·/i })).toBeNull();
   });
 });
+
+describe('the routing decision is SHOWN, not silently applied', () => {
+  it('renders the effort chip and its reason on a routed reply', async () => {
+    // ADR 0036's accountability claim, made real. The router decides what every
+    // turn costs; for one commit it did so with nothing on screen, which three
+    // swarm critics correctly called a mocked feature — good unit tests and no
+    // way for a person to see what they were being charged for.
+    const bridge = fakeBridge({
+      sendChat: vi.fn().mockResolvedValue({
+        text: 'Here is the answer.',
+        provider: 'anthropic',
+        routing: {
+          tier: 'deep',
+          effort: 'high',
+          source: 'rules',
+          why: 'Contains code or a stack trace.',
+        },
+      }),
+    });
+    render(<Conversation bridge={bridge} />);
+
+    type('x');
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+
+    expect(await screen.findByText('HIGH')).toBeTruthy();
+    expect(screen.getByTitle(/Contains code or a stack trace/)).toBeTruthy();
+  });
+
+  it('shows NO effort chip when the reply carried no routing', async () => {
+    // amplify and plan-automation answer without routing, and a chip invented
+    // for them would claim a decision nobody made.
+    const bridge = fakeBridge({
+      sendChat: vi.fn().mockResolvedValue({ text: 'plain reply', provider: 'mock' }),
+    });
+    render(<Conversation bridge={bridge} />);
+    type('x');
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+
+    await screen.findByText('plain reply');
+    for (const level of ['LOW', 'MEDIUM', 'HIGH', 'XHIGH', 'MAX']) {
+      expect(screen.queryByText(level), level).toBeNull();
+    }
+  });
+});

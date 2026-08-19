@@ -6,6 +6,9 @@ import type {
   AmplifierResult,
   AutomationPlan,
   ChatMessage,
+  ChatReply,
+  ChatRequest,
+  RoutingDecision,
   ModelDescription,
   ModelSelection,
   OrbState,
@@ -89,10 +92,12 @@ const MODEL_FAILURE_HINT = (what: string): string =>
 
 /** What the renderer needs from the preload bridge. Kept minimal on purpose. */
 export interface ConversationBridge {
-  sendChat: (request: { messages: ChatMessage[] }) => Promise<{
-    text: string;
-    provider: ProviderId;
-  }>;
+  // DERIVED from the contract, never re-declared. The hand-written version
+  // said `{ text, provider }` and silently went stale the moment `ChatReply`
+  // gained the routing decision — the renderer could not see a field main was
+  // already sending. A rule in two files drifts; this is the boundary where
+  // that costs a feature rather than a comment.
+  sendChat: (request: ChatRequest) => Promise<ChatReply>;
   amplify: (idea: string) => Promise<AmplifierResult>;
   planAutomation: (outcome: string) => Promise<AutomationPlan>;
   saveConversation: (request: { entries: TranscriptEntry[] }) => Promise<SavedConversationMeta>;
@@ -119,6 +124,8 @@ type TranscriptItem =
       role: 'user' | 'assistant';
       content: string;
       provider?: ProviderId;
+      /** What the router decided for this turn, when it routed one. */
+      routing?: RoutingDecision;
     }
   | { kind: 'amplify'; id: number; idea: string; result: AmplifierResult }
   | { kind: 'plan'; id: number; outcome: string; result: AutomationPlan }
@@ -241,6 +248,7 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
           role: 'assistant',
           content: reply.text,
           provider: reply.provider,
+          ...(reply.routing === undefined ? {} : { routing: reply.routing }),
         },
       ]);
       // A brief "speaking" beat, then settle to idle — the Orb reflects the
@@ -1052,6 +1060,7 @@ export function Conversation({ bridge, onOrbStateChange }: ConversationProps): J
                   role={item.role}
                   content={item.content}
                   provider={item.provider}
+                  routing={item.routing}
                 />
               ) : item.kind === 'amplify' ? (
                 <AmplifierCard key={item.id} idea={item.idea} result={item.result} />
@@ -1593,16 +1602,59 @@ function ProviderChip({ provider }: { provider: ProviderId }): JSX.Element | nul
   );
 }
 
+/**
+ * How hard Jarvis thought about this turn, and WHY.
+ *
+ * This is the whole accountability half of ADR 0036. The router decides what a
+ * turn costs on every message, and for one commit it did so silently: the
+ * decision was computed and dropped on the floor while three comments and an
+ * ADR asserted "the choice is SHOWN, never silent". Three separate swarm
+ * critics called that out, and they were right — a router that quietly changes
+ * what you pay for is a mocked feature by CLAUDE.md §8's definition, however
+ * good its unit tests are.
+ *
+ * `LOW` is deliberately faint and `MAX` deliberately loud: the visual weight
+ * tracks the money. Hovering gives the reason in the router's own words.
+ */
+function EffortChip({ routing }: { routing: RoutingDecision }): JSX.Element {
+  const color = EFFORT_COLOR[routing.effort];
+  return (
+    <span
+      title={`${routing.why} (${routing.source === 'pinned' ? 'you chose it' : 'chosen for this message'})`}
+      style={{
+        ...MONO_LABEL,
+        color,
+        border: `1px dashed ${color}`,
+        borderRadius: 4,
+        padding: '1px 5px',
+      }}
+    >
+      {routing.effort.toUpperCase()}
+    </span>
+  );
+}
+
+/** Faint for cheap, loud for dear — the weight tracks the money. */
+const EFFORT_COLOR: Record<RoutingDecision['effort'], string> = {
+  low: text.faint,
+  medium: text.secondary,
+  high: accent.jarvisBlue,
+  xhigh: accent.warning,
+  max: accent.danger,
+};
+
 function MessageBubble({
   role,
   content,
   provider,
+  routing,
 }: {
   role: 'user' | 'assistant';
   content: string;
   // `| undefined` explicitly: exactOptionalPropertyTypes is on, and a user
   // message legitimately has no provider.
   provider?: ProviderId | undefined;
+  routing?: RoutingDecision | undefined;
 }): JSX.Element {
   const isUser = role === 'user';
   return (
@@ -1621,6 +1673,7 @@ function MessageBubble({
       >
         {isUser ? 'You' : 'Jarvis'}
         {provider !== undefined && <ProviderChip provider={provider} />}
+        {routing !== undefined && <EffortChip routing={routing} />}
       </span>
       <div
         style={{

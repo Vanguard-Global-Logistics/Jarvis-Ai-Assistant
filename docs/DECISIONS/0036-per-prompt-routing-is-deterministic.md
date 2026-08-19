@@ -61,9 +61,10 @@ token spend on the SAME model. It is orthogonal to which model answers.
    — `ChatReplySchema` was `{ text, provider }` — while three separate comments
    and this decision asserted accountability as the justification for the whole
    design. Three critics caught it independently. `ChatReply` now carries the
-   decision. **What is still true: no renderer surface RENDERS it yet.** The
-   channel carries it; the chip does not show it. That is a UI gap, not a
-   fabricated claim, and it is listed below.
+   decision, and the reply now shows an EFFORT CHIP beside the existing provider
+   chip — `LOW` faint, `MAX` loud, so the visual weight tracks the money, with
+   the router's own reason on hover. The claim is now true rather than
+   aspirational.
 
 6. **A human pin always wins.** `effort` on the request is a person's explicit
    choice and the rules do not run. Same principle as Ledger's warn-don't-block:
@@ -129,10 +130,10 @@ early AND chatty — all three.
 - **It does not feed the Cost Governor yet.** `estimateCostCents` exists and is
   tested; nothing calls it from a screen. Wiring real spend to the Governor is
   the obvious next step and is NOT claimed here.
-- **No UI shows the routing decision, and no UI can pin one.** The reply now
-  carries `routing`, and nothing renders it; `effort` is accepted on the request
-  and no renderer sends it. Both are wired end to end in main and untouched by
-  the renderer.
+- **No UI can PIN an effort.** The decision is now shown — the effort chip
+  renders beside the provider chip with the reason on hover — but there is no
+  control to override it. `effort` is accepted on the request, clamped so it can
+  only lower spend, and no renderer sends it yet.
 - **`npm run check:model` cannot test Anthropic.** Its provider table assumes an
   OpenAI-compatible `/chat/completions`; Anthropic uses a different endpoint,
   auth header and body shape. A row there would report wrongly, which is worse
