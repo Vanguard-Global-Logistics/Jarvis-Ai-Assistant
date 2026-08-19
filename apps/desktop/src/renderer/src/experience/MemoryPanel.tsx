@@ -7,8 +7,8 @@ import {
   MEMORY_SENSITIVITIES,
   NEVER_SEND,
 } from '@jarvis/contracts';
-import { background, fontFamily, letterSpacing, surface, text } from '@jarvis/ui';
-import { alertBox, smallButton as deleteButton } from './panelStyles.js';
+import { accent, background, fontFamily, letterSpacing, surface, text } from '@jarvis/ui';
+import { alertBox, smallButton } from './panelStyles.js';
 
 /**
  * "What Jarvis knows" — the memory surface (ADR 0029).
@@ -216,7 +216,7 @@ export function MemoryPanel({
             fontFamily: fontFamily.body,
             fontSize: 12,
             color: text.body,
-            background: 'rgba(255,255,255,0.03)',
+            background: surface.glass,
             border: `1px solid ${surface.hairline}`,
             borderRadius: surface.radiusMin,
           }}
@@ -343,7 +343,7 @@ export function MemoryPanel({
               border: `1px solid ${surface.hairline}`,
               borderLeft: `2px solid ${TIER_COLOR[memory.sensitivity]}`,
               borderRadius: surface.radiusMin,
-              background: 'rgba(255,255,255,0.03)',
+              background: surface.glass,
               display: 'flex',
               flexDirection: 'column',
               gap: 6,
@@ -377,7 +377,7 @@ export function MemoryPanel({
                     onClick={() => {
                       void confirmForget(memory.id);
                     }}
-                    style={deleteButton('#ff5a5a')}
+                    style={smallButton(accent.danger)}
                   >
                     REALLY FORGET
                   </button>
@@ -386,7 +386,7 @@ export function MemoryPanel({
                     onClick={() => {
                       setConfirming(null);
                     }}
-                    style={deleteButton(text.faint)}
+                    style={smallButton(text.faint)}
                   >
                     KEEP
                   </button>
@@ -398,7 +398,7 @@ export function MemoryPanel({
                   onClick={() => {
                     setConfirming(memory.id);
                   }}
-                  style={deleteButton(text.faint)}
+                  style={smallButton(text.faint)}
                 >
                   FORGET
                 </button>

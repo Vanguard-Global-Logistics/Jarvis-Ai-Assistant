@@ -3,6 +3,7 @@ import type { JSX } from 'react';
 import type { CreatePurchaseReviewRequest, ExpenseClassification } from '@jarvis/contracts';
 import {
   EXPENSE_CLASSIFICATIONS,
+  JUSTIFICATION_FIELD_LABELS,
   REVIEW_LABEL_MAX_LENGTH,
   REVIEW_TEXT_MAX_LENGTH,
   missingJustification,
@@ -102,6 +103,15 @@ export function LedgerReviewForm({ onCreated, onCancel }: LedgerReviewFormProps)
       setFormError('Name what is being bought.');
       return;
     }
+    // Owned here rather than passed through from the parser. The parser's
+    // empty-string reason is "Enter an amount, or mark it MISSING." — correct
+    // vocabulary for the figures form, and nonsense on this screen, which has
+    // no MISSING control and no notion of a missing cost. A message that tells
+    // a person to use a control that does not exist is worse than none.
+    if (cost.trim().length === 0) {
+      setFormError('Enter what this costs.');
+      return;
+    }
     const parsedCost = parseDollarsToCents(cost);
     if (!parsedCost.ok) {
       setFormError(parsedCost.reason);
@@ -165,7 +175,7 @@ export function LedgerReviewForm({ onCreated, onCancel }: LedgerReviewFormProps)
         padding: 10,
         border: `1px solid ${surface.hairline}`,
         borderRadius: surface.radiusMin,
-        background: 'rgba(255,255,255,0.03)',
+        background: surface.glass,
       }}
     >
       <span
@@ -296,8 +306,9 @@ export function LedgerReviewForm({ onCreated, onCancel }: LedgerReviewFormProps)
 
       {gaps.length > 0 && (
         <p role="alert" style={inlineAlert()}>
-          {posture.label} spending asks to be justified, and this review leaves {gaps.join(', ')}{' '}
-          empty. You can record it anyway — Ledger keeps the record either way.
+          {posture.label} spending asks to be justified, and this review leaves{' '}
+          {gaps.map((field) => JUSTIFICATION_FIELD_LABELS[field]).join(', ')} empty. You can record
+          it anyway — Ledger keeps the record either way.
         </p>
       )}
 

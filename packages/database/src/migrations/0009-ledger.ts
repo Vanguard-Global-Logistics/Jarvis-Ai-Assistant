@@ -13,13 +13,25 @@ import type { Migration } from '../migrator.js';
  * bug. Adding one is a new ADR with its own review, never a quiet extension.
  *
  * **What that does NOT mean, and an earlier version of this comment implied:**
- * that the schema "has nowhere to put a credential". It has ten places — the
- * free-text `TEXT` columns of `purchase_reviews`, each up to 2,000 characters,
- * which hold a routing number or an API key as happily as they hold a
- * sentence. Named columns are absent; free text is free text. Credential
- * CONTENT is refused one layer up, by `refuseIfCredential` in the store,
- * before any of these columns is written — a guard over ten known formats, not
- * a proof.
+ * that the schema "has nowhere to put a credential". The free-text `TEXT`
+ * columns of `purchase_reviews` hold a routing number or an API key as happily
+ * as they hold a sentence. Named columns are absent; free text is free text.
+ *
+ * Note that THIS FILE imposes no length limit on any of them except
+ * `outcome` (`CHECK (length(outcome) BETWEEN 1 AND 200)`) — the 2,000- and
+ * 200-character caps are Zod's, in `packages/contracts/src/ledger/contracts.ts`,
+ * not the disk's. An earlier version of this comment said "each up to 2,000
+ * characters", which is not true of this schema and not true of three of the
+ * columns at any layer.
+ *
+ * Credential CONTENT is refused one layer up, by `refuseIfCredential` in the
+ * store, before any of these columns is written — a guard over ten known
+ * formats, not a proof. The exact surface is nine free-text fields on
+ * `ledger:create-review` plus `decidedBy` on `ledger:decide` — ten guarded
+ * columns in total, seven capped at 2,000 characters and three at 200.
+ * `CREDENTIAL_BEARING_FIELDS` in the ledger contracts derives that set from the
+ * schema and a test asserts it; every other file points there rather than
+ * restating a count.
  *
  * ## Money is INTEGER CENTS
  *
@@ -37,8 +49,13 @@ import type { Migration } from '../migrator.js';
  *   real state and Ledger must be able to describe it.
  * - **`state IN (...)`** is the closed data-state set. An unrecognised state is
  *   a figure whose reliability nobody knows, and `safeToSpend` branches on it.
- * - **`decision IN ('accepted','declined')`** — there is no third outcome, and
- *   in particular no value meaning "Ledger decided". A decision is a person's.
+ * - **`decision IN ('accepted','declined')` AT THIS MIGRATION** — widened to
+ *   include `'overridden'` by migration 10, which rebuilt this table. A
+ *   migration's comment is a snapshot that later migrations silently
+ *   invalidate, and a reader auditing the decision constraint from this file
+ *   was getting the superseded rule. What has not changed, and is the property
+ *   that matters, is that the set is CLOSED and contains no value meaning
+ *   "Ledger decided". A decision is a person's.
  */
 export const ledgerMigration: Migration = {
   id: 9,

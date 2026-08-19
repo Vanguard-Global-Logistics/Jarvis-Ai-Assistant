@@ -1,6 +1,6 @@
 import { migrate, migrations, openDatabase } from '@jarvis/database';
 import type { SqliteDatabase } from '@jarvis/database';
-import { safeToSpend } from '@jarvis/contracts';
+import { PURCHASE_DECISIONS, safeToSpend } from '@jarvis/contracts';
 import type { CreatePurchaseReviewRequest, SetLedgerInputsRequest } from '@jarvis/contracts';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -494,5 +494,46 @@ describe('the credential guard — ten free-text fields, all of them checked', (
     } catch (cause) {
       expect((cause as Error).message).not.toContain('TEST0123456789');
     }
+  });
+});
+
+describe('the decision enum and the disk agree — proven, not assumed', () => {
+  it('accepts EVERY value the contract declares, against the real CHECK constraint', () => {
+    // `PURCHASE_DECISIONS` and the `CHECK (decision IN (...))` in migration 10
+    // are two independent spellings of one closed set, in two languages, that
+    // nothing keeps in agreement. Adding a fourth decision to the enum compiles
+    // clean, passes Zod, and then fails at the disk — fail-CLOSED, so no wrong
+    // row lands, but the failure surfaces as a raw SQLite constraint error on
+    // the one action that records a person's decision about money.
+    //
+    // Driving every enum member through the real store turns that into a red
+    // suite the moment the two disagree, at authoring time. Deliberately NOT a
+    // string-match against the migration's SQL text: that would prove the two
+    // literals look alike, not that the database accepts what the contract
+    // promises.
+    for (const decision of PURCHASE_DECISIONS) {
+      const review = createPurchaseReview(db, reviewRequest({ outcome: `for ${decision}` }));
+      const decided = recordDecision(db, {
+        id: review.id,
+        decision,
+        decidedBy: 'William',
+      });
+      expect(decided.decision, decision).toBe(decision);
+
+      // And it is really on disk, not just in the returned object.
+      const reread = listPurchaseReviews(db).find((r) => r.id === review.id);
+      expect(reread?.decision, decision).toBe(decision);
+    }
+  });
+
+  it('the disk refuses a decision the contract never declared', () => {
+    // The other direction: the CHECK must not be wider than the enum, or a
+    // caller bypassing Zod could store an outcome no code knows how to render.
+    const review = createPurchaseReview(db, reviewRequest());
+    expect(() => {
+      db.prepare(
+        'UPDATE purchase_reviews SET decided_at = ?, decision = ?, decided_by = ? WHERE id = ?',
+      ).run(new Date().toISOString(), 'auto-approved', 'Ledger', review.id);
+    }).toThrow();
   });
 });

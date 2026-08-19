@@ -4,7 +4,7 @@ import type { ForgeFact, ForgeItem } from '@jarvis/contracts';
 import { FORGE_TITLE_MAX_LENGTH } from '@jarvis/contracts';
 import { background, fontFamily, letterSpacing, surface, text } from '@jarvis/ui';
 import { bridgeMember } from './bridge.js';
-import { alertBox, smallButton as deleteButton } from './panelStyles.js';
+import { alertBox, smallButton } from './panelStyles.js';
 
 /**
  * Forge v1 — the five-fact build/dev watchtower
@@ -184,7 +184,7 @@ export function ForgePanel(): JSX.Element {
             fontFamily: fontFamily.body,
             fontSize: 12,
             color: text.body,
-            background: 'rgba(255,255,255,0.03)',
+            background: surface.glass,
             border: `1px solid ${surface.hairline}`,
             borderRadius: surface.radiusMin,
           }}
@@ -226,7 +226,7 @@ export function ForgePanel(): JSX.Element {
               border: `1px solid ${surface.hairline}`,
               borderLeft: `2px solid ${item.approvedAt !== null ? '#5ad18a' : '#5ad1ff'}`,
               borderRadius: surface.radiusMin,
-              background: 'rgba(255,255,255,0.03)',
+              background: surface.glass,
               display: 'flex',
               flexDirection: 'column',
               gap: 8,
@@ -277,7 +277,7 @@ export function ForgePanel(): JSX.Element {
                               fontFamily: fontFamily.body,
                               fontSize: 10,
                               color: text.body,
-                              background: 'rgba(255,255,255,0.03)',
+                              background: surface.glass,
                               border: `1px solid ${surface.hairline}`,
                               borderRadius: 4,
                             }}
@@ -287,7 +287,7 @@ export function ForgePanel(): JSX.Element {
                             onClick={() => {
                               void submitEvidence(item.id, fact);
                             }}
-                            style={deleteButton('#5ad1ff')}
+                            style={smallButton('#5ad1ff')}
                           >
                             SAVE
                           </button>
@@ -297,7 +297,7 @@ export function ForgePanel(): JSX.Element {
                               setDrafting(null);
                               setDetailDraft('');
                             }}
-                            style={deleteButton(text.faint)}
+                            style={smallButton(text.faint)}
                           >
                             CANCEL
                           </button>
@@ -309,7 +309,7 @@ export function ForgePanel(): JSX.Element {
                             setDrafting({ id: item.id, fact });
                             setDetailDraft('');
                           }}
-                          style={deleteButton(text.faint)}
+                          style={smallButton(text.faint)}
                         >
                           MARK
                         </button>
@@ -358,7 +358,7 @@ export function ForgePanel(): JSX.Element {
                       fontFamily: fontFamily.body,
                       fontSize: 10,
                       color: text.body,
-                      background: 'rgba(255,255,255,0.03)',
+                      background: surface.glass,
                       border: `1px solid ${surface.hairline}`,
                       borderRadius: 4,
                     }}
@@ -369,7 +369,7 @@ export function ForgePanel(): JSX.Element {
                     onClick={() => {
                       void submitApproval(item.id);
                     }}
-                    style={deleteButton('#5ad18a')}
+                    style={smallButton('#5ad18a')}
                   >
                     CONFIRM APPROVAL
                   </button>
@@ -379,7 +379,7 @@ export function ForgePanel(): JSX.Element {
                       setConfirmingApproval(null);
                       setApproverName('');
                     }}
-                    style={deleteButton(text.faint)}
+                    style={smallButton(text.faint)}
                   >
                     CANCEL
                   </button>
@@ -390,7 +390,7 @@ export function ForgePanel(): JSX.Element {
                   onClick={() => {
                     setConfirmingApproval(item.id);
                   }}
-                  style={deleteButton('#5ad18a')}
+                  style={smallButton('#5ad18a')}
                 >
                   APPROVE
                 </button>

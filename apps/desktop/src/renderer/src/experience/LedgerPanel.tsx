@@ -10,6 +10,7 @@ import type {
 import { CENTS_PER_DOLLAR, DATA_STATES, EXPENSE_CLASSIFICATIONS } from '@jarvis/contracts';
 import { accent, fontFamily, letterSpacing, surface, text } from '@jarvis/ui';
 import { bridgeMember } from './bridge.js';
+import { LEDGER_TERMS, labelForTerm } from './ledgerTerms.js';
 import { LedgerFiguresForm } from './LedgerFiguresForm.js';
 import { LedgerReviewForm } from './LedgerReviewForm.js';
 import { alertBox, smallButton } from './panelStyles.js';
@@ -64,21 +65,6 @@ const DECISION_COLOR: Record<'accepted' | 'declined' | 'overridden' | 'undecided
   overridden: accent.warning,
   undecided: accent.warning,
 };
-
-const TERM_LABELS: { key: keyof Omit<LedgerInputs, 'updatedAt'>; label: string }[] = [
-  { key: 'cash', label: 'Cash' },
-  { key: 'pending', label: 'Pending' },
-  { key: 'bills30d', label: 'Bills (30d)' },
-  { key: 'debtMinimums', label: 'Debt minimums' },
-  { key: 'emergencyReserve', label: 'Emergency reserve' },
-  { key: 'commitments', label: 'Commitments' },
-  { key: 'taxSetAside', label: 'Tax set-aside' },
-];
-
-/** Property key -> the label the panel already shows for that row. */
-const LABEL_BY_KEY: Record<string, string> = Object.fromEntries(
-  TERM_LABELS.map(({ key, label }) => [key, label]),
-);
 
 export function LedgerPanel(): JSX.Element {
   const [inputs, setInputs] = useState<LedgerInputs | null>(null);
@@ -199,7 +185,7 @@ export function LedgerPanel(): JSX.Element {
           padding: 10,
           border: `1px solid ${surface.hairline}`,
           borderRadius: surface.radiusMin,
-          background: 'rgba(255,255,255,0.03)',
+          background: surface.glass,
         }}
       >
         <span
@@ -278,7 +264,7 @@ export function LedgerPanel(): JSX.Element {
               Not enough is known to say.
             </p>
             <span style={{ fontFamily: fontFamily.body, fontSize: 11, color: text.faint }}>
-              Still needed: {computed.missing.map((key) => LABEL_BY_KEY[key] ?? key).join(', ')}
+              Still needed: {computed.missing.map(labelForTerm).join(', ')}
             </span>
           </>
         )}
@@ -290,7 +276,7 @@ export function LedgerPanel(): JSX.Element {
           number a person came here to read. */}
       {inputs !== null && openForm !== 'figures' && (
         <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 3 }}>
-          {TERM_LABELS.map(({ key, label }) => {
+          {LEDGER_TERMS.map(({ key, label }) => {
             const figure = inputs[key];
             return (
               <li
@@ -326,28 +312,42 @@ export function LedgerPanel(): JSX.Element {
         </ul>
       )}
 
-      {openForm === 'figures' ? (
-        <LedgerFiguresForm
-          inputs={inputs}
-          onSaved={async () => {
-            setOpenForm(null);
-            await refresh();
-          }}
-          onCancel={() => {
-            setOpenForm(null);
-          }}
-        />
-      ) : (
-        <button
-          type="button"
-          onClick={() => {
-            setOpenForm('figures');
-          }}
-          style={smallButton(accent.jarvisBlue)}
-        >
-          ENTER FIGURES
-        </button>
-      )}
+      {/* ENTER FIGURES is gated on `inputs !== null` — the SAME guard the
+          reading surface above uses, and for a much harder reason.
+          `ledger:set-inputs` is a whole-row upsert with no merge, so a form
+          opened without the current figures would offer to replace all seven
+          with whatever it could seed, and a failed read seeds nothing. Offering
+          to overwrite a state you could not read is the write-path version of
+          treating MISSING as zero. When the read fails, this control is simply
+          not there, and the error above says why.
+
+          It is also disabled while the OTHER form is open, so switching cannot
+          silently unmount a review someone has typed several thousand
+          characters into. */}
+      {inputs !== null &&
+        (openForm === 'figures' ? (
+          <LedgerFiguresForm
+            inputs={inputs}
+            onSaved={async () => {
+              setOpenForm(null);
+              await refresh();
+            }}
+            onCancel={() => {
+              setOpenForm(null);
+            }}
+          />
+        ) : (
+          <button
+            type="button"
+            disabled={openForm !== null}
+            onClick={() => {
+              setOpenForm('figures');
+            }}
+            style={smallButton(openForm === null ? accent.jarvisBlue : text.faint)}
+          >
+            ENTER FIGURES
+          </button>
+        ))}
 
       <span
         style={{
@@ -374,10 +374,11 @@ export function LedgerPanel(): JSX.Element {
       ) : (
         <button
           type="button"
+          disabled={openForm !== null}
           onClick={() => {
             setOpenForm('review');
           }}
-          style={smallButton(accent.jarvisBlue)}
+          style={smallButton(openForm === null ? accent.jarvisBlue : text.faint)}
         >
           OPEN A REVIEW
         </button>
@@ -397,7 +398,7 @@ export function LedgerPanel(): JSX.Element {
               border: `1px solid ${surface.hairline}`,
               borderLeft: `2px solid ${DECISION_COLOR[review.decision ?? 'undecided']}`,
               borderRadius: surface.radiusMin,
-              background: 'rgba(255,255,255,0.03)',
+              background: surface.glass,
               display: 'flex',
               flexDirection: 'column',
               gap: 5,
@@ -462,7 +463,7 @@ export function LedgerPanel(): JSX.Element {
                     fontFamily: fontFamily.body,
                     fontSize: 10,
                     color: text.body,
-                    background: 'rgba(255,255,255,0.03)',
+                    background: surface.glass,
                     border: `1px solid ${surface.hairline}`,
                     borderRadius: 4,
                   }}

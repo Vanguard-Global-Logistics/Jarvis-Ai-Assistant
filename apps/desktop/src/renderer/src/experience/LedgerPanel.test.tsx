@@ -400,3 +400,75 @@ describe('LedgerPanel — says what it is', () => {
     expect(await screen.findByText(/Bills \(30d\), Tax set-aside/)).toBeTruthy();
   });
 });
+
+describe('the write surfaces, and the guard that keeps them from destroying figures', () => {
+  it('offers BOTH write paths once the figures have been read', async () => {
+    stubJarvis();
+    render(<LedgerPanel />);
+    expect(await screen.findByText('ENTER FIGURES')).toBeTruthy();
+    expect(screen.getByText('OPEN A REVIEW')).toBeTruthy();
+  });
+
+  it('does NOT offer ENTER FIGURES when the read failed', async () => {
+    // The defect this guard exists for: `ledger:set-inputs` is a whole-row
+    // upsert with no merge, so a form opened without the current figures would
+    // offer to replace all seven with whatever it could seed — and a failed
+    // read seeds nothing. One click would have destroyed them. Offering to
+    // overwrite a state you could not read is the write-path version of
+    // treating MISSING as zero.
+    stubJarvis({
+      getLedgerInputs: vi.fn().mockRejectedValue(new Error('database is locked')),
+    });
+    render(<LedgerPanel />);
+
+    expect(await screen.findByText(/could not read its figures/i)).toBeTruthy();
+    expect(screen.queryByText('ENTER FIGURES')).toBeNull();
+  });
+
+  it('opens the entry form and hides the read-only term list', async () => {
+    stubJarvis();
+    render(<LedgerPanel />);
+    fireEvent.click(await screen.findByText('ENTER FIGURES'));
+
+    expect(await screen.findByLabelText('Enter figures')).toBeTruthy();
+    // The reading surface and the writing surface are never the same pixels.
+    expect(screen.queryByText('Tax set-aside')).toBeTruthy(); // the form's own label
+    expect(screen.getByLabelText('Cash')).toBeTruthy();
+  });
+
+  it('will not let one form be replaced by the other, discarding what was typed', async () => {
+    // Switching used to unmount the losing form, silently throwing away up to
+    // several thousand characters of a half-written purchase review with no
+    // confirmation and no restore.
+    stubJarvis();
+    render(<LedgerPanel />);
+    fireEvent.click(await screen.findByText('OPEN A REVIEW'));
+    await screen.findByLabelText('Open a purchase review');
+
+    const other = screen.getByText('ENTER FIGURES');
+    expect((other as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('re-reads the figures after a successful save, so the panel is never stale', async () => {
+    const getLedgerInputs = vi.fn().mockResolvedValue({
+      inputs: fullInputs(),
+      safeToSpend: { computable: true, cents: 75_000, confidence: 'POSTED' },
+    });
+    stubJarvis({ getLedgerInputs, setLedgerInputs: vi.fn().mockResolvedValue(undefined) });
+    render(<LedgerPanel />);
+    fireEvent.click(await screen.findByText('ENTER FIGURES'));
+    await screen.findByLabelText('Enter figures');
+
+    const before = getLedgerInputs.mock.calls.length;
+    fireEvent.click(screen.getByText('SAVE FIGURES'));
+
+    // The form closes and the panel refreshes — dropping `await onSaved()`
+    // would leave the old figures on screen next to the ones just written.
+    await waitFor(() => {
+      expect(getLedgerInputs.mock.calls.length).toBeGreaterThan(before);
+    });
+    await waitFor(() => {
+      expect(screen.queryByLabelText('Enter figures')).toBeNull();
+    });
+  });
+});

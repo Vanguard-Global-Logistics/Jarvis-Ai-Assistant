@@ -447,6 +447,29 @@ async function cdp(url) {
  *
  * @param {{ evaluate: (e: string) => Promise<any> }} page
  */
+/**
+ * Poll until a DOM condition holds, or give up after a deadline.
+ *
+ * NOT a fixed sleep. A swarm critic caught two `setTimeout(250)` calls added
+ * for the Ledger checks and pointed at this file's own argument against them
+ * (see `settle` below): a sleep short enough to feel fast reports a false
+ * failure on a loaded machine, and a false failure trains everyone to ignore
+ * the probe. The interval here is a retry cadence, never a bet on how fast
+ * React is.
+ *
+ * @param {{ evaluate: (e: string) => Promise<any> }} page
+ * @param {string} expression a JS expression evaluating to a boolean
+ */
+async function waitForCondition(page, expression, timeoutMs = 5000) {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const r = await page.evaluate(expression);
+    if (r.value === true) return true;
+    if (Date.now() >= deadline) return false;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+}
+
 async function settle(page, timeoutMs = 20_000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -1465,7 +1488,10 @@ async function runChecks(page, mode, stub = null) {
        return null;
      })()`,
   );
-  await new Promise((resolve) => setTimeout(resolve, 250));
+  await waitForCondition(
+    page,
+    `[...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'ENTER FIGURES')`,
+  );
 
   const ledgerControls = await page.evaluate(
     `(() => {
@@ -1490,7 +1516,10 @@ async function runChecks(page, mode, stub = null) {
        return null;
      })()`,
   );
-  await new Promise((resolve) => setTimeout(resolve, 250));
+  await waitForCondition(
+    page,
+    `document.querySelector('form[aria-label="Enter figures"]') !== null`,
+  );
   const ledgerFormFields = await page.evaluate(
     `(() => {
        const form = document.querySelector('form[aria-label="Enter figures"]');
@@ -1502,6 +1531,53 @@ async function runChecks(page, mode, stub = null) {
     'ENTER FIGURES opens the seven-term form in the real app',
     ledgerFormFields.value?.present === true && ledgerFormFields.value?.rows === 7,
     JSON.stringify(ledgerFormFields.value),
+  );
+
+  // The form is SEEDED from the store, not blank. This is the assertion that
+  // would have caught the worst defect this module has had: the form once
+  // accepted a null `inputs` and seeded every term MISSING, and because
+  // `ledger:set-inputs` is a whole-row upsert, saving that blank draft would
+  // have destroyed all seven stored figures. Counting seven inputs cannot tell
+  // a seeded form from a blanked one; reading a value out of one can.
+  const ledgerSeeded = await page.evaluate(`document.querySelector('#ledger-cash')?.value ?? null`);
+  add(
+    'the entry form is SEEDED from the store, not blank',
+    ledgerSeeded.value === '5000.00',
+    `#ledger-cash = ${JSON.stringify(ledgerSeeded.value)}`,
+  );
+
+  // And a figure a PERSON types actually reaches the database. Every other
+  // Ledger assertion in this file drives `window.jarvis` directly; this is the
+  // only one that crosses from a keystroke, through the form, over the real
+  // IPC boundary, into real SQLite, and back onto the screen. Without it the
+  // "the panel writes" claim rests on a rendered button at one end and a
+  // stubbed bridge at the other, with nothing joining them.
+  await page.evaluate(
+    `(() => {
+       const box = document.querySelector('#ledger-cash');
+       const setter = Object.getOwnPropertyDescriptor(
+         window.HTMLInputElement.prototype, 'value',
+       ).set;
+       setter.call(box, '6543.21');
+       box.dispatchEvent(new Event('input', { bubbles: true }));
+       const save = [...document.querySelectorAll('button')].find(
+         (b) => b.textContent.trim() === 'SAVE FIGURES',
+       );
+       if (save) save.click();
+       return null;
+     })()`,
+  );
+  await waitForCondition(
+    page,
+    `document.querySelector('form[aria-label="Enter figures"]') === null`,
+  );
+  const ledgerAfterUiSave = await page.evaluate(
+    'window.jarvis ? (await window.jarvis.getLedgerInputs()).inputs.cash.cents : null',
+  );
+  add(
+    'a figure TYPED INTO THE FORM reaches the real database as integer cents',
+    ledgerAfterUiSave.value === 654321,
+    `cash.cents = ${JSON.stringify(ledgerAfterUiSave.value)} (typed 6543.21)`,
   );
 
   // E2: the Experience Shell mounts the Orb. Assert the real component is

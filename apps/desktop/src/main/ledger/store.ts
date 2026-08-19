@@ -9,7 +9,11 @@ import type {
   PurchaseReview,
   SetLedgerInputsRequest,
 } from '@jarvis/contracts';
-import { looksLikeCredential, safeToSpend } from '@jarvis/contracts';
+import {
+  LEDGER_CREDENTIAL_REFUSED_MESSAGE,
+  looksLikeCredential,
+  safeToSpend,
+} from '@jarvis/contracts';
 import type { SqliteDatabase } from '@jarvis/database';
 import { UserFacingError } from '../user-facing-error.js';
 
@@ -152,11 +156,6 @@ const toPurchaseReview = (row: PurchaseReviewRow): PurchaseReview => ({
  * rejection that echoed the matched text would write the secret into the very
  * message meant to explain the refusal.
  */
-const LEDGER_CREDENTIAL_REFUSED_MESSAGE =
-  'That looks like an API key, password, or account number, so Ledger will not ' +
-  'store it. A purchase review is kept for years and is shown again every time ' +
-  'the list is opened. Describe the account, never its numbers — and keys belong ' +
-  'in the .env file on this computer.';
 
 export class LedgerRefusedError extends UserFacingError {
   public constructor() {

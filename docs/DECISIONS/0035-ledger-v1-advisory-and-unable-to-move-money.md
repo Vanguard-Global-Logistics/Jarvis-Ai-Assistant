@@ -193,9 +193,27 @@ The fifth blocking finding above was disclosed rather than fixed. It is now fixe
     two decimal places is REFUSED rather than rounded, because `12.345` quietly becoming
     `$12.34` is Ledger editing a figure a person typed.
 
-    Its own test found a defect while being written: the refusal reason echoed the entire
-    input verbatim, so a mis-pasted API key would have travelled straight into a rendered
-    error and any log carrying it. The quoted text is now capped at 24 characters.
+    **The refusal QUOTES NOTHING BACK, and getting there took two rounds — the second
+    of which matters more than the first.** The original echoed the entire input, so a
+    mis-pasted API key travelled into a rendered error and any log carrying it. That was
+    capped at 24 characters and written up here as closed. A swarm critic then counted:
+    three of the ten credential formats this repo's own guard knows are 24 characters or
+    SHORTER — an AWS access key id is exactly 20, `xai-` plus 16 is 20, `ghp_` plus 20 is
+    24 — so every one was still echoed IN FULL, by a cap this ADR had documented as a
+    security property. The test could not see it because it asserted a LENGTH bound
+    against a 5,000-character string: green against every real credential, while carrying
+    a name that claimed otherwise.
+
+    The property is "quote nothing"; length is orthogonal to whether the quoted bytes are
+    a secret. The reason is now a constant, like `CREDENTIAL_REFUSED_MESSAGE` and
+    `LEDGER_CREDENTIAL_REFUSED_MESSAGE` beside it, and the test asserts that constant plus
+    non-containment of four planted credential shapes. **Do not reintroduce a truncating
+    echo here — this ADR previously recommended one.**
+
+    One limit stays true and is pinned by its own test: a BARE routing number typed into
+    an amount box is read as an amount, because nine digits is a valid amount. Nothing is
+    echoed, and nothing catches it. That is the documented edge of the guard, not a
+    regression.
 
 12. **`requiresJustification` is wired — as a WARNING, not a refusal.** It existed, was
     tested, and was called by nothing, so a `premature-scale` purchase could be recorded
@@ -208,18 +226,50 @@ The fifth blocking finding above was disclosed rather than fixed. It is now fixe
     reading later. Ledger advises; a person decides. The friction belongs in front of the
     person, not in front of the truth.
 
-**Red-green on the three new guards**, per CLAUDE.md's instrument for correctness work.
-Each was deliberately broken and the suite confirmed red before restoring:
+**Red-green, per CLAUDE.md's instrument for correctness work** — each guard deliberately
+broken, the suite confirmed red, then restored.
 
-| Break                                            | Checks turned red    |
-| ------------------------------------------------ | -------------------- |
-| `parseDollarsToCents` reverted to the float path | 2 (contract + form)  |
-| the form's negative-deduction guard disabled     | 2 (both in the form) |
-| the refusal reason echoes its full input         | 1 (contract)         |
+The first version of this table read "`parseDollarsToCents` reverted to the float path —
+2 red" without naming WHICH float path. A swarm critic ran the other one and found it
+green: the row was true of the mutant tested and false as written. A red-green table that
+does not name its mutant is not evidence, so this one does.
 
-Verification after the amendment: `npm run verify` 1038 tests / 65 files green (was
-1001); `npm run build` green with the artifact assertion; `npm run probe:runtime` green
-including the two new DOM assertions.
+| Break                                                         | Checks red |
+| ------------------------------------------------------------- | ---------- |
+| `Math.floor(parseFloat(x) * 100)` — the truncating float path | 2          |
+| `Math.round(parseFloat(x) * 100)` — the rounding float path   | **0**      |
+| the form's negative-deduction guard disabled                  | 2          |
+| the refusal reason echoes its full input                      | 1          |
+| the parser's `MAX_ENTRY_CENTS` check deleted                  | 1          |
+| the schema's `MAX_ENTRY_CENTS` bound deleted                  | 1          |
+| ENTER FIGURES no longer gated on a successful read            | 1          |
+| the chosen `DataState` replaced by a constant `POSTED`        | 1          |
+| an eighth decision in the enum but not in the SQL CHECK       | 1          |
+
+**The zero is the honest row, and the interesting one.** `Math.round(parseFloat(x) * 100)`
+is not merely undetected — it is CORRECT across the whole accepted domain. That was
+measured rather than argued: 3,000,000 random values spanning `0..MAX_ENTRY_CENTS`
+produced ZERO disagreements with exact digit arithmetic, while `Math.floor` produced
+12,299 mismatches in 200,000 (about 6%, the first at `5440878048.65`). No test can
+distinguish an equivalent implementation, so the suite is not weakened by failing to —
+and contorting one to catch a non-bug would have been worse than the gap.
+
+Digits-as-digits remains the right implementation for a reason the measurement itself
+shows: rounding is exact here only by an argument about float error relative to
+`MAX_ENTRY_CENTS`, and that argument stops holding the moment someone raises the cap.
+Exact-by-construction survives an edit that exact-by-margin does not.
+
+The critic's underlying point was right even though its mutant was not a defect: the
+original test asserted `Number.isInteger(cents)` — a property of the RESULT TYPE that any
+`Math.round` satisfies. It is now an exhaustive sweep of all 200,001 two-decimal strings
+from `$0.00` to `$2,000.00`, which catches any truncating or off-by-one arithmetic.
+
+Verification after the amendment: `npm run verify` green; `npm run build` green with the
+artifact assertion; `npm run probe:runtime` green — including that a figure TYPED INTO THE
+FORM reaches real SQLite as `654321` cents. That is the only Ledger assertion that crosses
+from a keystroke, through the form, over the real IPC boundary and into the database;
+every other one drives `window.jarvis` directly, which proves the channel works and says
+nothing about whether a person can reach it.
 
 ## Review — OUTSTANDING, and this ADR does not claim otherwise
 

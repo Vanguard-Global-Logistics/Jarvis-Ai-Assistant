@@ -71,7 +71,7 @@ export function fieldStyle(): CSSProperties {
     fontFamily: fontFamily.body,
     fontSize: 11,
     color: text.body,
-    background: 'rgba(255,255,255,0.03)',
+    background: surface.glass,
     border: `1px solid ${surface.hairline}`,
     borderRadius: 4,
   };

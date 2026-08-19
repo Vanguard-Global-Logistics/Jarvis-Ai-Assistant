@@ -108,10 +108,11 @@ const ALLOWED_API = [
   // new ADR with its own independent review, never an edit to this list.
   //
   // Its credential half is NOT held by absence, and this comment used to say
-  // it was: `createPurchaseReview` takes nine free-text fields that would each
-  // hold an account number fine. Those are refused by a guard in the store,
-  // over ten known formats. Absence and a guard are different strengths of
-  // claim and this file should not blur them.
+  // it was: `createPurchaseReview` takes free-text fields that would each hold
+  // an account number fine (`CREDENTIAL_BEARING_FIELDS` names the exact set).
+  // Those are refused by a guard in the store, over ten known formats. Absence
+  // and a guard are different strengths of claim, and this file should not blur
+  // them.
   //
   // `decidePurchaseReview` is separate from `createPurchaseReview` for the
   // same reason `approveForgeItem` is separate from `recordForgeEvidence`: a

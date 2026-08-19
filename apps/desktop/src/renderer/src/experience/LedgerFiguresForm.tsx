@@ -1,9 +1,11 @@
 import { useCallback, useState } from 'react';
 import type { JSX } from 'react';
-import type { DataState, LedgerInputs, SetLedgerInputsRequest } from '@jarvis/contracts';
+import type { DataState, Figure, LedgerInputs, SetLedgerInputsRequest } from '@jarvis/contracts';
 import { DATA_STATES, formatCentsForInput, parseDollarsToCents } from '@jarvis/contracts';
 import { accent, fontFamily, letterSpacing, surface, text } from '@jarvis/ui';
 import { bridgeMember } from './bridge.js';
+import { LEDGER_TERMS, isDeduction } from './ledgerTerms.js';
+import type { LedgerTermKey } from './ledgerTerms.js';
 import { fieldStyle, formButton, inlineAlert } from './panelStyles.js';
 
 /**
@@ -18,18 +20,35 @@ import { fieldStyle, formButton, inlineAlert } from './panelStyles.js';
  * could only ever render its own refusal to compute. A channel with no human
  * caller is not a feature; it is a tested API.
  *
- * ## The three rules this form does not get to relax
+ * ## `inputs` is NON-NULLABLE, and that is a data-safety property
+ *
+ * The first version took `LedgerInputs | null` and seeded an all-MISSING draft
+ * for the null case. A swarm critic traced what that composes into, and it is
+ * the worst defect this module has had: `setLedgerInputs` is a whole-row
+ * upsert with no merge, so saving an all-MISSING draft REPLACES all seven
+ * stored figures with nothing. The null case is reachable the moment
+ * `getLedgerInputs` throws — the panel then renders "Ledger could not read its
+ * figures" while still offering ENTER FIGURES — and again by clicking in the
+ * tick before the first read resolves. One click on a failed read would have
+ * destroyed the figures the whole module exists to protect, and the runtime
+ * probe could not have seen it, because a blanked form has seven inputs too.
+ *
+ * Making the prop non-nullable turns that into a compile error, and the panel
+ * gates the button on the same `inputs !== null` its reading surface already
+ * used. This is `safeToSpend`'s own rule applied to the write path: when the
+ * current state is unknown, REFUSE the operation rather than substitute zero.
+ *
+ * ## The other rules this form does not get to relax
  *
  * 1. **MISSING is a first-class choice, not an empty box.** Every term has an
  *    explicit state, `MISSING` included, so clearing a figure is a decision a
- *    person makes rather than a blank the form guesses about. An amount left
- *    blank is not zero here any more than it is in `safeToSpend`.
+ *    person makes rather than a blank the form guesses about.
  * 2. **Deductions may not be negative** — checked here so the person sees
  *    *which* row is wrong, and again at the Zod boundary, and again by a
  *    `CHECK` on disk. This layer exists for the message, not for the safety;
  *    the two below it are the safety.
  * 3. **Nothing is parsed as a float.** `parseDollarsToCents` reads digits as
- *    digits (see its contract). This form never multiplies a decimal by 100.
+ *    digits. This form never multiplies a decimal by 100.
  *
  * Save is ALL SEVEN AT ONCE, matching `SetLedgerInputsRequestSchema` — the
  * store's single row is replaced whole. A per-row save would let a partial
@@ -43,25 +62,11 @@ interface Draft {
   readonly state: DataState;
 }
 
-type DraftKey = keyof SetLedgerInputsRequest;
-
-const ROWS: { key: DraftKey; label: string; signed: boolean }[] = [
-  // `cash` is the ONLY signed row. An overdrawn account is a real state Ledger
-  // must be able to describe; a negative deduction would INCREASE Safe-to-Spend.
-  { key: 'cash', label: 'Cash', signed: true },
-  { key: 'pending', label: 'Pending', signed: false },
-  { key: 'bills30d', label: 'Bills (30d)', signed: false },
-  { key: 'debtMinimums', label: 'Debt minimums', signed: false },
-  { key: 'emergencyReserve', label: 'Emergency reserve', signed: false },
-  { key: 'commitments', label: 'Commitments', signed: false },
-  { key: 'taxSetAside', label: 'Tax set-aside', signed: false },
-];
-
 /** Seed the form from what is stored, so editing one row does not blank six. */
-function draftFrom(inputs: LedgerInputs | null): Record<DraftKey, Draft> {
-  const entries = ROWS.map(({ key }): [DraftKey, Draft] => {
-    const figure = inputs?.[key];
-    if (figure === undefined || figure.state === 'MISSING') {
+function draftFrom(inputs: LedgerInputs): Record<LedgerTermKey, Draft> {
+  const entries = LEDGER_TERMS.map(({ key }): [LedgerTermKey, Draft] => {
+    const figure = inputs[key];
+    if (figure.state === 'MISSING') {
       // A MISSING figure's cents are meaningless — the store keeps whatever was
       // last there. Rendering that stale number into an editable box would
       // invite someone to accept a figure nobody stands behind.
@@ -69,11 +74,12 @@ function draftFrom(inputs: LedgerInputs | null): Record<DraftKey, Draft> {
     }
     return [key, { amount: formatCentsForInput(figure.cents), state: figure.state }];
   });
-  return Object.fromEntries(entries) as Record<DraftKey, Draft>;
+  return Object.fromEntries(entries) as Record<LedgerTermKey, Draft>;
 }
 
 export interface LedgerFiguresFormProps {
-  readonly inputs: LedgerInputs | null;
+  /** Never null: see the module comment. A failed read must not open this form. */
+  readonly inputs: LedgerInputs;
   readonly onSaved: () => Promise<void> | void;
   readonly onCancel: () => void;
 }
@@ -83,12 +89,12 @@ export function LedgerFiguresForm({
   onSaved,
   onCancel,
 }: LedgerFiguresFormProps): JSX.Element {
-  const [draft, setDraft] = useState<Record<DraftKey, Draft>>(() => draftFrom(inputs));
-  const [rowErrors, setRowErrors] = useState<Partial<Record<DraftKey, string>>>({});
+  const [draft, setDraft] = useState<Record<LedgerTermKey, Draft>>(() => draftFrom(inputs));
+  const [rowErrors, setRowErrors] = useState<Partial<Record<LedgerTermKey, string>>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const update = useCallback((key: DraftKey, patch: Partial<Draft>): void => {
+  const update = useCallback((key: LedgerTermKey, patch: Partial<Draft>): void => {
     setDraft((previous) => ({ ...previous, [key]: { ...previous[key], ...patch } }));
   }, []);
 
@@ -102,16 +108,16 @@ export function LedgerFiguresForm({
 
     // Validate EVERY row before sending any of it. Stopping at the first bad
     // row would make a person fix six typos in six round trips.
-    const errors: Partial<Record<DraftKey, string>> = {};
-    const request: Partial<SetLedgerInputsRequest> = {};
+    const errors: Partial<Record<LedgerTermKey, string>> = {};
+    const figures: Partial<Record<LedgerTermKey, Figure>> = {};
 
-    for (const { key, label, signed } of ROWS) {
+    for (const { key, label } of LEDGER_TERMS) {
       const { amount, state } = draft[key];
       if (state === 'MISSING') {
         // Cents are required by the schema even for MISSING. Zero is the honest
         // filler precisely because `safeToSpend` never reads it — a MISSING
         // term refuses the whole computation before any arithmetic happens.
-        request[key] = { cents: 0, state };
+        figures[key] = { cents: 0, state };
         continue;
       }
       const parsed = parseDollarsToCents(amount);
@@ -119,11 +125,11 @@ export function LedgerFiguresForm({
         errors[key] = parsed.reason;
         continue;
       }
-      if (!signed && parsed.cents < 0) {
+      if (isDeduction(key) && parsed.cents < 0) {
         errors[key] = `${label} is subtracted from cash, so it cannot be negative.`;
         continue;
       }
-      request[key] = { cents: parsed.cents, state };
+      figures[key] = { cents: parsed.cents, state };
     }
 
     setRowErrors(errors);
@@ -132,10 +138,21 @@ export function LedgerFiguresForm({
       return;
     }
 
+    // Every iteration above either recorded an error or set a figure, and the
+    // error case returned — so with no errors, `figures` is total over
+    // `LEDGER_TERMS`. This assertion makes that reasoning FAIL LOUDLY rather
+    // than sending a partial row if it ever stops holding: a short request
+    // would be rejected wholesale by the `.strict()` boundary, and "SAVE does
+    // nothing" is a far worse symptom than an error naming the cause.
+    if (Object.keys(figures).length !== LEDGER_TERMS.length) {
+      setFormError('Ledger could not assemble a complete set of figures, so it saved nothing.');
+      return;
+    }
+
     setSaving(true);
     setFormError(null);
     try {
-      await setLedgerInputs(request as SetLedgerInputsRequest);
+      await setLedgerInputs(figures as SetLedgerInputsRequest);
       await onSaved();
     } catch (cause: unknown) {
       setFormError(cause instanceof Error ? cause.message : 'Ledger could not save those figures.');
@@ -157,7 +174,7 @@ export function LedgerFiguresForm({
         padding: 10,
         border: `1px solid ${surface.hairline}`,
         borderRadius: surface.radiusMin,
-        background: 'rgba(255,255,255,0.03)',
+        background: surface.glass,
       }}
     >
       <span
@@ -171,7 +188,7 @@ export function LedgerFiguresForm({
         ENTER FIGURES — ALL SEVEN SAVE TOGETHER
       </span>
 
-      {ROWS.map(({ key, label, signed }) => (
+      {LEDGER_TERMS.map(({ key, label }) => (
         <div key={key} style={{ display: 'grid', gap: 3 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <label
@@ -189,7 +206,7 @@ export function LedgerFiguresForm({
               id={`ledger-${key}`}
               value={draft[key].amount}
               inputMode="decimal"
-              placeholder={signed ? '-0.00' : '0.00'}
+              placeholder={isDeduction(key) ? '0.00' : '-0.00'}
               disabled={draft[key].state === 'MISSING'}
               onChange={(event) => {
                 update(key, { amount: event.target.value });

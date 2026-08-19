@@ -2,6 +2,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { LedgerInputs } from '@jarvis/contracts';
+import { SetLedgerInputsRequestSchema } from '@jarvis/contracts';
 import { LedgerFiguresForm } from './LedgerFiguresForm.js';
 
 afterEach(() => {
@@ -34,7 +35,7 @@ function stubBridge(
   return setLedgerInputs;
 }
 
-function renderForm(inputs: LedgerInputs | null = stored(), onSaved = vi.fn()): void {
+function renderForm(inputs: LedgerInputs = stored(), onSaved = vi.fn()): void {
   render(<LedgerFiguresForm inputs={inputs} onSaved={onSaved} onCancel={vi.fn()} />);
 }
 
@@ -57,9 +58,10 @@ describe('LedgerFiguresForm — the surface that makes set-inputs reachable', ()
     expect(screen.getByLabelText<HTMLInputElement>('Bills (30d)').disabled).toBe(true);
   });
 
-  it('sends all seven terms as integer cents', async () => {
+  it('sends all seven terms as integer cents, and the payload passes the REAL schema', async () => {
     const setLedgerInputs = stubBridge();
-    renderForm();
+    const onSaved = vi.fn();
+    renderForm(stored(), onSaved);
     fireEvent.change(screen.getByLabelText('Cash'), { target: { value: '1234.56' } });
     fireEvent.click(screen.getByText('SAVE FIGURES'));
 
@@ -70,6 +72,18 @@ describe('LedgerFiguresForm — the surface that makes set-inputs reachable', ()
       string,
       { cents: number } | undefined
     >;
+    // Asserting against a `vi.fn()` proves only that SOMETHING was passed. The
+    // boundary that actually judges this payload is Zod in main, so the test
+    // runs the real schema over it — a shape main would reject must not be
+    // green here.
+    expect(SetLedgerInputsRequestSchema.safeParse(sent).success).toBe(true);
+    // The success callback is asserted POSITIVELY. It was previously only ever
+    // checked with `not.toHaveBeenCalled()` on the failure path, so deleting
+    // `await onSaved()` left the suite green while the panel stopped closing
+    // the form and stopped refreshing the figures it had just written.
+    await waitFor(() => {
+      expect(onSaved).toHaveBeenCalledTimes(1);
+    });
     expect(sent.cash?.cents).toBe(123456);
     expect(Object.keys(sent).sort()).toStrictEqual([
       'bills30d',
@@ -83,6 +97,32 @@ describe('LedgerFiguresForm — the surface that makes set-inputs reachable', ()
     for (const figure of Object.values(sent)) {
       expect(Number.isInteger(figure?.cents)).toBe(true);
     }
+  });
+
+  it('sends the DATA STATE the person chose, not a confident default', async () => {
+    // Without this, rewriting line-of-sight `state` to a constant `'POSTED'`
+    // left every test green — and that mutation makes an ESTIMATED or ASSUMED
+    // figure read as confirmed, which is the exact claim this module exists to
+    // never make.
+    const setLedgerInputs = stubBridge();
+    renderForm();
+    fireEvent.change(screen.getByLabelText('Cash'), { target: { value: '1234.56' } });
+    fireEvent.change(screen.getByLabelText('Cash state'), { target: { value: 'ESTIMATED' } });
+    fireEvent.change(screen.getByLabelText('Commitments state'), {
+      target: { value: 'CONFIRMED' },
+    });
+    fireEvent.click(screen.getByText('SAVE FIGURES'));
+
+    await waitFor(() => {
+      expect(setLedgerInputs).toHaveBeenCalled();
+    });
+    const sent = setLedgerInputs.mock.calls[0]?.[0] as Record<
+      string,
+      { cents: number; state: string } | undefined
+    >;
+    expect(sent.cash).toStrictEqual({ cents: 123456, state: 'ESTIMATED' });
+    expect(sent.commitments?.state).toBe('CONFIRMED');
+    expect(sent.taxSetAside?.state).toBe('ESTIMATED');
   });
 
   it('parses 0.29 as 29 cents — not 28, which the float path would give', async () => {

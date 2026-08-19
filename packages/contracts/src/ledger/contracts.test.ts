@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
   CreatePurchaseReviewRequestSchema,
+  CREDENTIAL_BEARING_FIELDS,
   CostGovernorStatusSchema,
+  REVIEW_LABEL_MAX_LENGTH,
+  REVIEW_TEXT_MAX_LENGTH,
   DEDUCTION_TERMS,
   DecidePurchaseReviewRequestSchema,
+  DeductionFigureSchema,
   EXPENSE_CLASSIFICATIONS,
+  FigureSchema,
   JUSTIFICATION_FIELDS,
   LedgerInputsSchema,
   MAX_ENTRY_CENTS,
@@ -372,17 +377,41 @@ describe('parseDollarsToCents — the only path a typed amount takes into the sy
     }
   });
 
-  it('is EXACT where the float path is not — the bug this function exists to avoid', () => {
-    // `parseFloat('1234.56') * 100` is 123456.00000000001. The whole point of
-    // reading digits as digits is that no value here is ever a binary fraction.
-    // These are the classic offenders; every one must land on the integer.
-    for (const dollars of ['0.07', '0.29', '1.10', '2.90', '8.20', '29.00', '1.005'.slice(0, 4)]) {
-      const parsed = parseDollarsToCents(dollars);
-      expect(parsed.ok, dollars).toBe(true);
-      if (parsed.ok) expect(Number.isInteger(parsed.cents), dollars).toBe(true);
+  it('is EXACT where BOTH float paths are not — the bug this function exists to avoid', () => {
+    // The first version of this test asserted `Number.isInteger(parsed.cents)`
+    // over a list of "classic offenders". A swarm critic RAN the mutant and
+    // showed the test could not see the one that matters: replacing the digit
+    // arithmetic with `Math.round(parseFloat(x) * 100)` left all 79 checks
+    // green, because `Math.round` always returns an integer and rounding
+    // happens to rescue 0.29 and 8.20. It caught only the TRUNCATING float
+    // path (`Math.floor`), which is not the one a future author would write.
+    //
+    // A property of the result TYPE is not the behaviour that distinguishes
+    // two implementations. This sweeps every two-decimal string in a range
+    // instead: `Math.round(parseFloat(s) * 100)` disagrees with exact digit
+    // arithmetic somewhere in it, so no float path survives.
+    let checked = 0;
+    for (let cents = 0; cents <= 200_000; cents += 1) {
+      const text = formatCentsForInput(cents);
+      const parsed = parseDollarsToCents(text);
+      expect(parsed, text).toStrictEqual({ ok: true, cents });
+      checked += 1;
     }
+    expect(checked).toBe(200_001);
+  });
+
+  it('lands on the integer the float path misses, at the values that expose it', () => {
+    // Pinned individually so a failure names the value rather than a sweep
+    // index. Each of these is a string where at least one float formulation
+    // produces the wrong cents.
     expect(parseDollarsToCents('0.29')).toStrictEqual({ ok: true, cents: 29 });
     expect(parseDollarsToCents('8.20')).toStrictEqual({ ok: true, cents: 820 });
+    expect(parseDollarsToCents('1.10')).toStrictEqual({ ok: true, cents: 110 });
+    expect(parseDollarsToCents('0.07')).toStrictEqual({ ok: true, cents: 7 });
+    expect(parseDollarsToCents('1.005')).toStrictEqual({
+      ok: false,
+      reason: 'Amounts have at most two decimal places (cents).',
+    });
   });
 
   it('accepts a dollar sign, commas, and surrounding whitespace', () => {
@@ -413,18 +442,113 @@ describe('parseDollarsToCents — the only path a typed amount takes into the sy
     }
   });
 
-  it('refuses an amount too large to stay exact', () => {
-    const parsed = parseDollarsToCents('99999999999999999999');
-    expect(parsed.ok).toBe(false);
+  it('refuses the FIRST value over the cap, not merely an absurd one', () => {
+    // The first version only tried '99999999999999999999', whose magnitude
+    // (1e22) is refused by any sane guard — so deleting the `MAX_ENTRY_CENTS`
+    // comparison entirely left the suite green, as a swarm critic showed. The
+    // boundary needs a witness on the refused side, one cent over.
+    const overByOneCent = MAX_ENTRY_CENTS + 1;
+    const asDollars = `${String(Math.floor(overByOneCent / 100))}.${String(overByOneCent % 100).padStart(2, '0')}`;
+    const parsed = parseDollarsToCents(asDollars);
+    expect(parsed.ok, asDollars).toBe(false);
     if (!parsed.ok) expect(parsed.reason).toContain('too large');
-    // And the boundary itself is inclusive on the safe side.
-    expect(parseDollarsToCents(String(MAX_ENTRY_CENTS / 100)).ok).toBe(true);
   });
 
-  it('never quotes a huge input back in full — a reason is not an echo', () => {
-    const parsed = parseDollarsToCents('x'.repeat(5000));
-    expect(parsed.ok).toBe(false);
-    if (!parsed.ok) expect(parsed.reason.length).toBeLessThan(200);
+  it('accepts the LAST value at the cap — the boundary is inclusive', () => {
+    expect(parseDollarsToCents(String(MAX_ENTRY_CENTS / 100))).toStrictEqual({
+      ok: true,
+      cents: MAX_ENTRY_CENTS,
+    });
+  });
+
+  it('the SCHEMAS enforce the cap too — a caller bypassing the form is refused', () => {
+    // The parser is a renderer-side helper. Main is the side that must not
+    // trust the caller, so the bound has to live on the schema or it is a UI
+    // hint. `1e300` passed every check before this.
+    expect(FigureSchema.safeParse({ cents: 1e300, state: 'POSTED' }).success).toBe(false);
+    expect(FigureSchema.safeParse({ cents: -1e300, state: 'POSTED' }).success).toBe(false);
+    expect(FigureSchema.safeParse({ cents: MAX_ENTRY_CENTS + 1, state: 'POSTED' }).success).toBe(
+      false,
+    );
+    expect(FigureSchema.safeParse({ cents: MAX_ENTRY_CENTS, state: 'POSTED' }).success).toBe(true);
+    // Cash may be negative to the same depth — an overdrawn account is real.
+    expect(FigureSchema.safeParse({ cents: -MAX_ENTRY_CENTS, state: 'POSTED' }).success).toBe(true);
+    expect(
+      DeductionFigureSchema.safeParse({ cents: MAX_ENTRY_CENTS + 1, state: 'POSTED' }).success,
+    ).toBe(false);
+    expect(
+      CreatePurchaseReviewRequestSchema.safeParse({
+        outcome: 'A very expensive monitor',
+        whyNow: '',
+        alternatives: '',
+        lowestCostOption: '',
+        premiumOption: '',
+        costCents: MAX_ENTRY_CENTS + 1,
+        projectPaying: '',
+        classification: 'essential',
+        benefit: '',
+        risk: '',
+        delayConsequence: '',
+        cancellationRequired: false,
+      }).success,
+    ).toBe(false);
+  });
+
+  it('a stored figure can always be re-read by the form that must edit it', () => {
+    // The round-trip claim quantifies over what the SCHEMA admits. If the
+    // schema allowed a figure the parser refuses, seeding the form with it
+    // would make an unrelated row unsaveable with no way out.
+    for (const cents of [MAX_ENTRY_CENTS, -MAX_ENTRY_CENTS, 0, 1, -1]) {
+      const text = formatCentsForInput(cents);
+      expect(parseDollarsToCents(text), text).toStrictEqual({ ok: true, cents });
+    }
+  });
+
+  it('QUOTES NOTHING BACK — the reason is a constant, not an echo', () => {
+    // This test previously asserted `reason.length < 200` against a
+    // 5,000-character string. That is a bound five to eight times looser than
+    // the 24-character cap it claimed to protect, so it stayed green against
+    // every credential shorter than 24 characters — which is most of them —
+    // and against re-introducing a 150-character echo. A test passing against
+    // the leak it is named after is the exact failure this repository has paid
+    // for before.
+    //
+    // Assert the property instead: the refusal is one fixed sentence.
+    const NOT_AN_AMOUNT = 'That is not an amount. Enter digits, for example 1234.56.';
+    for (const input of ['x'.repeat(5000), 'abc', '1.2.3', '--5']) {
+      const parsed = parseDollarsToCents(input);
+      expect(parsed.ok, input).toBe(false);
+      if (!parsed.ok) expect(parsed.reason, input).toBe(NOT_AN_AMOUNT);
+    }
+  });
+
+  it('a bare routing number is READ AS AN AMOUNT — the documented limit of the guard', () => {
+    // Not a leak, and worth pinning so nobody "fixes" it into one: nine digits
+    // is a perfectly valid amount, so it is parsed rather than quoted. This is
+    // exactly the gap every artifact already states — the guard catches ten
+    // credential FORMATS and cannot catch a bare account number typed as
+    // digits, because it is indistinguishable from money.
+    expect(parseDollarsToCents('021000021')).toStrictEqual({ ok: true, cents: 2_100_002_100 });
+  });
+
+  it('never echoes a CREDENTIAL, including the short formats a length cap missed', () => {
+    // Every one of these is at or under 24 characters — the cap an earlier
+    // version presented as a security property. Each was echoed in full.
+    const planted = [
+      `AKIA${'A'.repeat(16)}`, // AWS access key id, exactly 20
+      `xai-${'0'.repeat(16)}`, // 20
+      `ghp_${'a'.repeat(20)}`, // 24
+      `sk-${'z'.repeat(20)}`, // 23
+    ];
+    for (const secret of planted) {
+      const parsed = parseDollarsToCents(secret);
+      expect(parsed.ok, secret).toBe(false);
+      if (!parsed.ok) {
+        expect(parsed.reason, secret).not.toContain(secret);
+        // Not even a recognisable prefix of it.
+        expect(parsed.reason, secret).not.toContain(secret.slice(0, 8));
+      }
+    }
   });
 
   it('round-trips through formatCentsForInput for every value it produced', () => {
@@ -489,6 +613,66 @@ describe('missingJustification — reports gaps, never refuses the record', () =
       expect(missingJustification(blank).length > 0, classification).toBe(
         requiresJustification(classification),
       );
+    }
+  });
+});
+
+describe('the credential-bearing surface is DERIVED, not transcribed', () => {
+  it('is exactly the nine free-text fields on the create request', () => {
+    // Six documents once stated this count by hand, in two different numbers,
+    // all of them adding "each up to 2,000 characters" — wrong for three.
+    // Deriving it from the schema means the prose cannot outlive the shape.
+    expect(CREDENTIAL_BEARING_FIELDS).toStrictEqual([
+      'alternatives',
+      'benefit',
+      'delayConsequence',
+      'lowestCostOption',
+      'outcome',
+      'premiumOption',
+      'projectPaying',
+      'risk',
+      'whyNow',
+    ]);
+    expect(CREDENTIAL_BEARING_FIELDS).toHaveLength(9);
+  });
+
+  it('splits into seven narrative fields at 2,000 and two labels at 200', () => {
+    // The half of the claim that was wrong everywhere it was written.
+    const longText = 'a'.repeat(REVIEW_TEXT_MAX_LENGTH);
+    const tooLongLabel = 'a'.repeat(REVIEW_LABEL_MAX_LENGTH + 1);
+    const base = {
+      outcome: 'x',
+      whyNow: '',
+      alternatives: '',
+      lowestCostOption: '',
+      premiumOption: '',
+      costCents: 1,
+      projectPaying: '',
+      classification: 'essential' as const,
+      benefit: '',
+      risk: '',
+      delayConsequence: '',
+      cancellationRequired: false,
+    };
+    for (const field of [
+      'whyNow',
+      'alternatives',
+      'lowestCostOption',
+      'premiumOption',
+      'benefit',
+      'risk',
+      'delayConsequence',
+    ]) {
+      expect(
+        CreatePurchaseReviewRequestSchema.safeParse({ ...base, [field]: longText }).success,
+        field,
+      ).toBe(true);
+    }
+    for (const label of ['outcome', 'projectPaying']) {
+      expect(
+        CreatePurchaseReviewRequestSchema.safeParse({ ...base, [label]: tooLongLabel }).success,
+        label,
+      ).toBe(false);
     }
   });
 });

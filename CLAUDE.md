@@ -726,7 +726,7 @@ to a design.
 | **Memory** | Long-term memory; repository/state files are the production source of truth, **not** conversational memory | Real CRUD in Phase 1. Sensitivity level + approval/review workflow is a **new Phase 1 design decision** — the handoff docs do not define one. |
 | **Drive Mode** | Separate personality profile; safety override always-on (humor forced to 0 during maneuvers/hazards/emergencies/"quiet") | State UI only. **Waze coordination is conceptual — Jarvis must never claim to control Waze internally.** |
 | **Forge** | Build/dev watchtower. Non-negotiable five-fact model: **claimed ≠ committed ≠ tested ≠ previewed ≠ approved** | **v1 IMPLEMENTED (ADR 0034).** Manual Task Bridge only — no real GitHub/Vercel calls, no automated repair. |
-| **Ledger** | Read-only advisory personal CFO. Safe-to-Spend, Cost Governor, purchase review | **v1 IMPLEMENTED (ADR 0035)** — Safe-to-Spend store + purchase-review record, main-process and IPC only. No real banking. The panel is READ-ONLY (no entry form, no way to open a review) and the Cost Governor is unwired. Independent review OUTSTANDING. |
+| **Ledger** | Read-only advisory personal CFO. Safe-to-Spend, Cost Governor, purchase review | **v1 IMPLEMENTED (ADR 0035)** — Safe-to-Spend store + purchase-review record. No real banking. The panel WRITES: ENTER FIGURES and OPEN A REVIEW give both write channels a human caller, and `probe:runtime` drives a typed figure through the form into real SQLite. The Cost Governor is still unwired. Independent review OUTSTANDING. |
 | **AEGIS** | Independent security/containment runtime | **Real state engine in Phase 1** — with proof Jarvis cannot self-lower restrictions. |
 
 ### Official long-term modules of the Jarvis ecosystem
@@ -741,7 +741,7 @@ except Forge (ADR 0034) and Ledger (ADR 0035), which have v1s** — see its row 
 | **Throne OS** | The **parent AI operating platform** — the ecosystem within which Jarvis, Forge, Ledger, and AEGIS operate | The platform layer | **NOT IMPLEMENTED** |
 | **Jarvis** | The **personal AI** — assistant and orchestrator for William | Orchestration, personality, conversation, memory | **NOT IMPLEMENTED** (Phase 1 builds the foundation) |
 | **Forge** | The **software engineering system** | Build/dev pipeline state and approval evidence | **v1 IMPLEMENTED (ADR 0034)** — five-fact tracking, manual Task Bridge, no real GitHub/Vercel |
-| **Ledger** | **Manages finances** — read-only, advisory | Financial advisory state | **v1 IMPLEMENTED (ADR 0035)** — Safe-to-Spend store + purchase reviews; cannot move money. Read-only panel; Cost Governor unwired; review OUTSTANDING |
+| **Ledger** | **Manages finances** — read-only, advisory | Financial advisory state | **v1 IMPLEMENTED (ADR 0035)** — Safe-to-Spend store + purchase reviews; cannot move money. Panel reads AND writes; Cost Governor unwired; review OUTSTANDING |
 | **AEGIS** | **Manages security, independently** of Jarvis | Security level, capability grants, audit log | **NOT IMPLEMENTED** (Phase 1 builds the real state engine) |
 | **BCI Agent** | **Internal AV project management AI** | AV project management | **NOT IMPLEMENTED** |
 | **Sophisticated Sips** | **Business operating system for Amy Lavold's coffee business**, including **Menu OS** | Coffee business operations; Menu OS | **NOT IMPLEMENTED** |

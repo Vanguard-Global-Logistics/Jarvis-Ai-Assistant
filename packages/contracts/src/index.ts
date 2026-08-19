@@ -107,6 +107,7 @@ export type {
 export {
   CENTS_PER_DOLLAR,
   COST_GOVERNOR_BANDS,
+  CREDENTIAL_BEARING_FIELDS,
   CostGovernorStatusSchema,
   CreatePurchaseReviewRequestSchema,
   DATA_STATES,
@@ -118,6 +119,7 @@ export {
   ExpenseClassificationSchema,
   FigureSchema,
   JUSTIFICATION_FIELDS,
+  JUSTIFICATION_FIELD_LABELS,
   LedgerInputsSchema,
   MAX_ENTRY_CENTS,
   PURCHASE_DECISIONS,
@@ -235,6 +237,7 @@ export type {
 
 export {
   CREDENTIAL_REFUSED_MESSAGE,
+  LEDGER_CREDENTIAL_REFUSED_MESSAGE,
   MEMORY_CREDENTIAL_PATTERNS,
   looksLikeCredential,
 } from './memory/credential-guard.js';

@@ -19,14 +19,34 @@ import { z } from 'zod';
  *
  * **The credential half of rule 10 is a GUARD, not an absence, and an earlier
  * version of this comment claimed otherwise.** It said no field here could
- * hold an account or routing number. That was false: `reviewText` below is
- * 2,000 characters of free text, ten times over, and a routing number or an
- * API key fits in it perfectly well. The absence argument had been checked
- * against field NAMES and never against what the field TYPES admit. What is
- * true is that `refuseIfCredential` in `apps/desktop/src/main/ledger/store.ts`
- * rejects credential-shaped text before the write, and that it catches ten
- * known formats rather than every possible one — a bare account number typed
- * as digits is indistinguishable from an amount.
+ * hold an account or routing number. That was false — a routing number or an
+ * API key fits in a free-text field perfectly well. The absence argument had
+ * been checked against field NAMES and never against what the field TYPES
+ * admit. What is true is that `refuseIfCredential` in
+ * `apps/desktop/src/main/ledger/store.ts` rejects credential-shaped text
+ * before the write, over ten known formats rather than every possible one — a
+ * bare account number typed as digits is indistinguishable from an amount.
+ *
+ * ## THE authoritative count of the credential-bearing surface
+ *
+ * Every other artifact that describes this surface must point HERE rather than
+ * restate it. The correction above was first written out by hand in six
+ * documents and arrived already drifted — some said ten fields, some nine, and
+ * all of them said "each up to 2,000 characters", which is wrong for three of
+ * them. Fixing an over-strong claim by copy-pasting a wrong one is the same
+ * defect one level up, so the count is now derived from the schema by
+ * `CREDENTIAL_BEARING_FIELDS` below and asserted by a test:
+ *
+ * - **Seven** narrative fields capped at `REVIEW_TEXT_MAX_LENGTH` (2,000):
+ *   `whyNow`, `alternatives`, `lowestCostOption`, `premiumOption`, `benefit`,
+ *   `risk`, `delayConsequence`.
+ * - **Two** labels capped at `REVIEW_LABEL_MAX_LENGTH` (200) on the create
+ *   request: `outcome` (also `CHECK (length(outcome) BETWEEN 1 AND 200)` on
+ *   disk) and `projectPaying`.
+ * - **One** more label at 200 on the SEPARATE decide channel: `decidedBy`.
+ *
+ * So: **nine guarded fields on `ledger:create-review`, ten guarded columns in
+ * total.** Both numbers are correct; neither is correct without saying which.
  *
  * ## Money is integer CENTS, everywhere, with no exceptions
  *
@@ -79,10 +99,39 @@ const STATE_STRENGTH: Record<DataState, number> = {
   POSTED: 5,
 };
 
+/**
+ * The largest amount any figure may hold, in cents — ten billion dollars.
+ *
+ * Not a guess at William's finances; a guard on the arithmetic. Every figure
+ * here is a JavaScript number, exact only below `Number.MAX_SAFE_INTEGER`
+ * (about $90 trillion in cents). Refusing about four orders of magnitude below
+ * that — roughly 9,000x of headroom — keeps every sum, difference and Cost
+ * Governor product exact with room to spare, and turns a pasted-by-accident digit string into a message rather
+ * than a silently rounded total.
+ *
+ * **Enforced by the SCHEMAS below, not only by the parser.** The first version
+ * checked it inside `parseDollarsToCents` alone — the renderer-side helper —
+ * which a swarm critic correctly called a UI hint rather than a constraint:
+ * main is the side that must not trust the caller, and any caller reaching
+ * `ledger:set-inputs` directly could store `1e300`. It would then come back
+ * through `safeToSpend` as a figure the "money is never a float" promise says
+ * cannot exist, and seed a form box the parser refuses to re-read — so a
+ * person editing an unrelated row could not save at all.
+ */
+export const MAX_ENTRY_CENTS = 1_000_000_000_000;
+
+/**
+ * An amount in cents, bounded on both sides. Signed — only `cash` uses it.
+ */
+const signedCents = z.number().int().min(-MAX_ENTRY_CENTS).max(MAX_ENTRY_CENTS);
+
+/** An amount in cents that may never be negative. */
+const unsignedCents = z.number().int().min(0).max(MAX_ENTRY_CENTS);
+
 /** A figure: an amount in cents, and how sure anyone is about it. */
 export const FigureSchema = z
   .object({
-    cents: z.number().int(),
+    cents: signedCents,
     state: DataStateSchema,
   })
   .strict();
@@ -100,7 +149,7 @@ export type Figure = z.infer<typeof FigureSchema>;
  */
 export const DeductionFigureSchema = z
   .object({
-    cents: z.number().int().min(0),
+    cents: unsignedCents,
     state: DataStateSchema,
   })
   .strict();
@@ -215,6 +264,10 @@ export const SafeToSpendSchema = z.discriminatedUnion('computable', [
     .object({
       computable: z.literal(true),
       cents: z.number().int(),
+      // Deliberately UNBOUNDED, unlike the inputs: this is a computed
+      // difference, and seven bounded terms can legitimately sum outside the
+      // per-figure cap. Bounding a derived value would make the module refuse
+      // to describe a state it can correctly reach.
       /**
        * The WEAKEST state among the seven terms. A total built on one
        * `ASSUMED` figure is an assumed total, and saying so is the difference
@@ -431,7 +484,7 @@ export const PurchaseReviewSchema = z
     lowestCostOption: reviewText,
     premiumOption: reviewText,
     /** Integer cents, never negative — a purchase does not earn money. */
-    costCents: z.number().int().min(0),
+    costCents: unsignedCents,
     /** Which project's budget pays. Free label in v1; there is no project table yet. */
     projectPaying: z.string().trim().max(REVIEW_LABEL_MAX_LENGTH),
     classification: ExpenseClassificationSchema,
@@ -459,7 +512,7 @@ export const PurchaseReviewSchema = z
      * look prudent in hindsight.
      */
     safeToSpendBefore: z
-      .object({ cents: z.number().int(), confidence: DataStateSchema })
+      .object({ cents: signedCents, confidence: DataStateSchema })
       .strict()
       .nullable(),
     createdAt: z.iso.datetime(),
@@ -509,22 +562,24 @@ export const DecidePurchaseReviewRequestSchema = z
 
 export type DecidePurchaseReviewRequest = z.infer<typeof DecidePurchaseReviewRequestSchema>;
 
+/**
+ * Every free-text field on `ledger:create-review` that could hold a credential
+ * — derived from the request schema itself, so prose cannot outlive it.
+ *
+ * `refuseIfCredential` in the store is called with exactly this set (plus
+ * `decidedBy` on the separate decide path). A test asserts the length, so
+ * adding an eighth narrative field to `PurchaseReviewSchema` fails the suite
+ * until someone decides whether it is guarded.
+ */
+export const CREDENTIAL_BEARING_FIELDS = Object.entries(CreatePurchaseReviewRequestSchema.shape)
+  .filter(([, schema]) => schema instanceof z.ZodString)
+  .map(([key]) => key)
+  .sort();
+
 /** Every review, newest first. */
 export const PurchaseReviewListSchema = z.array(PurchaseReviewSchema);
 
 export type PurchaseReviewList = z.infer<typeof PurchaseReviewListSchema>;
-
-/**
- * The largest amount a person may type, in cents — ten billion dollars.
- *
- * Not a guess at William's finances; a guard on the arithmetic. Every figure
- * here is a JavaScript number, exact only below `Number.MAX_SAFE_INTEGER`
- * (about $90 trillion in cents). Refusing five orders of magnitude below that
- * keeps every sum, difference and Cost Governor product exact with room to
- * spare, and turns a pasted-by-accident digit string into a message rather
- * than a silently rounded total.
- */
-export const MAX_ENTRY_CENTS = 1_000_000_000_000;
 
 /**
  * The result of reading a typed dollar amount — a discriminated union, for the
@@ -562,21 +617,41 @@ export function parseDollarsToCents(input: string): CentsParse {
   const cleaned = input.trim().replace(/^\$/, '').replace(/,/g, '').trim();
   if (cleaned.length === 0) return { ok: false, reason: 'Enter an amount, or mark it MISSING.' };
 
-  // The rejected text is TRUNCATED before it goes into the message, and this
-  // is a security property rather than tidiness. A refusal reason is rendered
-  // into the panel and may be logged; quoting an arbitrary-length input back
-  // in full means a mis-pasted API key travels straight into both. The store's
-  // credential guard already refuses to echo — a parser that echoes anyway
-  // would reopen the hole one layer up. 24 characters is enough to recognise
-  // your own typo and not enough to carry a secret.
-  const quoted = cleaned.length > 24 ? `${cleaned.slice(0, 24)}…` : cleaned;
+  // The refusal QUOTES NOTHING BACK, and the first version of this function
+  // got that wrong in a way worth recording, because the wrong fix looked
+  // exactly like a right one.
+  //
+  // It began by echoing the whole input. A test caught that, and the fix
+  // capped the echo at 24 characters with a comment calling 24 "enough to
+  // recognise your own typo and not enough to carry a secret". A swarm critic
+  // then pointed out that three of the ten credential formats this repo's own
+  // guard knows are 24 characters or SHORTER: an AWS access key id is exactly
+  // 20, `xai-` plus 16 is 20, `ghp_` plus 20 is 24. Every one of them was
+  // echoed in full, into a `role="alert"` node, by a cap documented as closing
+  // the hole. The test was green the whole time because it asserted a LENGTH
+  // bound against a 5,000-character string, so it could not see any real
+  // credential — a test passing against the leak it is named after, which is a
+  // failure mode this repository has paid for before.
+  //
+  // The lesson is that the property is "quote nothing", and length is
+  // orthogonal to whether the quoted bytes are a secret. Every sibling refusal
+  // — `CREDENTIAL_REFUSED_MESSAGE`, `LEDGER_CREDENTIAL_REFUSED_MESSAGE`, and
+  // `looksLikeCredential`, which returns a boolean and never the matched text
+  // — is a constant. So is this one.
+  const NOT_AN_AMOUNT = 'That is not an amount. Enter digits, for example 1234.56.';
 
   const match = /^(-?)(\d*)(?:\.(\d*))?$/.exec(cleaned);
-  if (match === null) return { ok: false, reason: `"${quoted}" is not an amount.` };
+  if (match === null) return { ok: false, reason: NOT_AN_AMOUNT };
 
   const [, sign, whole = '', fraction] = match;
+  // The `= ''` is dead at RUNTIME — group 2 is `\d*`, which always
+  // participates — but it is not dead to the compiler, which types every
+  // destructured group as `string | undefined`. A swarm critic called it dead
+  // code; removing it produces two `TS18048: 'whole' is possibly 'undefined'`
+  // errors. Kept, with the reason written down so it is not removed a third
+  // time.
   if (whole.length === 0 && (fraction === undefined || fraction.length === 0)) {
-    return { ok: false, reason: `"${quoted}" is not an amount.` };
+    return { ok: false, reason: NOT_AN_AMOUNT };
   }
   if (fraction !== undefined && fraction.length > 2) {
     return { ok: false, reason: 'Amounts have at most two decimal places (cents).' };
@@ -586,7 +661,12 @@ export function parseDollarsToCents(input: string): CentsParse {
   const fractionCents = fraction === undefined ? 0 : Number(fraction.padEnd(2, '0'));
   const magnitude = wholeCents + fractionCents;
 
-  if (!Number.isSafeInteger(magnitude) || magnitude > MAX_ENTRY_CENTS) {
+  // `MAX_ENTRY_CENTS` (1e12) is about 9,000x below `Number.MAX_SAFE_INTEGER`
+  // (~9.007e15) — four orders of magnitude, not the five an earlier version of
+  // this comment claimed — so anything that is not a safe integer is already
+  // over the limit and a separate `Number.isSafeInteger` disjunct here would
+  // be unreachable.
+  if (magnitude > MAX_ENTRY_CENTS) {
     return { ok: false, reason: 'That amount is too large to record.' };
   }
 
@@ -597,7 +677,9 @@ export function parseDollarsToCents(input: string): CentsParse {
  * Cents back to the plain string a text input should hold — `-1234.56`.
  *
  * Deliberately NOT the display format: no `$`, no thousands separators, so
- * `parseDollarsToCents(formatCentsForInput(c)) === c` for every value in range.
+ * `parseDollarsToCents(formatCentsForInput(c)) === c` for every value the
+ * schema admits — which is why `MAX_ENTRY_CENTS` is enforced on the schema and
+ * not only here; a stored figure the parser would refuse could not be edited.
  * A form that renders `$1,234.56` into the box a person then edits is a form
  * that fights its own parser.
  */
@@ -620,6 +702,22 @@ export function formatCentsForInput(cents: number): string {
 export const JUSTIFICATION_FIELDS = ['whyNow', 'alternatives', 'benefit'] as const;
 
 export type JustificationField = (typeof JUSTIFICATION_FIELDS)[number];
+
+/**
+ * What each justification field is CALLED on the form.
+ *
+ * The warning listed raw schema keys — "whyNow, alternatives, benefit" — at a
+ * person looking at boxes captioned "Why now", "Alternatives" and "Benefit".
+ * Naming three things that appear nowhere on screen is not naming them. Same
+ * key-versus-label split the seven Safe-to-Spend terms already have, and a
+ * total `Record` for the same reason: a new justification field is a compile
+ * error until someone writes the words a person will read.
+ */
+export const JUSTIFICATION_FIELD_LABELS: Record<JustificationField, string> = {
+  whyNow: 'Why now',
+  alternatives: 'Alternatives',
+  benefit: 'Benefit',
+};
 
 /**
  * Which justification fields a review leaves empty that its own classification

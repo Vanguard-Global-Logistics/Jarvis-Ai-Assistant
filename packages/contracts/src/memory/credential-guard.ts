@@ -96,3 +96,24 @@ export const CREDENTIAL_REFUSED_MESSAGE =
   'Memories are replayed into every future conversation — including ones sent ' +
   'to a brain that leaves this machine. Keys belong in the .env file on this ' +
   'computer, which Jarvis reads but never stores and never shows.';
+
+/**
+ * The Ledger equivalent — same rule, different consequence, so a different
+ * sentence.
+ *
+ * It lives HERE rather than in the store for a reason a swarm critic found:
+ * the renderer test asserting "the refusal does not contain the credential"
+ * had INVENTED its own refusal string, because the real one was in main and a
+ * renderer file may not import main. So the test proved nothing about the real
+ * message, and the two copies could drift without anything noticing — the
+ * repository's own "a rule in two files will drift", applied to a security
+ * message. One constant, importable from both sides.
+ *
+ * Quotes nothing back, for the same reason `looksLikeCredential` returns a
+ * boolean and never the matched text.
+ */
+export const LEDGER_CREDENTIAL_REFUSED_MESSAGE =
+  'That looks like an API key, password, or account number, so Ledger will not ' +
+  'store it. A purchase review is kept for years and is shown again every time ' +
+  'the list is opened. Describe the account, never its numbers — and keys belong ' +
+  'in the .env file on this computer.';

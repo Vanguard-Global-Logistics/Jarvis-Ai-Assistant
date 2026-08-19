@@ -193,11 +193,12 @@ export const CHANNELS = {
    *
    * A correction the first version of this comment needed: it also claimed no
    * channel here accepts "an account number, a routing number, or any
-   * credential", which was not true of the TYPES. `ledger:create-review`
-   * carries nine free-text fields of up to 2,000 characters and any of them
-   * holds a credential fine. Credential CONTENT is refused by a guard in the
-   * store (`refuseIfCredential`), not by absence, and that guard knows ten
-   * formats rather than all of them.
+   * credential", which was not true of the TYPES. Credential CONTENT is refused
+   * by a guard in the store (`refuseIfCredential`), over ten known formats, not
+   * by absence. The exact surface — nine free-text fields here plus `decidedBy`
+   * on `ledger:decide` — is derived by `CREDENTIAL_BEARING_FIELDS` in the
+   * ledger contracts and asserted by a test, rather than restated here as a
+   * number that can drift.
    *
    * `ledger:get-inputs`/`set-inputs` carry the seven person-entered
    * Safe-to-Spend terms — figures a human types, never a bank feed.
