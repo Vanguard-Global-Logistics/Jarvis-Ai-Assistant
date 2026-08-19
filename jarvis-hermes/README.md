@@ -17,6 +17,25 @@ Three layers, each swappable:
 | `config.yaml` | `~/.hermes/config.yaml` | Model choice + memory on |
 | `install.sh` | — | Sets all of the above up on a fresh machine |
 
+## Two installers, and which one you want
+
+`./install.sh` here is the **minimal** one: identity, profile, model config. Nothing
+else. It is correct for standing a bare engine up quickly.
+
+**For a real machine, use the full restore instead:**
+
+```bash
+cd brain-snapshot && ./scripts/install.sh
+```
+
+That copies the whole `~/.hermes` — the installed **skills**, `MEMORY.md`, the
+`agent-hooks/spend_guard.py` daily dollar cap, and the brain router — then rewrites
+the `/tmp` paths the snapshot was born with, re-issues the hook approval, and
+verifies the spend cap actually fires. Details: `brain-snapshot/RESTORE.md`.
+
+The difference matters most where it is quietest: the minimal install has **no spend
+cap**. It works, it answers, and it bills without a ceiling.
+
 Note the memory path: the profile Hermes actually reads is
 `~/.hermes/memories/USER.md`, not `~/.hermes/USER.md`. A file in the second
 location is silently ignored.

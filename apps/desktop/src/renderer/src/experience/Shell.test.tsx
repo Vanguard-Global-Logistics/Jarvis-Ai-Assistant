@@ -1,7 +1,14 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { AppInfo, ForgeItem, Memory } from '@jarvis/contracts';
+import type {
+  AppInfo,
+  ForgeItem,
+  LedgerInputs,
+  Memory,
+  PurchaseReview,
+  SafeToSpend,
+} from '@jarvis/contracts';
 import { AEGIS_CAPABILITIES, DEFAULT_PROFILE, ORB_STATES } from '@jarvis/contracts';
 
 import { orbTiming } from '@jarvis/ui';
@@ -66,6 +73,41 @@ const MEMORY: Memory = {
   sensitivity: 'open',
   learnedFrom: 'told',
   learnedAt: '2026-08-16T12:00:00.000Z',
+};
+
+/** A fresh Ledger: nothing entered, so nothing can be honestly computed. */
+const EMPTY_LEDGER_INPUTS: LedgerInputs = {
+  cash: { cents: 0, state: 'MISSING' },
+  pending: { cents: 0, state: 'MISSING' },
+  bills30d: { cents: 0, state: 'MISSING' },
+  debtMinimums: { cents: 0, state: 'MISSING' },
+  emergencyReserve: { cents: 0, state: 'MISSING' },
+  commitments: { cents: 0, state: 'MISSING' },
+  taxSetAside: { cents: 0, state: 'MISSING' },
+  updatedAt: '1970-01-01T00:00:00.000Z',
+};
+
+const NOT_COMPUTABLE: SafeToSpend = { computable: false, missing: ['cash'] };
+
+const PURCHASE_REVIEW: PurchaseReview = {
+  id: '33333333-3333-4333-8333-333333333333',
+  outcome: 'A second monitor',
+  whyNow: 'Two windows side by side',
+  alternatives: 'Use the laptop screen',
+  lowestCostOption: 'Refurbished, $120',
+  premiumOption: 'New 4K, $400',
+  costCents: 12_000,
+  projectPaying: 'Jarvis',
+  classification: 'efficiency-upgrade',
+  benefit: 'Less window switching',
+  risk: 'Might not help much',
+  delayConsequence: 'Nothing breaks; it waits',
+  cancellationRequired: false,
+  safeToSpendBeforeCents: null,
+  createdAt: '2026-08-19T00:00:00.000Z',
+  decidedAt: null,
+  decision: null,
+  decidedBy: null,
 };
 
 /** One tracked item, for the default Forge bridge stub. */
@@ -168,6 +210,17 @@ function stubBridge(overrides: Partial<JarvisBridge> = {}): void {
     createForgeItem: vi.fn().mockResolvedValue(FORGE_ITEM),
     recordForgeEvidence: vi.fn().mockResolvedValue(FORGE_ITEM),
     approveForgeItem: vi.fn().mockResolvedValue(FORGE_ITEM),
+    // Ledger v1. The honest default for a Shell test is a store nobody has
+    // filled in yet — every term MISSING, so Safe-to-Spend is not computable.
+    getLedgerInputs: vi
+      .fn()
+      .mockResolvedValue({ inputs: EMPTY_LEDGER_INPUTS, safeToSpend: NOT_COMPUTABLE }),
+    setLedgerInputs: vi
+      .fn()
+      .mockResolvedValue({ inputs: EMPTY_LEDGER_INPUTS, safeToSpend: NOT_COMPUTABLE }),
+    listPurchaseReviews: vi.fn().mockResolvedValue([]),
+    createPurchaseReview: vi.fn().mockResolvedValue(PURCHASE_REVIEW),
+    decidePurchaseReview: vi.fn().mockResolvedValue(PURCHASE_REVIEW),
     ...overrides,
   };
   vi.stubGlobal('jarvis', bridge);
@@ -693,5 +746,35 @@ describe('Forge reaches the person through the real Shell (ADR 0034)', () => {
     fireEvent.click(await screen.findByRole('button', { name: /^FORGE/ }));
 
     expect(await screen.findByText(FORGE_ITEM.title)).toBeTruthy();
+  });
+});
+
+/**
+ * Ledger, driven through the REAL Shell
+ * (`docs/architecture/ledger-architecture.md`). Same seam as Forge and Memory:
+ * the panel's own tests prove it in isolation, this proves Shell wires it.
+ */
+describe('Ledger reaches the person through the real Shell', () => {
+  it('mounts LedgerPanel when the LEDGER toggle is clicked', async () => {
+    stubMatchMedia();
+    stubBridge();
+    render(<Shell devStateSwitcher={false} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /^LEDGER/ }));
+
+    expect(await screen.findByText(/never moves money/i)).toBeTruthy();
+  });
+
+  it('shows no Safe-to-Spend number at all when the figures are unknown', async () => {
+    // The property that matters most, asserted at the level a person sees.
+    // A fresh Ledger must not render a confident $0.00.
+    stubMatchMedia();
+    stubBridge();
+    render(<Shell devStateSwitcher={false} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /^LEDGER/ }));
+
+    expect(await screen.findByText(/not enough is known to say/i)).toBeTruthy();
+    expect(screen.queryByText('$0.00')).toBeNull();
   });
 });

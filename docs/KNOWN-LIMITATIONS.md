@@ -159,11 +159,11 @@ storage, separate credentials. Phase 1 will not deliver OS-level enforcement. Wh
 state engine ships, this gap must be restated wherever AEGIS is described — not quietly
 dropped once the UI looks convincing.
 
-## 3. The IPC bridge exposes exactly twenty-four narrow channels
+## 3. The IPC bridge exposes exactly twenty-nine narrow channels
 
 **Status: PARTIAL — intended for this stage.**
 
-`window.jarvis` exposes exactly twenty-four purpose-named functions: `getAppInfo` (host
+`window.jarvis` exposes exactly twenty-nine purpose-named functions: `getAppInfo` (host
 facts), `sendChat` and `amplify` (model calls, ADR 0007), the four history
 operations (ADR 0008), `exportHistory` (ADR 0011), `importHistory` (ADR 0014),
 `describeModels`/`selectModel` (ADR 0022 — which brain is answering, and switching it
@@ -172,10 +172,13 @@ without a restart), `planAutomation` (ADR 0024 — writes a plan, performs nothi
 there is deliberately no way to lower one), `getProfile`/`setProfile`
 (ADR 0013 — the orb's name and colour, which grant nothing),
 `remember`/`listMemories`/`forget` (ADR 0029 — human-driven writes, credential-shaped
-text refused at the boundary), and `listForgeItems`/`getForgeItem`/`createForgeItem`/
+text refused at the boundary), `listForgeItems`/`getForgeItem`/`createForgeItem`/
 `recordForgeEvidence`/`approveForgeItem` (ADR 0034 — a build/dev watchtower;
 `approveForgeItem` is the only one of the five that may ever set an item's approval
-fields). The authority envelope remains
+fields), and `getLedgerInputs`/`setLedgerInputs`/`listPurchaseReviews`/
+`createPurchaseReview`/`decidePurchaseReview` (ADR 0035 — read-only financial advice;
+`decidePurchaseReview` is the only one that may record a decision, and NONE of the five
+moves money). The authority envelope remains
 deliberately small: a model call, a conversation store, a memory store, a build-status
 store, and one backup write whose
 destination the renderer can neither name nor learn — main opens the native save
@@ -404,7 +407,7 @@ Four jobs, and the distinctions matter:
   did not.
 - **`runtime`** — installs Electron's GUI libraries and Xvfb, builds, then runs
   `npm run probe:runtime`: launches the real app (packaged path **and** `dev:desktop`) and
-  asserts React mounts, the bridge exposes exactly the twenty-four allowlisted functions, a
+  asserts React mounts, the bridge exposes exactly the twenty-nine allowlisted functions, a
   brain switch really re-routes messages in both directions (ADR 0022), a
   chat/amplify round-trip works, the full history save/list/get/delete loop works against
   a real SQLite (including that an unsaved chat never persists), the renderer has no Node
@@ -470,3 +473,33 @@ function in `apps/desktop/src/main/forge/store.ts` that writes `approved_at`/
 and the runtime probe drives create → record-evidence → approve → list against a real
 SQLite file and asserts the approval fields are null until, and only until, the separate
 approve call.
+
+## 12. Ledger v1 is advisory, unreviewed, and connected to no bank
+
+**Status: IMPLEMENTED AND VERIFIED on the Linux runtime probe (ADR 0035) — for exactly
+what it claims. The MANDATORY independent review has NOT happened.**
+
+**The review gap is the headline.** CLAUDE.md §5 requires an independent review in a fresh
+context for finance-critical work, and `docs/architecture/ledger-architecture.md` §10 says
+Ledger v1 is not done until that review has happened and its findings are addressed. It has
+not been sent. Ledger must not be described as complete or accepted until it is.
+
+**No bank connection, and no code that could become one.** Every figure is typed by a
+person. There is no Plaid, no OAuth to a bank, no HTTP client in the store, and no schema
+field or database column that could hold an account number, a routing number, or an access
+token. Ledger cannot transfer, pay, send, open credit, trade, change bank details, or
+approve a subscription — held by ABSENCE, not by a guard.
+
+**Also not built:** the Cost Governor's function is implemented and tested but **nothing
+calls it from a screen** — there is no project table, so `projectPaying` is a free text
+label and per-project budgets are not stored. There is no editing UI for the seven
+Safe-to-Spend figures yet: the panel READS them, and `ledger:set-inputs` exists, but no
+form is wired to it, so in the shipped UI every figure stays MISSING and Safe-to-Spend
+correctly refuses to compute. There is no burn-rate, runway, anomaly detection, or
+recurring-charge tracking.
+
+**What IS proven:** that unknown figures produce a refusal rather than an inflated number;
+that a negative deduction is refused at the boundary and again by a database CHECK; that
+confidence reports the weakest term; that a purchase review cannot arrive pre-decided;
+that `ledger:decide` is the only path to a decision; and that a decision cannot be
+overwritten. All driven against a real SQLite, and the refusal paths through the real app.

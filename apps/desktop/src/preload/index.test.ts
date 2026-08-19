@@ -97,6 +97,26 @@ const ALLOWED_API = [
   'createForgeItem',
   'recordForgeEvidence',
   'approveForgeItem',
+  // Ledger v1 (`docs/architecture/ledger-architecture.md`). Read-only and
+  // advisory: these five carry person-typed figures and a written purchase
+  // record, and nothing more.
+  //
+  // What is NOT here is the security property. There is no `pay`, `transfer`,
+  // `send`, `subscribe`, `openCredit`, or `connectBank` on this bridge, and no
+  // function that accepts an account number, a routing number, or any
+  // credential. FINANCIAL-SURVIVAL-RULES rule 10 is held by ABSENCE — the
+  // capability was never built, so no bug can reach it. Adding one is a new
+  // ADR with its own independent review, never an edit to this list.
+  //
+  // `decidePurchaseReview` is separate from `createPurchaseReview` for the
+  // same reason `approveForgeItem` is separate from `recordForgeEvidence`: a
+  // decision about money is a person's, and it must not be reachable from the
+  // channel that merely drafts the record.
+  'getLedgerInputs',
+  'setLedgerInputs',
+  'listPurchaseReviews',
+  'createPurchaseReview',
+  'decidePurchaseReview',
 ] as const;
 
 /** Load the bridge fresh and return what it handed to `exposeInMainWorld`. */

@@ -1,7 +1,7 @@
 # The IPC Surface
 
 Date: 2026-08-19
-Status: **TWENTY-FOUR channels.** `forge:list`/`forge:get`/`forge:create`/
+Status: **TWENTY-NINE channels.** `forge:list`/`forge:get`/`forge:create`/
 `forge:record-evidence`/`forge:approve` (`docs/architecture/forge-architecture.md`) are
 IMPLEMENTED AND VERIFIED on the Linux runtime probe — an item is created with every fact
 unset, evidence is recorded on exactly the requested fact, and `forge:approve` is proven
@@ -439,6 +439,36 @@ Claude-in-the-loop repair. Every fact is entered by a person pasting evidence �
 later, separately-scoped ADR gated on a configured token, in the same mock-default /
 real-if-configured shape as the model providers.
 
+### `ledger:get-inputs` / `set-inputs` / `list-reviews` / `create-review` / `decide`
+
+|                       |                                                                                                                                                                                                                                                                                           |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Status**            | IMPLEMENTED AND VERIFIED on the Linux runtime probe (ADR 0035), 2026-08-19. **Independent review still OUTSTANDING** — CLAUDE.md §5 makes it mandatory for finance-critical work.                                                                                                         |
+| **Renderer call**     | `getLedgerInputs()` · `setLedgerInputs(request)` · `listPurchaseReviews()` · `createPurchaseReview(request)` · `decidePurchaseReview(request)`                                                                                                                                            |
+| **Request**           | get/list: `z.undefined()`. set-inputs: seven figures, each `{ cents (integer), state }` from a closed enum; the six deduction terms are schema-bound `>= 0`. create-review: the review fields with **no** decision field. decide: `{ id, decision: 'accepted' \| 'declined', decidedBy }` |
+| **Response**          | `{ inputs, safeToSpend }` / `PurchaseReviewListSchema` / `PurchaseReviewSchema`, all `.strict()`                                                                                                                                                                                          |
+| **Handler**           | `registerLedgerHandlers(db)` in `apps/desktop/src/main/handlers/ledger.ts`, over `apps/desktop/src/main/ledger/store.ts`                                                                                                                                                                  |
+| **Side effects**      | set-inputs: one upsert into the single-row `ledger_inputs` (migration 9). create-review / decide: one insert / one narrow update on `purchase_reviews`. get/list: read-only.                                                                                                              |
+| **Authority granted** | Store person-typed figures, compute one formula, keep a written purchase record. **Nothing else.**                                                                                                                                                                                        |
+
+**No channel here moves money, and none ever will.** There is no `pay`, `transfer`,
+`send`, `subscribe`, `openCredit`, or `connectBank`, and no request field anywhere that
+could carry an account number, a routing number, or a credential. FINANCIAL-SURVIVAL-RULES
+rule 10 is held by **absence**: the capability was never built, so no bug, injection, or
+careless edit can reach it. Adding one is a new ADR with its own independent review.
+
+**`safeToSpend` refuses rather than guesses.** It is a discriminated union. When any of
+the seven terms is `MISSING` it returns `{ computable: false, missing: [...] }` and the UI
+renders those names — never a number. Treating unknown as zero would report MORE spending
+room than exists, most confidently in the case where Ledger knows least. A fresh install
+therefore shows no figure at all, not `$0.00`.
+
+**Two structural separations, both mirroring `forge:approve`:** `create-review` has no
+field that could carry a decision, and `decide` calls a different store function
+(`recordDecision`, never `createPurchaseReview`). A decision is also **not overwritable** —
+re-deciding a decided review is refused with an explanation, because the record's value is
+that it says what was chosen and what was known at the time.
+
 ---
 
 ## Adding a channel
@@ -528,7 +558,7 @@ JavaScript. SQLite needs no external at all — the driver is Node's builtin
   (`packages/contracts/src/ipc/contracts.test.ts`).
 - The `AppInfo` schema rejects unknown platforms, missing fields, empty strings, and
   extra keys; the request schema rejects any payload.
-- The bridge exposes exactly one namespace (`jarvis`) and exactly the twenty-four
+- The bridge exposes exactly one namespace (`jarvis`) and exactly the twenty-nine
   allowlisted functions, all values are functions, and no generic passthrough exists
   (`apps/desktop/src/preload/index.test.ts`). This test was verified red-green: it fails
   when a generic `invoke` is added to the bridge.

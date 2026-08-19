@@ -179,6 +179,33 @@ export const CHANNELS = {
 
   /** The ONLY channel that may set `approvedAt`/`approvedBy`. */
   forgeApprove: 'forge:approve',
+
+  /**
+   * Ledger v1 — read-only, advisory personal CFO
+   * (`docs/architecture/ledger-architecture.md`).
+   *
+   * **Nothing on this boundary moves money, and nothing ever will.** There is
+   * no channel here that transfers, pays, sends, opens credit, trades, changes
+   * bank details, or approves a subscription — and none that accepts an
+   * account number, a routing number, or any credential. That is
+   * FINANCIAL-SURVIVAL-RULES rule 10 held by ABSENCE: the capability was never
+   * built, so no bug, prompt injection, or careless edit can reach it. Adding
+   * one is a new ADR with its own independent review, never a quiet widening.
+   *
+   * `ledger:get-inputs`/`set-inputs` carry the seven person-entered
+   * Safe-to-Spend terms — figures a human types, never a bank feed.
+   * `ledger:create-review` DRAFTS a purchase review and cannot decide one:
+   * its schema has no decision field. `ledger:decide` is the ONLY channel that
+   * may record a decision, separated for the same reason `forge:approve` is —
+   * a decision about money is a person's, always.
+   */
+  ledgerGetInputs: 'ledger:get-inputs',
+  ledgerSetInputs: 'ledger:set-inputs',
+  ledgerListReviews: 'ledger:list-reviews',
+  ledgerCreateReview: 'ledger:create-review',
+
+  /** The ONLY channel that may record a decision on a purchase review. */
+  ledgerDecide: 'ledger:decide',
 } as const;
 
 export type ChannelName = (typeof CHANNELS)[keyof typeof CHANNELS];

@@ -5,6 +5,19 @@
 #
 # Installs the Hermes engine, then drops in the Jarvis identity, the profile
 # memory, and the model config. Idempotent — safe to re-run.
+#
+# THIS IS THE MINIMAL INSTALL — identity only. It deliberately does NOT bring
+# skills, MEMORY.md, the spend guard, or the brain router. Running it on a box
+# that was supposed to get the full Jarvis leaves you with a working but
+# toothless one: no daily dollar cap, no per-task brain choice, no skills.
+#
+# For the FULL restore, use the snapshot installer instead:
+#
+#   cd brain-snapshot && ./scripts/install.sh
+#
+# That one copies the whole ~/.hermes (skills, memories, agent-hooks), rewrites
+# the container's /tmp paths, re-issues the hook approval, and verifies the
+# spend cap actually fires. See brain-snapshot/RESTORE.md.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

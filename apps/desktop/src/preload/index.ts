@@ -19,6 +19,13 @@ import type {
   ForgeItemList,
   ForgetRequest,
   HistoryIdRequest,
+  CreatePurchaseReviewRequest,
+  DecidePurchaseReviewRequest,
+  LedgerInputs,
+  PurchaseReview,
+  PurchaseReviewList,
+  SafeToSpend,
+  SetLedgerInputsRequest,
   Memory,
   ModelDescription,
   ModelSelection,
@@ -249,6 +256,42 @@ const api = {
 
   approveForgeItem: (request: ApproveForgeItemRequest): Promise<ForgeItem> =>
     ipcRenderer.invoke(CHANNELS.forgeApprove, request) as Promise<ForgeItem>,
+
+  /**
+   * Ledger v1 (`docs/architecture/ledger-architecture.md`) — read-only,
+   * advisory.
+   *
+   * **Nothing on this bridge moves money.** There is no `pay`, `transfer`,
+   * `send`, `subscribe`, or `connectBank` here, and there must never be: the
+   * capability is absent rather than guarded, which is the only version of
+   * that promise a bug cannot break.
+   *
+   * `decidePurchaseReview` is a SEPARATE function invoking a SEPARATE channel
+   * from `createPurchaseReview`, because a decision about money is a person's
+   * and must not be reachable from the call that merely drafts the record.
+   */
+  getLedgerInputs: (): Promise<{ inputs: LedgerInputs; safeToSpend: SafeToSpend }> =>
+    ipcRenderer.invoke(CHANNELS.ledgerGetInputs) as Promise<{
+      inputs: LedgerInputs;
+      safeToSpend: SafeToSpend;
+    }>,
+
+  setLedgerInputs: (
+    request: SetLedgerInputsRequest,
+  ): Promise<{ inputs: LedgerInputs; safeToSpend: SafeToSpend }> =>
+    ipcRenderer.invoke(CHANNELS.ledgerSetInputs, request) as Promise<{
+      inputs: LedgerInputs;
+      safeToSpend: SafeToSpend;
+    }>,
+
+  listPurchaseReviews: (): Promise<PurchaseReviewList> =>
+    ipcRenderer.invoke(CHANNELS.ledgerListReviews) as Promise<PurchaseReviewList>,
+
+  createPurchaseReview: (request: CreatePurchaseReviewRequest): Promise<PurchaseReview> =>
+    ipcRenderer.invoke(CHANNELS.ledgerCreateReview, request) as Promise<PurchaseReview>,
+
+  decidePurchaseReview: (request: DecidePurchaseReviewRequest): Promise<PurchaseReview> =>
+    ipcRenderer.invoke(CHANNELS.ledgerDecide, request) as Promise<PurchaseReview>,
 } as const;
 
 export type JarvisApi = typeof api;

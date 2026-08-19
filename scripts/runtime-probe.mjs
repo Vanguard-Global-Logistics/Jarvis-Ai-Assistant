@@ -558,6 +558,14 @@ async function runChecks(page, mode, stub = null) {
     'createForgeItem',
     'recordForgeEvidence',
     'approveForgeItem',
+    // Ledger v1 (docs/architecture/ledger-architecture.md) — read-only and
+    // advisory. Nothing here moves money; `decidePurchaseReview` is separate
+    // from `createPurchaseReview` because a decision is a person's.
+    'getLedgerInputs',
+    'setLedgerInputs',
+    'listPurchaseReviews',
+    'createPurchaseReview',
+    'decidePurchaseReview',
   ];
   const keysOk = JSON.stringify(keys.value) === JSON.stringify(EXPECTED_KEYS);
   add(
@@ -1268,6 +1276,105 @@ async function runChecks(page, mode, stub = null) {
     'forge:list shows the tracked item, newest first',
     Array.isArray(forgeList.value) && forgeList.value[0]?.id === forgeId,
     `${String(forgeList.value?.length)} items`,
+  );
+
+  // Ledger v1 (docs/architecture/ledger-architecture.md), over the real IPC
+  // boundary and a real SQLite file. The property being proven is the one the
+  // whole module rests on: unknown figures produce a REFUSAL, not a number.
+
+  const ledgerFresh = await page.evaluate(
+    'window.jarvis ? await window.jarvis.getLedgerInputs() : null',
+  );
+  add(
+    'ledger:get-inputs starts every term MISSING — never a confident zero',
+    ledgerFresh.value?.inputs?.cash?.state === 'MISSING' &&
+      ledgerFresh.value?.safeToSpend?.computable === false,
+    ledgerFresh.error
+      ? `THREW: ${String(ledgerFresh.error).split('\n')[0]}`
+      : `computable=${String(ledgerFresh.value?.safeToSpend?.computable)}`,
+  );
+
+  const ledgerSet = await page.evaluate(
+    `window.jarvis ? await window.jarvis.setLedgerInputs({
+       cash: { cents: 500000, state: 'POSTED' },
+       pending: { cents: 20000, state: 'POSTED' },
+       bills30d: { cents: 150000, state: 'POSTED' },
+       debtMinimums: { cents: 30000, state: 'POSTED' },
+       emergencyReserve: { cents: 100000, state: 'POSTED' },
+       commitments: { cents: 50000, state: 'POSTED' },
+       taxSetAside: { cents: 75000, state: 'ASSUMED' }
+     }) : null`,
+  );
+  add(
+    'ledger:set-inputs computes Safe-to-Spend and reports the WEAKEST confidence',
+    ledgerSet.value?.safeToSpend?.computable === true &&
+      ledgerSet.value.safeToSpend.cents === 75000 &&
+      ledgerSet.value.safeToSpend.confidence === 'ASSUMED',
+    ledgerSet.error
+      ? `THREW: ${String(ledgerSet.error).split('\n')[0]}`
+      : JSON.stringify(ledgerSet.value?.safeToSpend),
+  );
+
+  const ledgerNegative = await page.evaluate(
+    `window.jarvis ? await window.jarvis.setLedgerInputs({
+       cash: { cents: 500000, state: 'POSTED' },
+       pending: { cents: -1, state: 'POSTED' },
+       bills30d: { cents: 0, state: 'POSTED' },
+       debtMinimums: { cents: 0, state: 'POSTED' },
+       emergencyReserve: { cents: 0, state: 'POSTED' },
+       commitments: { cents: 0, state: 'POSTED' },
+       taxSetAside: { cents: 0, state: 'POSTED' }
+     }).then(() => 'ACCEPTED').catch((e) => 'refused') : null`,
+  );
+  add(
+    'a NEGATIVE deduction is refused at the boundary — it would invent money',
+    ledgerNegative.value === 'refused',
+    String(ledgerNegative.value),
+  );
+
+  const reviewCreated = await page.evaluate(
+    `window.jarvis ? await window.jarvis.createPurchaseReview({
+       outcome: 'PROBE: a second monitor',
+       whyNow: 'probe', alternatives: 'probe', lowestCostOption: 'probe',
+       premiumOption: 'probe', costCents: 12000, projectPaying: 'Jarvis',
+       classification: 'efficiency-upgrade', benefit: 'probe', risk: 'probe',
+       delayConsequence: 'probe', cancellationRequired: false
+     }) : null`,
+  );
+  add(
+    'ledger:create-review opens UNDECIDED and captures Safe-to-Spend as it was',
+    reviewCreated.value?.decision === null &&
+      reviewCreated.value?.decidedAt === null &&
+      reviewCreated.value?.safeToSpendBeforeCents === 75000,
+    reviewCreated.error
+      ? `THREW: ${String(reviewCreated.error).split('\n')[0]}`
+      : JSON.stringify(reviewCreated.value),
+  );
+  const reviewId = reviewCreated.value?.id;
+
+  const decided = await page.evaluate(
+    `window.jarvis ? await window.jarvis.decidePurchaseReview({
+       id: ${JSON.stringify(String(reviewId))},
+       decision: 'accepted', decidedBy: 'PROBE-William'
+     }) : null`,
+  );
+  add(
+    'ledger:decide is the ONLY call that records a decision',
+    decided.value?.decision === 'accepted' && decided.value?.decidedBy === 'PROBE-William',
+    JSON.stringify(decided.value),
+  );
+
+  const reDecided = await page.evaluate(
+    `window.jarvis ? await window.jarvis.decidePurchaseReview({
+       id: ${JSON.stringify(String(reviewId))},
+       decision: 'declined', decidedBy: 'PROBE-William'
+     }).then(() => 'OVERWROTE').catch((e) => 'refused:' + e.message) : null`,
+  );
+  add(
+    'a decision is NOT overwritable — the record survives a second attempt',
+    String(reDecided.value).startsWith('refused:') &&
+      String(reDecided.value).includes('already been decided'),
+    String(reDecided.value).slice(0, 120),
   );
 
   // E2: the Experience Shell mounts the Orb. Assert the real component is

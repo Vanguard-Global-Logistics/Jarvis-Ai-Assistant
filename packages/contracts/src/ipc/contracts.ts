@@ -34,6 +34,15 @@ import {
   ForgeItemSchema,
   RecordEvidenceRequestSchema,
 } from '../forge/contracts.js';
+import {
+  CreatePurchaseReviewRequestSchema,
+  DecidePurchaseReviewRequestSchema,
+  LedgerInputsSchema,
+  PurchaseReviewListSchema,
+  PurchaseReviewSchema,
+  SafeToSpendSchema,
+  SetLedgerInputsRequestSchema,
+} from '../ledger/contracts.js';
 
 /**
  * IPC contracts — the single definition of every message that crosses the
@@ -477,6 +486,82 @@ export const forgeApproveContract = defineContract({
   response: ForgeItemSchema,
 });
 
+// --- ledger:* (docs/architecture/ledger-architecture.md) --------------------
+
+/**
+ * `ledger:get-inputs` — the seven Safe-to-Spend terms plus the computed total.
+ *
+ * The total is COMPUTED in main and returned alongside the inputs rather than
+ * left for the renderer to calculate, so there is exactly one implementation
+ * of the formula in the application (CLAUDE.md §3). `safeToSpend` is a
+ * discriminated union: when any term is MISSING it reports `computable: false`
+ * and names the gaps, so the UI structurally cannot render a confident number
+ * built out of unknowns.
+ */
+export const ledgerGetInputsContract = defineContract({
+  channel: CHANNELS.ledgerGetInputs,
+  request: z.undefined(),
+  response: z
+    .object({
+      inputs: LedgerInputsSchema,
+      safeToSpend: SafeToSpendSchema,
+    })
+    .strict(),
+});
+
+/**
+ * `ledger:set-inputs` — replace the seven person-entered figures.
+ *
+ * `updatedAt` is absent from the request by construction; main mints it. Every
+ * deduction term is schema-bound to `>= 0`, because a negative deduction would
+ * INCREASE Safe-to-Spend — a fail-open in the direction that costs money.
+ */
+export const ledgerSetInputsContract = defineContract({
+  channel: CHANNELS.ledgerSetInputs,
+  request: SetLedgerInputsRequestSchema,
+  response: z
+    .object({
+      inputs: LedgerInputsSchema,
+      safeToSpend: SafeToSpendSchema,
+    })
+    .strict(),
+});
+
+/** `ledger:list-reviews` — every purchase review, newest first. Read-only. */
+export const ledgerListReviewsContract = defineContract({
+  channel: CHANNELS.ledgerListReviews,
+  request: z.undefined(),
+  response: PurchaseReviewListSchema,
+});
+
+/**
+ * `ledger:create-review` — DRAFT a purchase review. Cannot decide one.
+ *
+ * The request schema omits `decision`, `decidedBy`, `decidedAt`, `id`,
+ * `createdAt`, and `safeToSpendBeforeCents` entirely, so a review cannot
+ * arrive pre-approved and a caller cannot forge the financial position it was
+ * weighed against.
+ */
+export const ledgerCreateReviewContract = defineContract({
+  channel: CHANNELS.ledgerCreateReview,
+  request: CreatePurchaseReviewRequestSchema,
+  response: PurchaseReviewSchema,
+});
+
+/**
+ * `ledger:decide` — the ONLY channel that may record a decision.
+ *
+ * Its own channel, its own schema, its own store function. A decision about
+ * money is a person's, and this separation is what keeps that true in code
+ * rather than in a comment. There is deliberately no value meaning "Ledger
+ * decided": the enum is `accepted | declined` and nothing else.
+ */
+export const ledgerDecideContract = defineContract({
+  channel: CHANNELS.ledgerDecide,
+  request: DecidePurchaseReviewRequestSchema,
+  response: PurchaseReviewSchema,
+});
+
 // --- model:* (ADR 0022) -----------------------------------------------------
 
 /**
@@ -579,4 +664,9 @@ export const IPC_CONTRACTS = {
   [CHANNELS.forgeCreate]: forgeCreateContract,
   [CHANNELS.forgeRecordEvidence]: forgeRecordEvidenceContract,
   [CHANNELS.forgeApprove]: forgeApproveContract,
+  [CHANNELS.ledgerGetInputs]: ledgerGetInputsContract,
+  [CHANNELS.ledgerSetInputs]: ledgerSetInputsContract,
+  [CHANNELS.ledgerListReviews]: ledgerListReviewsContract,
+  [CHANNELS.ledgerCreateReview]: ledgerCreateReviewContract,
+  [CHANNELS.ledgerDecide]: ledgerDecideContract,
 } as const;

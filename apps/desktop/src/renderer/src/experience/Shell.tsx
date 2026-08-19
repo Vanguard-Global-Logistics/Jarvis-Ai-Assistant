@@ -33,6 +33,7 @@ import { Conversation } from './Conversation.js';
 import type { ConversationBridge } from './Conversation.js';
 import { MemoryPanel } from './MemoryPanel.js';
 import { ForgePanel } from './ForgePanel.js';
+import { LedgerPanel } from './LedgerPanel.js';
 import { bridgeMember } from './bridge.js';
 
 /**
@@ -186,6 +187,13 @@ export function Shell({ devStateSwitcher = import.meta.env.DEV }: ShellProps): J
    * whether the panel is open.
    */
   const [forgeOpen, setForgeOpen] = useState(false);
+
+  /**
+   * Ledger v1 (`docs/architecture/ledger-architecture.md`) — read-only,
+   * advisory. Like Forge, the panel owns its own reads: Ledger's contents are
+   * not replayed into a prompt, so Shell holds only whether it is open.
+   */
+  const [ledgerOpen, setLedgerOpen] = useState(false);
 
   /**
    * Set when `memory:list` could not be read.
@@ -844,6 +852,58 @@ export function Shell({ devStateSwitcher = import.meta.env.DEV }: ShellProps): J
             }}
           >
             FORGE {forgeOpen ? '▾' : '▸'}
+          </button>
+        </section>
+      )}
+
+      {!cinematic && (
+        <section
+          aria-label="Ledger"
+          style={{
+            position: 'absolute',
+            right: 14,
+            bottom: 138,
+            zIndex: 2,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 6,
+            alignItems: 'flex-end',
+          }}
+        >
+          {ledgerOpen && (
+            <div
+              style={{
+                maxHeight: '60vh',
+                overflowY: 'auto',
+                padding: 10,
+                border: `1px solid ${surface.hairline}`,
+                borderRadius: surface.radiusMin,
+                background: 'rgba(5,7,10,0.92)',
+              }}
+            >
+              <LedgerPanel />
+            </div>
+          )}
+          <button
+            type="button"
+            aria-expanded={ledgerOpen}
+            onClick={() => {
+              setLedgerOpen((value) => !value);
+            }}
+            style={{
+              minHeight: 30,
+              padding: '5px 10px',
+              fontFamily: fontFamily.mono,
+              fontSize: 10,
+              letterSpacing: letterSpacing.label,
+              color: text.faint,
+              background: 'transparent',
+              border: `1px solid ${surface.hairline}`,
+              borderRadius: surface.radiusMin,
+              cursor: 'pointer',
+            }}
+          >
+            LEDGER {ledgerOpen ? '▾' : '▸'}
           </button>
         </section>
       )}
