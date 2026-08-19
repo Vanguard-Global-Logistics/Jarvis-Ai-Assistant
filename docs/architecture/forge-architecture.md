@@ -39,13 +39,14 @@ is derived from `Forge-Claude-Code-Handoff.md`, not imagined.
 **Forge is a build/dev watchtower.** It shows the true state of the things William is
 building — never invents evidence, never blends a claim with a fact.
 
-| Not this                                  | Because                                                                                        |
-| ----------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| A CI system                               | Forge reads CI results; it does not run builds or tests.                                       |
-| A code reviewer                           | Forge shows human-authored review status; it does not review code.                             |
-| An auto-deploy pipeline                   | v1 never triggers a deploy. It reads whether one happened.                                     |
-| A thing that approves itself              | "approved" is always a human's decision, on its own channel — §6.                              |
-| A GitHub/Vercel client with invented data | If no token is configured, the fact is "not connected," never a plausible-looking fake status. |
+| Not this                                  | Because                                                                                                                                                                                                                                                                                              |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A CI system                               | Forge reads CI results; it does not run builds or tests.                                                                                                                                                                                                                                             |
+| A code reviewer                           | Forge shows human-authored review status; it does not review code.                                                                                                                                                                                                                                   |
+| An auto-deploy pipeline                   | v1 never triggers a deploy. It reads whether one happened.                                                                                                                                                                                                                                           |
+| A thing that approves itself              | "approved" is always a human's decision, on its own channel — §6.                                                                                                                                                                                                                                    |
+| A GitHub/Vercel client with invented data | If no token is configured, the fact is "not connected," never a plausible-looking fake status.                                                                                                                                                                                                       |
+| A place to keep credentials               | Every free-text field (title, evidence detail, approver name) is checked against the same credential guard `memory:remember` uses, and refused rather than stored — a field a person pastes evidence into is rendered straight back into the panel on every load, the identical shape memory guards. |
 
 ## 2. The five facts, and why they are never conflated
 
@@ -82,7 +83,9 @@ ForgeItem:
   previewedAt        timestamp | null   — Vercel (or equivalent) preview deployed
   previewUrl         URL | null
   approvedAt         timestamp | null   — ALWAYS a separate human decision (§6)
-  approvedBy         "William" (only value in v1 — single operator)
+  approvedBy         free text, 1-200 chars, entered by the approving human — not
+                     restricted to a literal value; v1 is single-operator in
+                     practice, not by schema enforcement
   createdAt          timestamp, main-minted
   updatedAt          timestamp, main-minted on every write
 ```

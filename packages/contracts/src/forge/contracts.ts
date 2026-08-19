@@ -39,8 +39,17 @@ export const ForgeItemSchema = z
     claimedDetail: z.string().trim().max(FORGE_DETAIL_MAX_LENGTH).nullable(),
 
     committedAt: z.iso.datetime().nullable(),
-    /** A commit sha, when known. Not validated as a real sha — a person types it. */
-    committedRef: z.string().trim().max(200).nullable(),
+    /**
+     * A commit sha, when known. Not validated as a real sha — a person types
+     * it. Bounded by `FORGE_DETAIL_MAX_LENGTH`, the same cap every other
+     * detail field uses — it was briefly capped at a literal 200 here while
+     * the write side (`RecordEvidenceRequestSchema.detail`) allowed up to
+     * `FORGE_DETAIL_MAX_LENGTH` (2000), so a person pasting a long commit
+     * message could write a row `recordEvidence` accepted and `forge:list`
+     * could never read back — every subsequent list call failed the
+     * response schema for every item, not just the offending one.
+     */
+    committedRef: z.string().trim().max(FORGE_DETAIL_MAX_LENGTH).nullable(),
 
     testsPassedAt: z.iso.datetime().nullable(),
     testsDetail: z.string().trim().max(FORGE_DETAIL_MAX_LENGTH).nullable(),
@@ -69,22 +78,10 @@ export const CreateForgeItemRequestSchema = z
 export type CreateForgeItemRequest = z.infer<typeof CreateForgeItemRequestSchema>;
 
 /**
- * One id in, the matching item out (or `null` when the id names nothing) — the
- * same "stale id is a normal outcome" shape `history:get` and `memory:forget`
- * already use.
- */
-export const ForgeIdRequestSchema = z.object({ id: z.uuid() }).strict();
-
-export type ForgeIdRequest = z.infer<typeof ForgeIdRequestSchema>;
-
-/**
- * Record evidence for one of the first four facts. Exactly one fact per call —
- * a request naming more than one is rejected by the refinement below, because
- * a multi-fact write is exactly the kind of call that could quietly grow an
- * `approved` field onto it later (§6 of the architecture doc).
- *
- * `at` is OPTIONAL and defaults to "now" in main, matching the memory pattern
- * of minting timestamps server-side — a renderer that could pick a timestamp
+ * Record evidence for one of the first four facts. `id`/`fact`/`detail` are
+ * the whole request — there is no field that could name a fifth fact, and no
+ * `at`: the timestamp is minted in main, matching the memory pattern of
+ * minting timestamps server-side — a renderer that could pick a timestamp
  * could backdate a claim.
  */
 export const FORGE_FACTS = ['claimed', 'committed', 'testsPassed', 'previewed'] as const;
@@ -109,7 +106,13 @@ export type RecordEvidenceRequest = z.infer<typeof RecordEvidenceRequestSchema>;
 export const ApproveForgeItemRequestSchema = z
   .object({
     id: z.uuid(),
-    /** Free text in v1 — single operator, so this is always "William". */
+    /**
+     * Free text, 1–200 characters, entered by the approving human. NOT
+     * restricted to a literal `"William"` — v1 is single-operator in
+     * practice, but the schema does not enforce that, and the runtime probe
+     * deliberately approves with a different string to prove the field is
+     * genuinely free text rather than a value the UI happens to always send.
+     */
     approvedBy: z.string().trim().min(1).max(200),
   })
   .strict();

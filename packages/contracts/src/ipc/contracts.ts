@@ -30,7 +30,6 @@ import {
 import {
   ApproveForgeItemRequestSchema,
   CreateForgeItemRequestSchema,
-  ForgeIdRequestSchema,
   ForgeItemListSchema,
   ForgeItemSchema,
   RecordEvidenceRequestSchema,
@@ -441,7 +440,10 @@ export const forgeListContract = defineContract({
 /** `forge:get` — one item by id, or `null` when the id names nothing. */
 export const forgeGetContract = defineContract({
   channel: CHANNELS.forgeGet,
-  request: ForgeIdRequestSchema,
+  // Reuses the id-only request shape `history:get` already defines — a third
+  // hand-written `{ id: z.uuid() }.strict()` copy (after history's and
+  // memory's) is exactly the duplication CLAUDE.md §3 warns drifts.
+  request: HistoryIdRequestSchema,
   response: z.object({ item: ForgeItemSchema.nullable() }).strict(),
 });
 

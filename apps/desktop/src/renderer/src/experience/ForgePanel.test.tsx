@@ -65,6 +65,29 @@ describe('ForgePanel', () => {
     expect(screen.getAllByText('MARK').length).toBe(4);
   });
 
+  it('renders a SET fact with its timestamp/detail, and only the remaining three as MARK', async () => {
+    // The prior test's fixture had every fact null, so it could not tell
+    // "shows MARK because unset" from "shows MARK unconditionally" — a
+    // hardcoded render would have satisfied it. This fixture has one fact set.
+    stubJarvis({
+      listForgeItems: vi.fn().mockResolvedValue([
+        item({
+          committedAt: '2026-08-19T00:00:00.000Z',
+          committedRef: 'abc1234',
+        }),
+      ]),
+    });
+    render(<ForgePanel />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Ship the punchlist')).toBeTruthy();
+    });
+
+    expect(screen.getByText(/abc1234/)).toBeTruthy();
+    // The set fact no longer offers a MARK button; the other three still do.
+    expect(screen.getAllByText('MARK').length).toBe(3);
+  });
+
   it('says plainly when the preload does not provide Forge', async () => {
     vi.stubGlobal('jarvis', {});
     render(<ForgePanel />);

@@ -15,7 +15,6 @@ import type {
   ChatReply,
   ChatRequest,
   CreateForgeItemRequest,
-  ForgeIdRequest,
   ForgeItem,
   ForgeItemList,
   ForgetRequest,
@@ -238,7 +237,7 @@ const api = {
     ipcRenderer.invoke(CHANNELS.forgeList) as Promise<ForgeItemList>,
 
   getForgeItem: (id: string): Promise<{ item: ForgeItem | null }> =>
-    ipcRenderer.invoke(CHANNELS.forgeGet, { id } satisfies ForgeIdRequest) as Promise<{
+    ipcRenderer.invoke(CHANNELS.forgeGet, { id } satisfies HistoryIdRequest) as Promise<{
       item: ForgeItem | null;
     }>,
 

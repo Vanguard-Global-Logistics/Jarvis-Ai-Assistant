@@ -6,6 +6,7 @@ import type {
   ForgeItem,
   RecordEvidenceRequest,
 } from '@jarvis/contracts';
+import { looksLikeCredential } from '@jarvis/contracts';
 import type { SqliteDatabase } from '@jarvis/database';
 import { UserFacingError } from '../user-facing-error.js';
 
@@ -62,6 +63,37 @@ export class ForgeItemNotFoundError extends UserFacingError {
   }
 }
 
+/**
+ * What a person is told when Forge refuses credential-shaped text.
+ *
+ * Forge's whole write surface is a person pasting evidence — a title, a
+ * commit ref, a test-run tail, a preview URL, an approver name — into
+ * main-owned storage that is then rendered straight back into the panel on
+ * every load. That is the identical shape `memory:remember` guards
+ * (constitution §5), and this module was shipped without the check; a
+ * blocking swarm finding on ADR 0034 caught it. Quotes nothing back, for the
+ * same reason `MemoryRefusedError`'s message does not: a rejection that
+ * echoed the matched text would write the secret into the very log line
+ * meant to explain the refusal.
+ */
+const FORGE_CREDENTIAL_REFUSED_MESSAGE =
+  'That looks like an API key or password, so Forge will not store it. ' +
+  'Every field here is rendered back into the panel on every load. Keys ' +
+  'belong in the .env file on this computer, never in a pasted evidence field.';
+
+export class ForgeRefusedError extends UserFacingError {
+  public constructor() {
+    super(FORGE_CREDENTIAL_REFUSED_MESSAGE);
+    this.name = 'ForgeRefusedError';
+  }
+}
+
+function refuseIfCredential(text: string | null | undefined): void {
+  if (text !== null && text !== undefined && looksLikeCredential(text)) {
+    throw new ForgeRefusedError();
+  }
+}
+
 const SELECT_COLUMNS = `id, title, claimed_at, claimed_detail, committed_at, committed_ref,
        tests_passed_at, tests_detail, previewed_at, preview_url,
        approved_at, approved_by, created_at, updated_at`;
@@ -81,8 +113,31 @@ export function getForgeItem(db: SqliteDatabase, id: string): ForgeItem | null {
   return row === undefined ? null : toForgeItem(row);
 }
 
+/**
+ * Read back the item after a mutation, trusting the pre-mutation existence
+ * check rather than repeating it.
+ *
+ * `recordEvidence` and `approveForgeItem` both need "confirm the id exists,
+ * mutate, return the fresh row" — and both independently wrote a second
+ * `if (updated === null) throw ForgeItemNotFoundError()` after the mutation,
+ * which a swarm finding on ADR 0034 named as dead code written twice: this
+ * module has no `forge:delete` channel, and `packages/database`'s connection
+ * is the sole, synchronous writer for the whole application (single-writer
+ * rule, CLAUDE.md §3), so nothing can remove the row between the existence
+ * check and this read. The check stays — a future `forge:delete` should fail
+ * loudly here rather than return stale data — but it is written in ONE place.
+ */
+function mutateExisting(db: SqliteDatabase, id: string, mutate: () => void): ForgeItem {
+  if (getForgeItem(db, id) === null) throw new ForgeItemNotFoundError();
+  mutate();
+  const updated = getForgeItem(db, id);
+  if (updated === null) throw new ForgeItemNotFoundError();
+  return updated;
+}
+
 /** Start tracking a new item. Title only — every fact starts unset. */
 export function createForgeItem(db: SqliteDatabase, request: CreateForgeItemRequest): ForgeItem {
+  refuseIfCredential(request.title);
   const now = new Date().toISOString();
   const item: ForgeItem = {
     id: randomUUID(),
@@ -129,20 +184,17 @@ const FACT_COLUMNS: Record<ForgeFact, { at: string; detail: string }> = {
  * timestamp could backdate a claim.
  */
 export function recordEvidence(db: SqliteDatabase, request: RecordEvidenceRequest): ForgeItem {
-  const existing = getForgeItem(db, request.id);
-  if (existing === null) throw new ForgeItemNotFoundError();
+  refuseIfCredential(request.detail);
 
   const columns = FACT_COLUMNS[request.fact];
   const now = new Date().toISOString();
   const detail = request.detail ?? null;
 
-  db.prepare(
-    `UPDATE forge_items SET ${columns.at} = ?, ${columns.detail} = ?, updated_at = ? WHERE id = ?`,
-  ).run(now, detail, now, request.id);
-
-  const updated = getForgeItem(db, request.id);
-  if (updated === null) throw new ForgeItemNotFoundError();
-  return updated;
+  return mutateExisting(db, request.id, () => {
+    db.prepare(
+      `UPDATE forge_items SET ${columns.at} = ?, ${columns.detail} = ?, updated_at = ? WHERE id = ?`,
+    ).run(now, detail, now, request.id);
+  });
 }
 
 /**
@@ -152,15 +204,12 @@ export function recordEvidence(db: SqliteDatabase, request: RecordEvidenceReques
  * not reach approval through this module's shared helper.
  */
 export function approveForgeItem(db: SqliteDatabase, request: ApproveForgeItemRequest): ForgeItem {
-  const existing = getForgeItem(db, request.id);
-  if (existing === null) throw new ForgeItemNotFoundError();
+  refuseIfCredential(request.approvedBy);
 
   const now = new Date().toISOString();
-  db.prepare(
-    `UPDATE forge_items SET approved_at = ?, approved_by = ?, updated_at = ? WHERE id = ?`,
-  ).run(now, request.approvedBy, now, request.id);
-
-  const updated = getForgeItem(db, request.id);
-  if (updated === null) throw new ForgeItemNotFoundError();
-  return updated;
+  return mutateExisting(db, request.id, () => {
+    db.prepare(
+      `UPDATE forge_items SET approved_at = ?, approved_by = ?, updated_at = ? WHERE id = ?`,
+    ).run(now, request.approvedBy, now, request.id);
+  });
 }

@@ -673,3 +673,25 @@ describe('memory reaches the person through the real Shell (ADR 0029)', () => {
     expect(screen.queryByText(/AEGIS · GREEN/)).toBeNull();
   });
 });
+
+/**
+ * Forge, driven through the REAL Shell (ADR 0034).
+ *
+ * A swarm `tests-are-real` finding on the Forge commit: `Shell.test.tsx` grew
+ * the bridge stubs Forge's `JarvisApi` shape requires (so `stubBridge()` type-
+ * checks), but nothing ever clicked the FORGE toggle or asserted `ForgePanel`
+ * actually mounts inside Shell — the exact seam the equivalent Memory test
+ * above already covers. `ForgePanel.test.tsx` only proves the panel works in
+ * isolation; this proves Shell wires the toggle to it.
+ */
+describe('Forge reaches the person through the real Shell (ADR 0034)', () => {
+  it('mounts ForgePanel when the FORGE toggle is clicked', async () => {
+    stubMatchMedia();
+    stubBridge({ listForgeItems: vi.fn().mockResolvedValue([FORGE_ITEM]) });
+    render(<Shell devStateSwitcher={false} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /^FORGE/ }));
+
+    expect(await screen.findByText(FORGE_ITEM.title)).toBeTruthy();
+  });
+});

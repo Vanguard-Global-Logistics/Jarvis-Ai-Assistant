@@ -33,6 +33,7 @@ import { Conversation } from './Conversation.js';
 import type { ConversationBridge } from './Conversation.js';
 import { MemoryPanel } from './MemoryPanel.js';
 import { ForgePanel } from './ForgePanel.js';
+import { bridgeMember } from './bridge.js';
 
 /**
  * The Experience Shell (task E2, visual correction pass): cinematic ambient
@@ -101,78 +102,10 @@ const STAGE_BACKGROUND = [
 const VIGNETTE = `radial-gradient(120% 90% at 50% 42%, transparent 55%, rgba(0,0,0,0.5) 100%)`;
 const HAZE = `linear-gradient(180deg, transparent 78%, rgba(5,7,10,0.55) 100%)`;
 
-/** The preload bridge as the renderer sees it. Optional, per `preload/index.d.ts`. */
-type JarvisBridge = NonNullable<Window['jarvis']>;
-
-/**
- * THE answer to "what does this app do with an incomplete bridge?" — and it is
- * used by every bridge access in this file, without exception.
- *
- * ## What it is defending, and where — the two are not the same
- *
- * A missing bridge function throws a SYNCHRONOUS `TypeError`. That matters
- * differently at different call sites, and saying so precisely is the point:
- *
- * - **In a `.then()`/`.catch()` effect** — the host-facts and AEGIS effects —
- *   the throw happens BEFORE any promise exists, so no `.catch()` can intercept
- *   it and the whole Shell unmounts. Here the guard is the only thing standing
- *   between a stale preload and a blank window with the security indicator gone.
- *   An indicator that vanishes is not better than one showing GREEN wrongly; it
- *   is the same failure with no message attached.
- * - **Inside an `async` function** — `refreshMemories` — the throw becomes a
- *   rejected promise that the function's own `try`/`catch` already handles. The
- *   guard is NOT what prevents a crash there, and an earlier version of this
- *   comment said it was. What it does there is produce a DIFFERENT and more
- *   accurate message: "this build has no memory channel" rather than "the store
- *   could not be read". Those need different actions from whoever is holding
- *   the machine — a reinstall versus a database problem.
- *
- * That distinction was found by red-green: the mutation that was supposed to
- * prove the guard on the memory path stayed GREEN, because the try/catch was
- * doing the work the comment credited to the guard. Crediting the wrong
- * mechanism is how a reviewer comes to trust a control that is not working.
- *
- * `Window['jarvis']` being typed does not settle this. The type constrains the
- * TEST FAKE and the compile of this repository; it says nothing about the
- * preload actually loaded at runtime by a packaged app, which is the only
- * situation the check exists for — a stale `app.asar`, a preload that failed
- * partway, a renderer newer than the shell around it.
- *
- * ## Why it returns the MEMBER and not the bridge
- *
- * The first version returned the whole bridge, so the key it validated and the
- * method the caller then invoked were two independent strings that nothing kept
- * in agreement: `bridgeMember('remember')` followed by `jarvis.forget(id)` would
- * have compiled, type-checked, and reintroduced the exact crash with no test
- * able to see it. Returning the member means the name is written once per call
- * site and the compiler enforces the pairing — the same reason `recallFor`
- * makes the guard and the guarded value one expression.
- *
- * ## And why it is applied EVERYWHERE
- *
- * The first version was wired into four of eight call sites while its docstring
- * claimed to be the one rule. That is worse than not having it: `getAppInfo`
- * sat unguarded in the same effect ABOVE the AEGIS guard, so the guard was
- * unreachable and the crash it described as fixed was still live. The second
- * version fixed those and STILL over-claimed: `ConversationBridge` was the raw
- * `window.jarvis` behind a `=== null` check, sending eleven more members out
- * unchecked. It is now assembled from this helper too.
- *
- * A false claim about a control is more expensive than no control, because it
- * stops people looking. It took two rounds of critics to make this sentence
- * true, which is the argument for the critics.
- */
-function bridgeMember<K extends keyof JarvisBridge>(key: K): JarvisBridge[K] | null {
-  const bridge = window.jarvis;
-  if (bridge === undefined) return null;
-  const member = bridge[key];
-  if (typeof member !== 'function') return null;
-  // Bound so a call site can hold the function alone. The preload's members are
-  // arrow functions closing over `ipcRenderer` and do not use `this`, so this is
-  // belt rather than braces — but a member that later did would break silently
-  // without it.
-  return (member as (...args: never[]) => unknown).bind(bridge) as JarvisBridge[K];
-}
+// `JarvisBridge` and `bridgeMember` live in `./bridge.js` — shared with
+// `ForgePanel`, which needs the identical guard. See that module for why the
+// guard exists, what it defends against at each call-site shape, and why it
+// must be applied to every bridge access without exception.
 
 export function Shell({ devStateSwitcher = import.meta.env.DEV }: ShellProps): JSX.Element {
   const [orbState, setOrbState] = useState<OrbState>('idle');

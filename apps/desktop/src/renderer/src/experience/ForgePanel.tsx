@@ -3,6 +3,7 @@ import type { JSX } from 'react';
 import type { ForgeFact, ForgeItem } from '@jarvis/contracts';
 import { FORGE_TITLE_MAX_LENGTH } from '@jarvis/contracts';
 import { background, fontFamily, letterSpacing, surface, text } from '@jarvis/ui';
+import { bridgeMember } from './bridge.js';
 
 /**
  * Forge v1 — the five-fact build/dev watchtower
@@ -41,20 +42,6 @@ const FACT_DETAIL_KEY: Record<ForgeFact, keyof ForgeItem> = {
 };
 
 const FACT_ORDER: ForgeFact[] = ['claimed', 'committed', 'testsPassed', 'previewed'];
-
-/** Reads a `window.jarvis` member, or `null` when the preload does not provide it. */
-function bridgeMember<
-  K extends 'listForgeItems' | 'createForgeItem' | 'recordForgeEvidence' | 'approveForgeItem',
->(key: K): NonNullable<Window['jarvis']>[K] | null {
-  const bridge = window.jarvis;
-  if (bridge === undefined) return null;
-  const member = bridge[key];
-  if (typeof member !== 'function') return null;
-  // Bound so a call site can hold the function alone, matching Shell's own
-  // `bridgeMember` — the cast is required because indexing with a generic
-  // union key does not distribute back into a matching function type.
-  return (member as (...args: never[]) => unknown).bind(bridge) as NonNullable<Window['jarvis']>[K];
-}
 
 export function ForgePanel(): JSX.Element {
   const [items, setItems] = useState<readonly ForgeItem[]>([]);

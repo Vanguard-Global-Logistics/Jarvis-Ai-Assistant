@@ -1,8 +1,10 @@
 import { migrate, migrations, openDatabase } from '@jarvis/database';
 import type { SqliteDatabase } from '@jarvis/database';
+import { FORGE_TITLE_MAX_LENGTH } from '@jarvis/contracts';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   ForgeItemNotFoundError,
+  ForgeRefusedError,
   approveForgeItem,
   createForgeItem,
   getForgeItem,
@@ -88,6 +90,34 @@ describe('recordEvidence', () => {
       recordEvidence(db, { id: '00000000-0000-4000-8000-000000000000', fact: 'claimed' }),
     ).toThrow(ForgeItemNotFoundError);
   });
+
+  it('touches only the named row — a sibling item is left byte-for-byte unchanged', () => {
+    // The UPDATE carries `WHERE id = ?`, but nothing before this test proved
+    // it does: every other test in this file runs against a table holding
+    // exactly one row, so "updated the named row" and "updated every row"
+    // were indistinguishable. Mirrors memory/store.test.ts's `forget` ->
+    // "deletes only the memory named".
+    const target = createForgeItem(db, { title: 'Target' });
+    const sibling = createForgeItem(db, { title: 'Sibling' });
+
+    recordEvidence(db, { id: target.id, fact: 'committed', detail: 'abc1234' });
+
+    const untouched = getForgeItem(db, sibling.id);
+    expect(untouched).toEqual(sibling);
+  });
+
+  it('refuses credential-shaped evidence text, and stores nothing', () => {
+    const item = createForgeItem(db, { title: 'Item' });
+    const plantedKey = ['sk', 'ant', 'TEST0123456789abcdefghij'].join('-');
+
+    expect(() =>
+      recordEvidence(db, { id: item.id, fact: 'claimed', detail: `key: ${plantedKey}` }),
+    ).toThrow(ForgeRefusedError);
+
+    const stillUnset = getForgeItem(db, item.id);
+    expect(stillUnset?.claimedAt).toBeNull();
+    expect(stillUnset?.claimedDetail).toBeNull();
+  });
 });
 
 describe('approveForgeItem', () => {
@@ -113,6 +143,67 @@ describe('approveForgeItem', () => {
     expect(() =>
       approveForgeItem(db, { id: '00000000-0000-4000-8000-000000000000', approvedBy: 'William' }),
     ).toThrow(ForgeItemNotFoundError);
+  });
+
+  it('touches only the named row — a sibling item is left byte-for-byte unchanged', () => {
+    const target = createForgeItem(db, { title: 'Target' });
+    const sibling = createForgeItem(db, { title: 'Sibling' });
+
+    approveForgeItem(db, { id: target.id, approvedBy: 'William' });
+
+    const untouched = getForgeItem(db, sibling.id);
+    expect(untouched).toEqual(sibling);
+  });
+
+  it('refuses a credential-shaped approver name, and stores nothing', () => {
+    const item = createForgeItem(db, { title: 'Item' });
+    const plantedKey = ['sk', 'ant', 'TEST0123456789abcdefghij'].join('-');
+
+    expect(() => approveForgeItem(db, { id: item.id, approvedBy: plantedKey })).toThrow(
+      ForgeRefusedError,
+    );
+
+    const stillUnapproved = getForgeItem(db, item.id);
+    expect(stillUnapproved?.approvedAt).toBeNull();
+    expect(stillUnapproved?.approvedBy).toBeNull();
+  });
+});
+
+describe('createForgeItem — the credential guard', () => {
+  it('refuses a credential-shaped title, and stores nothing', () => {
+    const plantedKey = ['sk', 'ant', 'TEST0123456789abcdefghij'].join('-');
+    expect(() => createForgeItem(db, { title: `key: ${plantedKey}` })).toThrow(ForgeRefusedError);
+    expect(listForgeItems(db)).toHaveLength(0);
+  });
+});
+
+describe('the schema is the last line of defence', () => {
+  it('refuses a title longer than the cap, at the DATABASE level', () => {
+    // Deliberately bypassing the Zod contract (as memory/store.test.ts does
+    // for `fact`) to prove the CHECK constraint in migration 0008 is real,
+    // not merely asserted by the request schema above it.
+    const tooLong = 'x'.repeat(FORGE_TITLE_MAX_LENGTH + 1);
+    expect(() =>
+      db
+        .prepare(
+          `INSERT INTO forge_items (id, title, created_at, updated_at)
+           VALUES (?, ?, ?, ?)`,
+        )
+        .run(
+          '33333333-3333-4333-8333-333333333333',
+          tooLong,
+          new Date().toISOString(),
+          new Date().toISOString(),
+        ),
+    ).toThrow();
+  });
+
+  it('accepts EXACTLY the cap, which pins the constant to the SQL CHECK', () => {
+    // Stays green if `FORGE_TITLE_MAX_LENGTH` is raised above the migration's
+    // literal `200` while Zod would then accept a title SQLite rejects,
+    // surfacing to a person as "forge:create failed" — the ADR 0021 shape.
+    expect(() => createForgeItem(db, { title: 'x'.repeat(FORGE_TITLE_MAX_LENGTH) })).not.toThrow();
+    expect(listForgeItems(db)).toHaveLength(1);
   });
 });
 

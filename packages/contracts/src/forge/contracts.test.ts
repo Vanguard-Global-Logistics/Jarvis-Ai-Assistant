@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ApproveForgeItemRequestSchema,
   CreateForgeItemRequestSchema,
+  FORGE_DETAIL_MAX_LENGTH,
   FORGE_TITLE_MAX_LENGTH,
   ForgeItemSchema,
   RecordEvidenceRequestSchema,
@@ -40,6 +41,20 @@ describe('ForgeItemSchema', () => {
   it('rejects an unknown field', () => {
     const result = ForgeItemSchema.safeParse({ ...validItem, extra: 'nope' });
     expect(result.success).toBe(false);
+  });
+
+  it('accepts committedRef at the FULL evidence-detail length a "committed" record-evidence call can send', () => {
+    // Regression for a blocking finding: committedRef was once capped at a
+    // literal 200 while RecordEvidenceRequestSchema.detail (written straight
+    // into committedRef by the store) allowed up to FORGE_DETAIL_MAX_LENGTH —
+    // a committed evidence call between 201 and 2000 chars wrote a row this
+    // schema then rejected on every subsequent read, bricking forge:list for
+    // every item, not just the offending one. The two bounds must agree.
+    const result = ForgeItemSchema.safeParse({
+      ...validItem,
+      committedRef: 'x'.repeat(FORGE_DETAIL_MAX_LENGTH),
+    });
+    expect(result.success).toBe(true);
   });
 });
 

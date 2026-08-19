@@ -92,3 +92,42 @@ set only by it. `npm run verify`, `npm run build`, and `npm run probe:runtime` a
 green as of this ADR. Per CLAUDE.md §5, an `npm run review` pass to a second vendor is
 recommended (not mandatory — Forge is release-adjacent, not finance-critical) before this
 is called fully done; see `docs/architecture/forge-architecture.md` §10.
+
+## What the swarm caught on the first pass, before this ADR's commit was called done
+
+`npm run swarm` was run against the initial commit (five lenses, dispatched read-only, per
+the standing CLAUDE.md §5 gate). Two findings were blocking and were fixed before this ADR
+was finalized rather than shipped and patched later:
+
+- **No credential guard.** Every free-text field (title, evidence detail, approver name)
+  is exactly the shape `memory:remember` guards — a person pasting text into main-owned
+  storage that is rendered straight back into the UI on every load — and the first version
+  shipped without the check `memory:remember` already has. `looksLikeCredential` now runs
+  on all three write paths, refusing before the write, echoing nothing back, matching §5's
+  new row in `docs/architecture/forge-architecture.md` §1.
+- **A length-bound mismatch that could corrupt a row.** `committedRef` was capped at a
+  literal 200 while the request schema's `detail` field (written into it verbatim) allowed
+  up to `FORGE_DETAIL_MAX_LENGTH` (2000) — a `committed` evidence call between 201 and 2000
+  characters would write a row that `forge:list`'s own response validation then rejected
+  forever after, for every item, not just the offending one. Fixed by capping `committedRef`
+  at `FORGE_DETAIL_MAX_LENGTH` like every other detail field; regression-tested in
+  `packages/contracts/src/forge/contracts.test.ts`.
+
+Four more findings, all major rather than blocking, were fixed in the same pass: a
+third hand-written copy of `{ id: z.uuid() }.strict()` (now reusing `HistoryIdRequestSchema`
+instead of a new `ForgeIdRequestSchema`); a second, independently-typed `bridgeMember`
+forked into `ForgePanel.tsx` instead of reusing Shell's (extracted into a shared
+`apps/desktop/src/renderer/src/experience/bridge.ts`); a dead not-found check written
+twice after the mutation instead of once (factored into `mutateExisting`); and an
+architecture-doc claim that `approvedBy` was restricted to the literal value `"William"`
+when the schema never enforced that (corrected to describe the actual, free-text contract).
+Missing test coverage was also added: multi-row isolation for both write paths (nothing
+previously proved `recordEvidence`/`approveForgeItem` touch only the named row), a
+DATABASE-level CHECK-constraint test for the title cap, a ForgePanel test rendering a SET
+fact rather than only ever-unset ones, and a Shell-level test that the FORGE toggle
+actually mounts the panel. `npm run verify` grew from 861 to 871 tests as a result.
+
+None of this is a claim that the swarm process is now unnecessary to run again — it is the
+opposite: the same process should run against Ledger before that ADR is written, and it
+found real, shippable-looking defects here on the first pass despite `verify`/`build`/
+`probe:runtime` all being green when the swarm was dispatched.
