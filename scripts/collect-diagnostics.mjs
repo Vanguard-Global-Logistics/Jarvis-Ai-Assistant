@@ -34,6 +34,24 @@ import { parseEnvText, safeEnvNames } from './lib/env-text.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
+/**
+ * The `.env` this report describes. Repo root, unless `JARVIS_ENV_FILE` names
+ * another — and it exists for exactly one caller.
+ *
+ * The leak tests have to run this script against a `.env` FULL of planted
+ * secrets. Two of them did that by moving the repo's real `.env` aside, writing
+ * their own, and putting it back afterwards, and that was not merely a race:
+ * vitest runs test files in parallel, both files did the same dance on the same
+ * path, and the interleaving that lost destroyed the real `.env` and left a
+ * file of planted fakes in its place. It surfaced as a flake on an 8-core Mac
+ * after passing on CI by scheduling luck.
+ *
+ * A test-visible seam is the honest fix: the tests point at a temp file and
+ * touch nothing in the repository, and the DEFAULT path — the one William
+ * actually uses — is still asserted, without writing to it.
+ */
+const envPath = process.env.JARVIS_ENV_FILE ?? join(root, '.env');
+
 /** Run a command for its output; never throw — a missing tool is itself a fact. */
 function cmd(/** @type {string} */ bin, /** @type {string[]} */ args) {
   try {
@@ -54,7 +72,7 @@ function cmd(/** @type {string} */ bin, /** @type {string[]} */ args) {
  * @returns {{ name: string, set: boolean }[]}
  */
 function envFileKeys() {
-  const path = join(root, '.env');
+  const path = envPath;
   if (!existsSync(path)) return [];
   // THE pinned parser (`env-text.mjs`), not a hand-rolled one. The inline
   // version this replaced had the same defect the health check shipped with:
@@ -88,7 +106,7 @@ function envFileKeys() {
  * happening as a side effect.
  */
 function envFileValue(/** @type {string} */ key) {
-  const path = join(root, '.env');
+  const path = envPath;
   if (!existsSync(path)) return undefined;
   for (const line of readFileSync(path, 'utf8').split('\n')) {
     const trimmed = line.trim();

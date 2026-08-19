@@ -1,5 +1,6 @@
-import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -17,8 +18,20 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
  */
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-const envPath = join(root, '.env');
-const backupPath = join(root, '.env.diagnostics-test-backup');
+
+/**
+ * The planted `.env` lives in a TEMP DIRECTORY. The repository's own is never
+ * moved, written, or deleted.
+ *
+ * This file and `check-model-redaction.test.ts` both used to swap the real
+ * `.env` out and back on the same path, and vitest runs test files in parallel.
+ * The losing interleaving deletes the real `.env` and restores the OTHER
+ * test's planted fakes over it — see that file's header for the exact sequence.
+ * The scripts now honour `JARVIS_ENV_FILE`, so neither test needs a repository
+ * file.
+ */
+const tempDir = mkdtempSync(join(tmpdir(), 'jarvis-diagnostics-'));
+const envPath = join(tempDir, '.env');
 
 /** Values that must never reach the report. Each is distinctive enough to grep. */
 const PLANTED = {
@@ -34,13 +47,8 @@ const PLANTED = {
 };
 
 let output = '';
-let hadExistingEnv = false;
 
 beforeAll(() => {
-  // Never destroy a real .env: move it aside and put it back afterwards.
-  hadExistingEnv = existsSync(envPath);
-  if (hadExistingEnv) renameSync(envPath, backupPath);
-
   writeFileSync(
     envPath,
     [
@@ -59,13 +67,16 @@ beforeAll(() => {
     encoding: 'utf8',
     // The planted values must not reach the script through the environment
     // either — this proves the .env parser is what is being tested.
-    env: { ...process.env, ...Object.fromEntries(Object.keys(PLANTED).map((k) => [k, ''])) },
+    env: {
+      ...process.env,
+      ...Object.fromEntries(Object.keys(PLANTED).map((k) => [k, ''])),
+      JARVIS_ENV_FILE: envPath,
+    },
   });
 });
 
 afterAll(() => {
-  rmSync(envPath, { force: true });
-  if (hadExistingEnv) renameSync(backupPath, envPath);
+  rmSync(tempDir, { recursive: true, force: true });
 });
 
 describe('npm run diagnostics never prints a secret', () => {
@@ -120,6 +131,45 @@ describe('the script itself', () => {
     const callSites = [...source.matchAll(/envFileValue\('([^']+)'\)/g)].map((m) => m[1]);
     expect(new Set(callSites)).toEqual(permitted);
     expect([...permitted].filter((k) => /KEY|SECRET|TOKEN|PASSWORD/i.test(k))).toEqual([]);
+  });
+
+  it('reads the REPO-ROOT .env by default — the path William actually uses', () => {
+    // Two assertions for the reason spelled out in
+    // `check-model-redaction.test.ts`: the structural one has teeth on every
+    // machine, the behavioural one only on a machine that actually has a
+    // `.env` (William's Mac does; this container does not). Neither is
+    // sufficient alone, and neither writes anything.
+    const source = readFileSync(join(root, 'scripts', 'collect-diagnostics.mjs'), 'utf8');
+    expect(source).toContain("process.env.JARVIS_ENV_FILE ?? join(root, '.env')");
+
+    const env = { ...process.env };
+    delete env.JARVIS_ENV_FILE;
+    const result = spawnSync('node', [join(root, 'scripts', 'collect-diagnostics.mjs')], {
+      cwd: root,
+      encoding: 'utf8',
+      env,
+    });
+    const report = result.stdout;
+    if (existsSync(join(root, '.env'))) {
+      expect(report).not.toContain('- (no .env file)');
+    } else {
+      expect(report).toContain('- (no .env file)');
+    }
+  });
+
+  it('leaves the repository .env exactly as it found it', () => {
+    // The bug this file shipped with could DELETE a real `.env` and leave
+    // another test's planted fakes in its place. This is that property,
+    // asserted rather than assumed.
+    const repoEnv = join(root, '.env');
+    const before = existsSync(repoEnv) ? readFileSync(repoEnv, 'utf8') : null;
+    execFileSync('node', [join(root, 'scripts', 'collect-diagnostics.mjs')], {
+      cwd: root,
+      encoding: 'utf8',
+      env: { ...process.env, JARVIS_ENV_FILE: envPath },
+    });
+    const after = existsSync(repoEnv) ? readFileSync(repoEnv, 'utf8') : null;
+    expect(after).toStrictEqual(before);
   });
 
   it('names the Grok key without printing it', () => {

@@ -34,6 +34,15 @@ import { parseEnvMap } from './lib/env-text.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
+/**
+ * The `.env` this script reads. Repo root, unless `JARVIS_ENV_FILE` names
+ * another — see the same constant in `collect-diagnostics.mjs` for why the seam
+ * exists: the leak tests must run this against a file full of planted keys, and
+ * the two tests that did that by swapping the repo's real `.env` in and out
+ * raced each other badly enough to destroy it.
+ */
+const envPath = process.env.JARVIS_ENV_FILE ?? join(root, '.env');
+
 // --- .env ------------------------------------------------------------------
 
 /**
@@ -46,9 +55,8 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
  * rule 7).
  */
 function readEnvFile() {
-  const path = join(root, '.env');
-  if (!existsSync(path)) return {};
-  return parseEnvMap(readFileSync(path, 'utf8'));
+  if (!existsSync(envPath)) return {};
+  return parseEnvMap(readFileSync(envPath, 'utf8'));
 }
 
 /** The ambient environment wins, exactly as the app decides it (ADR 0021). */
@@ -434,7 +442,7 @@ const chosen = chooseProvider();
 console.log('─'.repeat(64));
 console.log('  MODEL CHECK — one real request, so the service explains itself');
 console.log('─'.repeat(64));
-console.log(`.env found    : ${existsSync(join(root, '.env')) ? 'yes' : 'NO'}`);
+console.log(`.env found    : ${existsSync(envPath) ? 'yes' : 'NO'}`);
 
 let code = 0;
 if (chosen === 'local') {

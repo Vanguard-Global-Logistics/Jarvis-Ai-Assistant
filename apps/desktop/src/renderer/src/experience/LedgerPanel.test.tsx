@@ -344,14 +344,50 @@ describe('LedgerPanel — how old the figures are', () => {
   });
 
   it('dates the figures when they exist — a confidence tag is not a freshness tag', async () => {
+    // The first version asserted the literal string `3/4/2026` against
+    // `2026-03-04T00:00:00.000Z`. That is midnight UTC, which is the 3rd of
+    // March at 4pm in Pacific time, so the test passed in CI and failed on
+    // William's Mac — a test that depended on the machine instead of
+    // controlling it, which is the exact class this repo already has scar
+    // tissue for (ADR 0021, CLAUDE.md §8 rule 7).
+    //
+    // Computing the expected string the same way the component does would make
+    // the assertion a tautology on its own, so it is paired with the control
+    // below: it is the CONTROL that proves the panel reads `updatedAt`.
+    const iso = '2026-03-04T12:00:00.000Z';
+    const expected = new Date(iso).toLocaleDateString('en-US');
     stubJarvis({
       getLedgerInputs: vi.fn().mockResolvedValue({
-        inputs: fullInputs({ updatedAt: '2026-03-04T00:00:00.000Z' }),
+        inputs: fullInputs({ updatedAt: iso }),
         safeToSpend: { computable: true, cents: 75_000, confidence: 'POSTED' },
       }),
     });
     render(<LedgerPanel />);
-    expect(await screen.findByText(/Figures as of 3\/4\/2026/)).toBeTruthy();
+    const line = await screen.findByText(`Figures as of ${expected}.`);
+    expect(line).toBeTruthy();
+    // The two failures a wrong implementation actually produces.
+    expect(line.textContent).not.toContain('1970');
+    expect(line.textContent).not.toContain('never entered');
+  });
+
+  it('dates them from updatedAt, not from today — two instants render differently', async () => {
+    // This is the assertion the hardcoded date was really making. A panel that
+    // formatted `Date.now()` (or any constant) would render the SAME string for
+    // both of these and pass every test above it.
+    const dates = new Set<string>();
+    for (const iso of ['2024-06-01T12:00:00.000Z', '2026-03-04T12:00:00.000Z']) {
+      stubJarvis({
+        getLedgerInputs: vi.fn().mockResolvedValue({
+          inputs: fullInputs({ updatedAt: iso }),
+          safeToSpend: { computable: true, cents: 75_000, confidence: 'POSTED' },
+        }),
+      });
+      const view = render(<LedgerPanel />);
+      const line = await screen.findByText(/Figures as of /);
+      dates.add(line.textContent);
+      view.unmount();
+    }
+    expect(dates.size).toBe(2);
   });
 });
 
