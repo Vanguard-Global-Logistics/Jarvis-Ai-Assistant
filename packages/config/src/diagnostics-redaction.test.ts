@@ -39,7 +39,23 @@ const PLANTED = {
   OPENAI_API_KEY: 'sk-PLANTED-SECRET-must-not-appear-0002',
   SUPABASE_SERVICE_ROLE_KEY: 'PLANTED-SECRET-must-not-appear-0003',
   VERCEL_TOKEN: 'PLANTED-SECRET-must-not-appear-0004',
-  DATABASE_URL: 'postgres://user:PLANTED-SECRET-must-not-appear-0005@db.example.com/x',
+  // NOT written with a password in the userinfo — scheme, user, colon, secret,
+  // at-sign, all contiguous. (Spelled out in words rather than shown, because
+  // writing the shape here would trip the very guard this comment is about; the
+  // scanner's own source documents the same trap.) That shape matches the
+  // connection-string pattern in `scripts/lib/secret-scan.mjs`, which is
+  // deliberately NOT exemptible — a password is human-chosen text, so a fixture
+  // marker inside one proves nothing. The consequence was severe and silent:
+  // `npm run review` scans the whole branch diff, found this line, and REFUSED
+  // TO WRITE A PACKET AT ALL. The mandatory CLAUDE.md §5 independent review had
+  // become impossible to obtain, because of a fake password in a test.
+  //
+  // The guard was right and the fixture was wrong. Nothing here needs a
+  // password — the test asserts that a value under a SECRET-named key never
+  // reaches the report, and redaction is by key NAME, not by value shape. The
+  // marker also sits earlier in the string now, which makes the
+  // leaked-prefix assertion below mean something.
+  DATABASE_URL: 'postgres://PLANTED-SECRET-must-not-appear-0005@db.example.com/x',
   PLAID_SECRET: 'PLANTED-SECRET-must-not-appear-0006',
   // Grok (ADR 0020) gets the same promise as every other key, asserted before
   // there is ever a real one to leak.
