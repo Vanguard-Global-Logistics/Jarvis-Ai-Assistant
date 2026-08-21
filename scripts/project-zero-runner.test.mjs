@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -84,6 +84,22 @@ describe('Project Zero one-shot runner', () => {
     expect(report.projectCount).toBe(12);
     expect(report.informationMigrationReady).toBe(true);
     expect(report.destructiveCleanupAuthorized).toBe(false);
+  });
+
+  it('keeps synthesized outputs owner-private on POSIX systems', async () => {
+    if (process.platform === 'win32') return;
+    const { root, migration, requester } = await fixture();
+    await synthesizeProjectBrains({ outputRoot: root, migration, apiKey: 'test', requester });
+
+    const projectDirectory = await stat(resolve(root, 'jarvis-ai'));
+    const brain = await stat(resolve(root, 'jarvis-ai', 'BRAIN.md'));
+    const verified = await stat(resolve(root, 'jarvis-ai', 'SYNTHESIS-VERIFIED.json'));
+    const summary = await stat(resolve(root, 'SYNTHESIS-SUMMARY.json'));
+
+    expect(projectDirectory.mode & 0o777).toBe(0o700);
+    expect(brain.mode & 0o777).toBe(0o600);
+    expect(verified.mode & 0o777).toBe(0o600);
+    expect(summary.mode & 0o777).toBe(0o600);
   });
 
   it('blocks information readiness when unclassified chats remain', async () => {
