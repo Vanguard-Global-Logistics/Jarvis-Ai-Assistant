@@ -18,19 +18,35 @@ if [[ ! "$NODE_MAJOR" =~ ^[0-9]+$ ]] || (( NODE_MAJOR < 22 )); then
   exit 1
 fi
 
-for env_file in "$HOME/.hermes/.env" "$HOME/.jarvis/.env"; do
-  if [[ -f "$env_file" ]]; then
-    set -a
-    # shellcheck disable=SC1090
-    source "$env_file"
-    set +a
+load_openai_key() {
+  local env_file="$1" line value
+  [[ -z "${OPENAI_API_KEY:-}" ]] || return 0
+  [[ -f "$env_file" ]] || return 0
+  line="$(grep -m1 '^OPENAI_API_KEY=' "$env_file" 2>/dev/null || true)"
+  [[ -n "$line" ]] || return 0
+  value="${line#OPENAI_API_KEY=}"
+  value="${value%$'\r'}"
+  if [[ "$value" == \"*\" && "$value" == *\" ]]; then
+    value="${value:1:${#value}-2}"
+  elif [[ "$value" == \'*\' && "$value" == *\' ]]; then
+    value="${value:1:${#value}-2}"
   fi
-done
+  if [[ -n "$value" ]]; then
+    export OPENAI_API_KEY="$value"
+  fi
+}
+
+load_openai_key "$HOME/.hermes/.env"
+load_openai_key "$HOME/.jarvis/.env"
 
 EXPORT_PATH="${1:-${PROJECT_ZERO_EXPORT:-$HOME/Downloads/conversations.json}}"
 if [[ ! -f "$EXPORT_PATH" ]]; then
   echo "FAIL: ChatGPT export not found: $EXPORT_PATH"
   echo "Place conversations.json in Downloads or pass its path as the first argument."
+  exit 1
+fi
+if [[ "$(basename "$EXPORT_PATH")" != "conversations.json" ]]; then
+  echo "FAIL: Project Zero only accepts a ChatGPT conversations.json export."
   exit 1
 fi
 
@@ -40,7 +56,7 @@ if [[ -z "${OPENAI_API_KEY:-}" ]]; then
   exit 1
 fi
 
-RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)"
+RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)-$$"
 PROJECT_ZERO_HOME="${PROJECT_ZERO_HOME:-$HOME/.jarvis/project-zero}"
 OUTPUT_ROOT="$PROJECT_ZERO_HOME/runs/$RUN_ID"
 OWNER_BRAIN="${PROJECT_ZERO_OWNER_BRAIN:-$HOME/.jarvis/WILLIAM-BRAIN.md}"
@@ -64,10 +80,10 @@ set +e
 node "${ARGS[@]}"
 STATUS=$?
 set -e
-printf '%s\n' "$OUTPUT_ROOT" > "$PROJECT_ZERO_HOME/LATEST"
-chmod 600 "$PROJECT_ZERO_HOME/LATEST"
 
 if [[ -f "$OUTPUT_ROOT/PROJECT-ZERO-REPORT.md" ]]; then
+  printf '%s\n' "$OUTPUT_ROOT" > "$PROJECT_ZERO_HOME/LATEST"
+  chmod 600 "$PROJECT_ZERO_HOME/LATEST"
   echo
   echo "Project Zero report: $OUTPUT_ROOT/PROJECT-ZERO-REPORT.md"
   open "$OUTPUT_ROOT/PROJECT-ZERO-REPORT.md" >/dev/null 2>&1 || true
