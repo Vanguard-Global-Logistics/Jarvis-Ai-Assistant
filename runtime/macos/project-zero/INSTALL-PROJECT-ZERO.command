@@ -28,11 +28,13 @@ SKILL_SOURCE="$REPO_ROOT/jarvis-hermes/skills/operations/project-zero/SKILL.md"
 SKILL_TARGET="$HERMES_HOME/skills/operations/project-zero"
 WRAPPER_SOURCE="$REPO_ROOT/jarvis-hermes/scripts/jarvis-project-zero.sh"
 WRAPPER_TARGET="$HERMES_HOME/bin/jarvis-project-zero"
+REPO_POINTER="$JARVIS_HOME/project-zero/repo-path"
 mkdir -p "$SKILL_TARGET" "$HERMES_HOME/bin" "$JARVIS_HOME/project-zero/runs"
+printf '%s\n' "$REPO_ROOT" > "$REPO_POINTER"
 cp "$SKILL_SOURCE" "$SKILL_TARGET/SKILL.md"
 cp "$WRAPPER_SOURCE" "$WRAPPER_TARGET"
 chmod 700 "$HERMES_HOME" "$HERMES_HOME/bin" "$HERMES_HOME/skills" "$HERMES_HOME/skills/operations" "$SKILL_TARGET" 2>/dev/null || true
-chmod 600 "$SKILL_TARGET/SKILL.md"
+chmod 600 "$SKILL_TARGET/SKILL.md" "$REPO_POINTER"
 chmod 700 "$WRAPPER_TARGET" "$JARVIS_HOME" "$JARVIS_HOME/project-zero" "$JARVIS_HOME/project-zero/runs"
 
 if [[ ! -s "$JARVIS_HOME/WILLIAM-BRAIN.md" ]]; then
@@ -44,5 +46,6 @@ bash "$SCRIPT_DIR/project-zero-doctor.sh"
 
 echo
 echo "PASS: Project Zero is installed for Hermes/Jarvis."
+echo "Repository: $REPO_ROOT"
 echo "Test from Hermes with: Project Zero"
 echo "Direct test: $WRAPPER_TARGET \"$HOME/Downloads/conversations.json\""
