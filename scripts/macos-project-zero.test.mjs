@@ -30,6 +30,18 @@ describe('Project Zero Mac/Hermes entry points', () => {
     expect(copyIndex).toBeGreaterThan(testIndex);
   });
 
+  it('records the actual repository path and the installed wrapper consumes it', () => {
+    const installer = readFileSync(resolve(root, installerPath), 'utf8');
+    const wrapper = readFileSync(resolve(root, wrapperPath), 'utf8');
+    const doctor = readFileSync(resolve(root, doctorPath), 'utf8');
+
+    expect(installer).toContain('project-zero/repo-path');
+    expect(installer).toContain("printf '%s\\n' \"$REPO_ROOT\" > \"$REPO_POINTER\"");
+    expect(wrapper).toContain('project-zero/repo-path');
+    expect(wrapper).toContain('IFS= read -r RESOLVED_REPO');
+    expect(doctor).toContain('installed Project Zero repo pointer matches this checkout');
+  });
+
   it('uses GPT-5.6 high by default and never accepts the API key as an argument', () => {
     const launcher = readFileSync(resolve(root, launcherPath), 'utf8');
     expect(launcher).toContain('PROJECT_ZERO_OPENAI_MODEL:-gpt-5.6');
