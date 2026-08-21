@@ -7,11 +7,12 @@ import {
   PROJECTS,
   renderIndex,
   renderProjectBrain,
+  renderProjectSourceArchive,
   renderUnclassified,
 } from './project-zero-chat-consolidation.mjs';
 
 function usage() {
-  console.log(`Usage:\n  node scripts/consolidate-chatgpt-export.mjs --input /path/to/conversations.json [--output ./chat-consolidation-output]\n\nThis is a local, non-destructive developer utility. It reads a ChatGPT export and writes 12 project BRAIN.md files plus an index and an UNCLASSIFIED review file. It never archives or deletes chats.`);
+  console.log(`Usage:\n  node scripts/consolidate-chatgpt-export.mjs --input /path/to/conversations.json [--output ./chat-consolidation-output]\n\nThis is a local, non-destructive developer utility. It reads a ChatGPT export and writes compact startup brains plus separate source archives for 12 projects. It never archives or deletes chats.`);
 }
 
 function parseArgs(argv) {
@@ -44,20 +45,26 @@ async function main() {
 
   for (const project of PROJECTS) {
     const directory = resolve(outputRoot, project.id);
+    const conversations = result.projects[project.id];
     await mkdir(directory, { recursive: true });
     await writeFile(
       resolve(directory, 'BRAIN.md'),
-      `${renderProjectBrain(project.id, result.projects[project.id])}\n`,
+      `${renderProjectBrain(project.id, conversations)}\n`,
+      'utf8',
+    );
+    await writeFile(
+      resolve(directory, 'SOURCE-TRANSCRIPTS.md'),
+      `${renderProjectSourceArchive(project.id, conversations)}\n`,
       'utf8',
     );
     await writeFile(
       resolve(directory, 'STATUS.md'),
-      `# ${project.title} — STATUS\n\nStatus: migration source packet generated from ${result.projects[project.id].length} classified ChatGPT conversation(s).\n\nNext: synthesize verified decisions/current state into this file; preserve source chat IDs for traceability.\n`,
+      `# ${project.title} — STATUS\n\nStatus: ${conversations.length} source conversation(s) classified. Compact brain synthesis is pending verification.\n\nNormal startup should load BRAIN.md, STATUS.md, and MASTER-PUNCHLIST.md only. Read SOURCE-TRANSCRIPTS.md only to verify a fact or resolve a conflict.\n`,
       'utf8',
     );
     await writeFile(
       resolve(directory, 'MASTER-PUNCHLIST.md'),
-      `# ${project.title} — MASTER PUNCH LIST\n\n- [ ] Review classified source conversations.\n- [ ] Resolve contradictions and stale branches/deployments.\n- [ ] Write concise current-state summary.\n- [ ] Verify source-of-truth repository/files.\n- [ ] Mark source chats safe-to-archive only after verification.\n`,
+      `# ${project.title} — MASTER PUNCH LIST\n\n- [ ] Synthesize compact confirmed facts and decisions into BRAIN.md.\n- [ ] Resolve contradictions and stale branches/deployments against source-of-truth systems.\n- [ ] Write concise current state and next action.\n- [ ] Verify source chat coverage.\n- [ ] Mark source chats safe-to-archive only after verification.\n`,
       'utf8',
     );
   }
