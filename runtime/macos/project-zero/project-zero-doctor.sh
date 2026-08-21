@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 HERMES_HOME="${HERMES_HOME:-$HOME/.hermes}"
 JARVIS_HOME="${JARVIS_HOME:-$HOME/.jarvis}"
+REPO_POINTER="$JARVIS_HOME/project-zero/repo-path"
 PASS=0
 FAIL=0
 WARN=0
@@ -42,6 +43,17 @@ fi
 
 [[ -s "$HERMES_HOME/skills/operations/project-zero/SKILL.md" ]] && pass "Hermes Project Zero skill installed" || fail "Hermes Project Zero skill missing"
 [[ -x "$HERMES_HOME/bin/jarvis-project-zero" ]] && pass "Hermes Project Zero launcher installed" || fail "Hermes Project Zero launcher missing"
+
+if [[ -s "$REPO_POINTER" ]]; then
+  IFS= read -r INSTALLED_REPO < "$REPO_POINTER"
+  if [[ "$INSTALLED_REPO" == "$REPO_ROOT" ]]; then
+    pass "installed Project Zero repo pointer matches this checkout"
+  else
+    fail "installed repo pointer is stale (expected $REPO_ROOT; got ${INSTALLED_REPO:-empty})"
+  fi
+else
+  fail "installed Project Zero repo pointer is missing"
+fi
 
 if [[ -n "${OPENAI_API_KEY:-}" ]] || grep -qs '^OPENAI_API_KEY=' "$HERMES_HOME/.env" "$JARVIS_HOME/.env" 2>/dev/null; then
   pass "OpenAI API key is configured locally"
