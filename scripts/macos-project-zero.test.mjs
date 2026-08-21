@@ -42,6 +42,23 @@ describe('Project Zero Mac/Hermes entry points', () => {
     expect(doctor).toContain('installed Project Zero repo pointer matches this checkout');
   });
 
+  it('loads only the OpenAI key from local env files without sourcing shell code', () => {
+    const launcher = readFileSync(resolve(root, launcherPath), 'utf8');
+    expect(launcher).toContain("grep -m1 '^OPENAI_API_KEY='");
+    expect(launcher).not.toMatch(/\bsource\s+\"?\$env_file/);
+    expect(launcher).not.toContain('set -a');
+  });
+
+  it('accepts only conversations.json and records LATEST only when a report exists', () => {
+    const launcher = readFileSync(resolve(root, launcherPath), 'utf8');
+    expect(launcher).toContain('basename "$EXPORT_PATH"');
+    expect(launcher).toContain('conversations.json');
+    const reportGate = launcher.indexOf('if [[ -f "$OUTPUT_ROOT/PROJECT-ZERO-REPORT.md" ]]');
+    const latestWrite = launcher.indexOf('> "$PROJECT_ZERO_HOME/LATEST"');
+    expect(reportGate).toBeGreaterThanOrEqual(0);
+    expect(latestWrite).toBeGreaterThan(reportGate);
+  });
+
   it('uses GPT-5.6 high by default and never accepts the API key as an argument', () => {
     const launcher = readFileSync(resolve(root, launcherPath), 'utf8');
     expect(launcher).toContain('PROJECT_ZERO_OPENAI_MODEL:-gpt-5.6');
