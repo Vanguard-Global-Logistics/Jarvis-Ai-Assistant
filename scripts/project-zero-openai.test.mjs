@@ -6,7 +6,7 @@ import {
 } from './project-zero-openai.mjs';
 
 const request = {
-  version: 1,
+  version: 2,
   project: { id: 'jarvis-ai', title: 'Jarvis AI' },
   instructions: [],
   schema: {},
@@ -36,6 +36,19 @@ describe('Project Zero OpenAI synthesis adapter', () => {
     expect(body.store).toBe(false);
     expect(body.text.format.type).toBe('json_schema');
     expect(body.text.format.strict).toBe(true);
+  });
+
+  it('redacts credential-like transcript data while preserving source chat ids', () => {
+    const secret = 'sk-proj-abcdefghijklmnopqrstuvwxyz123456';
+    const unsafe = structuredClone(request);
+    unsafe.sources[0].sourceChatId = 'chat-keep-this-id';
+    unsafe.sources[0].messages = [
+      { role: 'user', text: `My OPENAI_API_KEY=${secret} should never enter a prompt.` },
+    ];
+    const body = buildOpenAIProjectZeroRequest(unsafe);
+    expect(body.input).not.toContain(secret);
+    expect(body.input).toContain('[REDACTED SECRET]');
+    expect(body.input).toContain('chat-keep-this-id');
   });
 
   it('validates source citations after a structured response', async () => {
