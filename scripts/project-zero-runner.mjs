@@ -1,13 +1,20 @@
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
+import {
+  buildBatchSynthesisRequest,
+  buildMergeSynthesisRequest,
+  DEFAULT_SOURCE_BATCH_CHAR_BUDGET,
+  groupMergeResults,
+  partitionSynthesisSources,
+} from './project-zero-batching.mjs';
 import { PROJECTS } from './project-zero-chat-consolidation.mjs';
-import { renderCompactBrain, validateSynthesisResult } from './project-zero-synthesis.mjs';
 import {
   DEFAULT_PROJECT_ZERO_MODEL,
   DEFAULT_REASONING_EFFORT,
   requestOpenAIProjectZeroSynthesis,
 } from './project-zero-openai.mjs';
+import { renderCompactBrain, validateSynthesisResult } from './project-zero-synthesis.mjs';
 
 function emptySynthesisResult() {
   return {
@@ -42,18 +49,122 @@ function sumUsage(target, usage) {
   }
 }
 
+function collectClaimSourceIds(result) {
+  const ids = new Set();
+  const collectClaims = (claims) => {
+    for (const claim of Array.isArray(claims) ? claims : []) {
+      for (const id of Array.isArray(claim.sourceChatIds) ? claim.sourceChatIds : []) ids.add(id);
+    }
+  };
+  collectClaims(result.confirmedFacts);
+  collectClaims(result.decisions);
+  collectClaims(result.sourceOfTruth);
+  collectClaims(result.completedWork);
+  collectClaims(result.openWork);
+  for (const conflict of Array.isArray(result.conflicts) ? result.conflicts : []) {
+    collectClaims(conflict.claims);
+  }
+  if (result.nextAction) collectClaims([result.nextAction]);
+  return ids;
+}
+
+function filterConversationsByIds(sourceConversations, ids) {
+  return sourceConversations.filter((conversation) => ids.has(conversation.id));
+}
+
+async function callSynthesis({
+  requester,
+  request,
+  allowedConversations,
+  apiKey,
+  model,
+  reasoningEffort,
+  usage,
+  calls,
+  kind,
+  label,
+}) {
+  const response = await requester(request, allowedConversations, {
+    apiKey,
+    model,
+    reasoningEffort,
+  });
+  const validated = validateSynthesisResult(response.result, allowedConversations);
+  sumUsage(usage, response.usage);
+  calls.push({
+    kind,
+    label,
+    model: response.model ?? model,
+    responseId: response.responseId ?? null,
+    sourceChatCount: allowedConversations.length,
+    usage: response.usage ?? null,
+  });
+  return validated;
+}
+
+async function mergeSynthesisResults({
+  project,
+  results,
+  sourceConversations,
+  requester,
+  apiKey,
+  model,
+  reasoningEffort,
+  usage,
+  calls,
+}) {
+  let current = results;
+  let round = 1;
+  while (current.length > 1) {
+    const groups = groupMergeResults(current);
+    const next = [];
+    for (let groupIndex = 0; groupIndex < groups.length; groupIndex += 1) {
+      const group = groups[groupIndex];
+      if (group.length === 1) {
+        next.push(group[0]);
+        continue;
+      }
+      const allowedIds = new Set();
+      for (const result of group) {
+        for (const id of collectClaimSourceIds(result)) allowedIds.add(id);
+      }
+      const allowedConversations = filterConversationsByIds(sourceConversations, allowedIds);
+      const request = buildMergeSynthesisRequest(project, group, round, groupIndex);
+      next.push(
+        await callSynthesis({
+          requester,
+          request,
+          allowedConversations,
+          apiKey,
+          model,
+          reasoningEffort,
+          usage,
+          calls,
+          kind: 'merge',
+          label: `round-${round}-group-${groupIndex + 1}`,
+        }),
+      );
+    }
+    current = next;
+    round += 1;
+  }
+  return current[0] ?? emptySynthesisResult();
+}
+
 export async function synthesizeProjectBrains({
   outputRoot,
   migration,
   apiKey,
   model = DEFAULT_PROJECT_ZERO_MODEL,
   reasoningEffort = DEFAULT_REASONING_EFFORT,
+  sourceBatchCharBudget = DEFAULT_SOURCE_BATCH_CHAR_BUDGET,
   requester = requestOpenAIProjectZeroSynthesis,
 }) {
   const root = resolve(outputRoot);
   const summary = {
     modelRequested: model,
     reasoningEffort,
+    sourceBatchCharBudget,
     projects: [],
     usage: { input_tokens: 0, output_tokens: 0, total_tokens: 0 },
   };
@@ -66,37 +177,70 @@ export async function synthesizeProjectBrains({
 
     const projectDir = resolve(root, project.id);
     await mkdir(projectDir, { recursive: true });
+    const calls = [];
     let validated;
-    let metadata;
+    let batchCount = 0;
 
     if (sourceConversations.length === 0) {
       validated = validateSynthesisResult(emptySynthesisResult(), sourceConversations);
-      metadata = {
-        provider: 'none',
-        reason: 'no-source-conversations',
-        model: null,
-        responseId: null,
-        usage: null,
-      };
     } else {
       const requestPath = resolve(projectDir, 'SYNTHESIS-REQUEST.json');
       const request = await readJson(requestPath);
-      const response = await requester(request, sourceConversations, {
+      const batches = partitionSynthesisSources(request.sources, {
+        charBudget: sourceBatchCharBudget,
+      });
+      batchCount = batches.length;
+      const batchResults = [];
+
+      for (let batchIndex = 0; batchIndex < batches.length; batchIndex += 1) {
+        const batch = batches[batchIndex];
+        const allowedIds = new Set(batch.map((source) => source.sourceChatId));
+        const allowedConversations = filterConversationsByIds(sourceConversations, allowedIds);
+        const batchRequest = buildBatchSynthesisRequest(
+          request,
+          batch,
+          batchIndex,
+          batches.length,
+        );
+        batchResults.push(
+          await callSynthesis({
+            requester,
+            request: batchRequest,
+            allowedConversations,
+            apiKey,
+            model,
+            reasoningEffort,
+            usage: summary.usage,
+            calls,
+            kind: 'source-batch',
+            label: `batch-${batchIndex + 1}-of-${batches.length}`,
+          }),
+        );
+      }
+
+      validated = await mergeSynthesisResults({
+        project,
+        results: batchResults,
+        sourceConversations,
+        requester,
         apiKey,
         model,
         reasoningEffort,
+        usage: summary.usage,
+        calls,
       });
-      validated = validateSynthesisResult(response.result, sourceConversations);
-      metadata = {
-        provider: 'openai',
-        model: response.model ?? model,
-        responseId: response.responseId ?? null,
-        usage: response.usage ?? null,
-      };
-      sumUsage(summary.usage, response.usage);
+      validated = validateSynthesisResult(validated, sourceConversations);
     }
 
     const brain = renderCompactBrain(project, sourceConversations, validated);
+    const metadata = {
+      provider: sourceConversations.length === 0 ? 'none' : 'openai',
+      modelRequested: model,
+      reasoningEffort,
+      sourceBatchCharBudget,
+      batchCount,
+      calls,
+    };
     await writeFile(resolve(projectDir, 'BRAIN.md'), `${brain}\n`, 'utf8');
     await writeFile(
       resolve(projectDir, 'SYNTHESIS-RESULT.json'),
@@ -117,6 +261,8 @@ export async function synthesizeProjectBrains({
       id: project.id,
       title: project.title,
       sourceChats: sourceConversations.length,
+      batchCount,
+      modelCalls: calls.length,
       conflicts: validated.conflicts.length,
       unresolvedConflicts: validated.conflicts.filter((conflict) => conflict.resolution === null)
         .length,
