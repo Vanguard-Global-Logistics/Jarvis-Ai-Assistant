@@ -76,24 +76,63 @@ function messageText(message) {
   return parts.map(asText).filter(Boolean).join('\n');
 }
 
+function activePathNodes(conversation, mapping) {
+  const currentNode = asText(conversation?.current_node);
+  if (!currentNode) return null;
+
+  const lookup = new Map();
+  for (const [key, node] of Object.entries(mapping)) {
+    lookup.set(key, node);
+    const nodeId = asText(node?.id);
+    if (nodeId) lookup.set(nodeId, node);
+  }
+
+  const path = [];
+  const visited = new Set();
+  let cursor = currentNode;
+
+  while (cursor) {
+    if (visited.has(cursor)) return null;
+    visited.add(cursor);
+
+    const node = lookup.get(cursor);
+    if (!node) return null;
+    path.push(node);
+    cursor = asText(node?.parent);
+  }
+
+  return path.reverse();
+}
+
+function toMessage(node, index) {
+  const message = node?.message;
+  if (!message) return null;
+  const text = messageText(message);
+  if (text.trim().length === 0) return null;
+
+  return {
+    id: asText(message.id || node.id || index),
+    role: asText(message?.author?.role || 'unknown'),
+    createTime: Number(message?.create_time ?? Number.MAX_SAFE_INTEGER),
+    text,
+    index,
+  };
+}
+
 function orderedMessages(conversation) {
   const mapping = conversation?.mapping;
   if (!mapping || typeof mapping !== 'object') return [];
 
+  const activeNodes = activePathNodes(conversation, mapping);
+  if (activeNodes) {
+    return activeNodes
+      .map((node, index) => toMessage(node, index))
+      .filter((message) => message !== null);
+  }
+
   return Object.values(mapping)
-    .map((node, index) => ({ node, index }))
-    .filter(({ node }) => node?.message)
-    .map(({ node, index }) => {
-      const message = node.message;
-      return {
-        id: asText(message.id || node.id || index),
-        role: asText(message?.author?.role || 'unknown'),
-        createTime: Number(message?.create_time ?? Number.MAX_SAFE_INTEGER),
-        text: messageText(message),
-        index,
-      };
-    })
-    .filter((message) => message.text.trim().length > 0)
+    .map((node, index) => toMessage(node, index))
+    .filter((message) => message !== null)
     .sort((a, b) => a.createTime - b.createTime || a.index - b.index);
 }
 
