@@ -19,6 +19,9 @@ wrapper.
 
 - [x] Deterministic registry for exactly 12 project lanes.
 - [x] Parse ChatGPT `conversations.json` text messages.
+- [x] Follow the export's active `current_node` parent chain so regenerated/superseded branches do not
+      get flattened into the active conversation; fall back to chronological mapping only when the
+      active path cannot be resolved.
 - [x] Weighted title/body classification with an `UNCLASSIFIED` fail-safe.
 - [x] Preserve source chat IDs, timestamps, roles, text, confidence, and candidate routing.
 - [x] Generate compact per-project `BRAIN.md`, `STATUS.md`, and `MASTER-PUNCHLIST.md`.
@@ -26,7 +29,8 @@ wrapper.
 - [x] `/brain` startup excludes source transcripts unless a fact/conflict requires verification.
 - [x] Optional private `WILLIAM-BRAIN.md` input; hard 16 KiB budget.
 - [x] Hard 32 KiB rendered project-brain budget.
-- [x] Generated migration directories/files use owner-private permissions and remain ignored by Git.
+- [x] Every generated migration/synthesis directory/file is forced owner-private (0700 directories,
+      0600 files) and ignored by Git.
 
 ### Source-cited synthesis
 
@@ -35,6 +39,7 @@ wrapper.
 - [x] Strict structured-output schema.
 - [x] Every retained fact, decision, status item, next action, conflict claim, and conflict resolution
       must cite exact source chat IDs.
+- [x] A conflict must contain at least one source-cited claim; empty conflict shells are rejected.
 - [x] Unknown or missing source IDs are rejected before a compact brain is written.
 - [x] Conflicts remain unresolved unless a supplied source explicitly supports a cited resolution.
 - [x] Raw transcript instructions are treated as untrusted data.
@@ -50,12 +55,20 @@ wrapper.
 
 - [x] Network-free `npm run project-zero:self-test` exercises all 12 lanes, synthesis validation,
       readiness reporting, and the destructive-action lock.
-- [x] Focused tests cover project separation, ambiguity, source citations, cited conflict resolution,
-      oversized-message batching, usage guards, credential redaction, private filesystem modes, and
-      Mac/Hermes entry-point boundaries.
+- [x] Focused tests cover project separation, ambiguity, active ChatGPT branch selection, source
+      citations, cited conflict resolution, oversized-message batching, usage guards, credential
+      redaction, private filesystem modes, and Mac/Hermes entry-point boundaries.
 - [x] `runtime/macos/project-zero/INSTALL-PROJECT-ZERO.command` runs the self-test before installing.
+- [x] Installer records the exact checkout in `~/.jarvis/project-zero/repo-path`; the installed Hermes
+      wrapper uses that pointer instead of assuming a fixed clone location.
 - [x] `runtime/macos/project-zero/RUN-PROJECT-ZERO.command` performs the isolated one-shot Mac run.
-- [x] `runtime/macos/project-zero/project-zero-doctor.sh` is read-only.
+- [x] Mac launcher reads only `OPENAI_API_KEY=` from approved local env files; it never sources an env
+      file as executable shell code.
+- [x] Mac launcher accepts only a file named `conversations.json` and updates `LATEST` only after a
+      verification report actually exists.
+- [x] `runtime/macos/project-zero/project-zero-doctor.sh` is read-only and verifies the installed repo
+      pointer.
+- [x] All four Project Zero Mac shell entry points were reviewed with Bash syntax validation.
 - [x] Hermes skill: `jarvis-hermes/skills/operations/project-zero/SKILL.md`.
 - [x] Installed command target: `~/.hermes/bin/jarvis-project-zero`.
 - [x] Spoken/user intent `Project Zero` is mapped to the skill workflow.
@@ -67,9 +80,11 @@ wrapper.
 ### P0 — Automated branch gate
 
 - [ ] Full repository CI on the final Project Zero head: format, lint, typecheck, tests, build,
-      Electron runtime probe, and archived-handoff integrity.
-- [ ] Independent final diff review for scope, secrets, unsafe IPC/tool expansion, and false
-      completion claims.
+      Electron runtime probe, and archived-handoff integrity. As of the final pre-Mac review, GitHub's
+      exposed commit-status surface reports no status entries; absence of status is **not** a pass.
+- [x] Final diff/security review completed for scope, secrets, unsafe IPC/tool expansion, destructive
+      filesystem behavior, hidden ChatGPT mutation, and false completion claims. Review defects found
+      were fixed before the Mac pilot.
 
 ### P1 — Real export gate
 
