@@ -1,4 +1,4 @@
-import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 import {
@@ -14,6 +14,7 @@ import {
   DEFAULT_REASONING_EFFORT,
   requestOpenAIProjectZeroSynthesis,
 } from './project-zero-openai.mjs';
+import { ensurePrivateDirectory, writePrivateUtf8 } from './project-zero-private-fs.mjs';
 import { renderCompactBrain, validateSynthesisResult } from './project-zero-synthesis.mjs';
 
 const DEFAULT_MAX_MODEL_CALLS = 64;
@@ -198,6 +199,7 @@ export async function synthesizeProjectBrains({
   requester = requestOpenAIProjectZeroSynthesis,
 }) {
   const root = resolve(outputRoot);
+  await ensurePrivateDirectory(root);
   const runGuard = {
     modelCalls: 0,
     maxModelCalls: positiveInteger(maxModelCalls, 'maxModelCalls'),
@@ -221,7 +223,7 @@ export async function synthesizeProjectBrains({
     }
 
     const projectDir = resolve(root, project.id);
-    await mkdir(projectDir, { recursive: true });
+    await ensurePrivateDirectory(projectDir);
     const calls = [];
     let validated;
     let batchCount = 0;
@@ -286,21 +288,18 @@ export async function synthesizeProjectBrains({
       batchCount,
       calls,
     };
-    await writeFile(resolve(projectDir, 'BRAIN.md'), `${brain}\n`, 'utf8');
-    await writeFile(
+    await writePrivateUtf8(resolve(projectDir, 'BRAIN.md'), `${brain}\n`);
+    await writePrivateUtf8(
       resolve(projectDir, 'SYNTHESIS-RESULT.json'),
       `${JSON.stringify(validated, null, 2)}\n`,
-      'utf8',
     );
-    await writeFile(
+    await writePrivateUtf8(
       resolve(projectDir, 'SYNTHESIS-VERIFIED.json'),
       `${JSON.stringify(validated, null, 2)}\n`,
-      'utf8',
     );
-    await writeFile(
+    await writePrivateUtf8(
       resolve(projectDir, 'SYNTHESIS-METADATA.json'),
       `${JSON.stringify(metadata, null, 2)}\n`,
-      'utf8',
     );
     summary.projects.push({
       id: project.id,
@@ -316,10 +315,9 @@ export async function synthesizeProjectBrains({
   }
 
   summary.modelCalls = runGuard.modelCalls;
-  await writeFile(
+  await writePrivateUtf8(
     resolve(root, 'SYNTHESIS-SUMMARY.json'),
     `${JSON.stringify(summary, null, 2)}\n`,
-    'utf8',
   );
   return summary;
 }
