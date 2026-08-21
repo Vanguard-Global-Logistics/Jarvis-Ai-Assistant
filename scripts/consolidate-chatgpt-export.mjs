@@ -11,9 +11,10 @@ import {
   renderUnclassified,
 } from './project-zero-chat-consolidation.mjs';
 import { validateOwnerBrain } from './project-zero-owner-brain.mjs';
+import { buildSynthesisRequest } from './project-zero-synthesis.mjs';
 
 function usage() {
-  console.log(`Usage:\n  node scripts/consolidate-chatgpt-export.mjs --input /path/to/conversations.json [--owner-brain /private/path/WILLIAM-BRAIN.md] [--output ./chat-consolidation-output]\n\nThis is a local, non-destructive developer utility. It reads a ChatGPT export and writes compact startup brains plus separate source archives for 12 projects. It never archives or deletes chats.`);
+  console.log(`Usage:\n  node scripts/consolidate-chatgpt-export.mjs --input /path/to/conversations.json [--owner-brain /private/path/WILLIAM-BRAIN.md] [--output ./chat-consolidation-output]\n\nThis is a local, non-destructive developer utility. It reads a ChatGPT export and writes compact startup brains, bounded synthesis requests, and separate source archives for 12 projects. It never archives or deletes chats.`);
 }
 
 function parseArgs(argv) {
@@ -74,6 +75,11 @@ async function main() {
     await writeFile(
       resolve(directory, 'SOURCE-TRANSCRIPTS.md'),
       `${renderProjectSourceArchive(project.id, conversations)}\n`,
+      'utf8',
+    );
+    await writeFile(
+      resolve(directory, 'SYNTHESIS-REQUEST.json'),
+      `${JSON.stringify(buildSynthesisRequest(project, conversations), null, 2)}\n`,
       'utf8',
     );
     await writeFile(
