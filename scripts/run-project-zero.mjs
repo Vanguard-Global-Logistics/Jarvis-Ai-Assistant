@@ -1,21 +1,33 @@
 #!/usr/bin/env node
+import { spawnSync } from 'node:child_process';
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { spawnSync } from 'node:child_process';
 
+import { DEFAULT_SOURCE_BATCH_CHAR_BUDGET } from './project-zero-batching.mjs';
 import {
   DEFAULT_PROJECT_ZERO_MODEL,
   DEFAULT_REASONING_EFFORT,
 } from './project-zero-openai.mjs';
 import {
+  DEFAULT_MAX_MODEL_CALLS,
+  DEFAULT_MAX_TOTAL_TOKENS,
   renderProjectZeroReport,
   synthesizeProjectBrains,
   verifyProjectZeroOutput,
 } from './project-zero-runner.mjs';
 
 function usage() {
-  console.log(`Usage:\n  node scripts/run-project-zero.mjs --input /path/to/conversations.json [--owner-brain /private/path/WILLIAM-BRAIN.md] [--output ./chat-consolidation-output] [--model gpt-5.6] [--reasoning high] [--no-synthesis]\n\nRuns Project Zero in one non-destructive pass: classify into 12 project lanes, build compact source-cited brains, and write a verification report. This command never opens, renames, archives, or deletes ChatGPT chats.`);
+  console.log(`Usage:\n  node scripts/run-project-zero.mjs --input /path/to/conversations.json [--owner-brain /private/path/WILLIAM-BRAIN.md] [--output ./chat-consolidation-output] [--model gpt-5.6] [--reasoning high] [--batch-chars 180000] [--max-model-calls 64] [--max-total-tokens 2000000] [--no-synthesis]\n\nRuns Project Zero in one non-destructive pass: classify into 12 project lanes, build compact source-cited brains, and write a verification report. This command never opens, renames, archives, or deletes ChatGPT chats.`);
+}
+
+function positiveInteger(value, field, fallback) {
+  if (value === undefined || value === null || value === '') return fallback;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    throw new Error(`${field} must be a positive integer.`);
+  }
+  return parsed;
 }
 
 export function parseProjectZeroArgs(argv) {
@@ -24,6 +36,21 @@ export function parseProjectZeroArgs(argv) {
     model: process.env.PROJECT_ZERO_OPENAI_MODEL || DEFAULT_PROJECT_ZERO_MODEL,
     reasoningEffort:
       process.env.PROJECT_ZERO_REASONING_EFFORT || DEFAULT_REASONING_EFFORT,
+    sourceBatchCharBudget: positiveInteger(
+      process.env.PROJECT_ZERO_SOURCE_BATCH_CHARS,
+      'PROJECT_ZERO_SOURCE_BATCH_CHARS',
+      DEFAULT_SOURCE_BATCH_CHAR_BUDGET,
+    ),
+    maxModelCalls: positiveInteger(
+      process.env.PROJECT_ZERO_MAX_MODEL_CALLS,
+      'PROJECT_ZERO_MAX_MODEL_CALLS',
+      DEFAULT_MAX_MODEL_CALLS,
+    ),
+    maxTotalTokens: positiveInteger(
+      process.env.PROJECT_ZERO_MAX_TOTAL_TOKENS,
+      'PROJECT_ZERO_MAX_TOTAL_TOKENS',
+      DEFAULT_MAX_TOTAL_TOKENS,
+    ),
     synthesize: true,
   };
   for (let index = 0; index < argv.length; index += 1) {
@@ -34,7 +61,13 @@ export function parseProjectZeroArgs(argv) {
     else if (value === '--output') args.output = argv[++index];
     else if (value === '--model') args.model = argv[++index];
     else if (value === '--reasoning') args.reasoningEffort = argv[++index];
-    else if (value === '--no-synthesis') args.synthesize = false;
+    else if (value === '--batch-chars') {
+      args.sourceBatchCharBudget = positiveInteger(argv[++index], '--batch-chars');
+    } else if (value === '--max-model-calls') {
+      args.maxModelCalls = positiveInteger(argv[++index], '--max-model-calls');
+    } else if (value === '--max-total-tokens') {
+      args.maxTotalTokens = positiveInteger(argv[++index], '--max-total-tokens');
+    } else if (value === '--no-synthesis') args.synthesize = false;
     else throw new Error(`Unknown argument: ${value}`);
   }
   if (!args.input) throw new Error('--input is required.');
@@ -93,6 +126,9 @@ export async function runProjectZero(args) {
       apiKey,
       model: args.model,
       reasoningEffort: args.reasoningEffort,
+      sourceBatchCharBudget: args.sourceBatchCharBudget,
+      maxModelCalls: args.maxModelCalls,
+      maxTotalTokens: args.maxTotalTokens,
     });
   }
 
