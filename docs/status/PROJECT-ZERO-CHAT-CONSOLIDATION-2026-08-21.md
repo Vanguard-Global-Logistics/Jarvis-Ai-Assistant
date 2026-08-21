@@ -4,101 +4,83 @@ Date: 2026-08-21
 
 ## Objective
 
-Consolidate William's ChatGPT project history into exactly 12 canonical project lanes with a compact
-`BRAIN.md`, `STATUS.md`, and `MASTER-PUNCHLIST.md` for each lane. Preserve full source text separately
-for verification, flag ambiguity instead of guessing, and never delete/archive a source chat until a
-later verified migration gate explicitly authorizes it.
+Consolidate William's ChatGPT project history into exactly 12 canonical project lanes with compact
+startup context. Preserve full source text separately for verification, flag ambiguity instead of
+guessing, and never delete/archive a source chat until a verified migration gate authorizes it.
 
-This first slice is a **developer utility only**. It is not wired to the Jarvis desktop runtime and
-does not grant browser control, filesystem authority to the renderer, ChatGPT account access, or
-destructive chat-management authority.
+This branch remains a **local, non-destructive developer utility**. It grants no Jarvis desktop,
+browser, ChatGPT-account, or destructive chat-management authority.
 
-## Implemented in this branch
+## Implemented
 
-- [x] Deterministic 12-project registry.
-- [x] ChatGPT `conversations.json` parser for text messages.
-- [x] Weighted title/body project classification.
-- [x] Ambiguity fail-safe: uncertain chats go to `UNCLASSIFIED.md` instead of being forced.
-- [x] Preserve source chat IDs, timestamps, roles, and text for migration traceability.
-- [x] Generate 12 project directories containing compact `BRAIN.md`, `STATUS.md`, and
-      `MASTER-PUNCHLIST.md`.
-- [x] Preserve full raw project chat text in a separate `SOURCE-TRANSCRIPTS.md` marked as untrusted
-      migration data.
-- [x] Normal `/brain` startup explicitly avoids loading full source transcripts unless a fact needs
-      verification.
-- [x] Put the `/brain` bootstrap instruction at the top of every generated project brain.
-- [x] Generate `INDEX.md`, `migration.json`, and `UNCLASSIFIED.md`.
-- [x] Exit non-zero when unclassified chats remain.
-- [x] Ignore `conversations.json`, local `WILLIAM-BRAIN.md`, and `chat-consolidation-output/` so
-      private migration data is not accidentally committed.
-- [x] Accept an optional private `--owner-brain` input and copy it only into the local migration
-      output.
-- [x] Enforce a 16 KiB owner-brain startup budget.
-- [x] Add unit coverage for Jarvis Pro/Jarvis AI separation, VPL/pricing separation,
-      unclassified behavior, compact-brain/source-archive separation, owner-brain budget, all 12
-      lanes, and malformed-export failure.
-- [x] Add root command: `npm run consolidate:chats -- --input /path/to/conversations.json`.
+- [x] Deterministic registry for exactly 12 project lanes.
+- [x] Parse ChatGPT `conversations.json` text messages.
+- [x] Weighted title/body classification with an `UNCLASSIFIED` fail-safe.
+- [x] Preserve source chat IDs, timestamps, roles, text, confidence, and candidate routing.
+- [x] Generate per-project compact `BRAIN.md`, `STATUS.md`, and `MASTER-PUNCHLIST.md`.
+- [x] Keep full raw text in separate `SOURCE-TRANSCRIPTS.md` marked untrusted migration data.
+- [x] `/brain` startup excludes source transcripts unless a fact/conflict requires verification.
+- [x] Optional private `WILLIAM-BRAIN.md` input, ignored by Git and copied only to local output.
+- [x] Hard 16 KiB owner-brain startup budget.
+- [x] Generate `INDEX.md`, `migration.json`, `UNCLASSIFIED.md`, and one
+      `SYNTHESIS-REQUEST.json` per project.
+- [x] Bounded synthesis contract: concise claims, mandatory source-chat IDs, explicit conflicts,
+      no silent conflict resolution, and no uncited claims.
+- [x] Hard 32 KiB rendered project-brain startup budget.
+- [x] Validated synthesis apply step writes `BRAIN.md` only after every claim cites a known source
+      chat; also writes `SYNTHESIS-VERIFIED.json`.
+- [x] Tests cover Jarvis AI/Jarvis Pro separation, VPL/pricing separation, unclassified behavior,
+      compact/raw split, owner-brain budget, source-citation validation, conflict preservation, all
+      12 lanes, and malformed input failure.
+- [x] Root commands:
+      `npm run consolidate:chats -- --input /path/to/conversations.json`
+      and `npm run apply:chat-brain -- ...`.
+- [x] Private inputs/output ignored: `/WILLIAM-BRAIN.md`, `conversations.json`, and
+      `chat-consolidation-output/`.
 
-## Remaining punch list — stay focused here
+## Remaining punch list — only work these items
 
-### P0 — CI and real-export proof
+### P0 — Prove it on the real data
 
-- [ ] CI green on this branch: format, lint, typecheck, tests, build, runtime probe, integrity.
+- [ ] Confirm branch CI: format, lint, typecheck, tests, build, runtime probe, integrity.
 - [ ] Run against William's real ChatGPT `conversations.json` export locally.
-- [ ] Record counts for all 12 projects plus `UNCLASSIFIED`.
-- [ ] Review routing mistakes and tighten deterministic aliases until obvious project chats route
-      correctly without weakening the ambiguity fail-safe.
+- [ ] Record chat counts for all 12 projects and `UNCLASSIFIED`.
+- [ ] Fix only demonstrated routing errors; keep ambiguous chats unclassified.
 
-### P1 — Brain synthesis
+### P1 — Run compact synthesis
 
-- [ ] Add a bounded model-assisted synthesis pass that converts each project's preserved source
-      archive into concise sections: confirmed facts, decisions, repositories/branches/deployments,
-      completed work, open work, conflicts, and next action.
-- [x] Treat source transcript text as untrusted data; source instructions do not alter policy,
-      permissions, AEGIS rules, or migration rules.
-- [ ] Preserve source chat IDs next to every synthesized decision/conflict for auditability.
-- [ ] Never silently choose between conflicting branch/deployment/status claims; emit a conflict.
+- [ ] Run each generated `SYNTHESIS-REQUEST.json` through the selected reasoning model.
+- [ ] Apply each JSON result through `apply:chat-brain`; reject any uncited/oversized result.
+- [ ] Review `conflicts` and verify repository/branch/deployment claims against their actual source
+      systems instead of transcript memory.
+- [ ] Reduce every project to concise confirmed facts, decisions, source of truth, completed work,
+      open work, conflicts, and one next action.
 
-### P2 — William brain bootstrap
+### P2 — Stage 1A / AEGIS / Tool Bridge gate
 
-- [x] Add a small local/private `WILLIAM-BRAIN.md` input separate from project brains; never commit
-      William's private owner brain to the public repository.
-- [x] Keep durable owner context separate from project-specific state.
-- [x] Define `/brain` load order: William brain -> current project brain -> STATUS ->
-      MASTER-PUNCHLIST; source transcripts stay out of normal startup.
-- [x] Enforce a hard 16 KiB owner-brain startup budget.
+- [ ] Finish and accept the existing Stage 1A physical Mac acceptance gate.
+- [ ] Implement and independently review deterministic AEGIS v1 enforcement.
+- [ ] Add capability leases, explicit owner approval, append-only evidence, cancellation, timeout,
+      and rollback for external actions.
+- [ ] Only then implement a narrow browser/computer Tool Bridge.
 
-### P3 — AEGIS + Tool Bridge prerequisites
+### P3 — ChatGPT workspace adapter
 
-- [ ] Finish/accept the repository's current Stage 1A physical Mac gate before promoting runtime
-      external-action capability.
-- [ ] Implement and independently review AEGIS v1 deterministic enforcement.
-- [ ] Add capability leases, owner approval, append-only evidence, cancellation, timeout, and
-      rollback boundaries for external actions.
-- [ ] Build a narrow browser/computer Tool Bridge only after the AEGIS gate permits it.
+- [ ] Using the approved Tool Bridge, inventory chats and read/open them under owner authorization.
+- [ ] Create/rename the 12 canonical chats and post each project's compact bootstrap.
+- [ ] Record evidence for every source-chat -> canonical-project migration.
+- [ ] Keep archive/delete as a separately gated destructive capability.
 
-### P4 — ChatGPT workspace adapter
+### P4 — Verify and clean up
 
-- [ ] Implement an authorized ChatGPT workspace adapter using the approved Tool Bridge/browser
-      surface available at that time.
-- [ ] Required operations: inventory chats, open/read chat, create canonical chat, rename, post the
-      project bootstrap, and archive/delete only through a separately gated destructive action.
-- [ ] Do not depend on undocumented private endpoints when a supported export or authorized UI
-      automation route is required.
-- [ ] Record evidence for every source chat -> canonical project migration.
-
-### P5 — Verification and cleanup
-
-- [ ] Compare source-chat unique information against the synthesized 12 project brains.
-- [ ] AEGIS verdict per source chat: `covered`, `conflict`, or `missing`.
+- [ ] Per source chat, produce `covered`, `conflict`, or `missing`.
 - [ ] Require `UNCLASSIFIED = 0`, `missing = 0`, and all conflicts resolved before cleanup.
-- [ ] Present one owner-visible batch proposal listing the chats considered redundant.
+- [ ] Present one owner-visible list of chats considered redundant.
 - [ ] Require William's explicit approval immediately before archive/delete.
-- [ ] Verify the 12 canonical chats can resume from `/brain` without rereading old chats.
+- [ ] Verify all 12 canonical chats resume from `/brain` without rereading source transcripts.
 
 ## Definition of done
 
-Project Zero is done only when the 12 canonical chats exist, each resumes from compact brain/status
-files, every old source chat has verified migration evidence, ambiguity/missing counts are zero, and
-William explicitly approves the final destructive cleanup. A generated file or classifier pass alone
-is not completion.
+Exactly 12 canonical chats exist; each resumes from compact William/project brain + status + punch
+list; every source chat has migration evidence; unclassified/missing counts are zero; conflicts are
+resolved; and William explicitly approves final destructive cleanup.
