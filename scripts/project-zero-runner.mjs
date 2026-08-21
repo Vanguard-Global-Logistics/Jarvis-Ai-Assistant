@@ -16,6 +16,9 @@ import {
 } from './project-zero-openai.mjs';
 import { renderCompactBrain, validateSynthesisResult } from './project-zero-synthesis.mjs';
 
+const DEFAULT_MAX_MODEL_CALLS = 64;
+const DEFAULT_MAX_TOTAL_TOKENS = 2_000_000;
+
 function emptySynthesisResult() {
   return {
     confirmedFacts: [],
@@ -41,6 +44,13 @@ async function fileExists(path) {
   }
 }
 
+function positiveInteger(value, field) {
+  if (!Number.isInteger(value) || value < 1) {
+    throw new Error(`${field} must be a positive integer.`);
+  }
+  return value;
+}
+
 function sumUsage(target, usage) {
   if (!usage || typeof usage !== 'object') return;
   for (const key of ['input_tokens', 'output_tokens', 'total_tokens']) {
@@ -63,6 +73,7 @@ function collectClaimSourceIds(result) {
   collectClaims(result.openWork);
   for (const conflict of Array.isArray(result.conflicts) ? result.conflicts : []) {
     collectClaims(conflict.claims);
+    if (conflict.resolution) collectClaims([conflict.resolution]);
   }
   if (result.nextAction) collectClaims([result.nextAction]);
   return ids;
@@ -72,6 +83,29 @@ function filterConversationsByIds(sourceConversations, ids) {
   return sourceConversations.filter((conversation) => ids.has(conversation.id));
 }
 
+function beforeModelCall(runGuard, label) {
+  if (runGuard.modelCalls >= runGuard.maxModelCalls) {
+    throw new Error(
+      `Project Zero stopped before ${label}: model-call guard reached ${runGuard.maxModelCalls}. Raise PROJECT_ZERO_MAX_MODEL_CALLS only after reviewing the prior run.`,
+    );
+  }
+  if (runGuard.usage.total_tokens >= runGuard.maxTotalTokens) {
+    throw new Error(
+      `Project Zero stopped before ${label}: token guard reached ${runGuard.maxTotalTokens} total tokens. Raise PROJECT_ZERO_MAX_TOTAL_TOKENS only after reviewing the prior run.`,
+    );
+  }
+  runGuard.modelCalls += 1;
+}
+
+function afterModelCall(runGuard, usage, label) {
+  sumUsage(runGuard.usage, usage);
+  if (runGuard.usage.total_tokens > runGuard.maxTotalTokens) {
+    throw new Error(
+      `Project Zero stopped after ${label}: cumulative token usage ${runGuard.usage.total_tokens} exceeded the ${runGuard.maxTotalTokens}-token guard. No further model calls will run.`,
+    );
+  }
+}
+
 async function callSynthesis({
   requester,
   request,
@@ -79,18 +113,19 @@ async function callSynthesis({
   apiKey,
   model,
   reasoningEffort,
-  usage,
+  runGuard,
   calls,
   kind,
   label,
 }) {
+  beforeModelCall(runGuard, label);
   const response = await requester(request, allowedConversations, {
     apiKey,
     model,
     reasoningEffort,
   });
   const validated = validateSynthesisResult(response.result, allowedConversations);
-  sumUsage(usage, response.usage);
+  afterModelCall(runGuard, response.usage, label);
   calls.push({
     kind,
     label,
@@ -110,7 +145,7 @@ async function mergeSynthesisResults({
   apiKey,
   model,
   reasoningEffort,
-  usage,
+  runGuard,
   calls,
 }) {
   let current = results;
@@ -138,10 +173,10 @@ async function mergeSynthesisResults({
           apiKey,
           model,
           reasoningEffort,
-          usage,
+          runGuard,
           calls,
           kind: 'merge',
-          label: `round-${round}-group-${groupIndex + 1}`,
+          label: `${project.id}:round-${round}-group-${groupIndex + 1}`,
         }),
       );
     }
@@ -158,15 +193,25 @@ export async function synthesizeProjectBrains({
   model = DEFAULT_PROJECT_ZERO_MODEL,
   reasoningEffort = DEFAULT_REASONING_EFFORT,
   sourceBatchCharBudget = DEFAULT_SOURCE_BATCH_CHAR_BUDGET,
+  maxModelCalls = DEFAULT_MAX_MODEL_CALLS,
+  maxTotalTokens = DEFAULT_MAX_TOTAL_TOKENS,
   requester = requestOpenAIProjectZeroSynthesis,
 }) {
   const root = resolve(outputRoot);
+  const runGuard = {
+    modelCalls: 0,
+    maxModelCalls: positiveInteger(maxModelCalls, 'maxModelCalls'),
+    maxTotalTokens: positiveInteger(maxTotalTokens, 'maxTotalTokens'),
+    usage: { input_tokens: 0, output_tokens: 0, total_tokens: 0 },
+  };
   const summary = {
     modelRequested: model,
     reasoningEffort,
     sourceBatchCharBudget,
+    maxModelCalls: runGuard.maxModelCalls,
+    maxTotalTokens: runGuard.maxTotalTokens,
     projects: [],
-    usage: { input_tokens: 0, output_tokens: 0, total_tokens: 0 },
+    usage: runGuard.usage,
   };
 
   for (const project of PROJECTS) {
@@ -210,10 +255,10 @@ export async function synthesizeProjectBrains({
             apiKey,
             model,
             reasoningEffort,
-            usage: summary.usage,
+            runGuard,
             calls,
             kind: 'source-batch',
-            label: `batch-${batchIndex + 1}-of-${batches.length}`,
+            label: `${project.id}:batch-${batchIndex + 1}-of-${batches.length}`,
           }),
         );
       }
@@ -226,7 +271,7 @@ export async function synthesizeProjectBrains({
         apiKey,
         model,
         reasoningEffort,
-        usage: summary.usage,
+        runGuard,
         calls,
       });
       validated = validateSynthesisResult(validated, sourceConversations);
@@ -270,6 +315,7 @@ export async function synthesizeProjectBrains({
     });
   }
 
+  summary.modelCalls = runGuard.modelCalls;
   await writeFile(
     resolve(root, 'SYNTHESIS-SUMMARY.json'),
     `${JSON.stringify(summary, null, 2)}\n`,
@@ -391,4 +437,8 @@ export function renderProjectZeroReport(report) {
   return lines.join('\n');
 }
 
-export { emptySynthesisResult };
+export {
+  DEFAULT_MAX_MODEL_CALLS,
+  DEFAULT_MAX_TOTAL_TOKENS,
+  emptySynthesisResult,
+};
