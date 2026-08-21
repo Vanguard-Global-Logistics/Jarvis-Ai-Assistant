@@ -8,13 +8,19 @@ import {
   synthesizeProjectBrains,
   verifyProjectZeroOutput,
 } from './project-zero-runner.mjs';
+import { buildSynthesisRequest } from './project-zero-synthesis.mjs';
 
 const cleanup = [];
 afterEach(async () => {
   while (cleanup.length) await rm(cleanup.pop(), { recursive: true, force: true });
 });
 
-async function fixture({ unclassified = [], conflict = false } = {}) {
+async function fixture({
+  unclassified = [],
+  conflict = false,
+  text = 'Jarvis project status.',
+  usageTotal = 2,
+} = {}) {
   const root = await mkdtemp(join(tmpdir(), 'project-zero-runner-test-'));
   cleanup.push(root);
   const migration = {
@@ -22,7 +28,14 @@ async function fixture({ unclassified = [], conflict = false } = {}) {
     projects: Object.fromEntries(PROJECTS.map((project) => [project.id, []])),
     unclassified,
   };
-  migration.projects['jarvis-ai'] = [{ id: 'chat-1', title: 'Jarvis AI', messages: [] }];
+  migration.projects['jarvis-ai'] = [
+    {
+      id: 'chat-1',
+      title: 'Jarvis AI',
+      updateTime: 1,
+      messages: [{ role: 'user', text }],
+    },
+  ];
 
   for (const project of PROJECTS) {
     const dir = resolve(root, project.id);
@@ -30,7 +43,11 @@ async function fixture({ unclassified = [], conflict = false } = {}) {
     for (const name of ['STATUS.md', 'MASTER-PUNCHLIST.md', 'SOURCE-TRANSCRIPTS.md']) {
       await writeFile(resolve(dir, name), 'fixture\n', 'utf8');
     }
-    await writeFile(resolve(dir, 'SYNTHESIS-REQUEST.json'), '{}\n', 'utf8');
+    await writeFile(
+      resolve(dir, 'SYNTHESIS-REQUEST.json'),
+      `${JSON.stringify(buildSynthesisRequest(project, migration.projects[project.id]), null, 2)}\n`,
+      'utf8',
+    );
   }
 
   const requester = async (_request, sources) => ({
@@ -53,7 +70,7 @@ async function fixture({ unclassified = [], conflict = false } = {}) {
     },
     model: 'gpt-5.6-sol-test',
     responseId: 'resp-test',
-    usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 },
+    usage: { input_tokens: usageTotal, output_tokens: 0, total_tokens: usageTotal },
   });
 
   return { root, migration, requester };
@@ -85,5 +102,32 @@ describe('Project Zero one-shot runner', () => {
     const report = await verifyProjectZeroOutput({ outputRoot: root, migration });
     expect(report.unresolvedConflicts).toBe(1);
     expect(report.informationMigrationReady).toBe(false);
+  });
+
+  it('stops before exceeding the model-call guard', async () => {
+    const { root, migration, requester } = await fixture({ text: 'x'.repeat(25_000) });
+    await expect(
+      synthesizeProjectBrains({
+        outputRoot: root,
+        migration,
+        apiKey: 'test',
+        requester,
+        sourceBatchCharBudget: 10_000,
+        maxModelCalls: 1,
+      }),
+    ).rejects.toThrow('model-call guard reached 1');
+  });
+
+  it('stops immediately after reported token usage crosses the token guard', async () => {
+    const { root, migration, requester } = await fixture({ usageTotal: 101 });
+    await expect(
+      synthesizeProjectBrains({
+        outputRoot: root,
+        migration,
+        apiKey: 'test',
+        requester,
+        maxTotalTokens: 100,
+      }),
+    ).rejects.toThrow('exceeded the 100-token guard');
   });
 });
