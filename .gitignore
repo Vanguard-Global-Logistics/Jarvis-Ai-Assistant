@@ -45,7 +45,8 @@ owner-profile.json
 *owner-bootstrap*.wav
 *owner-enroll*.wav
 
-# --- Private generated chat migration data ---
+# --- Private owner context and generated chat migration data ---
+/WILLIAM-BRAIN.md
 chat-consolidation-output/
 conversations.json
 
