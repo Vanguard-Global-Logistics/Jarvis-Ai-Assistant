@@ -28,7 +28,11 @@
     "dev:desktop": "npm run dev --workspace @jarvis/desktop",
     "doctor": "node scripts/doctor.mjs",
     "verify": "npm run format:check && npm run lint && npm run typecheck && npm run test",
-    "probe:runtime": "node scripts/runtime-probe.mjs"
+    "probe:runtime": "node scripts/runtime-probe.mjs",
+    "consolidate:chats": "node scripts/consolidate-chatgpt-export.mjs",
+    "apply:chat-brain": "node scripts/apply-project-zero-synthesis.mjs",
+    "project-zero": "node scripts/run-project-zero.mjs",
+    "project-zero:self-test": "node scripts/project-zero-self-test.mjs"
   },
   "devDependencies": {
     "@electron/rebuild": "^4.2.0",
