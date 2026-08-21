@@ -38,7 +38,7 @@ const synthesisSchema = {
         additionalProperties: false,
         properties: {
           topic: { type: 'string', minLength: 1, maxLength: 1200 },
-          claims: { type: 'array', maxItems: 40, items: claimSchema },
+          claims: { type: 'array', minItems: 1, maxItems: 40, items: claimSchema },
           resolution: { anyOf: [claimSchema, { type: 'null' }] },
         },
         required: ['topic', 'claims', 'resolution'],
