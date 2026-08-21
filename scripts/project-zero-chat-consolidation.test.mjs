@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   classifyConversation,
   consolidateConversations,
+  extractConversation,
   renderIndex,
   renderProjectBrain,
   renderProjectSourceArchive,
@@ -53,6 +54,59 @@ describe('Project Zero chat consolidation', () => {
     );
     expect(result.projectId).toBeNull();
     expect(result.confidence).toBe('none');
+  });
+
+  it('follows the active current_node chain instead of mixing superseded branches', () => {
+    const source = {
+      id: 'branched-chat',
+      title: 'Untitled conversation',
+      current_node: 'new-answer',
+      mapping: {
+        root: {
+          id: 'root',
+          parent: null,
+          message: {
+            id: 'root-message',
+            author: { role: 'user' },
+            create_time: 1,
+            content: { parts: ['Work on the coffee trailer.'] },
+          },
+        },
+        'old-answer': {
+          id: 'old-answer',
+          parent: 'root',
+          message: {
+            id: 'old-message',
+            author: { role: 'assistant' },
+            create_time: 2,
+            content: { parts: ['Use Procore for BCI Operations.'] },
+          },
+        },
+        'new-answer': {
+          id: 'new-answer',
+          parent: 'root',
+          message: {
+            id: 'new-message',
+            author: { role: 'assistant' },
+            create_time: 3,
+            content: { parts: ['Keep the real coffee trailer and menu builder.'] },
+          },
+        },
+      },
+    };
+
+    const extracted = extractConversation(source);
+    expect(extracted.text).toContain('coffee trailer');
+    expect(extracted.text).toContain('menu builder');
+    expect(extracted.text).not.toContain('Procore');
+    expect(classifyConversation(source).projectId).toBe('sophisticated-sips');
+  });
+
+  it('falls back to chronological mapping order when current_node is unavailable', () => {
+    const source = conversation('Jarvis AI', 'Hermes and Aegis belong to the core platform.');
+    const extracted = extractConversation(source);
+    expect(extracted.messages).toHaveLength(1);
+    expect(extracted.messages[0].text).toContain('Hermes and Aegis');
   });
 
   it('keeps normal /brain startup compact while preserving full source text separately', () => {
