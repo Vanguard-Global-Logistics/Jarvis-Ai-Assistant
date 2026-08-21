@@ -1,4 +1,5 @@
 const REDACTION = '[REDACTED SECRET]';
+const PRESERVE_KEYS = new Set(['sourceChatId', 'sourceChatIds']);
 
 const PATTERNS = [
   /-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z0-9 ]*PRIVATE KEY-----/g,
@@ -21,12 +22,13 @@ export function redactSensitiveText(value) {
   return redacted;
 }
 
-export function sanitizeForCloud(value) {
+export function sanitizeForCloud(value, parentKey = '') {
+  if (PRESERVE_KEYS.has(parentKey)) return value;
   if (typeof value === 'string') return redactSensitiveText(value);
-  if (Array.isArray(value)) return value.map(sanitizeForCloud);
+  if (Array.isArray(value)) return value.map((child) => sanitizeForCloud(child, parentKey));
   if (value && typeof value === 'object') {
     return Object.fromEntries(
-      Object.entries(value).map(([key, child]) => [key, sanitizeForCloud(child)]),
+      Object.entries(value).map(([key, child]) => [key, sanitizeForCloud(child, key)]),
     );
   }
   return value;
