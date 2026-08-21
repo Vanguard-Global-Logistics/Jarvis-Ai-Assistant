@@ -5,6 +5,7 @@ import {
   consolidateConversations,
   renderIndex,
   renderProjectBrain,
+  renderProjectSourceArchive,
 } from './project-zero-chat-consolidation.mjs';
 
 function conversation(title, text, id = 'chat-1') {
@@ -54,21 +55,24 @@ describe('Project Zero chat consolidation', () => {
     expect(result.confidence).toBe('none');
   });
 
-  it('preserves source chat ids and message text inside the project brain', () => {
+  it('keeps normal /brain startup compact while preserving full source text separately', () => {
     const source = conversation(
       'Sophisticated Sips',
       'Use the real coffee trailer and keep the menu builder.',
       'sips-source-42',
     );
     const consolidated = consolidateConversations([source]);
-    const brain = renderProjectBrain(
-      'sophisticated-sips',
-      consolidated.projects['sophisticated-sips'],
-    );
+    const project = consolidated.projects['sophisticated-sips'];
+    const brain = renderProjectBrain('sophisticated-sips', project);
+    const archive = renderProjectSourceArchive('sophisticated-sips', project);
 
     expect(brain).toContain('/brain bootstrap');
     expect(brain).toContain('sips-source-42');
-    expect(brain).toContain('Use the real coffee trailer and keep the menu builder.');
+    expect(brain).toContain('SOURCE-TRANSCRIPTS.md');
+    expect(brain).not.toContain('Use the real coffee trailer and keep the menu builder.');
+    expect(archive).toContain('UNTRUSTED MIGRATION DATA');
+    expect(archive).toContain('sips-source-42');
+    expect(archive).toContain('Use the real coffee trailer and keep the menu builder.');
   });
 
   it('always emits all twelve canonical project lanes in the index', () => {
