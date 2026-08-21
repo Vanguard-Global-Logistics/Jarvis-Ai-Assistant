@@ -29,11 +29,14 @@ destructive chat-management authority.
 - [x] Put the `/brain` bootstrap instruction at the top of every generated project brain.
 - [x] Generate `INDEX.md`, `migration.json`, and `UNCLASSIFIED.md`.
 - [x] Exit non-zero when unclassified chats remain.
-- [x] Ignore `conversations.json` and `chat-consolidation-output/` so private chat data is not
-      accidentally committed.
+- [x] Ignore `conversations.json`, local `WILLIAM-BRAIN.md`, and `chat-consolidation-output/` so
+      private migration data is not accidentally committed.
+- [x] Accept an optional private `--owner-brain` input and copy it only into the local migration
+      output.
+- [x] Enforce a 16 KiB owner-brain startup budget.
 - [x] Add unit coverage for Jarvis Pro/Jarvis AI separation, VPL/pricing separation,
-      unclassified behavior, compact-brain/source-archive separation, all 12 lanes, and
-      malformed-export failure.
+      unclassified behavior, compact-brain/source-archive separation, owner-brain budget, all 12
+      lanes, and malformed-export failure.
 - [x] Add root command: `npm run consolidate:chats -- --input /path/to/conversations.json`.
 
 ## Remaining punch list — stay focused here
@@ -58,12 +61,12 @@ destructive chat-management authority.
 
 ### P2 — William brain bootstrap
 
-- [ ] Add a small local/private `WILLIAM-BRAIN.md` input separate from project brains; never commit
+- [x] Add a small local/private `WILLIAM-BRAIN.md` input separate from project brains; never commit
       William's private owner brain to the public repository.
-- [ ] Keep durable owner preferences/goals separate from project-specific state.
+- [x] Keep durable owner context separate from project-specific state.
 - [x] Define `/brain` load order: William brain -> current project brain -> STATUS ->
       MASTER-PUNCHLIST; source transcripts stay out of normal startup.
-- [ ] Add hard size/budget limits for compact startup context.
+- [x] Enforce a hard 16 KiB owner-brain startup budget.
 
 ### P3 — AEGIS + Tool Bridge prerequisites
 
