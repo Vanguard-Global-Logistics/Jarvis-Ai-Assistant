@@ -54,6 +54,14 @@ describe('Project Zero synthesis', () => {
     expect(renderCompactBrain(project, sources, validated)).toContain('UNRESOLVED');
   });
 
+  it('rejects an empty conflict claim list', () => {
+    const invalid = structuredClone(result);
+    invalid.conflicts[0].claims = [];
+    expect(() => validateSynthesisResult(invalid, sources)).toThrow(
+      'must contain at least one source-cited claim',
+    );
+  });
+
   it('renders a resolved conflict only when the resolution is source-cited', () => {
     const resolved = structuredClone(result);
     resolved.conflicts[0].resolution = {
