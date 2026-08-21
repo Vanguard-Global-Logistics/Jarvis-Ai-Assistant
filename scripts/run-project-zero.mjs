@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
-import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -9,6 +9,7 @@ import {
   DEFAULT_PROJECT_ZERO_MODEL,
   DEFAULT_REASONING_EFFORT,
 } from './project-zero-openai.mjs';
+import { ensurePrivateDirectory, writePrivateUtf8 } from './project-zero-private-fs.mjs';
 import {
   DEFAULT_MAX_MODEL_CALLS,
   DEFAULT_MAX_TOTAL_TOKENS,
@@ -102,7 +103,7 @@ export async function runProjectZero(args) {
   const ownerBrain = args.ownerBrain ? resolve(args.ownerBrain) : undefined;
   await requireFile(input, 'ChatGPT conversations export');
   if (ownerBrain) await requireFile(ownerBrain, 'WILLIAM-BRAIN');
-  await mkdir(output, { recursive: true, mode: 0o700 });
+  await ensurePrivateDirectory(output);
 
   const classificationExit = runConsolidationCli({ input, ownerBrain, output });
   const migrationPath = resolve(output, 'migration.json');
@@ -135,12 +136,11 @@ export async function runProjectZero(args) {
   const report = await verifyProjectZeroOutput({ outputRoot: output, migration });
   const reportJson = resolve(output, 'PROJECT-ZERO-REPORT.json');
   const reportMarkdown = resolve(output, 'PROJECT-ZERO-REPORT.md');
-  await writeFile(
+  await writePrivateUtf8(
     reportJson,
     `${JSON.stringify({ ...report, classificationExit }, null, 2)}\n`,
-    'utf8',
   );
-  await writeFile(reportMarkdown, `${renderProjectZeroReport(report)}\n`, 'utf8');
+  await writePrivateUtf8(reportMarkdown, `${renderProjectZeroReport(report)}\n`);
 
   return { report, reportJson, reportMarkdown, classificationExit };
 }
