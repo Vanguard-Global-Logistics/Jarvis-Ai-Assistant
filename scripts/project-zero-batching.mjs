@@ -9,9 +9,47 @@ function cloneSourceWithMessages(source, messages) {
   return { ...source, messages };
 }
 
+function splitMessageToFit(source, message, budget) {
+  const text = typeof message?.text === 'string' ? message.text : '';
+  const shellMessage = { ...message, text: '' };
+  const envelopeSize = sourceSize(cloneSourceWithMessages(source, [shellMessage]));
+  const maxTextChars = budget - envelopeSize - 256;
+  if (maxTextChars < 1_000) {
+    throw new Error(
+      `Source chat ${String(source.sourceChatId ?? 'unknown')} has too much metadata to fit the ${budget}-character batch budget.`,
+    );
+  }
+  if (text.length === 0) {
+    throw new Error(
+      `Source chat ${String(source.sourceChatId ?? 'unknown')} exceeds the batch budget without splittable text.`,
+    );
+  }
+
+  const parts = [];
+  for (let start = 0; start < text.length; start += maxTextChars) {
+    parts.push(text.slice(start, start + maxTextChars));
+  }
+  return parts.map((part, index) => ({
+    ...message,
+    text: part,
+    migrationFragment: { index: index + 1, count: parts.length },
+  }));
+}
+
+function expandOversizedMessages(source, budget) {
+  const messages = Array.isArray(source.messages) ? source.messages : [];
+  const expanded = [];
+  for (const message of messages) {
+    const single = cloneSourceWithMessages(source, [message]);
+    if (sourceSize(single) <= budget) expanded.push(message);
+    else expanded.push(...splitMessageToFit(source, message, budget));
+  }
+  return expanded;
+}
+
 function splitOversizedSource(source, budget) {
   if (sourceSize(source) <= budget) return [source];
-  const messages = Array.isArray(source.messages) ? source.messages : [];
+  const messages = expandOversizedMessages(source, budget);
   if (messages.length === 0) {
     throw new Error(
       `Source chat ${String(source.sourceChatId ?? 'unknown')} exceeds the batch budget without splittable messages.`,
@@ -28,16 +66,11 @@ function splitOversizedSource(source, budget) {
     }
     if (current.length === 0) {
       throw new Error(
-        `One message in source chat ${String(source.sourceChatId ?? 'unknown')} exceeds the ${budget}-character batch budget.`,
+        `Source chat ${String(source.sourceChatId ?? 'unknown')} still exceeds the ${budget}-character batch budget after fragmentation.`,
       );
     }
     chunks.push(cloneSourceWithMessages(source, current));
     current = [message];
-    if (sourceSize(cloneSourceWithMessages(source, current)) > budget) {
-      throw new Error(
-        `One message in source chat ${String(source.sourceChatId ?? 'unknown')} exceeds the ${budget}-character batch budget.`,
-      );
-    }
   }
   if (current.length > 0) chunks.push(cloneSourceWithMessages(source, current));
   return chunks;
@@ -79,7 +112,7 @@ export function buildBatchSynthesisRequest(originalRequest, sources, batchIndex,
     batch: { index: batchIndex + 1, count: batchCount },
     instructions: [
       ...(Array.isArray(originalRequest.instructions) ? originalRequest.instructions : []),
-      `This is source batch ${batchIndex + 1} of ${batchCount}. Extract only claims supported by this batch. Cross-batch deduplication and conflict detection happen later.`,
+      `This is source batch ${batchIndex + 1} of ${batchCount}. Extract only claims supported by this batch. Cross-batch deduplication and conflict detection happen later. migrationFragment fields only indicate contiguous pieces of one oversized source message; treat all fragments as the same source chat.`,
     ],
     sources,
   };
