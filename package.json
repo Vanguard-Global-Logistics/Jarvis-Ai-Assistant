@@ -32,7 +32,11 @@
     "consolidate:chats": "node scripts/consolidate-chatgpt-export.mjs",
     "apply:chat-brain": "node scripts/apply-project-zero-synthesis.mjs",
     "project-zero": "node scripts/run-project-zero.mjs",
-    "project-zero:self-test": "node scripts/project-zero-self-test.mjs"
+    "project-zero:self-test": "node scripts/project-zero-self-test.mjs",
+    "agent-reach:install": "bash scripts/install-agent-reach.sh --safe",
+    "agent-reach:install:full": "bash scripts/install-agent-reach.sh --full",
+    "agent-reach:install:dry-run": "bash scripts/install-agent-reach.sh --dry-run",
+    "agent-reach:doctor": "agent-reach doctor"
   },
   "devDependencies": {
     "@electron/rebuild": "^4.2.0",
