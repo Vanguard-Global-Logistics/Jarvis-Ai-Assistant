@@ -45,6 +45,11 @@ owner-profile.json
 *owner-bootstrap*.wav
 *owner-enroll*.wav
 
+# --- Private owner context and generated chat migration data ---
+/WILLIAM-BRAIN.md
+chat-consolidation-output/
+conversations.json
+
 # --- Generated deterministic runtime reconstructions ---
 runtime/macos/voice-r13.3/live_voice_loop_r13_3.py
 
